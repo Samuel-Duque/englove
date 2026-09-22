@@ -7,7 +7,7 @@
 > - **Propuesto**: recomendación vigente a falta de decisión. Se puede implementar, pero debe quedar marcado como tal.
 > - **Pendiente**: requiere decisión humana antes de implementarse.
 >
-> Última actualización: 2026-09-21, tras la segunda ronda de decisiones del líder del proyecto (hosting, autenticación del alumno, escala de calificación, reintentos, retención de audios, navegación, estadísticas y metodología SDD).
+> Última actualización: 2026-09-22, tras aplicar `planning/incongruencias-y-decisiones-definitivas.md` (Ronda 3, decisión 34): eliminación de `Guardian` y de todo consentimiento legal, Cloudflare R2, transcodificación de audios, timestamps en servidor, algoritmo de rachas, rate limiting, `age_segment` y demás decisiones de esa sesión.
 
 ---
 
@@ -21,7 +21,7 @@
 6. Stack tecnológico
 7. Arquitectura y modelo de datos
 8. Sistema de diseño
-9. Legal y privacidad de menores
+9. Tratamiento de datos y retención de archivos
 10. Seguridad desde el día 1
 11. Calidad, operación y metodología de desarrollo
 12. Orden de construcción
@@ -55,9 +55,7 @@
 ### 2.2 Fase 2 — Academia
 
 - Múltiples profesores y sedes (multi-tenant real sobre el esquema ya preparado desde el piloto).
-- Rol de acudientes: supervisión del progreso de sus hijos.
-- Muro privado de actividades presenciales con fotos (privacidad estricta, ver §9).
-- Consentimiento parental con firma digital y checkbox en el registro.
+- Muro privado de actividades presenciales con fotos (privacidad estricta; fotos sin metadatos EXIF y URLs firmadas).
 - Juegos en Phaser.js detrás del mismo contrato de actividad (§7.3).
 - Empaquetado móvil con Capacitor y publicación en Google Play / App Store.
 
@@ -75,11 +73,11 @@
 | Heartbeat y detección de inactividad de pestaña | Registro de inicio y fin de cada actividad |
 | Pantallas de `parent` y `admin` | Enum de roles completo, sin pantallas |
 | Capacitor / tiendas de aplicaciones | PWA instalable |
-| Muro social / sección de padres | Nada. Requisito legal documentado en §9 |
+| Muro social / sección de padres | Nada |
 | Motor Phaser | Microjuegos en React puro |
 | Educaplay embebido (iframe) | Enlaces externos en "Contenido extra", fuera de calificación |
 | Pasarela de pagos | Nada. Entidades `Organization` / `Subscription` reservadas, no construidas |
-| Firma digital de consentimiento | Consentimiento en papel + estado en plataforma |
+| Cualquier gestión de consentimiento legal de menores | Nada. Es responsabilidad de la clienta fuera de la plataforma (§9) |
 
 Ningún elemento de esta tabla se construye durante el piloto, aunque parezca fácil o rápido.
 
@@ -92,21 +90,24 @@ Roles del enum RBAC, todos definidos desde el día 1: `teacher`, `student`, `par
 ### Estudiantes
 
 - Edad actual 7–14; futura 5–18.
-- Dos segmentos de experiencia: **Kids/Junior (7–10)** y **Teens (11–14+)**.
+- Dos segmentos de experiencia (Decidido 2026-09-22, decisión 34 §15): **Kids/Junior** y **Teens**.
+  - De **7 a 10 años**: solo tienen acceso a la interfaz Kids. No pueden cambiar.
+  - De **11 años en adelante**: tienen acceso a ambas interfaces y pueden alternar entre Kids y Teens desde su perfil cuantas veces quieran.
+  - `age_segment` se calcula automáticamente a partir de `birth_date` al registrarse. Un job mensual recalcula la edad; cuando un alumno cumple 11 años se activa `can_switch_interface` y se le habilita la opción de cambiar. El cambio nunca es automático: el alumno elige.
 - Dispositivos: prioridad alta en tablets y smartphones táctiles; soporte completo en escritorio y portátil.
-- Su cuenta es una **cuenta hija vinculada a un acudiente** (ver §4). Inician sesión con **correo y contraseña**, como cualquier usuario; el correo puede ser del alumno o uno gestionado por el acudiente.
-- **Se registran por su cuenta (Decidido 2026-09-21, decisión 33)**: el alumno completa un formulario de alta y fija su propia contraseña desde el primer momento. La cuenta queda `pending_approval` hasta que la profesora la revisa (§4, §5.1).
+- Son **usuarios independientes** con sus propias credenciales: inician sesión con **correo y contraseña** que ellos mismos fijan al registrarse (§4). No existe cuenta hija ni entidad de acudiente.
+- **Datos del acudiente:** `Student` guarda dos campos opcionales, `guardian_name` y `guardian_contact` (teléfono o correo). Se capturan en el auto-registro y después solo la profesora puede editarlos desde el panel; el alumno no puede modificarlos.
+- **Se registran por su cuenta (Decidido 2026-09-21, decisión 33)**: el alumno completa un formulario de alta y fija su propia contraseña desde el primer momento. La cuenta queda `pending_approval` hasta que la profesora la revisa (§4, §5.1). Es la **única** vía de alta (decisión 34 §1).
 - Nunca ven el leaderboard. Ven su progreso personal: estrellas, insignias, rachas y misiones.
 
 ### Profesora / Administradora
 
 - Dispositivo principal: computador o portátil.
-- Gestiona currículo por nivel MCER, crea y asigna actividades, califica audios y respuestas abiertas, gestiona alumnos y grupos, consulta estadísticas y el leaderboard privado.
+- Gestiona currículo por nivel MCER, crea y asigna actividades, califica audios y respuestas abiertas, gestiona alumnos, grupos y cuentas bloqueadas, consulta estadísticas y el leaderboard privado.
 
-### Acudientes (Fase 2)
+### Acudientes
 
-- Supervisión de progreso y acceso al muro cerrado de su grupo.
-- En el piloto solo existen como entidad `Guardian` vinculada al alumno, sin acceso a la plataforma.
+- No existe rol, entidad ni tabla de acudiente en el sistema (Decidido 2026-09-22, decisión 34 §1). Sus datos de contacto viven en `Student.guardian_name` y `Student.guardian_contact`. La tutela legal es un asunto externo a la plataforma (§9). Si en Fase 2 se desea un rol de acudiente, será una decisión nueva en §14; el valor `parent` del enum queda reservado para ello.
 
 ---
 
@@ -115,25 +116,28 @@ Roles del enum RBAC, todos definidos desde el día 1: `teacher`, `student`, `par
 - **La autenticación es responsabilidad de NestJS.** No se usa Supabase Auth.
 - JWT de acceso de vida corta + **refresh tokens rotativos** almacenados en cookie `httpOnly`, `Secure`, `SameSite`. Nunca en `localStorage`.
 - Persistencia prolongada ("Recuérdame") para evitar fricción de login en niños.
-- **Cuenta hija:** `Student` pertenece a un `Guardian`. La relación con el acudiente es de tutela legal y de contacto; no condiciona el mecanismo de acceso.
-- **Acceso del alumno (Decidido 2026-09-21): correo y contraseña, con recuperación de contraseña por correo.** Se adopta por convención: es el mecanismo que alumnos, acudientes y profesora ya conocen. El correo puede pertenecer al alumno o ser uno que gestione el acudiente; debe ser único dentro de la organización. La profesora puede restablecer la contraseña de un alumno desde el panel. Queda descartado el acceso por código de aula + PIN o avatar.
-- **Bloqueo por intentos fallidos (Decidido 2026-09-21):** tras **10 intentos fallidos** consecutivos, la cuenta queda bloqueada **10 minutos**. Aplica a alumnos y a la profesora. El bloqueo de alumnos es visible para la profesora en el panel, que puede levantarlo.
-- **Correo transaccional de cuenta (Decidido 2026-09-21):** un único proveedor y remitente (§6) envía todos los correos de cuenta: confirmación de solicitud recibida en el auto-registro, aviso de cuenta aprobada, y **recuperación de contraseña** (enlace de un solo uso con caducidad corta). Como alternativa para alumnos sin acceso a su correo, la profesora puede generar una contraseña temporal y entregarla en persona, o crear la cuenta ella misma (flujo alterno, §5.1).
+- **El alumno es un usuario independiente** con sus propias credenciales. No existe cuenta hija ni vínculo con una cuenta de acudiente (decisión 34 §1).
+- **Acceso del alumno (Decidido 2026-09-21): correo y contraseña, con recuperación de contraseña por correo.** Se adopta por convención: es el mecanismo que alumnos, acudientes y profesora ya conocen. El correo puede pertenecer al alumno o ser uno que gestione el acudiente; debe ser único dentro de la organización. Queda descartado el acceso por código de aula + PIN o avatar.
+- **Contraseña (Decidido 2026-09-22, decisión 34 §1):** la crea siempre el propio alumno. Requisitos: mínimo 8 caracteres, máximo 16, sin espacios. Sin otros requisitos de complejidad.
+- **La profesora no da contraseñas temporales ni crea cuentas.** La única vía de alta es el auto-registro (§4.1). Ante bloqueo o pérdida, la profesora puede **iniciar una recuperación de contraseña** desde el panel: el sistema envía el enlace de un solo uso al correo registrado del alumno.
+- **Cambio de correo desde el perfil del alumno (Decidido 2026-09-22):** verificación en dos pasos con un OTP enviado al correo (actual o nuevo) para confirmar que quien hace el cambio es el alumno. Cubre el caso en que se registró con el correo del acudiente y luego quiere usar el suyo.
+- **Bloqueo por intentos fallidos (Decidido 2026-09-21):** tras **10 intentos fallidos** consecutivos, la cuenta queda bloqueada **10 minutos**. Aplica a alumnos y a la profesora. El bloqueo de alumnos es visible para la profesora en una sección dedicada del panel (`Alumnos → Bloqueados`), desde donde puede levantarlo de forma ágil.
+- **Correo transaccional (Decidido 2026-09-21, ampliado 2026-09-22):** un único proveedor y remitente (§6) envía todos los correos de la plataforma: confirmación de solicitud recibida en el auto-registro, aviso de cuenta aprobada, **recuperación de contraseña** (enlace de un solo uso con caducidad corta), OTP de cambio de correo, **notificación de actividad calificada** al alumno (sin nota ni feedback, §5.1) y **resumen de pendientes** a la profesora cada 3 días (§5.1).
+- **Rate limiting (Decidido 2026-09-22, decisión 34 §20):** límites por endpoint sensible y globales, detallados en architecture §8.3. Toda entrada se valida con `class-validator` y Zod.
 
 ### 4.1 Registro autónomo del estudiante y aprobación — Decidido 2026-09-21 (decisión 33)
 
-El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para algo. Es el flujo principal de alta en el piloto. El alta directa por la profesora (como se describía antes de esta decisión) sigue existiendo como **flujo alterno** para alumnos sin correo propio o sin autonomía para registrarse.
+El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para algo. Es la **única vía de alta** en el piloto (decisión 34 §1): la profesora no crea cuentas ni entrega contraseñas.
 
-- **Formulario de auto-registro** (pantalla pública `/registro`): correo, contraseña, nombre del alumno, fecha de nacimiento (deriva `age_segment`), y datos de contacto del acudiente (nombre y un medio de contacto) para que la profesora pueda gestionar el consentimiento en papel.
-- Al enviarlo se crean `User` (rol `student`, correo y contraseña ya fijados por el alumno), `Guardian` (con los datos de contacto capturados, sin cuenta propia) y `Student`, todos en la única organización del piloto. El `Student` queda en estado **`pending_approval`**: no tiene nivel MCER ni grupo asignado, y su `consent_status` es `pendiente`.
+- **Formulario de auto-registro** (pantalla pública `/registro`): correo, contraseña (8–16 caracteres, sin espacios), nombre del alumno, fecha de nacimiento (deriva `age_segment`), datos de contacto del acudiente (`guardian_name` y `guardian_contact`, campos del propio `Student`) y checkbox de aceptación de los **Términos y Condiciones** convencionales de uso, con enlace al documento.
+- Al enviarlo se crean solo `User` (rol `student`, correo y contraseña ya fijados por el alumno) y `Student` (con los datos del acudiente como campos propios), en la única organización del piloto. No se crea ninguna entidad separada. El `Student` queda en estado **`pending_approval`**: no tiene nivel MCER ni grupo asignado.
 - **Mientras está `pending_approval`, el login se rechaza** con un mensaje propio (`ACCOUNT_PENDING_APPROVAL`), aunque la contraseña sea correcta. El alumno no entra a nada hasta ser aprobado.
 - La solicitud aparece en el panel de la profesora (§5.1) como una **solicitud de registro** pendiente. Al revisarla, la profesora:
-  1. Confirma o corrige los datos del acudiente.
-  2. Asigna nivel MCER, segmento de edad (si la fecha de nacimiento no basta para decidirlo) y grupo.
-  3. Registra el consentimiento en papel cuando el acudiente lo firme (puede quedar `pendiente` y aprobar la cuenta igual; son dos controles independientes, igual que en el alta directa).
-  4. Aprueba la cuenta (`approval_status = approved`) o la rechaza (la cuenta y sus datos se borran, mismo mecanismo que el borrado en cascada de §10).
+  1. Confirma o corrige `guardian_name` y `guardian_contact` directamente en el `Student`.
+  2. Asigna nivel MCER y grupo. `age_segment` ya viene calculado desde la fecha de nacimiento; solo lo corrige si la fecha es errónea.
+  3. Aprueba la cuenta (`approval_status = approved`) o la rechaza (la cuenta y sus datos se borran, mismo mecanismo que el borrado en cascada de §10).
 - Al aprobar, el alumno recibe un correo de "cuenta aprobada" y puede iniciar sesión.
-- El registro del acudiente (cuando exista cuenta propia, Fase 2) incluye aceptación de Términos y Condiciones (checkbox con versión y fecha). Esto **no sustituye** la autorización parental de tratamiento de datos (§9). Para el auto-registro del alumno en el piloto, la aceptación de T&C la marca el alumno en el propio formulario; el consentimiento de tratamiento de datos del menor sigue siendo el registro en papel que gestiona la profesora, sin relación con la aprobación de la cuenta.
+- La aceptación de T&C es el único acuerdo que existe en la plataforma. No hay consentimiento parental ni registro de autorización de ningún tipo (§9).
 - Los Guards de NestJS aplican RBAC y aislamiento por `organization_id` en cada petición.
 
 ---
@@ -144,22 +148,25 @@ El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para
 
 **Gestor de contenidos**
 
-- Crear actividades por nivel (A1–B2) y por tipo. Tipos del piloto:
+- Crear actividades por nivel (A1–B2) y por tipo. **El piloto incluye los cinco tipos desde su primera versión operativa** (Decidido 2026-09-22, decisión 34 §6), con calificación mixta automática y manual:
   - **Fill in the blanks:** oraciones con dropdowns en línea. Calificación automática inmediata.
-  - **Pregunta abierta:** texto libre. Va a la cola de revisión.
-  - **Speaking:** grabación con `MediaRecorder` en el navegador, se sube a Storage. Va a la cola de revisión.
-  - **Microjuego:** configuración JSON rellenada mediante formulario (ver §5.3).
-  - **Examen:** conjunto de ítems con calificación.
+  - **Pregunta abierta:** texto libre. Va a la cola de revisión (calificación manual).
+  - **Speaking:** grabación con `MediaRecorder` en el navegador, se sube a Cloudflare R2 y se transcodifica en servidor para reproducción universal (architecture §3.5). Va a la cola de revisión. Duración mínima 2 s; máxima configurable por actividad, 120 s por defecto y 300 s como tope absoluto (decisión 34 §13).
+  - **Microjuego:** configuración JSON rellenada mediante formulario (ver §5.3). Calificación automática.
+  - **Examen:** conjunto de ítems con pesos. Mínimo 2 ítems para publicarse; los pesos se normalizan automáticamente al 100 % al guardar; un ítem no respondido vale 0 y su peso entra en el denominador (decisión 34 §11 y §12).
 - Objetivo de onboarding: la profesora crea su primera actividad en menos de 10 minutos. Si no se cumple, el piloto fracasa por falta de contenido antes que por bugs.
 
 **Asignación**
 
 - Asignar una actividad a uno o varios grupos con fecha de apertura y fecha de cierre.
+- **Regla de `due_at` (Decidido 2026-09-22, decisión 34 §10):** lo que determina si un intento es válido es su momento de inicio, tomado en el servidor. Un intento iniciado antes del cierre puede terminarse después y se guarda normalmente. Un intento que se quiera iniciar después del cierre se rechaza con un aviso al alumno para que hable con su maestra.
 
 **Cola de revisión y feedback**
 
 - Lista de audios y respuestas abiertas pendientes de calificar.
 - Calificación + **comentario personal de retroalimentación por cada intento calificado** + stickers.
+- La profesora puede **descargar el audio** de speaking a su dispositivo antes de que venza la retención (decisión 34 §6).
+- **Notificación por correo (Decidido 2026-09-22, decisión 34 §5):** al calificar, el alumno recibe un correo que le avisa que su actividad ya fue calificada, con un enlace a la sección de feedback de la app. **El correo no incluye la nota ni el feedback**; ambos se ven únicamente dentro de la aplicación.
 - **Habilitar nuevo intento (Decidido 2026-09-21):** en el área de calificación y feedback, la profesora dispone de un campo para autorizar a ese estudiante un intento adicional sobre esa asignación. Si no lo hace, el estudiante tiene **un solo intento** por asignación. Aplica a todo tipo de actividad calificable, incluidas las autocalificadas (fichas, exámenes y microjuegos), cuyos intentos también aparecen en esta área aunque no requieran revisión manual.
 - El alumno recibe el comentario en la vista de esa actividad. El ciclo grabar → calificar → recibir feedback es el corazón pedagógico del producto.
 
@@ -171,13 +178,19 @@ El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para
 
 **Estudiantes y grupos**
 
-- **Solicitudes de registro (Decidido 2026-09-21):** bandeja con los auto-registros en `pending_approval`. Aprobar asigna nivel, segmento y grupo, y activa la cuenta; rechazar borra la solicitud. Es la vía principal de alta.
-- Alta directa de alumnos vinculados a un acudiente, con correo de acceso, nivel MCER y segmento de edad: flujo alterno para quien no puede auto-registrarse. Restablecimiento de contraseña del alumno.
+- **Solicitudes de registro (Decidido 2026-09-21):** bandeja con los auto-registros en `pending_approval`. Aprobar asigna nivel y grupo (y corrige `guardian_name`, `guardian_contact` o `age_segment` si hace falta) y activa la cuenta; rechazar borra la solicitud. Es la única vía de alta.
+- Edición de alumnos: nivel, segmento, datos del acudiente (`guardian_name`, `guardian_contact`, solo la profesora). Iniciar recuperación de contraseña del alumno (envía el enlace a su correo; no hay contraseñas temporales).
+- **Sección de bloqueados (Decidido 2026-09-22, decisión 34 §8):** pestaña dedicada dentro de `Alumnos` con el listado de cuentas bloqueadas por intentos fallidos y desbloqueo manual en un clic.
 - Grupos y membresías.
-- **Estado de consentimiento** por alumno: `pendiente` / `firmado_en_papel` (§9). Independiente de la aprobación de la cuenta.
+
+**Dashboard de la profesora — recordatorios (Decidido 2026-09-22, decisión 34 §8 y §18)**
+
+- Tarjetas minimalistas (contador + enlace directo) para: solicitudes de registro pendientes, y actividades sin calificar hace más de N días (umbral configurable, 3 días por defecto).
+- **Correo de pendientes cada 3 días:** el sistema evalúa esas mismas categorías y, solo si hay al menos un pendiente, envía a la profesora un correo de resumen con enlaces a cada sección. Si no hay pendientes, no envía nada.
 
 **Estadísticas (polling cada 30 s)**
 
+- Acceso **exclusivamente por RBAC** (Decidido 2026-09-22, decisión 34 §7): si el rol del JWT es `teacher` se concede; si no, `403`. No hay feature flags `stats` ni `leaderboard`.
 - Foco (Decidido 2026-09-21): **rendimiento y constancia por estudiante** para que la profesora vea cómo ha avanzado cada alumno durante su proceso (§13).
 - Rendimiento: evolución de la calificación (0,0–5,0) por alumno a lo largo del tiempo, por tipo de actividad y por nivel; promedio por grupo y por nivel.
 - Constancia: semanas activas, racha vigente, actividades completadas por semana y tasa de finalización de lo asignado.
@@ -193,7 +206,10 @@ El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para
 - **Navegación de 2 a 4 clics según la zona (Decidido 2026-09-21):** las actividades asignadas quedan a 2 clics desde la home; las zonas secundarias (juegos, progreso, feedback, contenido extra) admiten hasta 4 clics hasta el contenido final, sin perder la simpleza. El rango por zona se detalla en architecture §3.1.
 - Tema visual según segmento de edad (§8).
 - Zonas: Juegos (microjuegos), Classroom (fichas interactivas), progreso personal, feedback recibido.
+- **Perfil del alumno:** cambio de correo con OTP (§4) y, si tiene 11 años o más, alternar entre las interfaces Kids y Teens (§3).
 - **Tolerancia a conexión débil:** las respuestas se guardan localmente y se reintenta el envío; una grabación de audio no se pierde si falla la subida.
+- **Estados de error (Decidido 2026-09-22, decisión 34 §17):** toda situación indeseada (red, servidor, acceso no autorizado, recurso no encontrado, actividad cerrada, intento ya existente, fallo de subida de audio) tiene un mensaje claro y contextual, sin detalles técnicos. En Kids los mensajes son más visuales y simpáticos; en Teens y en el panel, más directos.
+- **Actualizaciones de la PWA (Decidido 2026-09-22, decisión 34 §4):** cuando hay una nueva versión, la app muestra una notificación in-app no bloqueante con un botón para reiniciar y aplicar los cambios. Aplica también al panel de la profesora.
 - **Accesibilidad:** texto a voz en las consignas del tema Kids, contraste verificado, objetivos táctiles grandes.
 - Sin analítica de terceros, píxeles ni publicidad. Solo eventos propios.
 
@@ -210,7 +226,7 @@ El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para
 - **Fuente única de verdad:** tabla `ProgressEvent` append-only. Puntos, insignias y rachas se derivan de los eventos y se pueden recalcular si cambian las reglas.
 - Insignias por hitos simples: primera tarea completada, primer audio enviado, y similares.
 - Insignias por permanencia: rachas de **4, 8 y 12 semanas**; insignia de **5 años** con la aplicación.
-- Las **rachas son semanales y perdonables**, no diarias. Las rachas diarias generan ansiedad en niños pequeños y dependen de los padres.
+- Las **rachas son semanales y perdonables**, no diarias. Las rachas diarias generan ansiedad en niños pequeños y dependen de los padres. Algoritmo vinculante (Decidido 2026-09-22, decisión 34 §9): solo las semanas activas suman; el perdón solo se puede usar con una racha activa (racha 0 no se perdona); tras usarlo se recupera al completar dos semanas activas consecutivas; nunca hay más de un perdón disponible. Detalle en architecture §9.3.
 - Las reglas de insignias viven en una tabla de configuración editable (`BadgeRule`), no en código.
 - El leaderboard es visible solo por la profesora.
 
@@ -236,10 +252,10 @@ El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para
 
 **Datos e infraestructura**
 
-- PostgreSQL 16 en Supabase Cloud. **Supabase se usa exclusivamente como Postgres y Storage**: sin Supabase Auth, sin Realtime, sin RLS como fuente de autorización.
-- Supabase Storage (S3 compatible) para audio y fotos. Buckets privados. URLs firmadas de corta duración generadas por el backend.
-- **Hosting (Decidido 2026-09-21): frontend en Vercel, backend en Render.** Ambos con dominio propio bajo la misma raíz (`app.` y `api.`), despliegue desde Git y entornos staging y producción.
-- **Correo transaccional: Resend (Decidido 2026-09-21).** Un solo remitente y dominio verificado para todos los correos de cuenta: registro (bienvenida y fijar contraseña) y recuperación de contraseña. Nunca marketing.
+- PostgreSQL 16 en Supabase Cloud. **Supabase se usa exclusivamente como Postgres**: sin Supabase Auth, sin Realtime, sin RLS como fuente de autorización, sin Supabase Storage.
+- **Almacenamiento de archivos: Cloudflare R2 (Decidido 2026-09-22, decisión 34 §21).** API compatible con S3 (`@aws-sdk/client-s3`), bucket privado por entorno, URLs firmadas de corta duración generadas por el backend. Sustituye a Supabase Storage por los límites de su capa gratuita. Variables `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`.
+- **Hosting (Decidido 2026-09-21): frontend en Vercel, backend en Render.** Ambos con dominio propio bajo la misma raíz (`app.` y `api.`), despliegue desde Git y entornos staging y producción. La imagen Docker de la API incluye `ffmpeg` para la transcodificación de audios (architecture §3.5).
+- **Correo transaccional: Resend (Decidido 2026-09-21).** Un solo remitente y dominio verificado para todos los correos: solicitud recibida, cuenta aprobada, recuperación de contraseña, OTP de cambio de correo, notificación de calificación y resumen de pendientes a la profesora. Nunca marketing.
 
 **Repositorio**
 
@@ -265,20 +281,19 @@ El alumno crea su propia cuenta; la profesora la aprueba antes de que sirva para
 Esquema orientativo. Cuando exista, el archivo `schema.prisma` es la referencia autoritativa y este apartado debe mantenerse alineado con él.
 
 - `Organization` — tenant. Una sola en el piloto.
-- `User` — `email` (obligatorio, único por organización), `password_hash`, `role` (enum), `organization_id`, contador y marca de bloqueo por intentos fallidos.
+- `User` — `email` (obligatorio, único por organización), `password_hash`, `role` (enum), `organization_id`, `terms_accepted_at` y `terms_version`, contador y marca de bloqueo por intentos fallidos.
 - `PasswordResetToken` — token de un solo uso para recuperación de contraseña.
-- `Guardian` — acudiente. Datos de contacto, aceptación de T&C (versión, fecha).
-- `Student` — `user_id`, `guardian_id` (nullable hasta que la profesora lo confirme en un auto-registro), `level` (A1–B2, nullable hasta la aprobación), `age_segment` (`kids` / `teens`), `consent_status`, **`approval_status`** (`pending_approval` / `approved` / `rejected`), **`registration_source`** (`self_registered` / `teacher_created`). El correo de acceso vive en `User.email`.
+- `EmailChangeRequest` — OTP de un solo uso para el cambio de correo del alumno (`user_id`, `new_email`, `otp_hash`, `expires_at`, `used_at`).
+- `Student` — `user_id`, `name`, `birth_date`, `guardian_name` (nullable), `guardian_contact` (nullable), `level` (A1–B2, nullable hasta la aprobación), `age_segment` (`kids` / `teens`), `can_switch_interface` (boolean), **`approval_status`** (`pending_approval` / `approved` / `rejected`). El correo de acceso vive en `User.email`. No hay entidad de acudiente ni campo de consentimiento.
 - `Group`, `GroupMembership`.
 - `Activity` — `type`, `level`, `title`, `created_by`, `version`, `status`.
-- Detalle 1:1 por tipo: `FillBlankDetail`, `OpenQuestionDetail`, `SpeakingDetail`, `GameDetail`, `ExamDetail`.
-- `Assignment` — `activity_id`, `group_id`, `opens_at`, `due_at`.
-- `Attempt` — `assignment_id`, `student_id`, `started_at`, `finished_at`, `status`, `score` (0,0–5,0), `payload` (respuestas crudas en JSON), `retry_granted_at`, `retry_granted_by`, `previous_attempt_id`.
-- `Review` — `attempt_id`, `reviewer_id`, `score` (0,0–5,0), `comment`, `stickers`, `graded_at`.
-- `ProgressEvent` — append-only: `student_id`, `type`, `value`, `occurred_at`, `source`.
+- Detalle 1:1 por tipo: `FillBlankDetail`, `OpenQuestionDetail`, `SpeakingDetail` (`min_duration_seconds`, `max_duration_seconds`), `GameDetail`, `ExamDetail` (pesos normalizados).
+- `Assignment` — `activity_id`, `group_id`, `opens_at`, `due_at`, `historical_student_count` (denominador congelado al borrar alumnos, decisión 34 §14).
+- `Attempt` — `assignment_id`, `student_id`, `started_at`, `finished_at` (ambos asignados por el servidor, decisión 34 §3), `status`, `score` (0,0–5,0), `payload` (respuestas crudas en JSON), `flags`, `retry_granted_at`, `retry_granted_by`, `previous_attempt_id`.
+- `Review` — `attempt_id`, `reviewer_id`, `score` (0,0–5,0), `comment`, `stickers`, `graded_at` (servidor).
+- `ProgressEvent` — append-only: `student_id`, `type`, `value`, `occurred_at` (servidor), `source`.
 - `BadgeRule` (configurable), `BadgeAward`.
-- `ConsentRecord` — `student_id`, `status`, `method` (`paper` / `digital`), `document_version`, `signed_at`, `registered_by`.
-- `MediaAsset` — ruta en bucket, propietario, tipo, `retention_until`.
+- `MediaAsset` — clave del archivo raw en R2, `converted_key` (MP4/AAC, nullable), propietario, `mime_type`, `duration_seconds`, `status`, `retention_until`.
 - `ExternalResource` — enlaces de "Contenido extra".
 - `FeatureFlag` — por organización.
 
@@ -304,15 +319,12 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 
 ---
 
-## 9. Legal y privacidad de menores — Decidido
+## 9. Tratamiento de datos y retención de archivos — Decidido
 
-- **Jurisdicción: Colombia.** Ley 1581 de 2012 (protección de datos personales) y Decreto 1377 de 2013. El tratamiento de datos de menores requiere autorización expresa del representante legal.
-- **Piloto:** la autorización se recoge **en papel**. La plataforma registra por alumno un `ConsentRecord` con `method = paper`, fecha, versión del documento y quién lo registró. El estado (`pendiente` / `firmado_en_papel`) se muestra en el panel de la profesora, que lo gestiona manualmente.
-- **Fase 2 (academia):** firma digital y checkbox en el registro con evidencia (timestamp, versión del documento, IP). Se documenta desde ahora; no se construye en el piloto. Cuando haya múltiples profesores, el volumen ya no permite gestión manual.
-- Términos y Condiciones aceptados en el registro del acudiente. Política de privacidad redactada para padres, no para desarrolladores.
-- **Grabaciones de voz** de menores se tratan como dato sensible. **Política de retención (Decidido 2026-09-21):** un audio se borra del bucket un tiempo módico después de haber sido calificado, y un audio cuya subida nunca se confirmó se borra también tras un plazo corto. Plazos (Decidido): 30 días tras la calificación y 7 días para subidas no confirmadas; configurables por organización. Además: borrado a petición del acudiente y borrado en cascada probado automáticamente. La calificación y el comentario se conservan; solo desaparece el archivo.
-- **Fotos y muro** (Fase 2): eliminación de metadatos EXIF, URLs firmadas, acceso solo a acudientes del grupo, autorización de uso de imagen firmada.
-- Sin analítica de terceros, píxeles ni publicidad en el portal del estudiante. Para Fase 2, preparar el cumplimiento de los programas infantiles de las tiendas (Designed for Families en Google Play, Kids Category en App Store).
+- **El tratamiento legal de datos de menores es responsabilidad de la clienta (la profesora), fuera de la plataforma (Decidido 2026-09-22, decisión 34 §2).** Englove no tiene ni tendrá ningún módulo, tabla, campo, endpoint, pantalla, tarea ni referencia documental sobre consentimiento legal de menores, autorización parental de tratamiento de datos ni ningún otro aspecto de cumplimiento legal sobre menores. La aplicación no se hace responsable de esos aspectos y no construirá funcionalidad relacionada.
+- **Lo único que existe en materia de acuerdos es un Términos y Condiciones convencional** de uso de la aplicación, aceptado por el alumno al registrarse mediante un checkbox estándar con enlace al documento (`User.terms_accepted_at`, `terms_version`).
+- **Política de retención de audios (Decidido 2026-09-21, decisión 27):** un audio se borra de R2 30 días después de ser calificado (`retention_until = graded_at + 30 días`); una subida nunca confirmada se borra a los 7 días. Ambos plazos son configurables por organización. Antes de que venza el plazo, la profesora puede descargar el audio a su dispositivo desde el panel de revisión. La calificación y el comentario se conservan; solo desaparece el archivo. El borrado en cascada de un alumno se prueba automáticamente.
+- Sin analítica de terceros, píxeles ni publicidad en el portal del estudiante. Ningún log ni reporte de error incluye datos personales (architecture §8.5).
 
 ---
 
@@ -321,8 +333,10 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 - Refresh tokens rotativos en cookie `httpOnly`; nunca `localStorage`.
 - URLs firmadas de expiración corta, emitidas por el backend tras verificar que el solicitante tiene derecho a ese recurso.
 - Puntaje y calificación en servidor; validación de rangos y duraciones plausibles.
-- DTOs validados en todos los endpoints; RBAC en Guards; `organization_id` en toda consulta.
-- Borrado en cascada (alumno → intentos, audios en bucket, eventos) con prueba automatizada escrita antes de la función.
+- **Reloj del servidor como única fuente temporal (Decidido 2026-09-22, decisión 34 §3):** `started_at`, `finished_at`, `graded_at`, `occurred_at` y toda marca de tiempo de tenant se asignan en NestJS o en PostgreSQL al procesar la petición. El cliente nunca los envía; si los envía, se ignoran. Elimina el fraude por manipulación del reloj del dispositivo.
+- DTOs validados en todos los endpoints (`class-validator` + Zod); RBAC en Guards; `organization_id` en toda consulta.
+- **Rate limiting (Decidido 2026-09-22, decisión 34 §20):** login 10 intentos / 15 min por IP; signup 10 / hora por IP; forgot-password 5 / hora por IP y por correo; API autenticada 120 peticiones / min por usuario; API no autenticada 30 / min por IP.
+- Borrado en cascada (alumno → intentos, audios en R2, eventos) con prueba automatizada escrita antes de la función, congelando antes el denominador histórico de sus asignaciones (§7.2).
 - Secretos solo en variables de entorno. Nunca en el repositorio.
 
 ---
@@ -354,16 +368,16 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 ## 12. Orden de construcción — Decidido
 
 1. Scaffold del monorepo, paquete compartido, `schema.prisma` núcleo, CI con migraciones.
-2. Autenticación con correo y contraseña (profesora y alumno), recuperación de contraseña, roles, **auto-registro del estudiante en `pending_approval`**, `Organization`, `Guardian` → `Student`.
-3. **Gestor de contenidos de la profesora:** tipos de actividad, niveles, grupos, **bandeja de solicitudes de registro**, alumnos, estado de consentimiento.
+2. Autenticación con correo y contraseña (profesora y alumno), recuperación de contraseña, cambio de correo con OTP, roles, rate limiting, **auto-registro del estudiante en `pending_approval`**, `Organization`, `Student`.
+3. **Gestor de contenidos de la profesora:** tipos de actividad, niveles, grupos, **bandeja de solicitudes de registro**, alumnos (con datos del acudiente), sección de bloqueados, recordatorios del dashboard.
 4. Asignación a grupos.
-5. Portal del estudiante: acceso, Classroom (fill in the blanks, pregunta abierta, speaking), progreso personal.
+5. Portal del estudiante: acceso, Classroom (fill in the blanks, pregunta abierta, speaking con transcodificación), progreso personal, perfil, job mensual de `age_segment`.
 6. Microjuegos en React tras el contrato de actividad.
-7. Cola de revisión y feedback personal, habilitación de nuevo intento, retención de audios.
-8. Panel estadístico (polling) de rendimiento y constancia por estudiante, y leaderboard privado.
-9. PWA, tolerancia offline, pase de accesibilidad.
+7. Cola de revisión y feedback personal, correo de notificación de calificación, descarga de audios, habilitación de nuevo intento, retención de audios.
+8. Panel estadístico (polling) de rendimiento y constancia por estudiante, leaderboard privado, correo de pendientes a la profesora.
+9. PWA con notificación de actualizaciones, tolerancia offline, pase de accesibilidad.
 10. Sección "Contenido extra".
-11. Lanzamiento del piloto. Condiciones previas: consentimientos en papel recogidos, contenido cargado por la profesora, estadísticas de rendimiento y constancia operativas.
+11. Lanzamiento del piloto. Condiciones previas: contenido cargado por la profesora, estadísticas de rendimiento y constancia operativas, manual de uso de la profesora entregado.
 
 Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 
@@ -386,10 +400,10 @@ Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 
 | # | Decisión | Estado |
 |---|---|---|
-| 1 | Supabase solo como Postgres + Storage; NestJS único backend de negocio | Decidido |
+| 1 | Supabase solo como Postgres + Storage; NestJS único backend de negocio | Decidido. Modificada por la decisión 34 §21: Supabase solo como Postgres; los archivos van a Cloudflare R2 |
 | 2 | Pasarela de pagos y suscripciones en Fase 2/3; precios fuera de plataforma en piloto | Decidido |
-| 3 | Jurisdicción Colombia (Ley 1581/2012); T&C en registro del acudiente | Decidido |
-| 4 | Cuenta hija vinculada a acudiente. (Modificada por la decisión 22: el correo de acceso vive en `User.email` y es obligatorio) | Decidido |
+| 3 | Jurisdicción Colombia (Ley 1581/2012); T&C en registro del acudiente | Sustituida por la decisión 34 §2: el cumplimiento legal queda fuera de la plataforma; solo T&C convencional aceptado por el alumno |
+| 4 | Cuenta hija vinculada a acudiente. (Modificada por la decisión 22: el correo de acceso vive en `User.email` y es obligatorio) | Sustituida por la decisión 34 §1: no existe `Guardian`; el alumno es un usuario independiente |
 | 5 | Actividades: tabla base + tablas de detalle por tipo (juegos, exámenes, fichas) | Decidido |
 | 6 | Insignias por hitos simples y permanencia (4/8/12 semanas, 5 años); rachas semanales | Decidido |
 | 7 | Feedback personal por intento calificado | Decidido |
@@ -403,7 +417,7 @@ Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 | 15 | Dos temas visuales (Kids / Teens) sobre tokens compartidos | Decidido |
 | 16 | Framer Motion sin restricción; carga diferida por tema | Decidido |
 | 17 | Microjuegos React en piloto; Phaser en Fase 2; Educaplay como enlaces en "Contenido extra" | Decidido |
-| 18 | Consentimiento en papel en piloto; firma digital al escalar a academia | Decidido |
+| 18 | Consentimiento en papel en piloto; firma digital al escalar a academia | Retirada por la decisión 34 §2 |
 | 19 | Métrica numérica de éxito del piloto | Retirada por la decisión 28 |
 
 ### Ronda 2 — 2026-09-21
@@ -423,7 +437,35 @@ Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 | 30 | Correo transaccional con Resend. El mismo proveedor y remitente envía el correo de registro (bienvenida y fijar contraseña) y el de recuperación de contraseña | Decidido |
 | 31 | Se rechaza intercambiar las Etapas 6 y 7. El orden de construcción de §12 se mantiene: microjuegos antes que calificación y feedback | Decidido |
 | 32 | Se aceptan los detalles A16–A23 de `architecture-overview.md` §14.2 (conversión a 0,0–5,0 y tramos de estrellas, recuperación de contraseña, bloqueo, nuevo intento, retención, Resend, techos de clics, Render siempre activo) | Decidido |
-| 33 | El registro autónomo del estudiante entra al piloto (antes reservado para Fase 2 y solo para el acudiente). El alumno crea su cuenta con correo y contraseña; queda `pending_approval` hasta que la profesora la revisa, asigna nivel y grupo, gestiona el consentimiento en papel y la aprueba. El alta directa por la profesora sigue existiendo como flujo alterno | Decidido |
+| 33 | El registro autónomo del estudiante entra al piloto (antes reservado para Fase 2 y solo para el acudiente). El alumno crea su cuenta con correo y contraseña; queda `pending_approval` hasta que la profesora la revisa, asigna nivel y grupo y la aprueba | Decidido. Modificada por la decisión 34: desaparecen la gestión del consentimiento en papel y el alta directa por la profesora; el auto-registro es la única vía de alta |
+
+### Ronda 3 — 2026-09-22
+
+| # | Decisión | Estado |
+|---|---|---|
+| 34 | Se aplica en su totalidad `planning/incongruencias-y-decisiones-definitivas.md` (§1–§22) a `CONTEXT.md`, `architecture-overview.md`, `pbp-development.md` y `taskboard.md`. Ese documento es vinculante; sus decisiones no se contradicen sin una nueva fila en esta tabla. Las filas 35–56 resumen cada sección | Decidido |
+| 35 | §1: se elimina el rol y la entidad `Guardian`. `Student.guardian_name` y `Student.guardian_contact` (opcionales, editables solo por la profesora). El alumno crea su contraseña (8–16 caracteres, sin espacios); cambio de correo con OTP; la profesora no da contraseñas temporales ni crea cuentas: el auto-registro es la única vía de alta | Decidido |
+| 36 | §2: se elimina todo lo relativo a consentimiento legal de menores (`ConsentRecord`, `ConsentStatus`, `ConsentMethod`, documentos legales, Ley 1581). Responsabilidad de la clienta. Solo T&C convencional aceptado por el alumno | Decidido |
+| 37 | §3: `started_at`, `finished_at`, `graded_at` y toda marca de tiempo se asignan en el servidor. Ningún DTO de entrada lleva timestamps | Decidido |
+| 38 | §4: notificación in-app de nueva versión de la PWA con botón de reinicio, en ambas interfaces | Decidido |
+| 39 | §5: al calificar se envía correo de notificación al alumno sin nota ni feedback; ambos se ven solo en la app | Decidido |
+| 40 | §6: el piloto incluye los cinco tipos de ítem desde la primera versión. Audios en R2 30 días tras calificar, 7 días para `pending_upload`; la profesora puede descargar el audio | Decidido |
+| 41 | §7: acceso al panel estadístico y leaderboard solo por RBAC (`teacher`). Se eliminan los flags `stats` y `leaderboard` | Decidido |
+| 42 | §8: sección de alumnos bloqueados en `Alumnos` y tarjetas de recordatorio en el dashboard (solicitudes pendientes, sin calificar > N días, N = 3 configurable) | Decidido |
+| 43 | §9: algoritmo de rachas de 4 reglas (solo semanas activas cuentan; perdón solo con racha activa; se recupera tras 2 semanas activas consecutivas; máximo 1 perdón) | Decidido |
+| 44 | §10: la validez de un intento la decide `started_at` del servidor frente a `due_at`. Iniciado antes y terminado después: válido. Iniciar después del cierre: rechazado con aviso al alumno | Decidido |
+| 45 | §11: ítem no respondido = 0 con su peso en el denominador; un examen requiere mínimo 2 ítems, validado en `POST /activities/:id/publish` | Decidido |
+| 46 | §12: los pesos de un examen se normalizan proporcionalmente al 100 % al guardar y el formulario muestra el valor ajustado | Decidido |
+| 47 | §13: audios de speaking: mínimo 2 s (fijo), máximo 120 s por defecto, tope absoluto 300 s, configurable por actividad | Decidido |
+| 48 | §14: al borrar un alumno se congela el denominador histórico de sus asignaciones (`Assignment.historical_student_count`) | Decidido |
+| 49 | §15: Kids 7–10 sin cambio de interfaz; 11+ puede alternar Kids/Teens; job mensual activa `can_switch_interface`; `age_segment` inicial derivado de `birth_date` | Decidido |
+| 50 | §16: seeds operativos (`seed-dev.ts`) y de volumen (`seed-volume.ts`) además del seed mínimo | Decidido |
+| 51 | §17: estados de error claros y contextuales en toda la interfaz, sin detalles técnicos; `ErrorBoundary` global | Decidido |
+| 52 | §18: correo de pendientes a la profesora cada 3 días, solo si hay pendientes | Decidido |
+| 53 | §19: manual de uso de la profesora en español y tono casual (tarea DOC-06) | Decidido |
+| 54 | §20: política de rate limiting por endpoint y global (architecture §8.3) | Decidido |
+| 55 | §21: Cloudflare R2 sustituye a Supabase Storage para archivos; Supabase sigue siendo el único motor SQL | Decidido |
+| 56 | §22: detección de codec en el cliente (`getSupportedMimeType`) y transcodificación asíncrona a MP4/AAC en servidor con `ffmpeg`; `MediaAsset.converted_key`; fallback al raw con aviso | Decidido |
 
 Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abrir una ronda nueva con fecha) y actualizar la sección afectada de este documento en el mismo cambio.
 
@@ -437,6 +479,8 @@ Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abri
 
 **Cerrados el 2026-09-21:** métrica numérica del piloto (retirada), UX de acceso del alumno, retención de audios y sus plazos, política de reintentos, hosting por capa, umbral de aprobación, bloqueo para la profesora, proveedor de correo transaccional, intercambio de etapas 6 y 7 (rechazado), registro autónomo del estudiante en el piloto con aprobación de la profesora.
 
+**Cerrados el 2026-09-22 (decisión 34):** entidad de acudiente, consentimiento legal, reloj de los intentos, actualizaciones de la PWA, canal de notificación de calificaciones, alcance de tipos del piloto, control de acceso al panel estadístico, bloqueados y recordatorios, algoritmo de rachas, `due_at`, ítems no respondidos y mínimo de ítems, normalización de pesos, duración de audios, denominador histórico, `age_segment`, seeds, estados de error, correo de pendientes, manual de la profesora, rate limiting, almacenamiento en R2, compatibilidad de audio entre navegadores.
+
 ---
 
 ## 16. Convenciones para agentes que trabajen en este repositorio
@@ -448,6 +492,9 @@ Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abri
 - Todo tipo de actividad nuevo requiere tres piezas: esquema Zod en el paquete compartido, tabla de detalle 1:1 en Prisma, e implementación del contrato de actividad (§7.3).
 - Toda consulta a datos de tenant filtra por `organization_id`.
 - Todo puntaje se calcula en el backend y se expresa en la escala 0,0–5,0. Ningún endpoint acepta un puntaje enviado por el cliente.
+- Toda marca de tiempo se asigna en el servidor. Ningún DTO de entrada acepta `started_at`, `finished_at` ni equivalentes (decisión 34 §3).
+- No introducir ninguna referencia a `Guardian`, `ConsentRecord`, `ConsentStatus`, `ConsentMethod`, Supabase Storage ni a los flags `stats` o `leaderboard`. Están eliminados (decisión 34).
+- Los archivos binarios van siempre a Cloudflare R2 mediante URLs firmadas por el backend.
 - Al cerrar un pendiente de §15 o cambiar una decisión de §14, actualizar este documento en el mismo cambio.
 
 ---
@@ -456,11 +503,13 @@ Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abri
 
 - **MCER:** Marco Común Europeo de Referencia para las lenguas (A1–C2). Englove usa A1–B2.
 - **Activity / Assignment / Attempt:** plantilla de actividad, asignación de esa plantilla a un grupo con fechas, e intento de un alumno sobre una asignación.
-- **Kids / Teens:** segmentos de edad 7–10 y 11–14+, cada uno con su tema visual.
+- **Kids / Teens:** segmentos de edad 7–10 (solo Kids) y 11+ (puede alternar entre ambos), cada uno con su tema visual.
 - **Contenido extra:** sección de enlaces externos (Educaplay y otros) fuera del flujo de calificación.
 - **Contrato de actividad:** interfaz común que toda actividad implementa (§7.3).
 - **ProgressEvent:** evento append-only del que se derivan puntos, insignias y rachas.
-- **Acudiente / Guardian:** padre, madre o representante legal del alumno. Titular de la cuenta a la que se vincula el alumno.
+- **Acudiente:** padre, madre o representante legal del alumno. En la plataforma solo existe como datos de contacto en `Student.guardian_name` y `Student.guardian_contact`; no tiene cuenta, rol ni entidad propia.
+- **Perdón de racha:** semana inactiva que no rompe la racha. Máximo uno disponible; solo se usa con racha activa y se recupera tras dos semanas activas consecutivas (§5.4).
+- **`can_switch_interface`:** marca del alumno que se activa al cumplir 11 años y le permite alternar entre Kids y Teens desde su perfil.
 - **Cola de revisión:** lista de intentos (audios y respuestas abiertas) pendientes de calificación manual por la profesora. El área de calificación y feedback también muestra los intentos autocalificados para comentar o habilitar un nuevo intento.
 - **Spec / SDD:** especificación de una capacidad, aprobada antes de implementarla; Spec-Driven Development es la metodología del proyecto (§11.1, `planning/sdd-process.md`).
 - **Escala 0,0–5,0:** escala colombiana de calificación usada en toda la plataforma; 3,0 es el umbral de aprobación.

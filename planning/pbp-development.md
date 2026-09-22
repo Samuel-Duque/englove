@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-09-21. Incorpora las decisiones 20–30 de CONTEXT §14: SDD, acceso por correo y contraseña, escala 0,0–5,0, nuevo intento habilitado por la profesora, retención de audios, hosting Vercel + Render, navegación 2–4 clics y estadísticas de rendimiento y constancia.
+> Última actualización: 2026-09-22. Incorpora la decisión 34 de CONTEXT §14 (aplicación de `incongruencias-y-decisiones-definitivas.md`): sin `Guardian` ni consentimiento legal, auto-registro como única vía de alta, Cloudflare R2, transcodificación de audios, timestamps en servidor, algoritmo de rachas, rate limiting, `age_segment`, recordatorios y correo de pendientes, estados de error, notificación de actualizaciones de la PWA, seeds operativos y manual de la profesora.
 
 ---
 
@@ -121,29 +121,28 @@ Una tarea o etapa está Hecha cuando:
 - Repositorio git con remoto. El directorio de trabajo hoy no es un repositorio.
 - Arranque de SDD: carpeta `specs/` con plantilla e índice (SPEC-00) y redacción de SPEC-01 (Scaffold). Son las primeras specs del proyecto; hasta aquí no se ha redactado ninguna.
 - Cuentas en Vercel y Render (hosting Decidido, CONTEXT §6) con proyectos de staging y producción apuntando al repositorio; dominio provisional con `app.` y `api.`.
-- Proyectos Supabase de staging y producción; buckets privados.
-- Documentos legales: autorización parental en papel (Ley 1581 de 2012), T&C del acudiente, política de privacidad redactada para padres.
+- Proyectos Supabase de staging y producción (solo PostgreSQL). Cuenta de Cloudflare R2 con un bucket privado por entorno y credenciales con alcance a su bucket (Decidido, decisión 34 §21).
+- Texto de los Términos y Condiciones convencionales de uso que el alumno acepta al registrarse. No se redacta ningún documento de consentimiento parental ni de cumplimiento legal sobre menores: es responsabilidad de la clienta fuera de la plataforma (Decidido, decisión 34 §2).
 - Especificación de tokens de diseño (dos conjuntos, Kids y Teens) y prototipo navegable del portal del alumno con la navegación de 2–4 clics por zona (architecture §3.1).
 - Sesiones de observación con 3 niños reales por segmento (CONTEXT §8).
 
-Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, retención de audios, política de reintentos y métrica del piloto. Ya no forman parte de la etapa.
+Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de audios, política de reintentos y métrica del piloto (2026-09-21); las 22 incongruencias de la decisión 34 (2026-09-22). Ya no forman parte de la etapa.
 
-**Entregables.** Repositorio, cuentas (Supabase, Vercel, Render), `specs/` con plantilla y SPEC-01 Aprobada, borradores legales revisados, especificación de tokens, informe de la observación con niños.
+**Entregables.** Repositorio, cuentas (Supabase, Cloudflare R2, Vercel, Render), `specs/` con plantilla y SPEC-01 Aprobada, texto de T&C, especificación de tokens, informe de la observación con niños.
 
 **Criterios de salida escalonados.**
 
-- Antes de la Etapa 1: repositorio, cuentas de Supabase, SPEC-01 Aprobada.
-- Antes de la Etapa 2: dominio reservado y proyectos de Vercel y Render creados; SPEC-02 Aprobada (se redacta durante la Etapa 1).
+- Antes de la Etapa 1: repositorio, cuentas de Supabase y R2, SPEC-01 Aprobada.
+- Antes de la Etapa 2: dominio reservado y proyectos de Vercel y Render creados; texto de T&C listo para enlazarlo desde `/registro`; SPEC-02 Aprobada (se redacta durante la Etapa 1).
 - Antes de la Etapa 5: tokens especificados y observación con niños realizada.
-- Antes de la Etapa 11: documentos legales listos y consentimientos en recogida.
 
-**Dependencias.** Ninguna técnica. Depende de una revisión legal y de la disponibilidad de niños para la observación.
+**Dependencias.** Ninguna técnica. Depende de la disponibilidad de niños para la observación.
 
 **Riesgos.** La observación con niños no ocurre: el tema Kids se diseña a ciegas; mitigación: hacerla con hijos de conocidos aunque sea informal. Tentación de saltarse SPEC-01 por parecer "solo infraestructura": la spec del scaffold fija el esquema núcleo y las convenciones que todas las demás heredan; no se salta.
 
 **Tamaño.** M, 1–2 semanas de trabajo repartidas en el calendario.
 
-**Tareas.** SPEC-00, SPEC-01, ENG-001, ENG-003, ENG-004, ENG-006, ENG-007, ENG-008. (ENG-002, ENG-005 y ENG-009 quedaron Hechas por decisión el 2026-09-21.)
+**Tareas.** SPEC-00, SPEC-01, ENG-001, ENG-003, ENG-004, ENG-007, ENG-008. (ENG-002, ENG-005 y ENG-009 quedaron Hechas por decisión el 2026-09-21; ENG-006 se eliminó el 2026-09-22 por la decisión 34 §2.)
 
 ---
 
@@ -154,26 +153,28 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 **Alcance.**
 
 - pnpm + Turborepo con `apps/web`, `apps/api`, `packages/shared` y `tooling`.
-- Next.js con App Router, TypeScript estricto, Tailwind, shadcn/ui y grupos de rutas vacíos.
-- NestJS con configuración validada, `health`, Swagger automático y logging pino.
-- `schema.prisma` con todas las entidades de CONTEXT §7.2 aunque muchas no se usen aún (incluidas `PasswordResetToken`, los campos de bloqueo en `User` y los de nuevo intento en `Attempt`), enums, `organization_id`, índices; migración inicial; seed con la organización piloto y la usuaria profesora.
-- `packages/shared` con enums, tipos del contrato de actividad y registro de esquemas Zod vacío.
+- Next.js con App Router, TypeScript estricto, Tailwind, shadcn/ui y grupos de rutas vacíos; `ErrorBoundary` global y componentes de estado de error reutilizables por zona e interfaz (Decidido, decisión 34 §17; architecture §3.6).
+- NestJS con configuración validada (incluidas las variables `R2_*`), `health`, Swagger automático y logging pino; imagen Docker con `ffmpeg`/`ffprobe`.
+- `schema.prisma` con todas las entidades de CONTEXT §7.2 aunque muchas no se usen aún (incluidas `PasswordResetToken`, `EmailChangeRequest`, los campos de bloqueo en `User`, `guardian_name` / `guardian_contact` / `can_switch_interface` en `Student`, `historical_student_count` en `Assignment`, `converted_key` en `MediaAsset` y los de nuevo intento en `Attempt`), enums (sin `guardian`, `ConsentStatus`, `ConsentMethod` ni `RegistrationSource`), `organization_id`, índices; migración inicial.
+- **Seeds (Decidido, decisión 34 §16):** `seed.ts` mínimo (organización piloto y profesora), `seed-dev.ts` con datos operativos realistas (al menos 10 alumnos con distintos niveles, segmentos, estados de aprobación, intentos en varios estados y rachas activas y perdonadas; una actividad publicada de cada tipo y mecánica; asignaciones abiertas, cerradas y próximas) y `seed-volume.ts` para rendimiento (100 alumnos, 3 meses de intentos).
+- `packages/shared` con enums, tipos del contrato de actividad y registro de esquemas Zod vacío. Los DTOs de intento no llevan campos de timestamp (decisión 34 §3).
 - CI: lint, typecheck, tests, `prisma migrate deploy` en staging y un check que prohíbe `db push`. Despliegue automático de staging en Vercel y Render desde `main`.
-- Docker compose con Postgres 16, `.env.example` y README de arranque.
+- Docker compose con Postgres 16, `.env.example` (con variables de R2, sin Supabase Storage) y README de arranque.
 - Test de esquema: toda tabla de tenant tiene `organization_id`.
-- Tabla `FeatureFlag` con servicio en la API y carga en el frontend al iniciar sesión; configuración inicial `passing_score`, `retention_days`, `pending_upload_ttl_days`.
-- Cuenta de correo transaccional (Resend, Decidido) con dominio verificado y `MailService` con plantillas de registro y recuperación, lista para la Etapa 2.
+- Tabla `FeatureFlag` con servicio en la API y carga en el frontend al iniciar sesión; flags `games` y `extra_content`; configuración inicial `passing_score`, `retention_days`, `pending_upload_ttl_days`, `ungraded_reminder_days`. Sin flags `stats` ni `leaderboard` (decisión 34 §7).
+- Cuenta de correo transaccional (Resend, Decidido) con dominio verificado y `MailService` con las seis plantillas (`signup-received`, `approved`, `password-reset`, `email-change-otp`, `grading-notification`, `teacher-pending-summary`), lista para la Etapa 2.
 - Redacción de SPEC-02 (Identidad y sesión) en paralelo.
 
 **Fuera de alcance.** Cualquier pantalla funcional.
 
-**Entregables.** `pnpm dev` levanta web y API en local; `/health` y `/docs` responden; CI verde con la migración inicial aplicada en staging; `/health` responde en `api-staging.<dominio>` y la web vacía carga en `app-staging.<dominio>`.
+**Entregables.** `pnpm dev` levanta web y API en local; `/health` y `/docs` responden; CI verde con la migración inicial aplicada en staging; `/health` responde en `api-staging.<dominio>` y la web vacía carga en `app-staging.<dominio>`; `pnpm seed:dev` deja una base con datos operativos.
 
 **Criterios de salida.**
 
 - Un desarrollador nuevo arranca el proyecto siguiendo el README en menos de 30 minutos.
 - El esquema completo existe y migró en staging.
 - El check de `db push` falla si se introduce en un script.
+- `seed-dev.ts` y `seed-volume.ts` corren sin errores contra una base vacía.
 - SPEC-02 Aprobada.
 
 **Dependencias.** SPEC-01 Aprobada, ENG-001 (repositorio), ENG-004 (Supabase), ENG-003 (dominio) para el despliegue de staging.
@@ -188,25 +189,25 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 ### Etapa 2 — Identidad y roles (CONTEXT §12.2)
 
-**Objetivo.** El alumno puede auto-registrarse y la profesora puede iniciar sesión; la API aplica RBAC, aislamiento de tenant y el bloqueo de cuentas `pending_approval` en cada petición; existen `Organization`, `Guardian` y `Student`.
+**Objetivo.** El alumno puede auto-registrarse y la profesora puede iniciar sesión; la API aplica RBAC, aislamiento de tenant, rate limiting y el bloqueo de cuentas `pending_approval` en cada petición; existen `Organization`, `User` y `Student` (con los datos del acudiente como campos propios).
 
 **Alcance.**
 
 - Login único con correo y contraseña para todos los roles (Decidido, CONTEXT §4): argon2id, cookies `httpOnly`, refresh rotativo (30 días profesora, 90 días alumno), detección de reutilización y logout.
-- **Auto-registro del estudiante (Decidido, CONTEXT §4.1, decisión 33):** `POST /auth/signup` y pantalla `/registro`; crea `User` + `Guardian` + `Student` en `pending_approval`; el login de una cuenta `pending_approval` o `rejected` no entra aunque la contraseña sea correcta.
-- Alta directa por la profesora como flujo alterno (`POST /students` con `approval_status = approved` desde el inicio), para alumnos sin correo propio.
-- Bloqueo de cuenta tras 10 intentos fallidos durante 10 minutos (Decidido), visible para la profesora en el panel con desbloqueo anticipado de alumnos.
-- Correos de cuenta con el mismo proveedor y remitente: solicitud recibida, cuenta aprobada, bienvenida del alta directa (enlace para fijar la contraseña, 72 h) y recuperación de contraseña (enlace de un solo uso de 30 minutos, revocación de sesiones); contraseña temporal generada por la profesora con cambio obligatorio como alternativa.
+- **Auto-registro del estudiante (Decidido, CONTEXT §4.1, decisiones 33 y 34 §1):** `POST /auth/signup` y pantalla `/registro`; crea solo `User` + `Student` en `pending_approval` con `guardian_name` y `guardian_contact` en el propio `Student`, checkbox de T&C convencional y contraseña de 8–16 caracteres sin espacios; el login de una cuenta `pending_approval` o `rejected` no entra aunque la contraseña sea correcta. **Es la única vía de alta:** no hay alta directa por la profesora ni contraseñas temporales.
+- Bloqueo de cuenta tras 10 intentos fallidos durante 10 minutos (Decidido), con API de listado de bloqueados y desbloqueo (`GET /students/locked`, `POST /students/:id/unlock`); la interfaz llega en la Etapa 3.
+- Correos con el mismo proveedor y remitente: solicitud recibida, cuenta aprobada, recuperación de contraseña (enlace de un solo uso de 30 minutos, revocación de sesiones) y OTP de cambio de correo. `POST /students/:id/reset-password` permite a la profesora disparar el envío del enlace al correo del alumno.
+- **Cambio de correo del alumno con OTP** (`POST /me/email-change`, `POST /me/email-change/confirm`), para quien se registró con el correo del acudiente y quiere el suyo.
 - Guards `JwtAuthGuard`, `RolesGuard`, `TenantContext` y extensión de Prisma para el filtro de tenant.
-- CRUD de `Guardian` (con versión y fecha de T&C) y de `Student` (con `User` asociado con correo obligatorio, nivel, segmento y `consent_status`).
+- CRUD de `Student` (`User` asociado con correo obligatorio, nivel, segmento, `guardian_name`, `guardian_contact`, `approval_status`, `can_switch_interface`) y API `requests` / `approve` / `reject`.
 - Pantallas de login, registro, recuperación y restablecimiento de contraseña; redirección por rol.
-- Endurecimiento HTTP: helmet, CORS con allowlist, throttler (incluye límite estricto en `signup`), comprobación de `Origin`.
-- Pruebas de integración de auth, auto-registro, bloqueo, recuperación y aislamiento de tenant.
-- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro).
+- **Endurecimiento HTTP y rate limiting (Decidido, decisión 34 §20):** helmet, CORS con allowlist, comprobación de `Origin` y la tabla de límites de architecture §8.3 (login 10 / 15 min por IP; signup 10 / hora por IP; forgot-password 5 / hora por IP y correo; 120 / min autenticado; 30 / min anónimo).
+- Pruebas de integración de auth, auto-registro, bloqueo, recuperación, cambio de correo, rate limiting y aislamiento de tenant.
+- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados y recordatorios).
 
-**Fuera de alcance.** Pantallas de `parent` y `admin`; el enum existe (Decidido). Aprobación o rechazo de solicitudes desde el panel (necesita grupos, Etapa 3; aquí solo se construye la API `requests`/`approve`/`reject` sin interfaz). Acceso por código de aula, PIN o avatar: descartado (decisión 22).
+**Fuera de alcance.** Pantallas de `parent` y `admin`; el enum existe (Decidido). Aprobación o rechazo de solicitudes desde el panel (necesita grupos, Etapa 3; aquí solo se construye la API sin interfaz). Acceso por código de aula, PIN o avatar: descartado (decisión 22). Alta directa por la profesora y contraseñas temporales: eliminadas (decisión 34 §1). Cualquier entidad de acudiente o de consentimiento: eliminadas (decisión 34 §1 y §2).
 
-**Entregables.** Un alumno se registra en `/registro` y su cuenta queda pendiente; la profesora entra y ve un panel vacío; un intento de login del alumno pendiente es rechazado con `ACCOUNT_PENDING_APPROVAL`; un alumno recupera su contraseña desde el correo en staging; una petición con JWT de otra organización recibe 403 o resultados vacíos.
+**Entregables.** Un alumno se registra en `/registro` y su cuenta queda pendiente; la profesora entra y ve un panel vacío; un intento de login del alumno pendiente es rechazado con `ACCOUNT_PENDING_APPROVAL`; un alumno recupera su contraseña desde el correo en staging; un alumno cambia su correo con OTP; una petición con JWT de otra organización recibe 403 o resultados vacíos; el undécimo login fallido desde la misma IP en 15 minutos recibe `429`.
 
 **Criterios de salida.**
 
@@ -215,49 +216,55 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 - Test de aislamiento de tenant sobre al menos dos modelos.
 - Test: el décimo intento fallido bloquea la cuenta 10 minutos y el login correcto tras el bloqueo pone el contador a cero.
 - Test: un token de recuperación usado o caducado es rechazado; el restablecimiento revoca las sesiones abiertas.
-- Test: `POST /auth/signup` crea la cuenta en `pending_approval` y el login subsecuente es rechazado con `ACCOUNT_PENDING_APPROVAL` hasta que `approval_status` cambie a `approved`.
+- Test: `POST /auth/signup` crea `User` + `Student` (y ninguna otra fila) en `pending_approval`, rechaza contraseñas fuera de 8–16 caracteres o con espacios, y el login subsecuente es rechazado con `ACCOUNT_PENDING_APPROVAL` hasta que `approval_status` cambie a `approved`.
+- Test: un OTP incorrecto tres veces invalida la solicitud de cambio de correo; el OTP correcto cambia `User.email` y revoca las demás sesiones.
+- Test: cada límite de la tabla de rate limiting responde `429` al superarse.
 - Test: el correo de solicitud recibida y el de recuperación salen del mismo remitente.
 - SPEC-03 Aprobada.
 
 **Dependencias.** SPEC-02 Aprobada. Etapa 1. ENG-019 (correo transaccional) para la recuperación en staging.
 
-**Riesgos.** Cookies entre `app.` y `api.` mal configuradas en Vercel o Render. Mitigación: probar el login en staging en la primera semana; plan B con rewrite de Next (architecture §8.2). Alumnos pequeños sin correo propio: la profesora crea la cuenta con el correo que indique el acudiente y entrega la contraseña temporal en persona.
+**Riesgos.** Cookies entre `app.` y `api.` mal configuradas en Vercel o Render. Mitigación: probar el login en staging en la primera semana; plan B con rewrite de Next (architecture §8.2). Alumnos pequeños sin correo propio: se registran con el correo del acudiente y, cuando tengan el suyo, lo cambian desde el perfil con OTP.
 
 **Tamaño.** M, 2 semanas.
 
-**Tareas.** ENG-020 a ENG-028, SPEC-03.
+**Tareas.** ENG-020, ENG-021, ENG-023 a ENG-029, SPEC-03. (ENG-022 se eliminó el 2026-09-22 por la decisión 34 §1.)
 
 ---
 
 ### Etapa 3 — Gestor de contenidos (CONTEXT §12.3) → Hito H1
 
-**Objetivo.** La profesora crea actividades de los cinco tipos por nivel MCER y gestiona la bandeja de solicitudes de registro, alumnos, acudientes, grupos y estado de consentimiento. Es la etapa más grande y la que decide si el piloto tendrá contenido.
+**Objetivo.** La profesora crea actividades de los cinco tipos por nivel MCER y gestiona la bandeja de solicitudes de registro, alumnos (con los datos de su acudiente), grupos y cuentas bloqueadas, con recordatorios en su dashboard. Es la etapa más grande y la que decide si el piloto tendrá contenido.
 
 **Alcance.**
 
-- Esquemas Zod completos por tipo con separación `config` / `answerKey`: `fill_blank`, `open_question`, `speaking`, `game` con cinco mecánicas, `exam`.
+- Esquemas Zod completos por tipo con separación `config` / `answerKey`: `fill_blank`, `open_question`, `speaking` (con `min_duration_seconds` fijo en 2 y `max_duration_seconds` entre 2 y 300, 120 por defecto), `game` con cinco mecánicas, `exam` (pesos normalizados).
 - Tablas de detalle 1:1 y migración.
-- Endpoints `activities`: CRUD, estados `draft` / `published` / `archived`, duplicar, versionado por duplicación.
-- Panel: layout, navegación, lista de actividades con filtros por nivel y tipo.
-- Formularios: fill in the blanks (editor de oraciones con huecos y opciones), pregunta abierta, speaking, microjuegos (uno por mecánica, derivados del esquema Zod), examen (composición de ítems).
+- Endpoints `activities`: CRUD, estados `draft` / `published` / `archived`, duplicar, versionado por duplicación; **normalización automática de pesos al guardar un examen y mínimo de 2 ítems validado en `publish`** (Decidido, decisión 34 §11 y §12).
+- Panel: layout, navegación, dashboard `inicio/` con tarjetas de recordatorio, lista de actividades con filtros por nivel y tipo.
+- Formularios: fill in the blanks (editor de oraciones con huecos y opciones), pregunta abierta, speaking (con duración máxima configurable), microjuegos (uno por mecánica, derivados del esquema Zod), examen (composición de ítems con pesos; muestra el peso ajustado tras la normalización con un mensaje del ajuste).
 - CRUD de grupos y membresías.
-- **Bandeja de solicitudes de registro (Decidido, CONTEXT §4.1, decisión 33):** interfaz sobre `GET /students/requests`, `POST /students/:id/approve` y `POST /students/:id/reject`, con asignación de nivel y grupo al aprobar. Es la vía principal de alta.
-- Gestión de alumnos y acudientes (alta directa como flujo alterno con correo de acceso, restablecer contraseña, ver y levantar bloqueos); `ConsentRecord` en papel con estado visible en la lista de alumnos, independiente de la aprobación de la cuenta.
+- **Bandeja de solicitudes de registro (Decidido, CONTEXT §4.1, decisión 33):** interfaz sobre `GET /students/requests`, `POST /students/:id/approve` y `POST /students/:id/reject`, con asignación de nivel y grupo y corrección de `guardian_name`, `guardian_contact` y `age_segment` al aprobar. Es la única vía de alta.
+- Gestión de alumnos: edición de nivel, segmento y datos del acudiente (solo la profesora), botón para enviar el enlace de recuperación de contraseña al alumno; **pestaña "Bloqueados"** con desbloqueo en un clic (Decidido, decisión 34 §8).
+- **Recordatorios del dashboard (Decidido, decisión 34 §8):** `GET /dashboard/reminders` y tarjetas de solicitudes pendientes y actividades sin calificar más de `ungraded_reminder_days` (esta segunda se llena con datos reales desde la Etapa 7).
 - Sesión cronometrada de onboarding: la profesora crea su primera actividad en menos de 10 minutos (CONTEXT §5.1).
 - Redacción de SPEC-04 y SPEC-05 en paralelo.
 
-**Fuera de alcance.** Vista previa con el renderizador del alumno (llega en la Etapa 5; hasta entonces, resumen textual de la actividad). Educaplay embebido.
+**Fuera de alcance.** Vista previa con el renderizador del alumno (llega en la Etapa 5; hasta entonces, resumen textual de la actividad). Educaplay embebido. Cualquier pantalla de acudiente o de consentimiento (eliminadas, decisión 34 §1 y §2).
 
-**Entregables.** Panel en staging con acceso para la profesora. Actividades reales cargadas por ella. Al menos una solicitud de auto-registro aprobada de punta a punta en staging.
+**Entregables.** Panel en staging con acceso para la profesora. Actividades reales cargadas por ella. Al menos una solicitud de auto-registro aprobada de punta a punta en staging. Un alumno bloqueado desbloqueado desde la pestaña.
 
 **Criterios de salida.**
 
 - Los cinco tipos se crean, editan, publican y archivan desde el panel.
 - Una actividad publicada con intentos no se puede editar en sitio; solo duplicar o archivar (test).
+- Un examen con un solo ítem no se puede publicar (`EXAM_MIN_ITEMS`) pero sí guardar como borrador (test). Guardar un examen con pesos 30/30/30 devuelve 33,3/33,3/33,4 y el formulario muestra el ajuste (test).
+- El formulario de speaking rechaza una duración máxima mayor de 300 s o menor de 2 s (test del esquema Zod).
 - La profesora creó una actividad de cada tipo sin ayuda en la sesión cronometrada, y la primera en menos de 10 minutos. Si no se cumple, se itera el formulario antes de seguir. No es negociable: CONTEXT dice que el piloto fracasa por falta de contenido antes que por bugs.
-- Todo alumno dado de alta (por auto-registro aprobado o alta directa) tiene acudiente, correo de acceso único y estado de consentimiento.
+- Todo alumno aprobado tiene correo de acceso único, nivel y grupo; `guardian_name` y `guardian_contact` son editables solo por la profesora (test de 403 para el alumno).
 - Aprobar una solicitud activa la cuenta y el alumno puede iniciar sesión de inmediato con la contraseña que fijó en el registro (test).
 - Rechazar una solicitud borra la cuenta sin dejar filas huérfanas (test).
+- La tarjeta de solicitudes pendientes muestra el contador correcto y enlaza a la bandeja (test).
 - SPEC-04 Aprobada; SPEC-05 al menos En revisión.
 
 **Dependencias.** SPEC-03 Aprobada. Etapa 2.
@@ -266,7 +273,7 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Tamaño.** XL, 3–4 semanas.
 
-**Tareas.** ENG-030 a ENG-044, SPEC-04, SPEC-05.
+**Tareas.** ENG-030 a ENG-041, ENG-043 a ENG-045, SPEC-04, SPEC-05. (ENG-042 se eliminó el 2026-09-22 por la decisión 34 §2; ENG-045 es nueva: recordatorios del dashboard.)
 
 ---
 
@@ -276,7 +283,8 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Alcance.**
 
-- Modelo y endpoints `assignments` con `opens_at` y `due_at`. Regla de un intento por asignación (Decidido, decisión 25); la habilitación de un nuevo intento llega en la Etapa 7.
+- Modelo y endpoints `assignments` con `opens_at`, `due_at` y `historical_student_count` (nullable; lo fija el borrado en cascada de la Etapa 5). Regla de un intento por asignación (Decidido, decisión 25); la habilitación de un nuevo intento llega en la Etapa 7.
+- Semántica de `due_at` (Decidido, decisión 34 §10): el cierre se compara con el `started_at` del servidor al iniciar el intento; un intento iniciado a tiempo puede terminarse después. La validación se implementa en la Etapa 5 con el ciclo de intento; aquí se documenta en la interfaz ("los alumnos pueden empezar hasta esta hora").
 - Interfaz de asignación y vista por grupo; fechas en zona America/Bogota.
 - Validaciones: solo actividades `published`; `opens_at < due_at`; no duplicar una asignación activa del mismo par actividad-grupo.
 - E2E flujo 1: la profesora crea y asigna una actividad.
@@ -308,16 +316,17 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 - Layout del alumno con tokens por `age_segment`; navegación de 2 a 4 clics según la zona (architecture §3.1): actividades a 2, resto hasta 3–4.
 - Home con asignaciones abiertas ordenadas por `due_at`.
-- Ciclo de intento en la API: start con `attemptToken` (rechaza un segundo intento sin habilitación), eventos por lotes idempotentes, complete; estados y `flags`.
+- Ciclo de intento en la API: start con `attemptToken` (rechaza un segundo intento sin habilitación; rechaza con `ATTEMPT_CLOSED` si `now()` del servidor ya pasó `due_at`), eventos por lotes idempotentes, complete; estados y `flags`. **`started_at` y `finished_at` los fija el servidor** y los DTOs no aceptan timestamps (Decidido, decisión 34 §3 y §10).
 - Runtime del contrato en el cliente: `ActivityRenderer` y `useAttempt`.
-- `ScoringService` con conversión de fracción de acierto a la escala 0,0–5,0 y umbral de aprobación configurable.
+- `ScoringService` con conversión de fracción de acierto a la escala 0,0–5,0 y umbral de aprobación configurable; ítem no respondido = 0 con su peso en el denominador (decisión 34 §11).
 - Fill in the blanks: renderizador, scorer en servidor y corrección por ítem en `complete`.
 - Pregunta abierta → `pending_review`.
-- Módulo `media`: URLs firmadas, `MediaAsset`, verificación de derechos, límites de tamaño.
-- Speaking: `MediaRecorder`, blob en IndexedDB, subida firmada, confirmación en `complete`.
-- `ProgressEvent`, motor de insignias con `BadgeRule` y rachas semanales perdonables; seed de reglas iniciales (primera tarea, primer audio, 4/8/12 semanas, 5 años).
+- Módulo `media` sobre **Cloudflare R2** (S3 API): URLs firmadas de subida, reproducción y descarga, `MediaAsset` con `converted_key`, verificación de derechos, límite de 10 MB, medición de duración con `ffprobe` y rechazo fuera de 2 s – máximo configurado, **transcodificación asíncrona a MP4/AAC con `ffmpeg`** y fallback al raw si falla (Decidido, decisión 34 §13, §21 y §22).
+- Speaking: `getSupportedMimeType()` + `MediaRecorder`, tope de grabación según `max_duration_seconds`, blob en IndexedDB, subida firmada, confirmación en `complete`.
+- `ProgressEvent`, motor de insignias con `BadgeRule` y rachas semanales con el **algoritmo de 4 reglas** de architecture §9.3; seed de reglas iniciales (primera tarea, primer audio, 4/8/12 semanas, 5 años).
 - Vista de progreso personal: estrellas, insignias, rachas.
-- Borrado en cascada de alumno, con el test escrito antes.
+- **Perfil del alumno** (`perfil/`): cambio de correo con OTP (API de la Etapa 2) y alternar Kids/Teens si `can_switch_interface`; **job mensual** que recalcula la edad y activa `can_switch_interface` a los 11 años (Decidido, decisión 34 §15).
+- Borrado en cascada de alumno, con el test escrito antes; congela `Assignment.historical_student_count` antes de borrar (decisión 34 §14).
 - Texto a voz en consignas Kids; objetivos táctiles grandes.
 - Vista previa de actividad en el panel reutilizando el renderizador (cierra ENG-039, nacida en la Etapa 3).
 - E2E flujo 2: el alumno completa una actividad.
@@ -325,26 +334,30 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Fuera de alcance.** Microjuegos (Etapa 6). Feedback de la profesora y nuevo intento (Etapa 7). Cola offline completa (Etapa 9): en esta etapa el blob de audio ya se persiste localmente, pero el reintento automático llega después.
 
-**Entregables.** Portal usable en tablet con los dos temas. Segundo E2E en CI.
+**Entregables.** Portal usable en tablet con los dos temas. Un audio grabado en Chrome/Android se reproduce en Safari de escritorio gracias al MP4 convertido. Segundo E2E en CI.
 
 **Criterios de salida.**
 
-- Un alumno Kids y uno Teens ven temas distintos con los mismos componentes (verificación visual y test de `data-theme`).
-- El scorer de fill in the blanks tiene pruebas unitarias con casos límite: respuesta vacía, ítem faltante, duplicados; la conversión a 0,0–5,0 tiene pruebas de redondeo y de rango.
+- Un alumno Kids y uno Teens ven temas distintos con los mismos componentes (verificación visual y test de `data-theme`). Un alumno de 11+ alterna de interfaz desde su perfil y el tema cambia sin relogin; uno de 9 años no ve la opción (tests).
+- El scorer de fill in the blanks tiene pruebas unitarias con casos límite: respuesta vacía, ítem faltante (puntaje 0, peso en el denominador), duplicados; la conversión a 0,0–5,0 tiene pruebas de redondeo y de rango.
 - Cada zona del portal respeta su techo de clics (revisión contra la tabla de architecture §3.1 en la spec).
-- Un segundo `POST /assignments/:id/attempts` del mismo alumno responde `ATTEMPT_ALREADY_EXISTS` (test).
+- Un segundo `POST /assignments/:id/attempts` del mismo alumno responde `ATTEMPT_ALREADY_EXISTS` (test). Iniciar tras `due_at` responde `ATTEMPT_CLOSED`; un intento iniciado antes y completado después se califica normalmente (tests con reloj simulado).
+- Un DTO de `start`, `events` o `complete` con `startedAt` o `finishedAt` es rechazado por `forbidNonWhitelisted` (test).
 - Un audio grabado con la red cortada a mitad de subida no se pierde: queda en IndexedDB y se puede reintentar manualmente.
-- El test de borrado en cascada pasa y no deja objetos en el bucket.
+- Un audio de 1 s es rechazado con `AUDIO_IMPLAUSIBLE_DURATION`; uno que supera el máximo de la actividad, con `AUDIO_EXCEEDS_MAX_DURATION` (tests). Tras confirmar una subida, `converted_key` queda fijado y el raw desaparece de R2; si `ffmpeg` falla, `converted_key` es `null` y el raw sigue (tests).
+- El motor de rachas pasa los tests de las 4 reglas: racha 0 no consume perdón, perdón usado se recupera tras 2 semanas activas, no acumulación, dos inactivas rompen.
+- El test de borrado en cascada pasa, no deja objetos en R2 y el `historical_student_count` de las asignaciones cerradas del alumno queda fijado.
+- El job mensual activa `can_switch_interface` a quien cumplió 11 años y no cambia `age_segment` (test con reloj simulado).
 - El E2E del flujo 2 pasa en CI.
 - SPEC-06 y SPEC-07 Aprobadas.
 
-**Dependencias.** SPEC-05 Aprobada. Etapa 4. ENG-007 y ENG-008 (tokens y observación con niños) de la Etapa 0.
+**Dependencias.** SPEC-05 Aprobada. Etapa 4. ENG-007 y ENG-008 (tokens y observación con niños) de la Etapa 0. `ffmpeg` en la imagen de la API (Etapa 1).
 
-**Riesgos.** `MediaRecorder` en iOS Safari tiene formatos y permisos distintos; mitigación: probar en un iPhone o iPad real en la primera semana de la etapa. Los niños no entienden la navegación; mitigación: la observación con niños de la Etapa 0 debe haber ocurrido; si no, hacerla con el primer build de esta etapa.
+**Riesgos.** `MediaRecorder` en iOS Safari tiene permisos distintos e irregularidades; mitigación: `getSupportedMimeType()` y probar en un iPhone o iPad real en la primera semana de la etapa. Transcodificación lenta en la instancia gratuita de Render; mitigación: audios de máximo 5 minutos, AAC mono 64 kbps, cola con reintentos y fallback al raw. Los niños no entienden la navegación; mitigación: la observación con niños de la Etapa 0 debe haber ocurrido; si no, hacerla con el primer build de esta etapa.
 
 **Tamaño.** XL, 3–4 semanas.
 
-**Tareas.** ENG-060 a ENG-072, ENG-039, SPEC-06, SPEC-07.
+**Tareas.** ENG-060 a ENG-073, ENG-039, SPEC-06, SPEC-07. (ENG-073 es nueva: perfil del alumno y job mensual de `age_segment`.)
 
 ---
 
@@ -388,30 +401,31 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Alcance.**
 
-- Endpoint de cola (`pending_review`) y de calificados (incluidos los autocalificados) con filtros por grupo, tipo y fecha; polling de 30 s en el panel.
-- Interfaz de calificación y feedback con dos pestañas: reproducir audio con URL firmada, leer respuesta, calificar 0,0–5,0, comentar, stickers, y el campo **"Habilitar nuevo intento"** (Decidido, decisión 25).
-- `Review` actualiza el intento, emite `ProgressEvent(review_received)` y fija `retention_until` del audio (`graded_at + retention_days`).
+- Endpoint de cola (`pending_review`) y de calificados (incluidos los autocalificados) con filtros por grupo, tipo y fecha; polling de 30 s en el panel. La tarjeta "sin calificar hace más de N días" del dashboard (Etapa 3) pasa a mostrar datos reales.
+- Interfaz de calificación y feedback con dos pestañas: reproducir audio con URL firmada del MP4 convertido (o del raw con aviso si `converted_key` es `null`), **botón de descarga del audio** (Decidido, decisión 34 §6), leer respuesta, calificar 0,0–5,0, comentar, stickers, y el campo **"Habilitar nuevo intento"** (Decidido, decisión 25).
+- `Review` actualiza el intento con `graded_at` del servidor, emite `ProgressEvent(review_received)`, fija `retention_until` del audio (`graded_at + retention_days`) y **envía al alumno el correo de notificación de calificación, sin nota ni feedback** (Decidido, decisión 34 §5).
 - Endpoint `grant-retry` para intentos ya calificados, con `extendUntil` opcional; el alumno ve la habilitación en su home y el nuevo intento enlaza al anterior.
-- Job nocturno de retención de audios: borrado de calificados vencidos y de subidas no confirmadas (architecture §4.5). Nace en la Etapa 11 y se adelanta aquí porque la política ya está decidida.
-- Vista de feedback en el portal del alumno, por actividad y agregada en `/feedback` (3–4 clics).
+- Job nocturno de retención de audios: borrado en R2 del raw y del convertido de los calificados vencidos (30 días) y de las subidas no confirmadas (7 días) (architecture §4.5). Nace en la Etapa 11 y se adelanta aquí porque la política ya está decidida.
+- Vista de feedback en el portal del alumno, por actividad y agregada en `/feedback` (3–4 clics); es el destino del enlace del correo.
 - E2E flujo 3: la profesora califica y el alumno ve el feedback.
 - Redacción de SPEC-08 (si no se cerró en la 6) en paralelo.
 
-**Entregables.** Área de calificación operativa; feedback visible para el alumno; nuevo intento funcionando de punta a punta; audios calificados se borran al vencer el plazo en staging. Tercer E2E en CI.
+**Entregables.** Área de calificación operativa; feedback visible para el alumno; correo de notificación recibido en staging; nuevo intento funcionando de punta a punta; audios calificados se borran al vencer el plazo en staging. Tercer E2E en CI.
 
 **Criterios de salida.**
 
 - Cada intento calificado manualmente tiene un comentario (Decidido: feedback personal por intento; el campo es obligatorio, los stickers son opcionales).
 - Una calificación fuera de 0,0–5,0 es rechazada (test).
+- Al calificar se envía exactamente un correo al alumno cuyo cuerpo no contiene la nota ni el comentario, solo el aviso y el enlace a `/feedback` (test sobre el `MailService` en modo log).
 - Habilitar un nuevo intento permite exactamente un intento más; un segundo `grant-retry` sin usar el anterior es rechazado; las estadísticas usan el último intento calificado (tests).
-- Una URL firmada de audio caduca a los 5 minutos (test).
-- Un alumno no puede pedir la URL del audio de otro alumno (test).
-- El job de retención borra el objeto del bucket y conserva `Review` y `Attempt.score` (test de integración con reloj simulado).
+- Una URL firmada de audio caduca a los 5 minutos (test). La URL de descarga lleva `Content-Disposition: attachment` (test).
+- Un alumno no puede pedir la URL del audio de otro alumno ni la suya propia: solo la profesora reproduce y descarga (test).
+- El job de retención borra raw y `_converted.mp4` de R2 y conserva `Review` y `Attempt.score` (test de integración con reloj simulado).
 - El E2E del flujo 3 pasa en CI.
 
 **Dependencias.** SPEC-07 Aprobada. Etapa 5. Independiente de la Etapa 6.
 
-**Riesgos.** Reproducción de WebM/Opus en Safari de escritorio; mitigación: recomendar Chrome o Edge a la profesora y documentarlo. Confusión entre "comentar un intento automático" y "habilitar nuevo intento"; mitigación: el campo de habilitación es un interruptor explícito con texto de confirmación.
+**Riesgos.** Confusión entre "comentar un intento automático" y "habilitar nuevo intento"; mitigación: el campo de habilitación es un interruptor explícito con texto de confirmación. Correos de calificación que terminan en spam; mitigación: dominio verificado (SPF, DKIM) y asunto estable. La reproducción de WebM/Opus en Safari dejó de ser riesgo con la transcodificación de la Etapa 5 (decisión 34 §22).
 
 **Tamaño.** M, 1.5–2 semanas.
 
@@ -425,18 +439,21 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Alcance.**
 
-- Consultas agregadas: serie de calificaciones por alumno, promedios por tipo, nivel y grupo, semanas activas y rachas, finalización de lo asignado, tiempo por actividad con recorte de valores implausibles; agregados diario, semanal y mensual; índices; regla del último intento calificado.
+- Consultas agregadas: serie de calificaciones por alumno, promedios por tipo, nivel y grupo, semanas activas y rachas, finalización de lo asignado, tiempo por actividad con recorte de valores implausibles; agregados diario, semanal y mensual; índices; regla del último intento calificado; **denominador congelado** (`Assignment.historical_student_count`) para asignaciones cerradas y conteo de activos para las abiertas (Decidido, decisión 34 §14).
 - Vista por estudiante (línea de tiempo de rendimiento + calendario de constancia), vista por grupo (tabla de ambos ejes) y vista general, según architecture §9.4.
-- Panel con polling.
-- Leaderboard solo para `teacher`, con test de 403 para alumnos.
+- Panel con polling. Acceso **solo por RBAC** (`@Roles('teacher')`), sin feature flags (Decidido, decisión 34 §7).
+- Leaderboard solo para `teacher`, con test de 403 para alumnos por el `RolesGuard`.
+- **Correo de pendientes a la profesora cada 3 días** (Decidido, decisión 34 §18): job que reutiliza el `PendingSummaryService` del dashboard y envía `teacher-pending-summary` solo si hay solicitudes sin aprobar o actividades sin calificar más de `ungraded_reminder_days`.
 - Redacción de SPEC-09 en paralelo.
 
-**Entregables.** Panel estadístico funcional con las tres vistas; leaderboard privado.
+**Entregables.** Panel estadístico funcional con las tres vistas; leaderboard privado; correo de pendientes recibido en staging con datos de prueba.
 
 **Criterios de salida.**
 
-- Ninguna consulta de estadísticas supera 500 ms con datos de prueba de 100 alumnos y 3 meses de intentos (script de seed de volumen).
-- Un `student` recibe 403 en el leaderboard (test).
+- Ninguna consulta de estadísticas supera 500 ms con `seed-volume.ts` (100 alumnos, 3 meses de intentos).
+- Un `student` recibe 403 en el leaderboard y en todo `GET /stats/*` (test).
+- Borrar un alumno no cambia el promedio ni la tasa de finalización de una asignación ya cerrada (test).
+- El job de pendientes no envía correo cuando no hay pendientes y envía uno con ambas secciones cuando las hay (test con reloj simulado y `MailService` en modo log).
 - La profesora, en sesión de validación en staging, identifica sin ayuda para un alumno concreto si mejora o empeora y si entra con constancia. Si no lo consigue, se iteran las vistas antes de cerrar la etapa.
 - SPEC-09 Aprobada.
 
@@ -446,7 +463,7 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Tamaño.** M, 1–1.5 semanas.
 
-**Tareas.** ENG-100 a ENG-103, SPEC-09.
+**Tareas.** ENG-100 a ENG-104, SPEC-09. (ENG-104 es nueva: correo de pendientes.)
 
 ---
 
@@ -457,16 +474,18 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 **Alcance.**
 
 - Manifest, iconos, service worker (Serwist), instalación.
+- **Notificación de actualizaciones (Decidido, decisión 34 §4):** detección de nueva versión del SW (`waiting`) o del header `X-App-Min-Version` de la API, notificación in-app no bloqueante con botón "Reiniciar y actualizar", texto adaptado a Kids, Teens y panel; nunca a mitad de un intento (architecture §3.7 y §10.2).
 - Cola offline en IndexedDB para eventos y audios con reintento automático al reconectar y al abrir la app.
 - Pase de accesibilidad: contraste AA en ambos temas (axe en CI), foco, tamaños táctiles, texto a voz.
 - Prueba de rendimiento en una tablet Android real de gama media o baja.
 
-**Entregables.** PWA instalable; pruebas de red cortada documentadas; informe de accesibilidad y rendimiento.
+**Entregables.** PWA instalable; pruebas de red cortada documentadas; informe de accesibilidad y rendimiento; un despliegue nuevo en staging muestra la notificación de actualización en un dispositivo con la versión anterior abierta.
 
 **Criterios de salida.**
 
 - Escenario probado: el alumno completa una ficha en modo avión y las respuestas llegan al servidor al reconectar, sin duplicados (test con `clientEventId`).
 - Escenario probado: un audio grabado sin red se sube solo al recuperar la conexión.
+- Escenario probado: tras publicar una versión nueva, la app abierta muestra la notificación y el botón aplica la actualización; con un intento en curso, la notificación espera.
 - axe no reporta violaciones de contraste en las pantallas del alumno.
 - El portal carga y los juegos responden en la tablet de control sin bloqueos perceptibles.
 
@@ -507,20 +526,20 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 - Suite E2E completa (tres flujos) ejecutándose en CI contra staging.
 - Captura de errores de frontend con rol y versión, con alertas al equipo.
 - Verificación del plan de backups de Supabase y ensayo de restauración en staging.
-- Producción en Vercel y Render con dominio propio, instancia de Render siempre activa, correo transaccional con dominio real verificado.
+- Producción en Vercel, Render y Cloudflare R2 con dominio propio, instancia de Render siempre activa, correo transaccional con dominio real verificado.
 - Contenido inicial cargado por la profesora: checklist por nivel A1–B2 con un mínimo acordado de actividades por nivel y tipo.
-- Consentimientos en papel recogidos y registrados para el 100 % de los alumnos activos.
-- Cuentas de alumnos creadas con su correo de acceso y contraseña temporal entregada.
+- **Manual de uso de la profesora (Decidido, decisión 34 §19):** documento en español, tono casual y conversacional, que cubre alumnos, grupos, actividades, asignaciones, calificación, feedback, estadísticas, bloqueados y configuración, con capturas o descripciones de cada flujo; entregado como `.md` o como sección de ayuda del panel.
+- Alumnos activos auto-registrados y aprobados desde la bandeja antes del primer día; prueba de login de una muestra en producción.
 - Checklist de lanzamiento y reunión go/no-go.
 - Todas las specs SPEC-01 a SPEC-10 en estado Verificada.
 
-**Entregables.** Producción desplegada; checklist firmada.
+**Entregables.** Producción desplegada; manual entregado; checklist firmada.
 
 **Criterios de salida** (condiciones de CONTEXT §12.11).
 
-- Consentimientos: cero alumnos activos en estado `pending`.
 - Contenido cargado según la checklist.
 - Estadísticas de rendimiento y constancia operativas y validadas por la profesora (Etapa 8).
+- Manual de uso revisado por la profesora.
 - Restauración de backup ensayada con éxito al menos una vez.
 - Los tres E2E verdes en la versión que se despliega.
 - Captura de errores recibiendo eventos de producción.
@@ -528,11 +547,11 @@ Cerrado antes de esta versión (2026-09-21): hosting, UX de acceso del alumno, r
 
 **Dependencias.** Todas las anteriores.
 
-**Riesgos.** Alumnos que no consiguen entrar el primer día por contraseñas olvidadas; mitigación: la profesora tiene el restablecimiento con contraseña temporal a un clic y la lista de bloqueados visible. Nombre definitivo del producto sin decidir: se lanza con "Englove" como provisional (CONTEXT §15).
+**Riesgos.** Alumnos que no consiguen entrar el primer día por contraseñas olvidadas; mitigación: la profesora envía el enlace de recuperación a un clic desde la ficha del alumno y tiene la pestaña de bloqueados visible. Nombre definitivo del producto sin decidir: se lanza con "Englove" como provisional (CONTEXT §15).
 
 **Tamaño.** M, 1–2 semanas, más el tiempo de carga de contenido de la profesora, que empieza en H1.
 
-**Tareas.** ENG-130 a ENG-132, ENG-135 a ENG-139.
+**Tareas.** ENG-130 a ENG-132, ENG-135, ENG-137 a ENG-139, DOC-06. (ENG-136 se eliminó el 2026-09-22 por la decisión 34 §2; DOC-06 es nueva: manual de la profesora.)
 
 ---
 
@@ -563,11 +582,11 @@ Solo horizonte, sin plan detallado. Se planifica cuando el piloto lo justifique.
 Bloques en orden orientativo:
 
 1. Multi-tenant real: segunda `Organization`, onboarding de profesores, rol `admin` con pantallas.
-2. Consentimiento digital con evidencia (timestamp, versión del documento, IP); registro autónomo del acudiente.
-3. Rol `parent` con pantallas: progreso de sus hijos.
-4. Muro privado de actividades presenciales: fotos sin metadatos EXIF, URLs firmadas, acceso solo a acudientes del grupo, autorización de uso de imagen.
-5. Phaser detrás del contrato de actividad, sin cambios en API ni panel.
-6. Capacitor, cumplimiento de los programas infantiles de las tiendas, publicación.
+2. Muro privado de actividades presenciales: fotos sin metadatos EXIF, URLs firmadas en R2, acceso restringido al grupo.
+3. Phaser detrás del contrato de actividad, sin cambios en API ni panel.
+4. Capacitor y publicación en tiendas.
+
+Un rol de acudiente con pantallas (el valor `parent` del enum queda reservado) o cualquier gestión de consentimiento dentro de la plataforma requieren una decisión nueva en CONTEXT §14 (decisión 34 §1 y §2); no están planificados.
 
 ### 6.3 Fase 3 — SaaS (CONTEXT §2.3)
 
@@ -585,9 +604,10 @@ Bloques en orden orientativo:
 | Código sin spec ("luego la escribo") | Un PR sin enlace a spec; una prueba sin RF                       | La plantilla de PR y la Definición de Hecho lo exigen; el revisor devuelve el PR                             |
 | Specs que se escriben todas al inicio | SPEC-05 redactada antes de terminar la Etapa 2                 | Calendario de sdd-process §7: una etapa por delante                                                          |
 | Cookies entre Vercel y Render       | Las cookies no llegan a la API en staging                       | Dominio propio en ambas capas (architecture §8.2); probar en la Etapa 2; plan B con rewrite de Next          |
-| Formatos de audio entre navegadores | La profesora no puede reproducir un audio                       | Probar Chrome, Edge y Safari en la Etapa 5; recomendar navegador; transcodificación en Fase 2                |
-| Niños abandonan por fricción        | Bajada de semanas activas tras la primera semana                | Observación con niños en la Etapa 0; 2–4 clics según zona; sesión de 90 días; captura de errores activa      |
-| Alumnos que olvidan la contraseña   | Bloqueos frecuentes en el panel; alumnos que dejan de entrar    | Contraseña temporal por la profesora a un clic; recuperación por correo; frases memorables en Kids           |
-| Abuso del auto-registro (endpoint público) | Solicitudes falsas o repetidas en la bandeja de la profesora | Throttling estricto en `signup` (architecture §8.3); rechazo borra en cascada sin dejar rastro; la profesora nunca aprueba sin verificar al acudiente |
+| Formatos de audio entre navegadores | `converted_key` queda `null` en muchos `MediaAsset`             | Resuelto por diseño: detección de codec en cliente + transcodificación a MP4/AAC en servidor (decisión 34 §22); vigilar la tasa de fallos de `ffmpeg` en staging |
+| Niños abandonan por fricción        | Bajada de semanas activas tras la primera semana                | Observación con niños en la Etapa 0; 2–4 clics según zona; sesión de 90 días; captura de errores activa; estados de error amigables |
+| Alumnos que olvidan la contraseña   | Bloqueos frecuentes en el panel; alumnos que dejan de entrar    | Enlace de recuperación enviado por la profesora a un clic; pestaña de bloqueados; frases memorables de 8–16 caracteres en Kids |
+| Abuso del auto-registro (endpoint público) | Solicitudes falsas o repetidas en la bandeja de la profesora | Throttling de 10 por hora por IP en `signup` (architecture §8.3); rechazo borra en cascada sin dejar rastro; la profesora nunca aprueba sin reconocer al alumno; CAPTCHA posible en Etapa 2 |
+| Almacenamiento de audios se desborda | Uso de R2 cerca del límite de la capa gratuita                 | Retención de 30 / 7 días; MP4 comprimido y raw borrado tras convertir; tope de 5 minutos por audio; alerta de uso del bucket |
 | Scope creep hacia CONTEXT §2.4      | Aparece una tarea de WebSockets, Phaser, pagos o muro           | Detener y proponer en CONTEXT §14; el taskboard no admite tareas de §2.4                                     |
 | Una sola persona en el equipo       | Las Etapas 6 y 7 no se solapan; total 17–24 semanas             | Aceptar el calendario (el intercambio de etapas fue rechazado, decisión 31) o sumar una segunda persona en la Etapa 6 |

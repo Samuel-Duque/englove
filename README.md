@@ -17,7 +17,8 @@ Plataforma web educativa, interactiva y gamificada para enseñar inglés a niño
 |---|---|
 | Frontend | Next.js 14+ / React 19, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion |
 | Backend | NestJS, Prisma ORM, JWT + Guards RBAC |
-| Base de datos | PostgreSQL 16 en Supabase Cloud (solo Postgres + Storage) |
+| Base de datos | PostgreSQL 16 en Supabase Cloud (solo Postgres) |
+| Archivos | Cloudflare R2 (audios raw y MP4 transcodificados con ffmpeg) |
 | Monorepo | pnpm workspaces + Turborepo (`apps/web`, `apps/api`, `packages/shared`) |
 | Hosting | Frontend → Vercel · Backend → Render |
 | Correo | Resend |

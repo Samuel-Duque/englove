@@ -10,9 +10,11 @@
 >
 > Documentos hermanos: [`sdd-process.md`](./sdd-process.md) (metodología), [`pbp-development.md`](./pbp-development.md) (etapas de construcción) y [`taskboard.md`](./taskboard.md) (tareas y estado). Las specs de `specs/` detallan cada capacidad a partir de este documento.
 >
-> Última actualización: 2026-09-28. Aplica `planning/decisiones-para-correccion-de-planeacion.md` (CONTEXT §14, decisión 57): cookies con `Domain=.<dominio>` (§8.2), correo globalmente único y registro sin enumeración de cuentas (§6.4, §7.2), tolerancia de 24 h y cierre efectivo (§7.5), `Attempt.retry_extend_until` y consumo atómico de la habilitación (§6.5, §7.7), OTP al correo nuevo (§7.4), cambio administrativo del correo con `AuditLog` (§7.3), una sola instancia con recuperación de la cola de transcodificación (§4.5, §11.4) y terminología de tipos de actividad y mecánicas de juego (§6.3). Los detalles nuevos se listan en §14.4; las decisiones menores pendientes, con su propuesta, en §15.
+> Última actualización: 2026-09-28 (Ronda 5). Aplica `planning/decisiones-modelo-de-datos.md` (CONTEXT §14, decisión 67): §6 reescrito con el diagrama completo, `AuthSession` (§6.4, §7.1), `EmailChangeRequest.failed_attempts` (§7.4), exámenes solo con ítems `fill_blank` (§4.4), nueva forma de `ProgressEvent` (§9.1), calificación única en `Attempt.score` / `graded_at` y `Review` solo como feedback (§7.7), un solo grupo vigente por alumno (§6.4, §7.2, §9.4), `Attempt.attempt_number` (§6.5, §7.5), `answer_key` en columna propia (§5.3), `ScheduledJobRun` (§4.5), `ApprovalStatus` sin `rejected`, revisión de índices, campos faltantes y política de `onDelete` (§6.2). Los detalles nuevos se listan en §14.5. La propuesta de parámetros de organización con tipo no se adoptó.
 >
-> Actualización anterior: 2026-09-22, `planning/incongruencias-y-decisiones-definitivas.md` (decisión 34): sin `Guardian` ni consentimiento, Cloudflare R2, transcodificación de audios, timestamps en servidor, algoritmo de rachas, rate limiting, `age_segment`, denominador congelado, estados de error y notificación de actualizaciones de la PWA (§14.3).
+> Actualización anterior (Ronda 4): 2026-09-28, `planning/decisiones-para-correccion-de-planeacion.md` (CONTEXT §14, decisión 57): cookies con `Domain=.<dominio>` (§8.2), correo globalmente único y registro sin enumeración de cuentas (§6.4, §7.2), tolerancia de 24 h y cierre efectivo (§7.5), `Attempt.retry_extend_until` y consumo atómico de la habilitación (§6.5, §7.7), OTP al correo nuevo (§7.4), cambio administrativo del correo con `AuditLog` (§7.3), una sola instancia con recuperación de la cola de transcodificación (§4.5, §11.4) y terminología de tipos de actividad y mecánicas de juego (§6.3). Los detalles nuevos se listan en §14.4; las decisiones menores pendientes, con su propuesta, en §15.
+>
+> Ronda 3: 2026-09-22, `planning/incongruencias-y-decisiones-definitivas.md` (decisión 34): sin `Guardian` ni consentimiento, Cloudflare R2, transcodificación de audios, timestamps en servidor, algoritmo de rachas, rate limiting, `age_segment`, denominador congelado, estados de error y notificación de actualizaciones de la PWA (§14.3).
 
 ---
 
@@ -260,7 +262,7 @@ Cada módulo es `controller` → `service` → Prisma. Sin repositorios genéric
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth`          | login con correo y contraseña (todos los roles, sin organización: correo globalmente único), auto-registro del alumno (crea `User` + `Student`; respuesta uniforme si el correo ya existe), cookies con `Domain=.<dominio>`, refresh rotativo, logout, recuperación de contraseña, cambio de correo con OTP al correo nuevo, bloqueo por intentos | `POST /auth/login`, `POST /auth/signup`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /me/email-change`, `POST /me/email-change/confirm`                                                                   |
 | `students`      | alumnos, nivel, segmento, datos del acudiente (`guardian_name`, `guardian_contact`), aprobación de solicitudes, iniciar recuperación de contraseña, cambio administrativo del correo con `AuditLog` (§7.3), bloqueados y desbloqueo, cambio de interfaz, borrado en cascada | `GET/PATCH/DELETE /students` (`PATCH` no modifica el correo), `GET /students/requests`, `POST /students/:id/approve`, `POST /students/:id/reject`, `POST /students/:id/reset-password` (envía el enlace al correo del alumno), `POST /students/:id/change-email`, `GET /students/locked`, `POST /students/:id/unlock`, `PATCH /me/interface` |
-| `groups`        | grupos y membresías                                                                                                                                                                                                                                    | `/groups`, `/groups/:id/members`                                                                                                                                                                                                                                          |
+| `groups`        | grupos (archivables) y membresías con un solo grupo vigente por alumno (decisión 73)                                                                                                                                                                  | `/groups`, `/groups/:id/members`, `PUT /students/:id/group`                                                                                                                                                                                                                                        |
 | `activities`    | CRUD de actividades y detalle por tipo, estados, versionado, normalización de pesos de examen, mínimo de ítems al publicar                                                                                                                             | `/activities`, `POST /activities/:id/publish`, `POST /activities/:id/duplicate`                                                                                                                                                                                           |
 | `assignments`   | asignación a grupos con fechas; `historical_student_count`                                                                                                                                                                                             | `/assignments`, `GET /me/assignments`                                                                                                                                                                                                                                     |
 | `attempts`      | ciclo start / events / complete, scoring, control de un intento por asignación con consumo atómico de la habilitación, validación del cierre efectivo sobre `started_at` del servidor, tolerancia de 24 h para completar | `POST /assignments/:id/attempts`, `POST /attempts/:id/events`, `POST /attempts/:id/complete`                                                                                                                                                                              |
@@ -288,7 +290,8 @@ Regla: nada específico de un tipo de actividad se valida con class-validator; n
 
 Orden de ejecución: `JwtAuthGuard` → `RolesGuard` → `TenantContext`.
 
-- El JWT contiene `sub` (user id), `role`, `org` (organization_id), `sid` (familia de sesión) y, para alumnos, `student_id` y `age_segment`. El login es el mismo endpoint para todos los roles; el rol sale de `User.role`, nunca del cliente.
+- El JWT contiene `sub` (user id), `role`, `org` (organization_id), `sid` (familia de sesión, `AuthSession.id`) y, para alumnos, `student_id` y `age_segment`. El login es el mismo endpoint para todos los roles; el rol sale de `User.role`, nunca del cliente.
+- `JwtAuthGuard` rechaza el access token si su `AuthSession` está revocada (decisión 68). Con 100 alumnos la consulta por clave primaria en cada petición es despreciable.
 - `TenantContext` expone `organization_id` durante toda la petición mediante AsyncLocalStorage.
 - Una extensión de Prisma Client añade `where: { organization_id }` a todas las operaciones sobre modelos de tenant. Los servicios además filtran explícitamente. El doble filtro es deliberado: defensa en profundidad para el multi-tenant real de Fase 2.
 - Un test de esquema verifica que toda tabla marcada como tenant tiene `organization_id`.
@@ -300,21 +303,21 @@ Orden de ejecución: `JwtAuthGuard` → `RolesGuard` → `TenantContext`.
 | Tipo de actividad | Scorer (fracción de acierto)                                                                                                                                                  | Resultado                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | `fill_blank`    | ítems correctos / ítems totales, comparando `answers` con `answerKey`; un hueco sin respuesta cuenta como incorrecto                                                            | `graded`, corrección por ítem |
-| `exam`          | media ponderada de sus ítems; cada ítem reutiliza el scorer de su subtipo; pesos normalizados en `ExamDetail`; un ítem no respondido aporta 0 y su peso entra en el denominador | `graded`                      |
+| `exam`          | media ponderada de sus ítems, que son exclusivamente `fill_blank` (decisión 70); cada ítem reutiliza el scorer de `fill_blank`; pesos normalizados en `ExamDetail`; un ítem no respondido aporta 0 y su peso entra en el denominador | `graded`                      |
 | `game`          | por mecánica de juego (`match`, `order_words`, `drag_drop`, `memory`, `timed_choice`): aciertos, errores y tiempo según fórmula del esquema de la mecánica; valida duración plausible                                                                   | `graded`                      |
 | `open_question` | ninguno; la profesora introduce el `score` 0,0–5,0 en la revisión                                                                                                               | `pending_review`              |
 | `speaking`      | ninguno; la profesora introduce el `score` 0,0–5,0 en la revisión                                                                                                               | `pending_review`              |
 
 Reglas de la escala:
 
-- `Attempt.score` y `Review.score` son `numeric(2,1)` entre `0.0` y `5.0`. La API rechaza cualquier otro valor con `SCORE_OUT_OF_RANGE`.
+- `Attempt.score` es `numeric(2,1)` entre `0.0` y `5.0` (con `CHECK` en base de datos) y es la **única** columna de calificación: la revisión manual también escribe en ella, y `Review` no guarda nota (decisión 72). La API rechaza cualquier otro valor con `SCORE_OUT_OF_RANGE`.
 - Umbral de aprobación `3.0` (Decidido), leído de `FeatureFlag`/configuración de la organización como `passing_score`. Determina el estado visual "aprobado / por mejorar" en el portal y en el panel; no bloquea nada.
 - La interfaz muestra la coma decimal (`4,5`); la API y la base de datos usan punto (`4.5`).
 - Las estrellas del alumno se derivan del `score`: 0–1 estrellas por debajo del umbral, 2 estrellas entre el umbral y 4,4, 3 estrellas de 4,5 en adelante (Decidido, A16).
 
-Validación de plausibilidad: si `finished_at - started_at` es menor que un mínimo por tipo (por ejemplo, 3 s por ítem), el intento se califica igual pero se marca con `flags: ['implausible_duration']` para que la profesora lo vea. No se rechaza: un niño que responde rápido no debe perder su trabajo. Los umbrales viven en la configuración de la actividad con valores por defecto. La única excepción es el audio de speaking menor de 2 s, que sí se rechaza (§3.5).
+Validación de plausibilidad: si `finished_at - started_at` es menor que un mínimo por tipo (por ejemplo, 3 s por ítem), el intento se califica igual pero se marca con `flags: ['implausible_duration']` para que la profesora lo vea. No se rechaza: un niño que responde rápido no debe perder su trabajo. El umbral vive en `Activity.min_plausible_seconds`, con valor por defecto por tipo en `packages/shared` (decisión 79). La única excepción es el audio de speaking menor de 2 s, que sí se rechaza (§3.5).
 
-**Reloj del servidor (Decidido, decisión 34 §3).** `started_at` y `finished_at` (y `graded_at`, `occurred_at`, `reviewed_at`) los asigna la API en el momento en que recibe y procesa la petición (`new Date()` en NestJS o `now()` en PostgreSQL). El cliente nunca los envía; si los envía, `whitelist: true` los descarta. Es lo que hace fiables la validación de plausibilidad, las estadísticas de tiempo, las rachas y la regla de `due_at` (§7.5).
+**Reloj del servidor (Decidido, decisión 34 §3).** `started_at` y `finished_at` (y `Attempt.graded_at`, `occurred_at`, `joined_at` / `left_at` de las membresías) los asigna la API en el momento en que recibe y procesa la petición (`new Date()` en NestJS o `now()` en PostgreSQL). El cliente nunca los envía; si los envía, `whitelist: true` los descarta. Es lo que hace fiables la validación de plausibilidad, las estadísticas de tiempo, las rachas y la regla de `due_at` (§7.5).
 
 **Reglas de examen (Decidido, decisión 34 §11 y §12):**
 
@@ -327,15 +330,18 @@ Validación de plausibilidad: si `finished_at - started_at` es menor que un mín
 Con `@nestjs/schedule`:
 
 - Nocturna: marcar `abandoned` los intentos `in_progress` cuyo **cierre efectivo + 24 h** ya pasó (el mismo margen del `attemptToken`, §7.5; Decidido, decisión 60). El cierre efectivo es `Assignment.due_at`, o el `retry_extend_until` del intento anterior cuando el intento es un nuevo intento habilitado con plazo (decisión 61). Un intento iniciado antes del cierre puede terminarse dentro de la tolerancia (decisión 34 §10); solo se abandona el que no se completó en esa ventana.
-- Nocturna, **retención de audios** (Decidido, CONTEXT §9, decisiones 27 y 34 §6): borrar de R2 el raw y el `_converted.mp4` de los `MediaAsset` con `retention_until < now()` (`retention_until = graded_at + 30 días`); borrar los `MediaAsset` en `pending_upload` creados hace más de `pending_upload_ttl_days` (7); reintentar los `pending_delete` que fallaron. Al borrar, el registro pasa a `deleted` y conserva `attempt_id`, `mime_type`, `duration_seconds` y `deleted_at` para trazabilidad; `Review` y `Attempt.score` no se tocan. Ambos plazos son configurables por organización.
+- Nocturna, **retención de audios** (Decidido, CONTEXT §9, decisiones 27 y 34 §6): borrar de R2 el raw y el `_converted.mp4` de los `MediaAsset` con `retention_until < now()` (`retention_until = Attempt.graded_at + 30 días`); borrar los `MediaAsset` en `pending_upload` creados hace más de `pending_upload_ttl_days` (7); reintentar los `pending_delete` que fallaron. Al borrar, el registro pasa a `deleted` y conserva `attempt_id`, `mime_type`, `duration_seconds` y `deleted_at` para trazabilidad; `Review` y `Attempt.score` no se tocan. Ambos plazos son configurables por organización.
 - Nocturna: desbloquear cuentas cuyo bloqueo por intentos fallidos ya venció (limpieza; el desbloqueo real es por comparación de `locked_until` en el login).
-- Semanal (lunes 00:05 America/Bogota): recalcular rachas con el algoritmo de §9.3 y emitir `streak_week`.
+- Nocturna — **limpieza de sesiones y tokens (decisión 68):** borrar las `AuthSession` caducadas o revocadas hace más de 30 días y los `PasswordResetToken` / `EmailChangeRequest` caducados.
+- Semanal (lunes 00:05 America/Bogota): recalcular rachas con el algoritmo de §9.3 y emitir `streak_week` con `period_key` = semana ISO cerrada.
 - **Mensual (día 1, 00:10 America/Bogota) — edad e interfaz (Decidido, decisión 34 §15):** recalcular la edad de cada `Student` desde `birth_date`; a quien haya cumplido 11 años se le activa `can_switch_interface = true`. No cambia `age_segment`: solo habilita la opción; el alumno elige desde su perfil.
 - **Cada 3 días (08:00 America/Bogota) — pendientes de la profesora (Decidido, decisión 34 §18):** `PendingSummaryService` cuenta solicitudes de registro sin aprobar y actividades sin calificar con más de `ungraded_reminder_days` desde su cierre. Si hay al menos un pendiente, `MailService.sendTeacherPendingSummary` envía un correo con el detalle y un enlace directo a cada sección. Si no hay ninguno, no se envía nada.
 - **Al confirmar una subida (tarea disparada, no cron) — transcodificación (Decidido, decisión 34 §22):** se encola una tarea `ffmpeg` que convierte el raw a MP4/AAC, sube `<assetId>_converted.mp4` a R2, actualiza `MediaAsset.converted_key` y borra el raw. Si falla, `converted_key` queda `null` y el raw se conserva (§3.5). Cola en memoria con reintento (3 intentos con backoff); sin Redis en el piloto (A14). Válida solo con una instancia (decisión 64).
 - **Al arrancar la API (tarea disparada, no cron) — recuperación de transcodificaciones (Decidido, decisión 64):** busca los `MediaAsset` con `status = ready`, `converted_key` nulo y sin fallo definitivo (índice parcial de §6.5) y los vuelve a encolar. Límite de intentos y fallo definitivo: pendiente P-3 (§15).
 
 Todas las tareas son idempotentes: durante un despliegue Render puede mantener brevemente el proceso anterior y el nuevo a la vez, así que una tarea repetida no debe duplicar efectos (por ejemplo, el correo de pendientes no se reenvía si ya salió en la misma ventana de 3 días, y el borrado de retención tolera objetos ya borrados).
+
+**Registro persistente de ejecución (Decidido, decisión 76).** Como la memoria del proceso no sobrevive a un reinicio, cada tarea periódica registra su ejecución en `ScheduledJobRun` (§6.4): al empezar inserta `(organization_id, job_key, period_key)` con `status = running` (`ON CONFLICT DO NOTHING`); si la fila ya existe en `done`, no hace nada; si está en `failed` o en `running` desde hace más de 1 hora, la retoma; al terminar la marca `done` o `failed`. `period_key`: fecha (nocturnas), semana ISO (semanal), mes (mensual) y ventana de 3 días (correo de pendientes). Los únicos `BadgeAward(student_id, badge_rule_id)` y `ProgressEvent(student_id, type, period_key)` impiden además duplicar insignias y eventos de racha aunque dos procesos coincidan. Las tareas disparadas (transcodificación y recuperación) se apoyan en `MediaAsset.transcode_attempts` y `transcode_failed_at`, no en esta tabla.
 
 Ninguna tarea programada envía la nota ni el feedback por correo; la notificación de calificación la dispara `POST /attempts/:id/review` (§7.7).
 
@@ -399,6 +405,7 @@ El puntaje en servidor solo protege si la clave no viaja al cliente.
 - Tipos calificados (`fill_blank`, `exam`): `registry.toPublicConfig()` elimina `answerKey` antes de responder al alumno. La corrección por ítem se devuelve en la respuesta de `complete`, no antes.
 - Microjuegos (`game`): la mecánica necesita la clave para dar feedback inmediato (por ejemplo, saber si dos tarjetas emparejan). Se acepta que la clave viaje: son actividades de práctica de bajo riesgo, y el servidor recalcula el puntaje y valida duraciones.
 - `speaking` y `open_question` no tienen clave.
+- **Clave en columna propia (Decidido, decisión 75).** La clave se guarda en `answer_key`, separada de `config`, en `FillBlankDetail`, `GameDetail` y `ExamDetail`. Prisma Client la omite por defecto (`omit` global); solo `ScoringService` y el editor de la profesora la piden explícitamente. Así la regla tiene dos capas: la clave no se lee en las consultas del alumno y, si se leyera, `toPublicConfig()` no la serializa. En `game` el servicio la añade de forma explícita a la respuesta.
 
 ### 5.4 Añadir un tipo de actividad (Decidido en CONTEXT §16)
 
@@ -412,6 +419,8 @@ Tres piezas, siempre juntas: esquema Zod en `packages/shared/activities`, tabla 
 
 ### 6.1 Diagrama de relaciones
 
+Completado por la decisión 67 (§12): muestra todas las relaciones. `Organization` se relaciona con **toda** tabla de tenant (§6.2); en el diagrama solo se dibujan sus relaciones de primer nivel para no saturarlo.
+
 ```mermaid
 erDiagram
   Organization ||--o{ User : "tiene"
@@ -419,44 +428,68 @@ erDiagram
   Organization ||--o{ Group : "tiene"
   Organization ||--o{ Activity : "tiene"
   Organization ||--o{ FeatureFlag : "configura"
+  Organization ||--o{ BadgeRule : "define"
   Organization ||--o{ ExternalResource : "publica"
   Organization ||--o{ AuditLog : "registra"
-  User ||--o{ AuditLog : "actor (profesora)"
-  Student ||--o{ AuditLog : "afectado"
+  Organization ||--o{ ScheduledJobRun : "ejecuta"
+  User ||--o{ AuthSession : "familia de sesión (sid)"
   User ||--o{ PasswordResetToken : "solicita"
   User ||--o{ EmailChangeRequest : "solicita"
-  User ||--o| Student : "credenciales (rol student); guardian_name y guardian_contact viven en Student"
-  Student ||--o{ GroupMembership : "pertenece"
+  User ||--o| Student : "credenciales y nombre (rol student)"
+  User ||--o{ Activity : "created_by"
+  User ||--o{ Review : "reviewer_id"
+  User ||--o{ Attempt : "retry_granted_by"
+  User ||--o{ ExternalResource : "created_by"
+  User ||--o{ AuditLog : "actor (profesora)"
+  Student ||--o{ AuditLog : "afectado"
+  Student ||--o{ GroupMembership : "una vigente (left_at nulo) + historial"
   Group ||--o{ GroupMembership : "agrupa"
+  Activity |o--o{ Activity : "parent_id (versión)"
   Activity ||--o| FillBlankDetail : "detalle"
   Activity ||--o| OpenQuestionDetail : "detalle"
   Activity ||--o| SpeakingDetail : "detalle"
   Activity ||--o| GameDetail : "detalle"
-  Activity ||--o| ExamDetail : "detalle"
+  Activity ||--o| ExamDetail : "detalle (ítems fill_blank)"
   Activity ||--o{ Assignment : "se asigna"
   Group ||--o{ Assignment : "recibe (historical_student_count congela el denominador)"
-  Assignment ||--o{ Attempt : "genera"
+  Assignment ||--o{ Attempt : "genera (attempt_number 1..n)"
   Student ||--o{ Attempt : "realiza"
-  Attempt |o--o| Attempt : "previous_attempt_id (nuevo intento habilitado; plazo en retry_extend_until del anterior)"
-  Attempt ||--o| Review : "recibe"
-  Attempt ||--o{ MediaAsset : "adjunta"
+  Attempt |o--o| Attempt : "previous_attempt_id (nuevo intento; plazo en retry_extend_until del anterior)"
+  Attempt ||--o| Review : "feedback"
+  Attempt ||--o{ MediaAsset : "adjunta (máx. uno ready)"
+  Attempt |o--o{ ProgressEvent : "attempt_id"
   Student ||--o{ ProgressEvent : "acumula"
   Student ||--o{ BadgeAward : "gana"
   BadgeRule ||--o{ BadgeAward : "otorga"
 ```
 
-No existen `Guardian` ni `ConsentRecord` (decisión 34 §1 y §2).
+No existen `Guardian` ni `ConsentRecord` (decisión 34 §1 y §2). `Subscription` está reservada para Fase 3 y no se crea.
 
-### 6.2 Convenciones — Decidido (A7 y decisión 20)
+### 6.2 Convenciones — Decidido (A7, decisiones 20 y 67)
 
 - Claves primarias `uuid`. `created_at` y `updated_at` en toda tabla; `timestamptz` en UTC.
 - **Toda marca de tiempo en tablas de tenant se escribe en el servidor** (`now()` de PostgreSQL o `new Date()` de NestJS). Los campos de tiempo no son parte de ningún DTO de entrada (Decidido, decisión 34 §3). Las únicas fechas que entran por DTO son **plazos de negocio elegidos por la profesora** —`opens_at`, `due_at` y `retry_extend_until`—, que no registran cuándo ocurrió algo y se validan contra el reloj del servidor (por ejemplo, `retry_extend_until ≥ now()`).
 - `organization_id` obligatorio en toda tabla de tenant. La única tabla sin él es `Organization`.
 - Identificadores en inglés: modelos en `PascalCase`, columnas en `snake_case` mediante `@map`.
-- Borrado: `Student` se borra en cascada real (§8.4), congelando antes el denominador histórico de sus asignaciones. `Activity` con intentos no se borra; se archiva (`status = archived`).
-- `Attempt.payload` guarda las respuestas crudas como JSON, cada una con su `clientEventId`. No hay tabla de eventos de intento en el piloto.
+- Borrado: `Student` se borra en cascada real (§8.4), congelando antes el denominador histórico de sus asignaciones. `Activity` con asignaciones no se borra; se archiva (`status = archived`). `Group` con historia no se borra; se archiva (`archived_at`).
+- **Política de `onDelete` (Decidido, decisión 80).** Toda clave foránea declara su comportamiento:
 
-### 6.3 Enums — Decidido (decisión 20)
+| Relación | `onDelete` |
+|---|---|
+| `Organization` → cualquier tabla | `Restrict` |
+| `User` (profesora) ← `Activity.created_by`, `Review.reviewer_id`, `Attempt.retry_granted_by`, `AuditLog.actor_user_id`, `ExternalResource.created_by` | `Restrict` |
+| `User` → `Student`, `AuthSession`, `PasswordResetToken`, `EmailChangeRequest` | `Cascade` |
+| `Student` → `Attempt`, `GroupMembership`, `ProgressEvent`, `BadgeAward` | `Cascade` (red de seguridad; el borrado lo orquesta §8.4, R2 primero) |
+| `Attempt` → `Review`, `MediaAsset`, `ProgressEvent.attempt_id` | `Cascade` (ídem) |
+| `Attempt.previous_attempt_id` → `Attempt` | `NoAction` (se comprueba al final de la sentencia) |
+| `AuditLog.target_student_id` → `Student` | `Cascade` según la propuesta vigente de P-4; si P-4 cambia, uuid sin FK |
+| `Activity` ← `Assignment`; `Activity.parent_id` → `Activity` | `Restrict` |
+| `Activity` → tablas de detalle | `Cascade` |
+| `Group` ← `Assignment`, `GroupMembership`; `Assignment` ← `Attempt`; `BadgeRule` ← `BadgeAward` | `Restrict` |
+
+- `Attempt.payload` guarda las respuestas crudas como JSON, cada una con su `clientEventId`. No hay tabla de eventos de intento en el piloto. **Escritura concurrente (decisión 67 §14):** `POST /attempts/:id/events` combina las respuestas nuevas con el JSON existente en una sola sentencia (`payload || $nuevas`, indexado por `itemId`) o bajo `SELECT … FOR UPDATE`, para que dos lotes simultáneos no se pisen.
+
+### 6.3 Enums — Decidido (decisiones 20 y 67)
 
 | Enum                | Valores                                                                                                                                      |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -467,50 +500,78 @@ No existen `Guardian` ni `ConsentRecord` (decisión 34 §1 y §2).
 | `ActivityStatus`    | `draft`, `published`, `archived`                                                                                                             |
 | `GameMechanic`      | Las **cinco mecánicas de juego** del tipo `game`: `match`, `order_words`, `drag_drop`, `memory`, `timed_choice`                              |
 | `AttemptStatus`     | `in_progress`, `pending_review`, `graded`, `abandoned`                                                                                       |
-| `ApprovalStatus`    | `pending_approval`, `approved`, `rejected`                                                                                                   |
+| `ApprovalStatus`    | `pending_approval`, `approved`. Sin `rejected`: rechazar borra la solicitud en el acto (decisión 77)                                         |
 | `ProgressEventType` | `attempt_completed`, `audio_submitted`, `review_received`, `retry_granted`, `streak_week`, `badge_awarded`                                   |
 | `MediaAssetStatus`  | `pending_upload`, `ready`, `pending_delete`, `deleted`                                                                                       |
 | `AuditAction`       | `student_email_changed` (decisión 63). Se amplía solo con una decisión nueva                                                                 |
+| `JobRunStatus`      | `running`, `done`, `failed` (decisión 76)                                                                                                    |
 
 **Terminología (Decidido, decisión 66).** "Tipo de actividad" designa solo los cinco valores de `ActivityType`; "mecánica de juego", solo los cinco de `GameMechanic`. `fill_blank` y `exam` son tipos de actividad, no mecánicas. Las estadísticas agrupan por tipo de actividad y, dentro de `game`, por mecánica de juego. Specs, tareas y la interfaz usan estos términos.
 
-Eliminados por la decisión 34: `ConsentStatus`, `ConsentMethod` (§2) y `RegistrationSource` (§1: el auto-registro es la única vía de alta, así que el origen ya no distingue nada).
+Eliminados por la decisión 34: `ConsentStatus`, `ConsentMethod` (§2) y `RegistrationSource` (§1: el auto-registro es la única vía de alta, así que el origen ya no distingue nada). Eliminado por la decisión 77: el valor `rejected` de `ApprovalStatus`.
 
 ### 6.4 Campos que merecen nota
 
-- `User`: `email` **obligatorio y único en toda la plataforma** para todos los roles (Decidido, decisión 22 modificada por la decisión 59): la restricción única es sobre `email` solo, sin `organization_id`, y se compara normalizado (sin espacios, en minúsculas), `password_hash` (argon2id), `role`, `organization_id`, `failed_login_count`, `locked_until`, `terms_accepted_at`, `terms_version` (T&C convencional aceptado en el registro). `Student.user_id` es 1:1 obligatorio. El correo de acceso del alumno vive en `User.email`. No existe `must_change_password`: no hay contraseñas temporales.
+**Identidad y sesión**
+
+- `User`: **`name` (obligatorio, para todos los roles; decisión 79)**, `email` **obligatorio y único en toda la plataforma** para todos los roles (Decidido, decisión 22 modificada por la decisión 59): la restricción única es sobre `email` solo, sin `organization_id`, y se compara normalizado (sin espacios, en minúsculas), `password_hash` (argon2id), `role`, `organization_id`, `failed_login_count`, `locked_until`, `terms_accepted_at`, `terms_version` (T&C convencional aceptado en el registro). `Student.user_id` es 1:1 obligatorio. El correo de acceso y el nombre del alumno viven en `User`. No existe `must_change_password`: no hay contraseñas temporales.
+- **`AuthSession` (Decidido, decisión 68):** una fila por familia de sesión. `id` (es el `sid` del JWT), `organization_id`, `user_id`, `refresh_token_hash` (único; hash del refresh vigente, sustituido en cada rotación), `expires_at` (30 días profesora, 90 días alumno), `rotated_at`, `last_used_at`, `revoked_at`. El refresh lleva el `sid` y un secreto aleatorio: un `sid` existente con hash distinto es una reutilización y revoca la familia (§7.1). `JwtAuthGuard` rechaza un access token cuyo `sid` esté revocado. "Revocar todas las sesiones" fija `revoked_at` en todas las del usuario; "revocar las demás" excluye el `sid` actual. La limpieza nocturna borra las caducadas o revocadas hace más de 30 días (§4.5).
 - `PasswordResetToken`: `user_id`, `token_hash`, `expires_at` (30 min), `used_at`. Se guarda el hash, nunca el token; un token usado o caducado no se reutiliza. Lo crea `POST /auth/forgot-password` o la profesora desde `POST /students/:id/reset-password`; en ambos casos el enlace va al correo del alumno.
-- `EmailChangeRequest` (Decidido, decisión 34 §1): `user_id`, `new_email`, `otp_hash` (6 dígitos), `expires_at` (10 min), `used_at`. `POST /me/email-change { newEmail, password }` valida la contraseña actual y que el correo nuevo sea globalmente único, y envía el OTP al correo nuevo (decisión 62); `POST /me/email-change/confirm { otp }` aplica el cambio, avisa al correo anterior con la plantilla `email-changed` y revoca las demás sesiones. Máximo 3 OTP fallidos por solicitud. Un cambio administrativo del correo (§7.3) invalida las solicitudes pendientes.
+- `EmailChangeRequest` (Decidido, decisiones 34 §1 y 69): `user_id`, `new_email`, `otp_hash` (6 dígitos), `expires_at` (10 min), `used_at`, **`failed_attempts` (smallint, 0 por defecto)**. `POST /me/email-change { newEmail, password }` valida la contraseña actual y que el correo nuevo sea globalmente único, y envía el OTP al correo nuevo (decisión 62); `POST /me/email-change/confirm { otp }` aplica el cambio, avisa al correo anterior con la plantilla `email-changed` y revoca las demás sesiones. Cada OTP incorrecto incrementa `failed_attempts`; al llegar a 3 la solicitud queda invalidada. Un cambio administrativo del correo (§7.3) invalida las solicitudes pendientes.
 - `AuditLog` (Decidido, decisión 63): `id`, `organization_id`, `actor_user_id` (la profesora), `action` (`AuditAction`), `target_student_id`, `details` (JSON; para `student_email_changed`: `old_email`, `new_email`), `created_at` (servidor). Append-only: ningún endpoint lo edita. Lo escribe `POST /students/:id/change-email` en la misma transacción que el cambio. Retención, consulta y acceso: pendiente P-4 (§15; propuesta vigente: se borra con el alumno en la cascada de §8.4 y no tiene pantalla en el piloto).
-- `Student`: `name`, `birth_date`, **`guardian_name` (string, nullable)** y **`guardian_contact` (string, nullable; teléfono o correo)** capturados en el auto-registro y editables solo por la profesora (`PATCH /students/:id`; el alumno no los ve en su perfil como editables). `age_segment` se calcula al registrarse desde `birth_date`; **`can_switch_interface` (boolean, false por defecto)** se activa al registrarse si ya tiene 11 años o cuando el job mensual detecta que los cumplió. `PATCH /me/interface { ageSegment }` solo se acepta si `can_switch_interface = true`; el cambio reemite el access token con el nuevo `age_segment` para que el layout aplique el tema sin relogin.
-- `Student.approval_status` (Decidido, decisión 33): `pending_approval` al auto-registrarse; `approved` tras la revisión de la profesora; `rejected` es transitorio, se resuelve borrando la fila (§8.4). `Student.level` y la membresía de grupo son `null` mientras está `pending_approval`.
-- `SpeakingDetail`: `prompt`, `example_url?`, `min_duration_seconds` (2, fijo), `max_duration_seconds` (120 por defecto, máximo 300). El esquema Zod compartido impone el rango (§3.5).
-- `ExamDetail`: lista de ítems con `weight` normalizado a suma 100 al guardar (§4.4).
-- `Assignment.historical_student_count` (Decidido, decisión 34 §14): `null` mientras nadie ha sido borrado; al borrar un alumno se fija, para cada asignación de sus grupos, el número de alumnos que tenía la asignación en ese momento (si ya estaba fijado, no se reduce). Las estadísticas usan este valor congelado como denominador para datos históricos y el conteo de alumnos activos para datos presentes (§9.4).
+
+**Alumnos y grupos**
+
+- `Student`: `birth_date`, **`guardian_name` (string, nullable)** y **`guardian_contact` (string, nullable; teléfono o correo)** capturados en el auto-registro y editables solo por la profesora (`PATCH /students/:id`; el alumno no los ve en su perfil como editables). Sin campo `name`: el nombre vive en `User.name` (decisión 79). `age_segment` se calcula al registrarse desde `birth_date`; **`can_switch_interface` (boolean, false por defecto)** se activa al registrarse si ya tiene 11 años o cuando el job mensual detecta que los cumplió. `PATCH /me/interface { ageSegment }` solo se acepta si `can_switch_interface = true`; el cambio reemite el access token con el nuevo `age_segment` para que el layout aplique el tema sin relogin.
+- `Student.approval_status` (Decidido, decisiones 33 y 77): `pending_approval` al auto-registrarse; `approved` tras la revisión de la profesora. Rechazar borra la fila en el acto (§8.4), por eso no existe `rejected`. `Student.level` y la membresía de grupo son `null` / inexistentes mientras está `pending_approval`.
+- **`GroupMembership` — un solo grupo vigente por alumno (Decidido, decisión 73):** `organization_id`, `group_id`, `student_id`, `joined_at`, `left_at` (nullable), ambos del servidor. Único parcial `(student_id) WHERE left_at IS NULL`. La aprobación crea la membresía vigente (`groupId` singular); `PUT /students/:id/group { groupId }` cierra la vigente (`left_at = now()`) y abre la nueva en una transacción; un alumno aprobado nunca queda sin grupo. El alumno solo ve e inicia asignaciones de su grupo vigente; sus intentos ya creados se conservan y pueden completarse dentro de su ventana aunque cambie de grupo. **Alumnos obligados por una asignación:** los que tuvieron membresía en su grupo solapada con `[opens_at, due_at]`.
+- `Group`: sin `classroom_code` (el acceso por código de aula fue descartado, decisión 22). **`archived_at` (nullable, decisión 79):** un grupo archivado no recibe alumnos ni asignaciones y conserva su historial.
+
+**Actividades**
+
+- `Activity`: `type`, `level`, `title`, `status`, `created_by`, `version`, `parent_id`, **`expected_duration_seconds` (int, nullable)** y **`min_plausible_seconds` (int, nullable)**, con valores por defecto por tipo en `packages/shared` (decisión 79). El primero recorta el tiempo en estadísticas (§9.4); el segundo es el umbral de `implausible_duration` (§4.4).
 - `Activity.version` y `parent_id`: una actividad publicada **sin** intentos se edita en sitio; **con** intentos solo se duplica (nueva fila con `version + 1` y `parent_id`) o se archiva. Las asignaciones siguen apuntando a la versión con la que se crearon. Así el historial de calificaciones nunca se reescribe.
-- **Un intento por asignación con habilitación por la profesora (Decidido, decisiones 25 y 61).** No existe `Assignment.max_attempts`. `Attempt` lleva `retry_granted_at`, `retry_granted_by`, **`retry_extend_until` (timestamptz, nullable)** y `previous_attempt_id`. `POST /assignments/:id/attempts` solo crea un intento si el alumno no tiene ninguno para esa asignación, o si su último intento tiene `retry_granted_at` no nulo y aún no se ha usado (no existe ningún intento con `previous_attempt_id` apuntando a él). El nuevo intento enlaza al anterior con `previous_attempt_id`. Para estadísticas y progreso cuenta **el último intento calificado**; el historial completo queda visible para la profesora.
-- `Attempt.retry_extend_until` (Decidido, decisión 61): vive en el intento que **concede** la autorización y guarda la fecha límite efectiva para iniciar el intento hijo, que todavía no existe. `null` → el hijo usa `Assignment.due_at`; con valor → el hijo usa esa fecha como cierre efectivo (§7.5). Solo se fija junto con `retry_granted_at`, y nunca con un valor anterior al momento de conceder (`RETRY_EXTEND_INVALID`). La autorización se consume al insertar el hijo; la unicidad de §6.5 impide que una misma autorización cree dos hijos.
-- `Attempt.score`: `numeric(2,1)` en escala 0,0–5,0 (§4.4).
+- **Tablas de detalle: `config` y `answer_key` separados (Decidido, decisión 75).** `FillBlankDetail`, `GameDetail` (con `mechanic`) y `ExamDetail` guardan `config` (jsonb, pública) y `answer_key` (jsonb) en columnas distintas; `OpenQuestionDetail` y `SpeakingDetail` no tienen `answer_key`. Prisma Client omite `answer_key` por defecto; solo `ScoringService` y el editor de la profesora la seleccionan explícitamente (§5.3).
+- `SpeakingDetail`: `prompt`, `example_url?`, `min_duration_seconds` (2, fijo), `max_duration_seconds` (120 por defecto, máximo 300). El esquema Zod compartido impone el rango (§3.5).
+- **`ExamDetail` (Decidido, decisión 70):** los ítems son **exclusivamente de tipo `fill_blank`**. `config` contiene la lista de ítems (`id`, `weight` normalizado a suma 100 al guardar, configuración pública del ítem) y `answer_key` la clave indexada por `id` de ítem (§4.4). Otros subtipos en un examen requieren una decisión nueva.
+
+**Asignaciones, intentos y calificación**
+
+- `Assignment.historical_student_count` (Decidido, decisión 34 §14): `null` mientras nadie ha sido borrado; al borrar un alumno se fija, para cada asignación a la que estaba obligado, el número de alumnos obligados en ese momento (regla de solape de `GroupMembership`; si ya estaba fijado, no se reduce). Las estadísticas usan este valor congelado como denominador para datos históricos (§9.4).
+- **Un intento por asignación con habilitación por la profesora (Decidido, decisiones 25, 61 y 74).** No existe `Assignment.max_attempts`. `Attempt` lleva **`attempt_number` (smallint, 1 para el primer intento)**, `retry_granted_at`, `retry_granted_by`, **`retry_extend_until` (timestamptz, nullable)** y `previous_attempt_id`. `POST /assignments/:id/attempts` solo crea un intento si el alumno no tiene ninguno para esa asignación (`attempt_number = 1`), o si su último intento (`MAX(attempt_number)`) tiene `retry_granted_at` no nulo; el hijo toma `attempt_number + 1` y enlaza al anterior con `previous_attempt_id`. El único de §6.5 garantiza la atomicidad. Para estadísticas y progreso cuenta **el último intento calificado**; el historial completo queda visible para la profesora.
+- `Attempt.retry_extend_until` (Decidido, decisión 61): vive en el intento que **concede** la autorización y guarda la fecha límite efectiva para iniciar el intento hijo, que todavía no existe. `null` → el hijo usa `Assignment.due_at`; con valor → el hijo usa esa fecha como cierre efectivo (§7.5). Solo se fija junto con `retry_granted_at`, y nunca con un valor anterior al momento de conceder (`RETRY_EXTEND_INVALID`). La autorización se consume al insertar el hijo.
+- **`Attempt.score` y `Attempt.graded_at` — fuente única de la calificación (Decidido, decisión 72):** `score` `numeric(2,1)` en escala 0,0–5,0 con `CHECK (score BETWEEN 0 AND 5)` (§4.4); `graded_at` del servidor, fijado en `complete` (autocalificados) o en `POST /attempts/:id/review` (revisión manual).
+- **`Review` — solo feedback (Decidido, decisión 72):** `attempt_id` (único), `reviewer_id`, `comment`, `stickers`, `created_at`, `updated_at`. Sin `score` ni `graded_at`. `stickers` es `text[]` con códigos del catálogo `STICKERS` de `packages/shared`; la API rechaza códigos desconocidos (decisión 79).
 - `Attempt.started_at` y `Attempt.finished_at`: los fija el servidor al crear y al completar el intento (decisión 34 §3). `started_at` frente al cierre efectivo decide la validez del intento, y `finished_at` debe caer dentro de cierre efectivo + 24 h (§7.5, decisión 60).
 - `Attempt.flags`: array de texto para marcas como `implausible_duration` u `offline_sync`.
-- `MediaAsset`: `key` (raw en R2), **`converted_key` (string, nullable)** con el MP4/AAC transcodificado (decisión 34 §22), `mime_type` detectado en el cliente, `duration_seconds` medido con `ffprobe`, `size_bytes`, `status`. `retention_until` se fija al calificar como `graded_at + retention_days` (30 por defecto). `created_at` gobierna el borrado de `pending_upload` (7 días por defecto). **`transcode_attempts` (int, 0 por defecto)** y **`transcode_failed_at` (timestamptz, nullable)** registran los reintentos y el fallo de la conversión y permiten que la rutina de recuperación al arrancar distinga una conversión interrumpida de una fallida (decisión 64; límite y tratamiento definitivo en el pendiente P-3). Ver §3.5 y §4.5.
-- `Group`: sin `classroom_code`. El acceso por código de aula fue descartado (decisión 22).
-- `FeatureFlag(organization_id, key, enabled, config json)`: claves iniciales **`games`, `extra_content`** (sin `stats` ni `leaderboard`: el panel estadístico se controla solo por RBAC, decisión 34 §7); configuración `passing_score = 3.0`, `retention_days = 30`, `pending_upload_ttl_days = 7`, `ungraded_reminder_days = 3` (umbral de los recordatorios y del correo de pendientes, §8 y §18).
+- `MediaAsset`: `key` (raw en R2), **`converted_key` (string, nullable)** con el MP4/AAC transcodificado (decisión 34 §22), `mime_type` detectado en el cliente, `duration_seconds` medido con `ffprobe`, `size_bytes`, `status`. Un intento tiene como máximo un `MediaAsset` en `ready` (§6.5). `retention_until` se fija al calificar como `Attempt.graded_at + retention_days` (30 por defecto). `created_at` gobierna el borrado de `pending_upload` (7 días por defecto). **`transcode_attempts` (int, 0 por defecto)** y **`transcode_failed_at` (timestamptz, nullable)** registran los reintentos y el fallo de la conversión y permiten que la rutina de recuperación al arrancar distinga una conversión interrumpida de una fallida (decisión 64; límite y tratamiento definitivo en el pendiente P-3). Ver §3.5 y §4.5.
 
-### 6.5 Índices iniciales — Decidido (decisión 20)
+**Gamificación, configuración y operación**
 
-- `Attempt(assignment_id, student_id, created_at)`; `Attempt(student_id, finished_at)`; índice parcial `Attempt(status) WHERE status = 'pending_review'`.
-- **Unicidad de intentos (Decidido, decisión 61):** único parcial `Attempt(assignment_id, student_id) WHERE previous_attempt_id IS NULL` (un solo primer intento por alumno y asignación) y único parcial `Attempt(previous_attempt_id) WHERE previous_attempt_id IS NOT NULL` (una autorización crea como máximo un intento hijo). Dos peticiones de inicio simultáneas producen un solo intento; la perdedora recibe `ATTEMPT_ALREADY_EXISTS`. Si Prisma no expresa el índice parcial, se escribe en SQL dentro de la migración.
-- `Assignment(group_id, opens_at, due_at)`.
-- `ProgressEvent(student_id, occurred_at)`.
-- `GroupMembership(group_id, student_id)` único.
+- **`ProgressEvent` (Decidido, decisión 71):** `organization_id`, `student_id`, `type`, `value` (numeric(6,1), nullable; solo magnitudes: calificación, `1`, semanas), `attempt_id` (nullable, FK a `Attempt`), `payload` (jsonb, nullable; estado de racha en `streak_week`, `badge_award_id` en `badge_awarded`), `period_key` (text, nullable; semana ISO en `streak_week`), `occurred_at` (servidor). Sin `source`. Detalle por evento en §9.1.
+- **`BadgeRule` por organización (decisión 79):** `organization_id`, `key` (único por organización), `name`, `description`, `icon`, `rule` (JSON), `active`. `BadgeAward`: `student_id`, `badge_rule_id`, `awarded_at`; único `(student_id, badge_rule_id)` (decisión 76).
+- **`ScheduledJobRun` (Decidido, decisión 76):** `organization_id`, `job_key`, `period_key`, `status` (`JobRunStatus`), `started_at`, `finished_at`; único `(organization_id, job_key, period_key)`. Registro persistente de ejecución de las tareas periódicas (§4.5).
+- **`ExternalResource` (decisión 79):** `organization_id`, `title`, `url` (https), `description` (nullable), `level` (nullable), `position`, `created_by`. Interfaz en SPEC-10.
+- `FeatureFlag(organization_id, key, enabled, config json)`: claves iniciales **`games`, `extra_content`** (sin `stats` ni `leaderboard`: el panel estadístico se controla solo por RBAC, decisión 34 §7); configuración `passing_score = 3.0`, `retention_days = 30`, `pending_upload_ttl_days = 7`, `ungraded_reminder_days = 3` (umbral de los recordatorios y del correo de pendientes, §8 y §18). Se mantiene así: la propuesta de moverlos a columnas con tipo en `Organization` no se adoptó (decisión 67 §15).
+
+### 6.5 Índices iniciales — Decidido (decisiones 20 y 78)
+
+- **Unicidad de intentos (Decidido, decisiones 61 y 74):** único `Attempt(assignment_id, student_id, attempt_number)`, expresado con `@@unique` de Prisma. Dos inicios simultáneos de un primer intento chocan en `attempt_number = 1`; como solo el último intento puede conceder una habilitación, dos consumos de la misma autorización chocan en `n + 1`. La perdedora recibe `ATTEMPT_ALREADY_EXISTS`. Sustituye a los dos únicos parciales de A50 y al índice `Attempt(assignment_id, student_id, created_at)`.
+- `Attempt(student_id, finished_at)`; índice parcial `Attempt(status) WHERE status = 'pending_review'`; `Attempt(previous_attempt_id)`.
+- `Assignment(group_id, opens_at, due_at)`; `Assignment(activity_id)`.
+- `ProgressEvent(student_id, occurred_at)`; `ProgressEvent(attempt_id)`; único parcial `ProgressEvent(student_id, type, period_key) WHERE period_key IS NOT NULL`.
+- `GroupMembership(group_id, student_id)` (no único: un alumno puede volver a un grupo); único parcial `GroupMembership(student_id) WHERE left_at IS NULL`.
 - `Activity(organization_id, level, type, status)`.
 - `Student(organization_id, approval_status)` para la bandeja de solicitudes.
-- `User(email)` único global (decisión 59; sustituye a `User(organization_id, email)`); `User(organization_id, role)`; `User(locked_until)` para la sección de bloqueados.
+- `User(email)` único global (decisión 59; sustituye a `User(organization_id, email)`); `User(organization_id, role)`.
+- `AuthSession(refresh_token_hash)` único; `AuthSession(user_id)`; `AuthSession(expires_at)` para la limpieza.
 - `AuditLog(organization_id, target_student_id, created_at)`.
-- `PasswordResetToken(token_hash)` único; `PasswordResetToken(expires_at)` para la limpieza. `EmailChangeRequest(user_id, expires_at)`.
-- `MediaAsset(status, created_at)` y `MediaAsset(retention_until)` para el job de retención; índice parcial `MediaAsset(status) WHERE converted_key IS NULL AND status = 'ready' AND transcode_failed_at IS NULL` para la cola de transcodificación y la rutina de recuperación al arrancar.
-- `Student(organization_id, birth_date)` para el job mensual de edad.
+- `PasswordResetToken(token_hash)` único; `PasswordResetToken(user_id)`; `PasswordResetToken(expires_at)` para la limpieza. `EmailChangeRequest(user_id, expires_at)`.
+- `Review(attempt_id)` único.
+- `MediaAsset(attempt_id)`; único parcial `MediaAsset(attempt_id) WHERE status = 'ready'`; `MediaAsset(status, created_at)` y `MediaAsset(retention_until)` para el job de retención; índice parcial `MediaAsset(status) WHERE converted_key IS NULL AND status = 'ready' AND transcode_failed_at IS NULL` para la cola de transcodificación y la rutina de recuperación al arrancar.
+- `BadgeAward(student_id, badge_rule_id)` único; `BadgeRule(organization_id, key)` único.
+- `ScheduledJobRun(organization_id, job_key, period_key)` único.
+- Retirados por la decisión 78 (innecesarios con 100 alumnos): `User(locked_until)` y `Student(organization_id, birth_date)`.
 
 ---
 
@@ -522,11 +583,11 @@ Un único flujo para todos los roles.
 
 1. `POST /auth/login` con correo y contraseña, **sin identificador de organización**: como el correo es globalmente único (decisión 59), identifica una sola cuenta y la organización sale de `User.organization_id`. Hash con argon2id. La respuesta de error es la misma para "correo no existe" y "contraseña incorrecta" (`AUTH_INVALID_CREDENTIALS`).
 2. La API responde con dos cookies `HttpOnly; Secure; SameSite=Lax; Domain=.<dominio>` (Decidido, decisión 58; §8.2): `access_token` (15 min, `Path=/`) y `refresh_token` (`Path=/api/v1/auth/refresh`, rotativo) con duración según rol: **30 días profesora, 90 días alumno**. Con `Domain=.<dominio>`, el `access_token` también llega a `app.<dominio>`, donde el middleware lo usa solo para redirigir; el `refresh_token`, por su `Path`, solo viaja al endpoint de refresh de la API. El "Recuérdame" de CONTEXT §4 es implícito para el alumno.
-3. El frontend nunca lee los tokens. Al expirar el acceso, llama a `POST /auth/refresh`; la API emite un par nuevo e invalida el anterior.
-4. Reutilización de un refresh ya rotado → se revoca toda la familia de sesión (`sid`) y se exige login de nuevo.
-5. `POST /auth/logout` revoca la familia y borra las cookies.
+3. El login crea una `AuthSession` (decisión 68): su `id` es el `sid` del JWT y guarda el hash del refresh emitido, que lleva el `sid` y un secreto aleatorio. El frontend nunca lee los tokens. Al expirar el acceso, llama a `POST /auth/refresh`; la API emite un par nuevo, sustituye `refresh_token_hash` y fija `rotated_at`.
+4. Reutilización de un refresh ya rotado (el `sid` existe pero el hash no coincide con el vigente) → se fija `revoked_at` en toda la familia de sesión y se exige login de nuevo.
+5. `POST /auth/logout` revoca la familia (`revoked_at`) y borra las cookies.
 6. El frontend redirige según `role` de la respuesta: `(teacher)` o `(student)`.
-7. **Cuenta `pending_approval` (Decidido, CONTEXT §4.1 y decisión 33):** si el `Student` de la cuenta tiene `approval_status = pending_approval`, el login responde `403 ACCOUNT_PENDING_APPROVAL` aunque la contraseña sea correcta, sin emitir cookies. Si es `rejected`, responde `AUTH_INVALID_CREDENTIALS` (no se distingue de una cuenta inexistente).
+7. **Cuenta `pending_approval` (Decidido, CONTEXT §4.1 y decisión 33):** si el `Student` de la cuenta tiene `approval_status = pending_approval`, el login responde `403 ACCOUNT_PENDING_APPROVAL` aunque la contraseña sea correcta, sin emitir cookies. Una solicitud rechazada ya no existe (se borra en el acto, decisión 77), así que su login responde `AUTH_INVALID_CREDENTIALS` como cualquier cuenta inexistente.
 
 **Bloqueo por intentos fallidos (Decidido, decisión 23):** cada login fallido incrementa `User.failed_login_count`. Al llegar a **10**, se fija `locked_until = now() + 10 min` y todo intento hasta esa hora responde `AUTH_ACCOUNT_LOCKED` con el tiempo restante, sin comprobar la contraseña. Un login correcto pone el contador a cero. El panel de la profesora muestra los alumnos bloqueados y puede desbloquearlos anticipadamente. La misma regla aplica a la profesora, sin desbloqueo anticipado (Decidido).
 
@@ -543,7 +604,7 @@ sequenceDiagram
   participant T as Panel profesora (/alumnos/solicitudes)
   S->>A: POST /auth/signup {email, password, name, birthDate, guardianName?, guardianContact?, acceptTerms}
   alt correo nuevo en toda la plataforma
-    A->>DB: INSERT User (role=student, terms_accepted_at) + Student (approval_status=pending_approval, guardian_name, guardian_contact, age_segment)
+    A->>DB: INSERT User (role=student, name, terms_accepted_at) + Student (approval_status=pending_approval, guardian_name, guardian_contact, age_segment)
     A->>M: correo "solicitud recibida"
   else correo ya registrado (cualquier organización)
     A->>M: correo "ya tienes una cuenta" (con enlace de recuperación)
@@ -552,19 +613,20 @@ sequenceDiagram
   Note over S: login responde ACCOUNT_PENDING_APPROVAL hasta la aprobación
   T->>A: GET /students/requests
   A-->>T: lista de Student en pending_approval
-  T->>A: POST /students/:id/approve {level, groupIds, ageSegment?, guardianName?, guardianContact?}
-  A->>DB: UPDATE Student (approval_status=approved, level, group, correcciones)
+  T->>A: POST /students/:id/approve {level, groupId, ageSegment?, guardianName?, guardianContact?}
+  A->>DB: UPDATE Student (approval_status=approved, level, correcciones) + INSERT GroupMembership vigente
   A->>M: correo "cuenta aprobada"
   Note over S: ya puede iniciar sesión con la contraseña que fijó en el registro
 ```
 
 1. `POST /auth/signup { email, password, name, birthDate, guardianName?, guardianContact?, acceptTerms }`. Sin autenticación previa (endpoint público); throttler estricto de **10 registros por hora por IP** (§8.3). `acceptTerms` debe ser `true`: es el checkbox de los Términos y Condiciones convencionales, con enlace al documento.
-2. La API valida la forma de los datos y los **requisitos de contraseña: 8 a 16 caracteres, sin espacios** (§7.4); estos errores (`PASSWORD_POLICY`, validación) sí se devuelven porque no dependen de que el correo exista. Después comprueba que el correo sea **globalmente único** (decisión 59): si ya existe en cualquier organización, no crea nada, envía al dueño de ese correo la plantilla `signup-existing-account` (aviso de que ya tiene cuenta, con enlace a `recuperar-contrasena/`) y responde exactamente igual que en el caso nuevo, sin `EMAIL_TAKEN`, para no enumerar cuentas. Si es nuevo, crea en una transacción solo dos filas: `User` (rol `student`, con la contraseña que el alumno ya fijó, `terms_accepted_at` y `terms_version`) y `Student` (`approval_status = pending_approval`, `level = null`, sin grupo, `guardian_name` y `guardian_contact` como campos propios). No se crea ninguna entidad separada. `age_segment` se calcula desde `birthDate` (`kids` hasta los 10 años, `teens` desde los 11) y `can_switch_interface` se activa si ya tiene 11 o más.
+2. La API valida la forma de los datos y los **requisitos de contraseña: 8 a 16 caracteres, sin espacios** (§7.4); estos errores (`PASSWORD_POLICY`, validación) sí se devuelven porque no dependen de que el correo exista. Después comprueba que el correo sea **globalmente único** (decisión 59): si ya existe en cualquier organización, no crea nada, envía al dueño de ese correo la plantilla `signup-existing-account` (aviso de que ya tiene cuenta, con enlace a `recuperar-contrasena/`) y responde exactamente igual que en el caso nuevo, sin `EMAIL_TAKEN`, para no enumerar cuentas. Si es nuevo, crea en una transacción solo dos filas: `User` (rol `student`, con `name`, la contraseña que el alumno ya fijó, `terms_accepted_at` y `terms_version`; decisión 79) y `Student` (`approval_status = pending_approval`, `level = null`, sin grupo, `guardian_name` y `guardian_contact` como campos propios). No se crea ninguna entidad separada. `age_segment` se calcula desde `birthDate` (`kids` hasta los 10 años, `teens` desde los 11) y `can_switch_interface` se activa si ya tiene 11 o más.
 3. La API responde `201` sin emitir cookies: el alumno no queda dentro de la sesión aunque la cuenta exista. Se envía un correo de "solicitud recibida" (no bloqueante para el flujo). La pantalla dice "Recibimos tu solicitud. Revisa tu correo." en ambos casos del paso 2. La carrera entre dos registros simultáneos con el mismo correo la resuelve el índice único de `User(email)`: el segundo se trata como correo ya registrado.
 4. `GET /students/requests` (solo `teacher`) lista los `Student` en `pending_approval` con los datos capturados en el registro.
-5. `POST /students/:id/approve { level, groupIds, ageSegment?, guardianName?, guardianContact? }`: fija `level` y grupo(s), permite corregir `age_segment` (solo si la fecha de nacimiento era errónea) y los datos del acudiente directamente en el `Student`, y pasa `approval_status` a `approved`. No hay ningún otro control previo a la aprobación.
+5. `POST /students/:id/approve { level, groupId, ageSegment?, guardianName?, guardianContact? }`: fija `level`, crea la **única membresía vigente** del alumno en `groupId` (decisión 73; el grupo no puede estar archivado), permite corregir `age_segment` (solo si la fecha de nacimiento era errónea) y los datos del acudiente directamente en el `Student`, y pasa `approval_status` a `approved`. No hay ningún otro control previo a la aprobación.
 6. `POST /students/:id/reject`: borra la solicitud completa (`User` y `Student`) con el mismo mecanismo que el borrado en cascada de §8.4. No hay "correo de rechazo": simplemente la cuenta deja de existir.
 7. Al aprobar, `MailService` envía el correo "cuenta aprobada"; el alumno inicia sesión con la contraseña que fijó en el paso 1.
+8. **Cambio de grupo (Decidido, decisión 73):** `PUT /students/:id/group { groupId }` (solo `teacher`) cierra la membresía vigente (`left_at = now()`) y abre la nueva en una transacción. Desde ese momento el alumno ve e inicia solo las asignaciones del grupo nuevo; los intentos que ya tenía se conservan y pueden completarse dentro de su ventana.
 
 ### 7.3 Recuperación de contraseña iniciada por la profesora y cambio administrativo del correo — Decidido (decisiones 34 §1 y 63)
 
@@ -574,7 +636,7 @@ Sustituye al antiguo flujo alterno de alta directa y a las contraseñas temporal
 
 1. En la ficha del alumno, "Cambiar correo de acceso" abre un diálogo que muestra el correo actual y el nuevo y exige confirmación explícita ("Confirmo que verifiqué la identidad del alumno"). La verificación de identidad ocurre fuera de la aplicación y es responsabilidad operativa de la profesora.
 2. `POST /students/:id/change-email { newEmail }` — solo `@Roles('teacher')` y el alumno debe pertenecer a la organización de la profesora (`TenantContext`; si no, `404`). El correo nuevo debe ser globalmente único (`EMAIL_TAKEN`; aquí se devuelve porque el endpoint es autenticado y exclusivo de la profesora).
-3. En una transacción: actualiza `User.email`, inserta `AuditLog(action = student_email_changed, actor_user_id, target_student_id, details = { old_email, new_email })` con `created_at` del servidor, invalida los `PasswordResetToken` y `EmailChangeRequest` pendientes del alumno y **revoca todas sus familias de sesión**.
+3. En una transacción: actualiza `User.email`, inserta `AuditLog(action = student_email_changed, actor_user_id, target_student_id, details = { old_email, new_email })` con `created_at` del servidor, invalida los `PasswordResetToken` y `EmailChangeRequest` pendientes del alumno y **revoca todas sus familias de sesión** (`revoked_at` en todas sus `AuthSession`).
 4. Tras confirmar la transacción, `MailService` envía `email-changed` al correo nuevo y al anterior (este último "cuando sea posible": un fallo de entrega se registra y no revierte el cambio).
 5. El alumno inicia sesión con el correo nuevo y su contraseña de siempre. Si tampoco la recuerda, la profesora envía después el enlace de recuperación, que ya llega al correo nuevo.
 
@@ -586,9 +648,9 @@ Un único `MailService` sobre Resend, con un solo remitente y dominio verificado
 
 1. `POST /auth/forgot-password { email }`. La API responde siempre `202` con el mismo mensaje exista o no el correo (no revela cuentas). Límite: **5 solicitudes por hora por IP y por correo** (§8.3).
 2. Si existe, crea `PasswordResetToken` (token aleatorio de 32 bytes, se guarda su hash, caduca a los **30 minutos**) y envía por correo transaccional un enlace a `app.<dominio>/restablecer/<token>`.
-3. `POST /auth/reset-password { token, newPassword }`. Verifica hash, caducidad y no uso; fija la nueva contraseña; marca `used_at`; **revoca todas las familias de sesión** del usuario; responde `200`.
+3. `POST /auth/reset-password { token, newPassword }`. Verifica hash, caducidad y no uso; fija la nueva contraseña; marca `used_at`; **revoca todas las familias de sesión** del usuario (`AuthSession.revoked_at`); responde `200`.
 4. **Requisitos de contraseña (Decidido, decisión 34 §1): mínimo 8 caracteres, máximo 16, sin espacios.** Sin requisitos de complejidad que un niño no pueda recordar; para Kids la pantalla sugiere una frase corta memorable que cumpla el rango. Los mismos requisitos aplican en el auto-registro (§7.2) y en el restablecimiento (§7.3). Código de error: `PASSWORD_POLICY`.
-5. **Cambio de correo del alumno con OTP (Decidido, decisión 62):** desde `perfil/`, `POST /me/email-change { newEmail, password }` verifica la contraseña actual y que el correo nuevo sea globalmente único; crea `EmailChangeRequest` con un OTP de 6 dígitos de un solo uso (hash, 10 min) y lo envía **al correo nuevo** (así se comprueba que el alumno controla la nueva dirección). `POST /me/email-change/confirm { otp }` aplica el cambio, envía la plantilla `email-changed` **al correo anterior** (aviso informativo: el correo anterior no autoriza ni puede bloquear el cambio) y revoca las demás sesiones. Tres OTP fallidos invalidan la solicitud. Cubre el caso del alumno que se registró con el correo del acudiente y luego quiere el suyo. Este endpoint es autenticado y limitado a 5 por hora (§8.3), por eso puede responder `EMAIL_TAKEN`.
+5. **Cambio de correo del alumno con OTP (Decidido, decisión 62):** desde `perfil/`, `POST /me/email-change { newEmail, password }` verifica la contraseña actual y que el correo nuevo sea globalmente único; crea `EmailChangeRequest` con un OTP de 6 dígitos de un solo uso (hash, 10 min) y lo envía **al correo nuevo** (así se comprueba que el alumno controla la nueva dirección). `POST /me/email-change/confirm { otp }` aplica el cambio, envía la plantilla `email-changed` **al correo anterior** (aviso informativo: el correo anterior no autoriza ni puede bloquear el cambio) y revoca las demás sesiones. Cada OTP incorrecto incrementa `EmailChangeRequest.failed_attempts`; al tercero la solicitud queda invalidada y hay que pedir otra (decisión 69). Cubre el caso del alumno que se registró con el correo del acudiente y luego quiere el suyo. Este endpoint es autenticado y limitado a 5 por hora (§8.3), por eso puede responder `EMAIL_TAKEN`.
 6. `MailService` tiene una única implementación (Resend) con ocho plantillas que comparten remitente, diseño y pie: `signup-received`, `signup-existing-account`, `approved`, `password-reset`, `email-change-otp`, `email-changed`, `grading-notification` y `teacher-pending-summary`. En `local` escribe el enlace o el aviso en el log en vez de enviarlo, sin incluir el correo del destinatario (§8.5).
 
 ### 7.5 Intento de actividad y puntaje en servidor
@@ -599,26 +661,28 @@ sequenceDiagram
   participant A as API NestJS
   participant DB as PostgreSQL
   S->>A: POST /assignments/:id/attempts
+  A->>A: membresía vigente en el grupo de la asignación ? sigue : 404
   A->>A: cierre_efectivo = retry_extend_until del intento anterior ?? due_at
   A->>A: now() <= cierre_efectivo ? sigue : 409 ATTEMPT_CLOSED
-  A->>DB: INSERT Attempt (in_progress, started_at = now() del servidor) — índices únicos de §6.5
+  A->>DB: INSERT Attempt (in_progress, attempt_number = n + 1, started_at = now() del servidor) — único de §6.5
   A-->>S: attemptId, attemptToken (exp = cierre_efectivo + 24 h), config sin answerKey
   loop por cada respuesta
     S->>S: guarda answered en IndexedDB
     S->>A: POST /attempts/:id/events [answered...]
-    A->>DB: UPDATE Attempt.payload (ignora clientEventId repetidos)
+    A->>DB: UPDATE Attempt.payload = payload || nuevas (una sentencia; ignora clientEventId repetidos)
   end
   S->>A: POST /attempts/:id/complete
   A->>A: now() <= cierre_efectivo + 24 h ? sigue : 409 ATTEMPT_CLOSED
   A->>A: ScoringService según type
-  A->>DB: UPDATE Attempt (score 0.0–5.0, status, finished_at = now() del servidor) + INSERT ProgressEvent + BadgeAward
+  A->>DB: UPDATE Attempt (score 0.0–5.0, status, finished_at y graded_at = now() del servidor) + INSERT ProgressEvent + BadgeAward
   A-->>S: score, corrección por ítem, insignias nuevas
 ```
 
 Notas:
 
-- **Un intento por asignación (Decidido, decisión 25).** `POST /assignments/:id/attempts` responde `ATTEMPT_ALREADY_EXISTS` si el alumno ya tiene un intento para esa asignación y no tiene un nuevo intento habilitado (§7.7). Si lo tiene, crea el nuevo `Attempt` con `previous_attempt_id` y consume la habilitación.
-- **Consumo atómico (Decidido, decisión 61).** La habilitación se consume en el mismo `INSERT` que crea el intento hijo: los índices únicos parciales de §6.5 garantizan que dos peticiones simultáneas (dos pestañas, reintento de red) creen un solo intento. La que pierde recibe `ATTEMPT_ALREADY_EXISTS` y el cliente recupera el intento ya creado. Lo mismo protege el primer intento.
+- **Un intento por asignación (Decidido, decisión 25).** `POST /assignments/:id/attempts` responde `ATTEMPT_ALREADY_EXISTS` si el alumno ya tiene un intento para esa asignación y no tiene un nuevo intento habilitado (§7.7). Si lo tiene, crea el nuevo `Attempt` con `attempt_number` del anterior + 1 y `previous_attempt_id`, y consume la habilitación.
+- **Solo el grupo vigente (Decidido, decisión 73).** El alumno solo puede iniciar intentos sobre asignaciones del grupo en el que tiene la membresía vigente; si no, `404`. `events` y `complete` de un intento ya creado no exigen la membresía vigente: basta con que el intento sea del alumno y esté dentro de su ventana.
+- **Consumo atómico (Decidido, decisiones 61 y 74).** La habilitación se consume en el mismo `INSERT` que crea el intento hijo: el único `Attempt(assignment_id, student_id, attempt_number)` de §6.5 garantiza que dos peticiones simultáneas (dos pestañas, reintento de red) creen un solo intento. La que pierde recibe `ATTEMPT_ALREADY_EXISTS` y el cliente recupera el intento ya creado. Lo mismo protege el primer intento.
 - **Cierre efectivo.** Para un primer intento es `Assignment.due_at`. Para un nuevo intento habilitado es el `retry_extend_until` del intento anterior si tiene valor, o `due_at` si es `null` (decisión 61).
 - **Regla de `due_at` (Decidido, decisión 34 §10).** La validez la decide el **momento de inicio en el servidor**, no el de finalización:
   - Intento con `started_at` **anterior o igual** al cierre efectivo → **válido**, aunque se termine después.
@@ -627,8 +691,8 @@ Notas:
 - **Inicio antes de `opens_at`:** pendiente P-1 (§15). Propuesta vigente: `409 ATTEMPT_NOT_OPEN` sin crear el intento.
 - **Reloj del servidor (Decidido, decisión 34 §3).** `started_at` se fija al crear el intento y `finished_at` al procesar `complete`, ambos con la hora de la API. Los DTOs no aceptan ningún timestamp; el `at` de los eventos del contrato es solo informativo (§5.2).
 - El `attemptToken` es un JWT corto con `attempt_id`, `student_id` y expiración en **cierre efectivo + 24 h**, para permitir sincronización offline tardía de un intento ya iniciado. La API comprueba además la ventana contra su propio reloj, sin depender solo de la expiración del token.
-- `POST /attempts/:id/events` acepta lotes. Cada `answered` lleva `clientEventId`; los duplicados se ignoran (idempotencia para reintentos offline).
-- `complete` calcula el puntaje, fija `finished_at`, emite `ProgressEvent(attempt_completed)` y evalúa insignias en la misma transacción.
+- `POST /attempts/:id/events` acepta lotes. Cada `answered` lleva `clientEventId`; los duplicados se ignoran (idempotencia para reintentos offline). La combinación con el `payload` existente se hace en una sola sentencia o bajo `SELECT … FOR UPDATE` (§6.2).
+- `complete` calcula el puntaje, fija `finished_at` y, en los autocalificados, `graded_at` (decisión 72), emite `ProgressEvent(attempt_completed, attempt_id)` y evalúa insignias en la misma transacción.
 - Ningún endpoint acepta `score` desde el cliente (Decidido, CONTEXT §5.3 y §16).
 
 ### 7.6 Speaking: grabación, subida, confirmación y transcodificación — Decidido (A9, decisión 34 §13, §21 y §22)
@@ -671,8 +735,10 @@ El área `revision/` del panel tiene dos pestañas sobre el mismo componente de 
 Flujo de revisión manual:
 
 1. La profesora reproduce el audio (URL firmada del MP4 convertido, §7.6) o lee la respuesta, asigna la **calificación 0,0–5,0**, escribe el comentario personal (obligatorio en la revisión manual) y elige stickers (opcionales). En los intentos autocalificados de la pestaña "Calificados", la obligatoriedad del comentario es el pendiente P-2 (§15; propuesta vigente: opcional). Junto al reproductor hay un botón **"Descargar audio"** (`GET /media/:id/download-url`) para conservar el archivo en su dispositivo antes de que venza la retención (decisión 34 §6).
-2. `POST /attempts/:id/review { score, comment, stickers, allowRetry, retryExtendUntil? }` crea `Review` (`graded_at = now()` del servidor), actualiza `Attempt.status = graded` y `Attempt.score`, emite `ProgressEvent(review_received)` con `value = score` y fija `MediaAsset.retention_until = graded_at + retention_days`.
-3. Si `allowRetry = true`, en la misma transacción se fija `Attempt.retry_granted_at / retry_granted_by`, `retry_extend_until` si se indicó `retryExtendUntil`, y se emite `ProgressEvent(retry_granted)`. Aplican las mismas reglas que `grant-retry` (abajo).
+2. `POST /attempts/:id/review { score, comment, stickers, allowRetry, retryExtendUntil? }` escribe en una transacción la calificación en el intento —`Attempt.score`, `Attempt.graded_at = now()` del servidor y `Attempt.status = graded`— y el feedback en `Review` (`reviewer_id`, `comment`, `stickers`); emite `ProgressEvent(review_received)` con `value = score` y `attempt_id`, y fija `MediaAsset.retention_until = Attempt.graded_at + retention_days`. `Review` no guarda nota (decisión 72).
+3. Si `allowRetry = true`, en la misma transacción se fija `Attempt.retry_granted_at / retry_granted_by`, `retry_extend_until` si se indicó `retryExtendUntil`, y se emite `ProgressEvent(retry_granted, attempt_id)`. Aplican las mismas reglas que `grant-retry` (abajo).
+
+**Feedback sobre un intento autocalificado (pestaña "Calificados").** El mismo endpoint sin `score`: `score` no se acepta porque la nota ya la fijó el servidor en `complete` (`SCORE_NOT_EDITABLE`). Crea o actualiza el `Review` con el comentario y los stickers, y puede habilitar un nuevo intento. La obligatoriedad del comentario sigue el pendiente P-2.
 4. **Correo de notificación (Decidido, decisión 34 §5):** tras confirmar la transacción, `MailService.sendGradingNotification(studentEmail, activityTitle, feedbackUrl)` envía al alumno un correo que dice únicamente que su actividad ya fue calificada y enlaza a `feedback/` de la app. **El correo no contiene la nota ni el comentario**: ambos se ven solo dentro de la aplicación. El envío es asíncrono y no bloquea la respuesta; si falla se registra y se reintenta una vez.
 
 Habilitar nuevo intento sobre un intento ya calificado (manual o automático): `POST /attempts/:id/grant-retry { retryExtendUntil? }`. Reglas (Decidido, decisiones 25 y 61):
@@ -755,13 +821,13 @@ Al superar un límite la API responde `429 RATE_LIMITED` con `Retry-After`. Los 
 
 `DELETE /students/:id`:
 
-1. **Congela el denominador histórico (Decidido, decisión 34 §14):** para cada `Assignment` de los grupos del alumno, si `historical_student_count` es `null` se fija con el número de alumnos que la asignación tiene en ese momento (incluido el que se va a borrar). Si ya estaba fijado, no se toca.
+1. **Congela el denominador histórico (Decidido, decisiones 34 §14 y 73):** para cada `Assignment` a la que el alumno estaba obligado (grupos con membresía suya solapada con `[opens_at, due_at]`, vigente o pasada), si `historical_student_count` es `null` se fija con el número de alumnos obligados en ese momento (incluido el que se va a borrar). Si ya estaba fijado, no se toca.
 2. Marca los `MediaAsset` del alumno como `pending_delete`.
 3. Borra los objetos de R2 (raw y `_converted.mp4`).
-4. En una transacción borra `Attempt`, `Review`, `ProgressEvent`, `BadgeAward`, `GroupMembership`, `MediaAsset`, `PasswordResetToken`, `EmailChangeRequest`, los `AuditLog` cuyo `target_student_id` es el alumno (según la propuesta vigente del pendiente P-4, §15), `Student` y su `User`.
+4. En una transacción borra `Attempt`, `Review`, `ProgressEvent`, `BadgeAward`, `GroupMembership` (vigente e históricas), `MediaAsset`, `AuthSession`, `PasswordResetToken`, `EmailChangeRequest`, los `AuditLog` cuyo `target_student_id` es el alumno (según la propuesta vigente del pendiente P-4, §15), `Student` y su `User`.
 5. Si el paso 3 falla a mitad, el job nocturno reintenta los `pending_delete` y la transacción del paso 4 no se ejecuta hasta que el bucket quede limpio.
 
-El test de integración se escribe antes que el endpoint y comprueba que no queda ninguna fila ni objeto huérfano, y que el denominador congelado no cambia después del borrado.
+El test de integración se escribe antes que el endpoint y comprueba que no queda ninguna fila ni objeto huérfano, y que el denominador congelado no cambia después del borrado. Las claves foráneas con `Cascade` de §6.2 son solo una red de seguridad: el orden (R2 primero, filas después) lo impone este servicio. La autorreferencia `Attempt.previous_attempt_id` es `NoAction`, así que el borrado conjunto de todos los intentos del alumno en una sentencia no falla.
 
 **Rechazo de una solicitud de auto-registro:** `POST /students/:id/reject` ejecuta el mismo procedimiento sobre un `Student` en `approval_status = pending_approval`. Como nunca tuvo grupos, `Attempt`, `Review` ni `MediaAsset`, el borrado es inmediato (solo `Student` y `User`).
 
@@ -779,22 +845,22 @@ La auditoría del cambio administrativo del correo (decisión 63) necesita guard
 
 Todo lo que el alumno ve (estrellas, insignias, rachas) se deriva de `ProgressEvent`. Nunca se edita un contador. Si cambian las reglas, se recalcula desde los eventos.
 
-Eventos del piloto y quién los emite:
+Eventos del piloto y quién los emite (forma de la entidad por decisión 71; `value` solo guarda magnitudes, las referencias van en `attempt_id` o `payload`):
 
-| Evento              | Emisor                                    | `value`                        |
-| ------------------- | ----------------------------------------- | ------------------------------ |
-| `attempt_completed` | `complete` (tipos autocalificados)        | calificación 0,0–5,0           |
-| `audio_submitted`   | `complete` de speaking                    | 1                              |
-| `review_received`   | `POST /attempts/:id/review`               | calificación 0,0–5,0           |
-| `retry_granted`     | `review` con `allowRetry` o `grant-retry` | id del intento habilitado      |
-| `streak_week`       | job semanal                               | número de semanas consecutivas |
-| `badge_awarded`     | motor de insignias                        | id de la regla                 |
+| Evento              | Emisor                                    | `value`                        | `attempt_id`               | `payload` / `period_key`                                  |
+| ------------------- | ----------------------------------------- | ------------------------------ | -------------------------- | --------------------------------------------------------- |
+| `attempt_completed` | `complete` (tipos autocalificados)        | calificación 0,0–5,0           | intento completado         | —                                                         |
+| `audio_submitted`   | `complete` de speaking                    | 1                              | intento completado         | —                                                         |
+| `review_received`   | `POST /attempts/:id/review`               | calificación 0,0–5,0           | intento calificado         | —                                                         |
+| `retry_granted`     | `review` con `allowRetry` o `grant-retry` | —                              | intento que concede        | `{ retry_extend_until }`                                  |
+| `streak_week`       | job semanal                               | número de semanas consecutivas | —                          | estado de racha; `period_key` = semana ISO (único)        |
+| `badge_awarded`     | motor de insignias                        | —                              | —                          | `{ badge_award_id }`                                      |
 
-Cuando un alumno tiene varios intentos de una misma asignación (nuevo intento habilitado), las agregaciones de rendimiento usan solo el evento del **último intento calificado**; el resto queda en el historial.
+**Reparto de lecturas (Decidido, decisión 71).** Las estadísticas de **rendimiento** (serie de calificaciones, promedios, último intento calificado) se calculan sobre `Attempt` (`score`, `graded_at`, `attempt_number`), que es la fuente única de la calificación (decisión 72). Las de **constancia** (semanas activas, rachas) y toda la gamificación se calculan sobre `ProgressEvent`. Cuando un alumno tiene varios intentos de una misma asignación, el rendimiento usa solo el **último intento calificado** (`MAX(attempt_number)` con `status = graded`); el resto queda en el historial.
 
 ### 9.2 Motor de insignias — Decidido (decisión 20)
 
-`BadgeRule` es una fila con `key`, `name`, `description`, `icon`, `rule` (JSON) y `active`. Ejemplos de `rule`:
+`BadgeRule` es una fila **de cada organización** (decisión 79) con `organization_id`, `key` (único por organización), `name`, `description`, `icon`, `rule` (JSON) y `active`. Una regla retirada se desactiva, no se borra. `BadgeAward` es único por `(student_id, badge_rule_id)`: cada insignia se gana una sola vez, aunque el motor se ejecute dos veces (decisión 76). Ejemplos de `rule`:
 
 ```json
 { "type": "count", "event": "attempt_completed", "threshold": 1 }
@@ -832,10 +898,11 @@ si no (semana inactiva):
     si no:
         streak_weeks = 0                        # la racha se rompe (o ya era 0)
         active_weeks_since_forgiveness_used = 0 # racha nueva empieza sin deuda; el perdón, si estaba disponible, se mantiene
-emitir ProgressEvent(streak_week, value = streak_weeks, payload = {forgiveness_available, forgiven: <bool>})
+emitir ProgressEvent(streak_week, value = streak_weeks, period_key = semana ISO,
+                     payload = {forgiveness_available, active_weeks_since_forgiveness_used, forgiven: <bool>})
 ```
 
-Consecuencias: dos semanas inactivas seguidas siempre rompen la racha (solo hay un perdón); un alumno nuevo empieza con `forgiveness_available = true` pero no puede gastarlo hasta tener al menos una semana activa. Se registra como `streak_week`; las insignias de 4, 8 y 12 semanas se disparan desde ese evento. Tests unitarios obligatorios (ENG-068): racha 0 sin perdón posible, perdón usado y recuperado tras 2 semanas activas, no acumulación, dos inactivas rompen.
+Consecuencias: dos semanas inactivas seguidas siempre rompen la racha (solo hay un perdón); un alumno nuevo empieza con `forgiveness_available = true` pero no puede gastarlo hasta tener al menos una semana activa. Se registra como `streak_week`; el job lee el estado de la semana anterior del `payload` del último `streak_week` del alumno, y el único `(student_id, type, period_key)` impide emitir dos veces la misma semana. Las insignias de 4, 8 y 12 semanas se disparan desde ese evento. Tests unitarios obligatorios (ENG-068): racha 0 sin perdón posible, perdón usado y recuperado tras 2 semanas activas, no acumulación, dos inactivas rompen.
 
 ### 9.4 Estadísticas del panel: rendimiento y constancia — Decidido (CONTEXT §13, decisión 28)
 
@@ -853,9 +920,11 @@ La profesora quiere ver **cómo ha avanzado cada estudiante**. No hay métrica g
 
 Reglas de cálculo:
 
-- Tiempo por actividad: `finished_at - started_at` (ambos del servidor), recortado a `expected_duration_sec × 3` para no contar pestañas olvidadas. Agregados diario, semanal y mensual.
-- Tasa de finalización: intentos `graded` o `pending_review` sobre alumnos asignados, por asignación, nivel y grupo.
-- **Denominador congelado (Decidido, decisión 34 §14):** para asignaciones ya cerradas (`due_at < now()`) el denominador es `Assignment.historical_student_count` si no es `null`; en caso contrario, y para asignaciones abiertas, se usa el conteo actual de alumnos activos del grupo. Borrar un alumno no altera retroactivamente los promedios ni las tasas de participación de actividades pasadas.
+- Rendimiento sobre `Attempt.score` y `Attempt.graded_at`; constancia sobre `ProgressEvent` (§9.1).
+- Tiempo por actividad: `finished_at - started_at` (ambos del servidor), recortado a `Activity.expected_duration_seconds × 3` (valor por defecto por tipo si es `null`; decisión 79) para no contar pestañas olvidadas. Agregados diario, semanal y mensual.
+- **Alumnos obligados (Decidido, decisión 73):** una asignación obliga a los alumnos que tuvieron membresía en su grupo solapada con `[opens_at, due_at]`. Un alumno que cambia de grupo cuenta en las asignaciones del grupo anterior que se solapan con su estancia y no en las anteriores a su llegada al nuevo. Como cada alumno tiene un solo grupo vigente, una actividad asignada a varios grupos no se cuenta dos veces para el mismo alumno salvo que haya cambiado de grupo entre ambas asignaciones.
+- Tasa de finalización: intentos `graded` o `pending_review` sobre alumnos obligados, por asignación, nivel y grupo.
+- **Denominador congelado (Decidido, decisión 34 §14):** para asignaciones ya cerradas (`due_at < now()`) el denominador es `Assignment.historical_student_count` si no es `null`; en caso contrario, y para asignaciones abiertas, se usa el conteo de alumnos obligados según la regla anterior. Borrar un alumno no altera retroactivamente los promedios ni las tasas de participación de actividades pasadas.
 - Con varios intentos por asignación cuenta el último calificado (§9.1).
 - **Plazos extendidos (Decidido, decisión 61):** un nuevo intento iniciado antes de su `retry_extend_until` es tan válido como uno iniciado antes de `due_at`; las estadísticas de finalización y puntualidad evalúan cada intento contra su cierre efectivo, no contra el `due_at` original. La vista por estudiante marca los intentos hechos con plazo extendido.
 - Agrupación: por tipo de actividad (los cinco valores de `ActivityType`) y, dentro de `game`, por mecánica de juego (decisión 66).
@@ -945,7 +1014,7 @@ Supabase Storage no se usa en ningún entorno (Decidido, decisión 34 §21).
 - Identificadores, tablas y columnas en inglés; interfaz, documentación y commits en español (CONTEXT §16).
 - Prefijo `/api/v1`. JSON. Fechas ISO-8601 en UTC; el frontend muestra en `America/Bogota`.
 - Calificaciones: número con un decimal en la API (`4.5`); la interfaz lo muestra con coma (`4,5`).
-- Errores: `{ statusCode, code, message }` con `code` estable por caso (`AUTH_INVALID_CREDENTIALS`, `AUTH_ACCOUNT_LOCKED`, `ACCOUNT_PENDING_APPROVAL`, `PASSWORD_POLICY`, `EMAIL_TAKEN`, `OTP_INVALID`, `RATE_LIMITED`, `ATTEMPT_CLOSED`, `ATTEMPT_ALREADY_EXISTS`, `RETRY_ALREADY_GRANTED`, `RETRY_EXTEND_INVALID`, `SCORE_OUT_OF_RANGE`, `ACTIVITY_HAS_ATTEMPTS`, `EXAM_MIN_ITEMS`, `AUDIO_IMPLAUSIBLE_DURATION`, `AUDIO_EXCEEDS_MAX_DURATION`, `INTERFACE_SWITCH_NOT_ALLOWED`; `ATTEMPT_NOT_OPEN` queda como Propuesto, pendiente P-1 de §15). `EMAIL_TAKEN` solo lo devuelven endpoints autenticados (`POST /me/email-change`, `POST /students/:id/change-email`); ningún endpoint público revela si un correo existe (decisión 59). **Ningún error devuelve datos técnicos internos** (stack traces, consultas, rutas de archivo, identificadores de infraestructura): `message` es un texto neutro y el detalle queda solo en el log del servidor (Decidido, decisión 34 §17). El cliente traduce `code` a mensajes en español por interfaz (§3.6).
+- Errores: `{ statusCode, code, message }` con `code` estable por caso (`AUTH_INVALID_CREDENTIALS`, `AUTH_ACCOUNT_LOCKED`, `ACCOUNT_PENDING_APPROVAL`, `PASSWORD_POLICY`, `EMAIL_TAKEN`, `OTP_INVALID`, `RATE_LIMITED`, `ATTEMPT_CLOSED`, `ATTEMPT_ALREADY_EXISTS`, `RETRY_ALREADY_GRANTED`, `RETRY_EXTEND_INVALID`, `SCORE_OUT_OF_RANGE`, `SCORE_NOT_EDITABLE` (decisión 72), `GROUP_ARCHIVED` (decisión 79), `ACTIVITY_HAS_ATTEMPTS`, `EXAM_MIN_ITEMS`, `AUDIO_IMPLAUSIBLE_DURATION`, `AUDIO_EXCEEDS_MAX_DURATION`, `INTERFACE_SWITCH_NOT_ALLOWED`; `ATTEMPT_NOT_OPEN` queda como Propuesto, pendiente P-1 de §15). `EMAIL_TAKEN` solo lo devuelven endpoints autenticados (`POST /me/email-change`, `POST /students/:id/change-email`); ningún endpoint público revela si un correo existe (decisión 59). **Ningún error devuelve datos técnicos internos** (stack traces, consultas, rutas de archivo, identificadores de infraestructura): `message` es un texto neutro y el detalle queda solo en el log del servidor (Decidido, decisión 34 §17). El cliente traduce `code` a mensajes en español por interfaz (§3.6).
 - Paginación por `offset` y `limit`. Suficiente para 100 alumnos.
 - Textos de interfaz en español directamente en los componentes; sin librería i18n en el piloto. El contenido pedagógico es en inglés y lo escribe la profesora.
 - Todo cambio de comportamiento pasa primero por su spec en `specs/` (CONTEXT §11.1).
@@ -987,7 +1056,7 @@ Supabase Storage no se usa en ningún entorno (Decidido, decisión 34 §21).
 | A22 | Techos de clics por zona (2 / 3 / 3 / 3–4 / 3) y principios de simpleza de navegación                                                                                                                                                                                                                             | §3.1                     |
 | A23 | Render con instancia siempre activa antes del piloto; misma región que Supabase                                                                                                                                                                                                                                   | §11.3                    |
 | A24 | El mismo proveedor y remitente envía el correo de bienvenida del alta directa (token `welcome` de 72 h) y el de recuperación (`reset` de 30 min). Aclaración del líder del proyecto a la decisión 30. **El correo `welcome` y el alta directa desaparecen con la decisión 34 §1**; el remitente único se mantiene | §7.4                     |
-| A25 | Registro autónomo del estudiante con aprobación de la profesora (`pending_approval` → `approved`/`rejected`). **El alta directa como flujo alterno queda eliminada por la decisión 34 §1**                                                                                                                        | §4.1 CONTEXT, §7.2, §7.3 |
+| A25 | Registro autónomo del estudiante con aprobación de la profesora (`pending_approval` → `approved`; el rechazo borra la solicitud y el valor `rejected` se eliminó por la decisión 77). **El alta directa como flujo alterno queda eliminada por la decisión 34 §1**                                                                                                                        | §4.1 CONTEXT, §7.2, §7.3 |
 
 ### 14.3 Aplicadas el 2026-09-22 (CONTEXT §14, decisión 34) — Decidido
 
@@ -1026,12 +1095,34 @@ Detalles de implementación que este documento añade al aplicar `planning/decis
 | A47 | Signup sin enumeración: con correo existente no crea nada, responde igual y envía `signup-existing-account`; `EMAIL_TAKEN` solo en endpoints autenticados | §7.2, §13 |
 | A48 | Cierre efectivo = `retry_extend_until` del intento anterior ?? `due_at`; inicio válido si `now() ≤ cierre efectivo`; `events`/`complete` hasta cierre efectivo + 24 h; `attemptToken` con esa expiración; job nocturno de abandono sobre la misma ventana | §4.5, §7.5, §10.1 |
 | A49 | `Attempt.retry_extend_until`; parámetro `retryExtendUntil` en `review` y `grant-retry`; `RETRY_EXTEND_INVALID` si es anterior a `now()`; concesión con `UPDATE … WHERE retry_granted_at IS NULL` | §6.4, §7.7 |
-| A50 | Índices únicos parciales `Attempt(assignment_id, student_id) WHERE previous_attempt_id IS NULL` y `Attempt(previous_attempt_id) WHERE previous_attempt_id IS NOT NULL` para el consumo atómico | §6.5, §7.5 |
+| A50 | Índices únicos parciales `Attempt(assignment_id, student_id) WHERE previous_attempt_id IS NULL` y `Attempt(previous_attempt_id) WHERE previous_attempt_id IS NOT NULL` para el consumo atómico. **Sustituido por A62** (único con `attempt_number`, decisión 74) | §6.5, §7.5 |
 | A51 | Plantilla `email-changed` (aviso al correo anterior en el cambio por el alumno; a ambos en el cambio por la profesora); `MailService` con ocho plantillas | §7.3, §7.4 |
 | A52 | `POST /students/:id/change-email` con transacción que actualiza `User.email`, escribe `AuditLog`, invalida tokens de recuperación y solicitudes de cambio pendientes y revoca todas las sesiones; `PATCH /students/:id` no modifica el correo | §4.1, §7.3 |
 | A53 | Tabla `AuditLog` append-only y enum `AuditAction` (`student_email_changed`); fuera de los logs de la aplicación | §6.3, §6.4, §8.5 |
 | A54 | `MediaAsset.transcode_attempts` y `transcode_failed_at`; rutina de recuperación al arrancar sobre `ready` sin `converted_key` ni fallo definitivo; clave de convertido determinista; raw borrado solo tras guardar `converted_key` | §3.5, §4.5, §6.4, §6.5 |
 | A55 | Render con una instancia, sin autoescalado; todas las tareas idempotentes por el solapamiento breve de procesos durante un despliegue | §4.5, §11.3, §11.4 |
+
+### 14.5 Aplicadas el 2026-09-28 (CONTEXT §14, decisión 67) — Decidido
+
+Detalles de implementación que este documento añade al aplicar `planning/decisiones-modelo-de-datos.md`:
+
+| #   | Detalle | Sección |
+| --- | ------- | ------- |
+| A56 | `AuthSession` (una fila por familia; `id` = `sid`; `refresh_token_hash` único sustituido en cada rotación; `revoked_at`); reutilización = `sid` existente con hash distinto; `JwtAuthGuard` rechaza sesiones revocadas; limpieza nocturna a los 30 días | §4.3, §4.5, §6.4, §7.1 |
+| A57 | `EmailChangeRequest.failed_attempts`; tercer OTP incorrecto invalida la solicitud | §6.4, §7.4 |
+| A58 | `ExamDetail` con ítems exclusivamente `fill_blank` en `config` y clave por ítem en `answer_key`; scorer de examen = scorer de `fill_blank` por ítem + media ponderada | §4.4, §6.4 |
+| A59 | `ProgressEvent` con `value numeric(6,1)` solo para magnitudes, `attempt_id`, `payload`, `period_key`; sin `source`; rendimiento sobre `Attempt`, constancia y gamificación sobre `ProgressEvent` | §6.4, §9.1, §9.4 |
+| A60 | `Attempt.score` (con `CHECK`) y `Attempt.graded_at` como fuente única de la calificación; `Review` solo feedback (sin `score` ni `graded_at`); `SCORE_NOT_EDITABLE` al enviar nota sobre un autocalificado | §4.4, §6.4, §7.5, §7.7, §13 |
+| A61 | `GroupMembership` con `joined_at` / `left_at` y único parcial de membresía vigente; `approve` con `groupId`; `PUT /students/:id/group`; inicio de intentos solo en el grupo vigente; regla de alumnos obligados por solape con `[opens_at, due_at]` | §4.1, §6.4, §7.2, §7.5, §8.4, §9.4 |
+| A62 | `Attempt.attempt_number` con único `(assignment_id, student_id, attempt_number)` en `@@unique`; sustituye a A50 | §6.4, §6.5, §7.5 |
+| A63 | `config` y `answer_key` en columnas separadas en las tablas de detalle con clave; `omit` global de `answer_key` en Prisma Client | §5.3, §6.4 |
+| A64 | `ScheduledJobRun` con único `(organization_id, job_key, period_key)` y estados `running` / `done` / `failed`; `period_key` por tarea; únicos `BadgeAward(student_id, badge_rule_id)` y `ProgressEvent(student_id, type, period_key)` | §4.5, §6.4, §9.2, §9.3 |
+| A65 | `ApprovalStatus` sin `rejected` | §6.3, §7.1 |
+| A66 | Índices en claves foráneas; único parcial `MediaAsset(attempt_id) WHERE status = 'ready'`; retirados `User(locked_until)` y `Student(organization_id, birth_date)` | §6.5 |
+| A67 | `Activity.expected_duration_seconds` y `min_plausible_seconds` con valores por defecto por tipo en `packages/shared` | §4.4, §6.4, §9.4 |
+| A68 | `User.name` para todos los roles; sin `Student.name`; `BadgeRule` por organización; `Review.stickers` como códigos del catálogo `STICKERS`; campos de `ExternalResource`; `Group.archived_at` y `GROUP_ARCHIVED` | §6.4, §9.2, §13 |
+| A69 | Política de `onDelete` por relación (`Restrict` para autoría, organización, actividades asignadas y grupos con historia; `Cascade` como red de seguridad bajo el alumno; `NoAction` en `previous_attempt_id`) | §6.2, §8.4 |
+| A70 | Combinación del `payload` del intento en una sola sentencia o bajo `SELECT … FOR UPDATE` | §6.2, §7.5 |
 
 ---
 
@@ -1044,6 +1135,7 @@ Detalles de implementación que este documento añade al aplicar `planning/decis
   - **P-3 — Recuperación de transcodificación** (cierra SPEC-05): propuesta máximo 3 intentos en total en `transcode_attempts`; al agotarlos, `transcode_failed_at` y fallback definitivo al raw; sin reconversión manual en el piloto (§3.5, §4.5).
   - **P-4 — Auditoría administrativa** (cierra SPEC-03): propuesta `AuditLog` conservado mientras exista el alumno y borrado en su cascada; sin pantalla de consulta; acceso solo del equipo técnico a petición de la profesora (§6.4, §8.4).
   - **P-5 — Identidad multi-organización** (compuerta de Fase 2): sin propuesta para el piloto; un modelo de membresías (`User` único + pertenencia por organización y rol) se decide antes de crear la segunda `Organization`.
+- Cerradas el 2026-09-28 (decisión 67, Ronda 5): persistencia de sesiones, contador de OTP, subtipos de ítem de examen, forma de `ProgressEvent`, fuente única de la calificación, un alumno en varios grupos (un solo grupo vigente), unicidad de intentos sin índices parciales, ubicación de la clave de respuestas, idempotencia de tareas tras reinicios, estado `rejected`, índices, campos faltantes y política de `onDelete`. No adoptada: parámetros de organización con tipo.
 - Cerradas el 2026-09-28 (decisión 57): visibilidad de la cookie de sesión para el middleware, unicidad del correo, tolerancia para completar intentos, representación del plazo del nuevo intento, destino del OTP, cambio administrativo del correo, estado en memoria con una sola instancia.
 - Cerradas el 2026-09-21: retención de audios y plazos, política de reintentos, acceso del alumno, hosting, umbral de aprobación, tramos de estrellas, bloqueo para la profesora, Resend.
 - Cerradas el 2026-09-22 (decisión 34): reproducción de WebM/Opus en Safari (resuelta con transcodificación), almacenamiento de archivos (R2), reloj de los intentos, algoritmo de rachas, `due_at`, ítems sin respuesta y pesos de examen, duración de audios, denominador histórico, `age_segment`, rate limiting, estados de error, actualizaciones de la PWA.

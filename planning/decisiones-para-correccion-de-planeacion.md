@@ -234,16 +234,3 @@ Definir la retención, consulta y acceso de los registros generados cuando la pr
 ### 10.5 Identidad multi-organización futura
 
 Aunque el correo globalmente único resuelve el piloto, en Fase 2 deberá decidirse si una persona puede pertenecer a varias organizaciones mediante membresías sin duplicar su identidad.
-
-## 11. Orden recomendado para aplicar posteriormente los cambios
-
-1. Actualizar el registro de decisiones de `CONTEXT.md`.
-2. Corregir la política de cookies y el comportamiento del middleware.
-3. Cambiar la unicidad de `User.email` a global.
-4. Formalizar la tolerancia de 24 horas para intentos.
-5. Añadir `retry_extend_until` y sus reglas.
-6. Documentar el cambio de correo administrativo por la profesora.
-7. Documentar la restricción de una sola instancia y la recuperación de transcodificaciones.
-8. Corregir el calendario de la Etapa 0 y sus dependencias.
-9. Uniformar la terminología de tipos de actividad y mecánicas.
-10. Resolver las decisiones menores en una ronda posterior y actualizar las specs correspondientes cuando llegue el momento.

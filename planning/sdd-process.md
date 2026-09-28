@@ -1,10 +1,10 @@
 # Englove — Proceso de desarrollo: Spec-Driven Development (SDD)
 
-> **Propósito.** Definir cómo se construye Englove día a día: qué es una especificación, dónde vive, quién la aprueba, cómo se relaciona con el código, las pruebas y el taskboard. Es **Decidido** (CONTEXT §14, decisión 21). Desarrolla la metodología; no contiene ninguna especificación. La redacción de las specs empieza cuando arranque la Etapa 1 y sigue el calendario de §7.
+> **Propósito.** Definir cómo se construye Englove día a día: qué es una especificación, dónde vive, quién la aprueba, cómo se relaciona con el código, las pruebas y el taskboard. Es **Decidido** (CONTEXT §14, decisión 21). Desarrolla la metodología; no contiene ninguna especificación. La redacción de las specs empieza en la Etapa 0 (SPEC-00 y SPEC-01) y sigue el calendario de §7.
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-09-21.
+> Última actualización: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 
 ---
 
@@ -58,7 +58,7 @@ Regla de conflicto: manda el documento de arriba. Una spec no puede contradecir 
 Una spec **es**:
 
 - Un documento Markdown en `specs/`, con identificador `SPEC-NN`, que describe una capacidad de punta a punta: comportamiento observable, contrato de API, cambios de datos, interfaz, seguridad y criterios de aceptación verificables.
-- Escrita en español, con identificadores técnicos en inglés (CONTEXT §16).
+- Escrita en español, con identificadores técnicos en inglés (CONTEXT §16). Usa "tipo de actividad" solo para los cinco valores de `ActivityType` y "mecánica de juego" solo para los cinco de `GameMechanic` (decisión 66).
 - Lo bastante concreta para que dos implementaciones independientes produzcan el mismo comportamiento observable.
 - Lo bastante corta para leerse en menos de 20 minutos. Si se pasa, se divide.
 
@@ -189,21 +189,25 @@ Reglas de transición:
 
 Las specs se escriben **una etapa por delante** de la implementación, no todas al principio. Así incorporan lo aprendido en la etapa anterior sin frenar el arranque.
 
-| Spec | Se redacta durante | Debe estar Aprobada antes de |
-|---|---|---|
-| Plantilla e índice de `specs/` | Etapa 0 | Etapa 1 |
-| SPEC-01 Scaffold | Etapa 0 | Etapa 1 |
-| SPEC-02 Identidad y sesión | Etapa 1 | Etapa 2 |
-| SPEC-03 Gestor de contenidos | Etapa 2 | Etapa 3 |
-| SPEC-04 Asignación | Etapa 3 | Etapa 4 |
-| SPEC-05 Portal e intentos | Etapa 3–4 | Etapa 5 |
-| SPEC-06 Microjuegos | Etapa 5 | Etapa 6 |
-| SPEC-07 Revisión y feedback | Etapa 5 | Etapa 7 |
-| SPEC-08 Estadísticas | Etapa 6–7 | Etapa 8 |
-| SPEC-09 PWA, offline y accesibilidad | Etapa 8 | Etapa 9 |
-| SPEC-10 Contenido extra | Cualquier hueco | Etapa 10 |
+| Spec | Se redacta durante | Debe estar Aprobada antes de | Pendientes de CONTEXT §15 que debe cerrar |
+|---|---|---|---|
+| Plantilla e índice de `specs/` | Etapa 0 | Etapa 1 | — |
+| SPEC-01 Scaffold | Etapa 0 | Etapa 1 | — |
+| SPEC-02 Identidad y sesión | Etapa 1 | Etapa 2 | — |
+| SPEC-03 Gestor de contenidos | Etapa 2 | Etapa 3 | P-4 (auditoría administrativa) |
+| SPEC-04 Asignación | Etapa 3 | Etapa 4 | — |
+| SPEC-05 Portal e intentos | Etapa 3–4 | Etapa 5 | P-1 (inicio antes de `opens_at`), P-3 (recuperación de transcodificación) |
+| SPEC-06 Microjuegos | Etapa 5 | Etapa 6 | — |
+| SPEC-07 Revisión y feedback | Etapa 5 | Etapa 7 | P-2 (comentario en autocalificados) |
+| SPEC-08 Estadísticas | Etapa 6–7 | Etapa 8 | — |
+| SPEC-09 PWA, offline y accesibilidad | Etapa 8 | Etapa 9 | — |
+| SPEC-10 Contenido extra | Cualquier hueco | Etapa 10 | — |
 
-Hoy (2026-09-21) **no se redacta ninguna spec**. La primera, SPEC-01, se escribe al iniciar la Etapa 0 (tareas SPEC-00 y SPEC-01 del taskboard).
+**La aprobación es la compuerta de inicio (Decidido, CONTEXT §14, decisión 65).** "Debe estar Aprobada antes de" es literal: la Etapa 1 empieza cuando SPEC-01 está Aprobada, y la Etapa 2 cuando SPEC-02 está Aprobada y las dependencias técnicas de la Etapa 1 están entregadas. La Etapa 0 no corre en paralelo con las Etapas 1 y 2 en lo que respecta a esas dependencias; solo la preparación que no las bloquea (cuentas, dominio, repositorio, tokens de diseño, observación con niños) puede solaparse. Lo mismo vale para el resto: redactar la spec de la etapa N+1 durante la etapa N no autoriza a empezar su código.
+
+**Pendientes con propuesta vigente.** Las decisiones menores P-1 a P-4 de CONTEXT §15 tienen una propuesta en estado Propuesto. La spec que las cubre puede redactarse con esa propuesta, pero debe dejarla en §11 (preguntas abiertas) hasta que el líder del proyecto la confirme o la cambie; como afecta a RF concretos, la spec no pasa a Aprobada sin esa confirmación. Al cerrarse, se registra en CONTEXT §14 y se elimina de §15. P-5 (identidad multi-organización) no pertenece a ninguna spec del piloto.
+
+A 2026-09-28 **aún no se ha redactado ninguna spec**. La primera, SPEC-01, se escribe durante la Etapa 0 (tareas SPEC-00 y SPEC-01 del taskboard).
 
 ---
 
@@ -245,6 +249,7 @@ Hoy (2026-09-21) **no se redacta ninguna spec**. La primera, SPEC-01, se escribe
 | Anti-patrón | Por qué es un problema | Qué hacer |
 |---|---|---|
 | Escribir todas las specs antes de la Etapa 1 | Se vuelven obsoletas antes de implementarse | Una etapa por delante (§7) |
+| Tratar la Etapa 0 como paralela a las Etapas 1 y 2 | Se escribe código del scaffold o de identidad sin SPEC-01 / SPEC-02 Aprobadas | La aprobación de la spec es la compuerta de inicio de cada etapa (§7, decisión 65) |
 | Una spec por tarea del taskboard | Fragmenta el comportamiento; nadie ve la capacidad completa | Una spec por capacidad; tareas enlazan RF |
 | Spec sin criterios Dado/Cuando/Entonces | No se puede verificar; las pruebas se improvisan | Cada RF con al menos un criterio |
 | Cambiar el código y "luego actualizo la spec" | La spec deja de ser fuente de verdad en horas | Spec primero, aunque sea una fila en el registro de cambios |

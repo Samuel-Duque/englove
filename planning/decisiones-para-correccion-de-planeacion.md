@@ -5,6 +5,8 @@
 > Este documento no modifica ni sustituye los documentos originales. Sus decisiones deben incorporarse mediante una nueva ronda en el registro de decisiones.
 >
 > Fecha: 2026-09-25
+>
+> **Estado: aplicado el 2026-09-28** mediante la Ronda 4 del registro de decisiones (`CONTEXT.md` §14, decisiones 57–66), con reflejo en `architecture-overview.md` (§14.4), `sdd-process.md`, `pbp-development.md` y `taskboard.md`. Las decisiones menores de §10 no se decidieron: quedan como pendientes P-1 a P-5 en `CONTEXT.md` §15, cada una con una propuesta vigente y la spec que debe cerrarla.
 
 ## 1. Cookies de sesión entre frontend y API
 

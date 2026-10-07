@@ -1011,7 +1011,7 @@ Supabase Storage no se usa en ningún entorno (Decidido, decisión 34 §21).
 
 ## 13. Convenciones de código y API — Decidido (decisión 20)
 
-- Identificadores, tablas y columnas en inglés; interfaz, documentación y commits en español (CONTEXT §16).
+- Identificadores, tablas y columnas en inglés; interfaz y documentación en español; commits en español o inglés (CONTEXT §16).
 - Prefijo `/api/v1`. JSON. Fechas ISO-8601 en UTC; el frontend muestra en `America/Bogota`.
 - Calificaciones: número con un decimal en la API (`4.5`); la interfaz lo muestra con coma (`4,5`).
 - Errores: `{ statusCode, code, message }` con `code` estable por caso (`AUTH_INVALID_CREDENTIALS`, `AUTH_ACCOUNT_LOCKED`, `ACCOUNT_PENDING_APPROVAL`, `PASSWORD_POLICY`, `EMAIL_TAKEN`, `OTP_INVALID`, `RATE_LIMITED`, `ATTEMPT_CLOSED`, `ATTEMPT_ALREADY_EXISTS`, `RETRY_ALREADY_GRANTED`, `RETRY_EXTEND_INVALID`, `SCORE_OUT_OF_RANGE`, `SCORE_NOT_EDITABLE` (decisión 72), `GROUP_ARCHIVED` (decisión 79), `ACTIVITY_HAS_ATTEMPTS`, `EXAM_MIN_ITEMS`, `AUDIO_IMPLAUSIBLE_DURATION`, `AUDIO_EXCEEDS_MAX_DURATION`, `INTERFACE_SWITCH_NOT_ALLOWED`; `ATTEMPT_NOT_OPEN` queda como Propuesto, pendiente P-1 de §15). `EMAIL_TAKEN` solo lo devuelven endpoints autenticados (`POST /me/email-change`, `POST /students/:id/change-email`); ningún endpoint público revela si un correo existe (decisión 59). **Ningún error devuelve datos técnicos internos** (stack traces, consultas, rutas de archivo, identificadores de infraestructura): `message` es un texto neutro y el detalle queda solo en el log del servidor (Decidido, decisión 34 §17). El cliente traduce `code` a mensajes en español por interfaz (§3.6).

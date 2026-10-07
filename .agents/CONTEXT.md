@@ -559,7 +559,7 @@ Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abri
 - Respetar todo lo marcado como **Decidido**. Si una tarea exige cambiarlo, proponerlo como nueva entrada en §14, no implementarlo en silencio.
 - **Trabajar bajo SDD (§11.1):** antes de implementar, leer la spec Aprobada de la capacidad en `specs/` y las secciones que enlaza. No escribir código de producción sin spec Aprobada. Lo que la spec no pide no se construye; lo que falta se anota en sus preguntas abiertas. Reglas completas en `planning/sdd-process.md` §9.
 - No construir nada listado en §2.4 durante el piloto.
-- Idioma (Decidido con las convenciones de código y API, decisión 20): identificadores de código, nombres de tablas y columnas en inglés; documentación, mensajes de commit y textos de interfaz en español. El contenido pedagógico es en inglés por naturaleza del producto.
+- Idioma (Decidido con las convenciones de código y API, decisión 20): identificadores de código, nombres de tablas y columnas en inglés; documentación y textos de interfaz en español. El idioma de los mensajes de commit es libre (español o inglés). El contenido pedagógico es en inglés por naturaleza del producto.
 - Todo tipo de actividad nuevo requiere tres piezas: esquema Zod en el paquete compartido, tabla de detalle 1:1 en Prisma, e implementación del contrato de actividad (§7.3).
 - Toda consulta a datos de tenant filtra por `organization_id`.
 - Todo puntaje se calcula en el backend y se expresa en la escala 0,0–5,0. Ningún endpoint acepta un puntaje enviado por el cliente.

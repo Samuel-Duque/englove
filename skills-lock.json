@@ -43,6 +43,11 @@
       "skillPath": "skills/email-best-practices/SKILL.md",
       "computedHash": "cf53e0d7ad72c440818c64a104ab220f527f26f10c7d8163fa99e066bf747eed"
     },
+    "englove-spec": {
+      "source": "./.agents/skills/englove-spec",
+      "sourceType": "local",
+      "computedHash": "d54c6da7ae8f22bca7c02c9e7ec486289b0d4c57b7b9fad807cb8fbf1db92c60"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",

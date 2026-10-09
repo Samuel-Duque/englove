@@ -4,7 +4,9 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
+> Última actualización: 2026-10-08. Añade la regla 7 de §9: la skill propia `englove-spec` como apoyo para agentes al redactar y revisar specs (tarea DOC-07). Sin cambios de proceso.
+>
+> Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 
 ---
 
@@ -241,6 +243,7 @@ A 2026-09-28 **aún no se ha redactado ninguna spec**. La primera, SPEC-01, se e
 4. Al terminar, actualizar en el mismo cambio: estado de la tarea en el taskboard, estado de la spec si corresponde, y CONTEXT §14/§15 si se cerró un pendiente o cambió una decisión.
 5. Toda spec respeta lo Decidido en CONTEXT (§16). Si una spec necesita cambiar una decisión, la ruta es CONTEXT §14 primero.
 6. Las specs se escriben para que las lea la próxima persona o agente sin contexto previo. Enlaces en vez de repeticiones; ejemplos concretos en vez de adjetivos.
+7. **Apoyo para agentes:** la skill propia `englove-spec` (`.agents/skills/englove-spec/`) aplica este proceso para crear `specs/` (SPEC-00) y para redactar, revisar o actualizar una spec. Su script `scripts/check-spec.mjs` verifica la estructura contra la plantilla de §5 y los pendientes de CONTEXT §15; no sustituye la revisión semántica ni la aprobación del líder del proyecto. Si la skill y este documento discrepan, manda este documento.
 
 ---
 

@@ -4,7 +4,7 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-10-08. Añade la regla 7 de §9: la skill propia `englove-spec` como apoyo para agentes al redactar y revisar specs (tarea DOC-07). Sin cambios de proceso.
+> Última actualización: 2026-10-08. Refleja en §7 el arranque completado de SPEC-00 y la primera spec redactada (SPEC-01, Borrador). En esta fecha también se añadió la regla 7 de §9: la skill propia `englove-spec` como apoyo para agentes (DOC-07). Sin cambios de proceso.
 >
 > Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 
@@ -103,56 +103,69 @@ Todas las secciones son obligatorias. Si una no aplica, se escribe "No aplica" y
 ```markdown
 # SPEC-NN — <Título de la capacidad>
 
-| Campo | Valor |
-|---|---|
-| Estado | Borrador / En revisión / Aprobada / Implementada / Verificada / Obsoleta |
-| Etapa | N — <nombre> |
-| Tareas | ENG-xxx, ENG-yyy |
-| Referencias | CONTEXT §a, §b · architecture §c, §d |
-| Aprobada por / fecha | — |
+| Campo                | Valor                                                                    |
+| -------------------- | ------------------------------------------------------------------------ |
+| Estado               | Borrador / En revisión / Aprobada / Implementada / Verificada / Obsoleta |
+| Etapa                | N — <nombre>                                                             |
+| Tareas               | ENG-xxx, ENG-yyy                                                         |
+| Referencias          | CONTEXT §a, §b · architecture §c, §d                                     |
+| Aprobada por / fecha | —                                                                        |
 
 ## 1. Contexto y objetivo
+
 Qué problema resuelve esta capacidad y para quién. Dos o tres párrafos.
 
 ## 2. Alcance
+
 - Incluye: …
 - No incluye (y dónde se cubre): …
 
 ## 3. Requisitos funcionales
+
 Lista numerada RF-1, RF-2… Cada requisito lleva al menos un criterio de aceptación en formato
 **Dado** <estado inicial> **Cuando** <acción> **Entonces** <resultado observable>.
 Los criterios son la fuente directa de las pruebas.
 
 ## 4. Reglas de negocio
+
 Reglas que cruzan varios requisitos: límites, cálculos, estados y transiciones, umbrales.
 Aquí viven, por ejemplo, la escala 0,0–5,0, el bloqueo por intentos fallidos o la racha perdonable.
 
 ## 5. Contrato de API
+
 Por endpoint: método, ruta, roles autorizados, cuerpo de entrada, respuesta, códigos de error
 (`code` estable según architecture §13). Se enlaza al esquema Zod de `packages/shared` cuando exista.
 
 ## 6. Modelo de datos
+
 Tablas y columnas nuevas o modificadas, enums, índices, migración. Alineado con architecture §6.
 
 ## 7. Interfaz
+
 Pantallas, estados (vacío, cargando, error, éxito), navegación y número de clics desde la home,
 diferencias Kids / Teens si las hay, textos clave en español.
 
 ## 8. Seguridad y privacidad
+
 Qué guard aplica, qué filtra por `organization_id`, qué datos de menores se tocan, qué no se registra en logs.
 
 ## 9. Pruebas
+
 Qué pruebas unitarias, de integración y E2E verifican esta spec, mapeadas a los RF.
 Qué se prueba en dispositivo real, si aplica.
 
 ## 10. Fuera de alcance y decisiones diferidas
+
 Qué se dejó fuera a propósito y en qué spec o fase se retomará.
 
 ## 11. Preguntas abiertas
+
 Lista con responsable y fecha. Una spec no pasa a Aprobada con preguntas abiertas que bloqueen un RF.
 
 ## 12. Registro de cambios
+
 | Fecha | Cambio | Motivo |
+| ----- | ------ | ------ |
 ```
 
 ---
@@ -170,14 +183,14 @@ flowchart LR
   V -->|reemplazada| O[Obsoleta]
 ```
 
-| Estado | Significado | Quién lo cambia |
-|---|---|---|
-| **Borrador** | Se está escribiendo. Puede tener huecos y preguntas abiertas. | Quien redacta |
-| **En revisión** | Completa según la plantilla. Se revisa contra CONTEXT y architecture. | Quien redacta la propone; el líder del proyecto revisa |
-| **Aprobada** | Contrato vinculante. A partir de aquí se puede escribir código. | Líder del proyecto |
-| **Implementada** | Todas las tareas ENG que cubre están en Hecho en el taskboard. | Quien cierra la última tarea |
-| **Verificada** | Las pruebas de §9 pasan en CI y, si aplica, la profesora validó la capacidad en staging. | Quien ejecuta la verificación |
-| **Obsoleta** | Reemplazada por otra spec. Se conserva por trazabilidad con enlace a la que la sustituye. | Quien crea la sustituta |
+| Estado           | Significado                                                                               | Quién lo cambia                                        |
+| ---------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Borrador**     | Se está escribiendo. Puede tener huecos y preguntas abiertas.                             | Quien redacta                                          |
+| **En revisión**  | Completa según la plantilla. Se revisa contra CONTEXT y architecture.                     | Quien redacta la propone; el líder del proyecto revisa |
+| **Aprobada**     | Contrato vinculante. A partir de aquí se puede escribir código.                           | Líder del proyecto                                     |
+| **Implementada** | Todas las tareas ENG que cubre están en Hecho en el taskboard.                            | Quien cierra la última tarea                           |
+| **Verificada**   | Las pruebas de §9 pasan en CI y, si aplica, la profesora validó la capacidad en staging.  | Quien ejecuta la verificación                          |
+| **Obsoleta**     | Reemplazada por otra spec. Se conserva por trazabilidad con enlace a la que la sustituye. | Quien crea la sustituta                                |
 
 Reglas de transición:
 
@@ -191,25 +204,25 @@ Reglas de transición:
 
 Las specs se escriben **una etapa por delante** de la implementación, no todas al principio. Así incorporan lo aprendido en la etapa anterior sin frenar el arranque.
 
-| Spec | Se redacta durante | Debe estar Aprobada antes de | Pendientes de CONTEXT §15 que debe cerrar |
-|---|---|---|---|
-| Plantilla e índice de `specs/` | Etapa 0 | Etapa 1 | — |
-| SPEC-01 Scaffold | Etapa 0 | Etapa 1 | — |
-| SPEC-02 Identidad y sesión | Etapa 1 | Etapa 2 | — |
-| SPEC-03 Gestor de contenidos | Etapa 2 | Etapa 3 | P-4 (auditoría administrativa) |
-| SPEC-04 Asignación | Etapa 3 | Etapa 4 | — |
-| SPEC-05 Portal e intentos | Etapa 3–4 | Etapa 5 | P-1 (inicio antes de `opens_at`), P-3 (recuperación de transcodificación) |
-| SPEC-06 Microjuegos | Etapa 5 | Etapa 6 | — |
-| SPEC-07 Revisión y feedback | Etapa 5 | Etapa 7 | P-2 (comentario en autocalificados) |
-| SPEC-08 Estadísticas | Etapa 6–7 | Etapa 8 | — |
-| SPEC-09 PWA, offline y accesibilidad | Etapa 8 | Etapa 9 | — |
-| SPEC-10 Contenido extra | Cualquier hueco | Etapa 10 | — |
+| Spec                                 | Se redacta durante | Debe estar Aprobada antes de | Pendientes de CONTEXT §15 que debe cerrar                                 |
+| ------------------------------------ | ------------------ | ---------------------------- | ------------------------------------------------------------------------- |
+| Plantilla e índice de `specs/`       | Etapa 0            | Etapa 1                      | —                                                                         |
+| SPEC-01 Scaffold                     | Etapa 0            | Etapa 1                      | —                                                                         |
+| SPEC-02 Identidad y sesión           | Etapa 1            | Etapa 2                      | —                                                                         |
+| SPEC-03 Gestor de contenidos         | Etapa 2            | Etapa 3                      | P-4 (auditoría administrativa)                                            |
+| SPEC-04 Asignación                   | Etapa 3            | Etapa 4                      | —                                                                         |
+| SPEC-05 Portal e intentos            | Etapa 3–4          | Etapa 5                      | P-1 (inicio antes de `opens_at`), P-3 (recuperación de transcodificación) |
+| SPEC-06 Microjuegos                  | Etapa 5            | Etapa 6                      | —                                                                         |
+| SPEC-07 Revisión y feedback          | Etapa 5            | Etapa 7                      | P-2 (comentario en autocalificados)                                       |
+| SPEC-08 Estadísticas                 | Etapa 6–7          | Etapa 8                      | —                                                                         |
+| SPEC-09 PWA, offline y accesibilidad | Etapa 8            | Etapa 9                      | —                                                                         |
+| SPEC-10 Contenido extra              | Cualquier hueco    | Etapa 10                     | —                                                                         |
 
 **La aprobación es la compuerta de inicio (Decidido, CONTEXT §14, decisión 65).** "Debe estar Aprobada antes de" es literal: la Etapa 1 empieza cuando SPEC-01 está Aprobada, y la Etapa 2 cuando SPEC-02 está Aprobada y las dependencias técnicas de la Etapa 1 están entregadas. La Etapa 0 no corre en paralelo con las Etapas 1 y 2 en lo que respecta a esas dependencias; solo la preparación que no las bloquea (cuentas, dominio, repositorio, tokens de diseño, observación con niños) puede solaparse. Lo mismo vale para el resto: redactar la spec de la etapa N+1 durante la etapa N no autoriza a empezar su código.
 
 **Pendientes con propuesta vigente.** Las decisiones menores P-1 a P-4 de CONTEXT §15 tienen una propuesta en estado Propuesto. La spec que las cubre puede redactarse con esa propuesta, pero debe dejarla en §11 (preguntas abiertas) hasta que el líder del proyecto la confirme o la cambie; como afecta a RF concretos, la spec no pasa a Aprobada sin esa confirmación. Al cerrarse, se registra en CONTEXT §14 y se elimina de §15. P-5 (identidad multi-organización) no pertenece a ninguna spec del piloto.
 
-A 2026-09-28 **aún no se ha redactado ninguna spec**. La primera, SPEC-01, se escribe durante la Etapa 0 (tareas SPEC-00 y SPEC-01 del taskboard).
+A 2026-10-08, SPEC-00 está Hecho y **SPEC-01 — Scaffold está redactada en Borrador**, pendiente de aprobación. Es la primera spec y se redacta durante la Etapa 0; el índice vigente está en [`specs/README.md`](../specs/README.md). Su redacción no habilita el inicio de la Etapa 1.
 
 ---
 
@@ -231,7 +244,7 @@ A 2026-09-28 **aún no se ha redactado ninguna spec**. La primera, SPEC-01, se e
 
 - Los pull requests enlazan la spec y los RF que cubren. La plantilla de PR (ENG-001) tiene un campo obligatorio para ello.
 - La Definición de Hecho (pbp §3) exige spec Aprobada y RF cubiertos por pruebas.
-- Los esquemas Zod de `packages/shared` y `schema.prisma` se derivan de las secciones 5 y 6 de la spec. Cuando el código existe, es la referencia autoritativa del *detalle*; la spec sigue siendo la referencia del *comportamiento*.
+- Los esquemas Zod de `packages/shared` y `schema.prisma` se derivan de las secciones 5 y 6 de la spec. Cuando el código existe, es la referencia autoritativa del _detalle_; la spec sigue siendo la referencia del _comportamiento_.
 
 ---
 
@@ -249,13 +262,13 @@ A 2026-09-28 **aún no se ha redactado ninguna spec**. La primera, SPEC-01, se e
 
 ## 10. Anti-patrones
 
-| Anti-patrón | Por qué es un problema | Qué hacer |
-|---|---|---|
-| Escribir todas las specs antes de la Etapa 1 | Se vuelven obsoletas antes de implementarse | Una etapa por delante (§7) |
-| Tratar la Etapa 0 como paralela a las Etapas 1 y 2 | Se escribe código del scaffold o de identidad sin SPEC-01 / SPEC-02 Aprobadas | La aprobación de la spec es la compuerta de inicio de cada etapa (§7, decisión 65) |
-| Una spec por tarea del taskboard | Fragmenta el comportamiento; nadie ve la capacidad completa | Una spec por capacidad; tareas enlazan RF |
-| Spec sin criterios Dado/Cuando/Entonces | No se puede verificar; las pruebas se improvisan | Cada RF con al menos un criterio |
-| Cambiar el código y "luego actualizo la spec" | La spec deja de ser fuente de verdad en horas | Spec primero, aunque sea una fila en el registro de cambios |
-| Copiar secciones de CONTEXT en la spec | Dos fuentes que divergen | Enlazar la sección |
-| Spec Aprobada con preguntas abiertas bloqueantes | El implementador decide por su cuenta | Resolver o recortar alcance antes de aprobar |
-| Implementar algo de CONTEXT §2.4 porque "la spec lo insinúa" | Rompe una decisión firme | Detenerse; proponer en CONTEXT §14 |
+| Anti-patrón                                                  | Por qué es un problema                                                        | Qué hacer                                                                          |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Escribir todas las specs antes de la Etapa 1                 | Se vuelven obsoletas antes de implementarse                                   | Una etapa por delante (§7)                                                         |
+| Tratar la Etapa 0 como paralela a las Etapas 1 y 2           | Se escribe código del scaffold o de identidad sin SPEC-01 / SPEC-02 Aprobadas | La aprobación de la spec es la compuerta de inicio de cada etapa (§7, decisión 65) |
+| Una spec por tarea del taskboard                             | Fragmenta el comportamiento; nadie ve la capacidad completa                   | Una spec por capacidad; tareas enlazan RF                                          |
+| Spec sin criterios Dado/Cuando/Entonces                      | No se puede verificar; las pruebas se improvisan                              | Cada RF con al menos un criterio                                                   |
+| Cambiar el código y "luego actualizo la spec"                | La spec deja de ser fuente de verdad en horas                                 | Spec primero, aunque sea una fila en el registro de cambios                        |
+| Copiar secciones de CONTEXT en la spec                       | Dos fuentes que divergen                                                      | Enlazar la sección                                                                 |
+| Spec Aprobada con preguntas abiertas bloqueantes             | El implementador decide por su cuenta                                         | Resolver o recortar alcance antes de aprobar                                       |
+| Implementar algo de CONTEXT §2.4 porque "la spec lo insinúa" | Rompe una decisión firme                                                      | Detenerse; proponer en CONTEXT §14                                                 |

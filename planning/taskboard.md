@@ -2,11 +2,11 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-10-08. Se crea y se cierra DOC-07: skill propia `englove-spec` para redactar y revisar specs (`planning/skills-propias-pendientes.md` §1; regla 7 de `sdd-process.md` §9). Es herramienta de apoyo para agentes: no cambia decisiones, etapas ni dependencias, y no sustituye a SPEC-00 ni a SPEC-01, que siguen Por hacer.
+> Última actualización: 2026-10-08. SPEC-01 está En curso: `specs/SPEC-01-scaffold.md` redactada en Borrador, con contratos operacionales y almacenamiento de configuración pendientes de decisión; su aprobación sigue pendiente y no se habilita la Etapa 1. SPEC-00 está Hecho (plantilla e índice de `specs/`) y DOC-07 está Hecho (skill propia `englove-spec` de apoyo para agentes).
 >
 > Ronda 5: 2026-09-28. Aplica la decisión 67 de CONTEXT §14 (`decisiones-modelo-de-datos.md`, auditoría del modelo entidad-relación): se reescriben SPEC-01, ENG-013, ENG-017, ENG-020, ENG-023, ENG-026, ENG-028, ENG-029, ENG-038, ENG-040, ENG-044, ENG-062, ENG-068, ENG-070, ENG-092, ENG-095, ENG-096, ENG-100, ENG-120 y SPEC-07 con `AuthSession`, `ScheduledJobRun`, `attempt_number`, la calificación única en `Attempt`, un solo grupo vigente por alumno, exámenes con ítems `fill_blank`, `answer_key` separado y la política de `onDelete`. Sin tareas nuevas ni eliminadas.
 >
-> Ronda 4: 2026-09-28. Aplica la decisión 57 de CONTEXT §14 (`decisiones-para-correccion-de-planeacion.md`): se crea ENG-046 (cambio administrativo del correo con auditoría); se reescriben las tareas afectadas por las cookies con `Domain=.<dominio>`, el correo globalmente único, la tolerancia de 24 h, `retry_extend_until`, el OTP al correo nuevo, la instancia única con recuperación de transcodificaciones y la terminología de tipos de actividad y mecánicas de juego; las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se añaden a "Decisiones que desbloquean tareas". Etapa activa: **0 — Arranque**. **La Etapa 1 — Scaffold empieza cuando SPEC-01 esté Aprobada**, y la Etapa 2 cuando SPEC-02 esté Aprobada y se hayan entregado las dependencias técnicas de la Etapa 1 (decisión 65); no corren en paralelo. Ninguna spec redactada todavía; la primera tarea de spec es SPEC-00.
+> Ronda 4: 2026-09-28. Aplica la decisión 57 de CONTEXT §14 (`decisiones-para-correccion-de-planeacion.md`): se crea ENG-046 (cambio administrativo del correo con auditoría); se reescriben las tareas afectadas por las cookies con `Domain=.<dominio>`, el correo globalmente único, la tolerancia de 24 h, `retry_extend_until`, el OTP al correo nuevo, la instancia única con recuperación de transcodificaciones y la terminología de tipos de actividad y mecánicas de juego; las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se añaden a "Decisiones que desbloquean tareas". Etapa activa: **0 — Arranque**. **La Etapa 1 — Scaffold empieza cuando SPEC-01 esté Aprobada**, y la Etapa 2 cuando SPEC-02 esté Aprobada y se hayan entregado las dependencias técnicas de la Etapa 1 (decisión 65); no corren en paralelo. Situación de aquella ronda: ninguna spec redactada; la primera tarea de spec era SPEC-00. Para el estado actual, ver la última actualización y `specs/README.md`.
 >
 > Actualización anterior: 2026-09-22, decisión 34: se eliminaron ENG-006, ENG-022, ENG-042 y ENG-136; se crearon ENG-045, ENG-073, ENG-104 y DOC-06.
 
@@ -32,9 +32,9 @@
 
 | Estado    | Tareas  |
 | --------- | ------- |
-| Hecho     | 9       |
-| En curso  | 0       |
-| Por hacer | 18      |
+| Hecho     | 10      |
+| En curso  | 1       |
+| Por hacer | 16      |
 | Bloqueado | 0       |
 | Backlog   | 85      |
 | **Total** | **112** |
@@ -62,12 +62,15 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 | ENG-005 | Cerrar con el líder del proyecto: métrica del piloto (retirada, foco en rendimiento y constancia), retención de audios y política de reintentos. Registrado en CONTEXT §14                                                                                                                                                                                                                       | 2026-09-21 |
 | ENG-009 | Cerrar el mecanismo de acceso del alumno: correo y contraseña con recuperación. Registrado en CONTEXT §4 y §14                                                                                                                                                                                                                                                                                   | 2026-09-21 |
 | DOC-07  | Skill propia `englove-spec` (`.agents/skills/englove-spec/`, copias en `.claude/skills/` y `.kiro/skills/`, registrada en `skills-lock.json`): redactar, revisar y actualizar specs según `sdd-process.md`, con guía por sección, lista de validación contra CONTEXT §14, §2.4, §15 y §16, y script `check-spec.mjs` de verificación estructural. Ver `planning/skills-propias-pendientes.md` §1 | 2026-10-08 |
+| SPEC-00 | Crear `specs/` con `README.md` (índice) y `_template.md` según `sdd-process.md` §4 y §5 | 2026-10-08 |
 
 ---
 
 ## En curso
 
-Ninguna tarea en curso.
+| ID | Tarea | Prioridad | Depende de | Spec | Estado |
+| --- | --- | --- | --- | --- | --- |
+| SPEC-01 | Redactar y aprobar SPEC-01 Scaffold: esquema núcleo, convenciones, CI, entornos. Las secciones de modelo de datos de la spec se derivan de architecture §6 tal como quedó tras la auditoría (decisión 67): entidades, `onDelete` por relación, índices y enums | P0 | SPEC-00 | [SPEC-01](../specs/SPEC-01-scaffold.md) | En curso |
 
 ---
 
@@ -77,8 +80,7 @@ Ninguna tarea en curso.
 
 | ID      | Tarea                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Prioridad | Depende de | Spec | Estado    |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------- | ---- | --------- |
-| SPEC-00 | Crear `specs/` con `README.md` (índice) y `_template.md` según `sdd-process.md` §4 y §5                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | P0        | —          | —    | Por hacer |
-| SPEC-01 | Redactar y aprobar SPEC-01 Scaffold: esquema núcleo, convenciones, CI, entornos. Las secciones de modelo de datos de la spec se derivan de architecture §6 tal como quedó tras la auditoría (decisión 67): entidades, `onDelete` por relación, índices y enums                                                                                                                                                                                                                                                                                              | P0        | SPEC-00    | —    | Por hacer |
+
 | ENG-001 | Inicializar repositorio git local y remoto (ambos ya existen a 2026-09-28); proteger rama principal; plantilla de PR con la Definición de Hecho y campo obligatorio de spec y RF. Compuerta de la Etapa 1 junto con SPEC-01                                                                                                                                                                                                                                                                                                                                 | P0        | —          | —    | Por hacer |
 | ENG-003 | Reservar dominio provisional; subdominios `app.` / `api.` y `app-staging.` / `api-staging.`; crear proyectos en Vercel (`apps/web`) y Render (`apps/api`) para staging y producción. **Inventario de subdominios:** todo subdominio de la raíz queda bajo control del proyecto y no se publica ninguno no controlado, porque las cookies de sesión se comparten con `Domain=.<dominio>` (decisión 58). Servicio de Render de la API con **una sola instancia y sin autoescalado** (decisión 64). Necesaria antes de ENG-015, no antes de iniciar la Etapa 1 | P0        | ENG-001    | —    | Por hacer |
 | ENG-004 | Crear proyectos Supabase staging y producción (solo PostgreSQL, sin buckets); crear cuenta de Cloudflare R2 con buckets privados `englove-dev`, `englove-staging` y `englove-prod` y credenciales con alcance a cada bucket (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`); credenciales fuera del repositorio. (Decisión 34 §21)                                                                                                                                                                         | P0        | —          | —    | Por hacer |

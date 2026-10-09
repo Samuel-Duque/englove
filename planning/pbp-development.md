@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-09-28 (Ronda 5). Incorpora la decisión 67 de CONTEXT §14 (`decisiones-modelo-de-datos.md`): el esquema de la Etapa 1 incluye `AuthSession`, `ScheduledJobRun`, `attempt_number`, `graded_at` en `Attempt`, `answer_key` separado, membresías con historial y la política de `onDelete`; un solo grupo vigente por alumno (Etapas 3–5 y 8); exámenes solo con ítems `fill_blank` (Etapa 3); `Review` como feedback (Etapa 7).
+> Última actualización: 2026-10-08 (estado de SPEC-00/SPEC-01 en Etapa 0, sin cambios de alcance). Última ronda de decisiones: 2026-09-28 (Ronda 5). Incorpora la decisión 67 de CONTEXT §14 (`decisiones-modelo-de-datos.md`): el esquema de la Etapa 1 incluye `AuthSession`, `ScheduledJobRun`, `attempt_number`, `graded_at` en `Attempt`, `answer_key` separado, membresías con historial y la política de `onDelete`; un solo grupo vigente por alumno (Etapas 3–5 y 8); exámenes solo con ítems `fill_blank` (Etapa 3); `Review` como feedback (Etapa 7).
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -136,7 +136,7 @@ Una tarea o etapa está Hecha cuando:
 **Alcance.**
 
 - Repositorio git con remoto (el local y el remoto ya existen a 2026-09-28; faltan la protección de la rama principal y la plantilla de PR).
-- Arranque de SDD: carpeta `specs/` con plantilla e índice (SPEC-00) y redacción de SPEC-01 (Scaffold). Son las primeras specs del proyecto; hasta aquí no se ha redactado ninguna.
+- Arranque de SDD: carpeta `specs/` con plantilla e índice (SPEC-00) y redacción de SPEC-01 (Scaffold). A 2026-10-08, SPEC-00 está Hecho y SPEC-01 es la primera spec redactada, en Borrador y pendiente de aprobación; la compuerta de la Etapa 1 sigue cerrada.
 - Cuentas en Vercel y Render (hosting Decidido, CONTEXT §6) con proyectos de staging y producción apuntando al repositorio; dominio provisional con `app.`, `api.`, `app-staging.` y `api-staging.`. **Todos los subdominios de la raíz quedan bajo control del proyecto** y no se publica ninguno no controlado, porque las cookies de sesión se comparten con `Domain=.<dominio>` (Decidido, decisión 58). El servicio de Render de la API se crea con una sola instancia, sin autoescalado (decisión 64).
 - Proyectos Supabase de staging y producción (solo PostgreSQL). Cuenta de Cloudflare R2 con un bucket privado por entorno y credenciales con alcance a su bucket (Decidido, decisión 34 §21).
 - Texto de los Términos y Condiciones convencionales de uso que el alumno acepta al registrarse. No se redacta ningún documento de consentimiento parental ni de cumplimiento legal sobre menores: es responsabilidad de la clienta fuera de la plataforma (Decidido, decisión 34 §2).

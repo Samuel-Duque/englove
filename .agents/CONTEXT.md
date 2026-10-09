@@ -8,7 +8,7 @@
 > - **Propuesto**: recomendación vigente a falta de decisión. Se puede implementar, pero debe quedar marcado como tal.
 > - **Pendiente**: requiere decisión humana antes de implementarse.
 >
-> Última actualización: 2026-09-28, tras aplicar `planning/decisiones-modelo-de-datos.md` (Ronda 5, decisión 67), resultado de la auditoría del modelo entidad-relación que cierra la etapa de planeación: `AuthSession` para las familias de sesión, contador de OTP fallidos, exámenes solo con ítems `fill_blank`, nueva forma de `ProgressEvent`, calificación única en `Attempt` con `Review` como feedback, **un solo grupo vigente por alumno**, `Attempt.attempt_number`, clave de respuestas en columna propia, `ScheduledJobRun`, `ApprovalStatus` sin `rejected`, revisión de índices, campos faltantes y política de borrado de claves foráneas. La propuesta de parámetros de organización con tipo no se adoptó.
+> Última actualización: 2026-10-08 (estado SDD de §11.1; sin decisiones nuevas). Última ronda de decisiones: 2026-09-28, tras aplicar `planning/decisiones-modelo-de-datos.md` (Ronda 5, decisión 67), resultado de la auditoría del modelo entidad-relación que cierra la etapa de planeación: `AuthSession` para las familias de sesión, contador de OTP fallidos, exámenes solo con ítems `fill_blank`, nueva forma de `ProgressEvent`, calificación única en `Attempt` con `Review` como feedback, **un solo grupo vigente por alumno**, `Attempt.attempt_number`, clave de respuestas en columna propia, `ScheduledJobRun`, `ApprovalStatus` sin `rejected`, revisión de índices, campos faltantes y política de borrado de claves foráneas. La propuesta de parámetros de organización con tipo no se adoptó.
 >
 > Ronda 4: 2026-09-28, `planning/decisiones-para-correccion-de-planeacion.md` (decisión 57): cookies de sesión compartidas entre subdominios del mismo entorno, correo globalmente único, tolerancia de 24 h para completar un intento, `Attempt.retry_extend_until`, OTP al correo nuevo, cambio administrativo del correo por la profesora con auditoría, una sola instancia de la API en el piloto, calendario secuencial de las Etapas 0–2 y terminología "cinco tipos de actividad / cinco mecánicas de juego". Las decisiones menores de su §10 quedan como pendientes en §15.
 >
@@ -370,7 +370,7 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 - Las specs viven en `specs/`, una por etapa de construcción (`SPEC-01` a `SPEC-10`), se redactan una etapa por delante de la implementación y siguen la plantilla y el ciclo de vida definidos en [`planning/sdd-process.md`](../planning/sdd-process.md).
 - Jerarquía: `CONTEXT.md` → `architecture-overview.md` → `sdd-process.md` → `pbp-development.md` → `taskboard.md` → `specs/` → código. Una spec nunca contradice un documento superior; si necesita hacerlo, primero se cambia la decisión en §14.
 - Ninguna tarea del taskboard pasa a "En curso" sin su spec Aprobada. La Definición de Hecho de `pbp-development.md` §3 lo exige.
-- **La redacción de las specs aún no ha empezado.** Arranca con la Etapa 0 según el calendario de `sdd-process.md` §7.
+- **La redacción de las specs empezó durante la Etapa 0.** A 2026-10-08, SPEC-00 está Hecho y [`SPEC-01 — Scaffold`](../specs/SPEC-01-scaffold.md) está redactada en Borrador, sin aprobación. El índice vigente está en [`specs/README.md`](../specs/README.md); se mantiene el calendario de `sdd-process.md` §7.
 
 ### 11.2 Calidad y operación
 

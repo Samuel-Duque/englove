@@ -34,7 +34,7 @@
 > - `references/validacion.md`: lista de comprobación contra CONTEXT §14, §2.4, §15 y §16, y formato del informe de revisión.
 > - `scripts/check-spec.mjs`: verificación estructural sin dependencias (`node .agents/skills/englove-spec/scripts/check-spec.mjs specs/SPEC-NN-nombre.md`). Lee en cada ejecución la plantilla de sdd-process §5, los pendientes de CONTEXT §15 y el taskboard, así que no se desactualiza cuando estos cambian. Comprueba secciones, cabecera y estado, texto de plantilla sin reemplazar, RF con Dado/Cuando/Entonces, RF sin prueba, P-n asignados, tareas `ENG` cubiertas, tamaño, índice y señales de alarma (términos eliminados o fuera de alcance).
 >
-> Prueba: un agente redactó con la skill un borrador de SPEC-01 en una carpeta temporal, fuera del repositorio. Sus hallazgos se incorporaron a la skill: campo Etapa (la que implementa la spec), P-n de otras specs como dependencia no bloqueante, "concretar sí, inventar no", criterio de Borrador y En revisión, división de specs solo con visto bueno del líder, y falsos positivos y negativos del script. El borrador no se incorporó al repositorio: SPEC-00 y SPEC-01 siguen Por hacer.
+> Prueba: un agente redactó con la skill un borrador de SPEC-01 en una carpeta temporal, fuera del repositorio. Sus hallazgos se incorporaron a la skill: campo Etapa (la que implementa la spec), P-n de otras specs como dependencia no bloqueante, "concretar sí, inventar no", criterio de Borrador y En revisión, división de specs solo con visto bueno del líder, y falsos positivos y negativos del script. El borrador temporal no se incorporó al repositorio; posteriormente SPEC-00 quedó Hecho y SPEC-01 pasó a En revisión.
 >
 > Lo que sigue es el encargo original con el que se construyó.
 

@@ -15,13 +15,28 @@ Plataforma web educativa, interactiva y gamificada para enseñar inglés a niño
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | Next.js 14+ / React 19, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion |
-| Backend | NestJS, Prisma ORM, JWT + Guards RBAC |
-| Base de datos | PostgreSQL 16 en Supabase Cloud (solo Postgres) |
+| Frontend | **Next.js 16.4** (App Router, Turbopack, React Compiler) / **React 19.3**, TypeScript 5.9, Tailwind CSS 4, shadcn/ui, Framer Motion, `@atlaskit/pragmatic-drag-and-drop` (microjuegos) |
+| Backend | NestJS 11, Prisma ORM 7, JWT + Guards RBAC |
+| Base de datos | PostgreSQL 18 en Neon (solo Postgres; pooler para el runtime, conexión directa para migraciones) |
 | Archivos | Cloudflare R2 (audios raw y MP4 transcodificados con ffmpeg) |
 | Monorepo | pnpm workspaces + Turborepo (`apps/web`, `apps/api`, `packages/shared`) |
-| Hosting | Frontend → Vercel · Backend → Render |
+| Hosting | Frontend → Cloudflare Workers (`vinext`) · Backend → Render |
 | Correo | Resend |
+
+### Requisitos previos
+
+- **Node.js 24 LTS** y **pnpm 11**.
+- Docker (PostgreSQL 18 local) y `ffmpeg` / `ffprobe` instalados para la transcodificación de audios en local.
+
+### Entornos y costes (decisión 82)
+
+| Entorno | Web | API | Postgres | Coste |
+|---|---|---|---|---|
+| `local` | `next dev` | `nest start` | Docker | $0 |
+| `staging` y demo | Cloudflare Free | Render Free | Neon Free | **$0** |
+| `production` (piloto inicial ~10 alumnos; preparado para ~30 activos) | Cloudflare Workers Paid | Render Starter | Neon Launch | **~$16–19/mes** |
+
+La demo gratuita (~11 personas, 1–2 semanas, sesiones guiadas) **no es apta para clases reales**: Render Free duerme a los 15 minutos y Neon Free suspende el cómputo a los 5. El bundle de Workers Free tiene un límite de 3 MB comprimido. Detalle y protocolo en [`CONTEXT.md`](./.agents/CONTEXT.md) §6 y §14 (decisiones 81 y 82).
 
 ## Estructura del repositorio
 

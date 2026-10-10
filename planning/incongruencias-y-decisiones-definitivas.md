@@ -1,5 +1,7 @@
 # Englove — Resolución de Incongruencias e Implementación de Decisiones Definitivas
 
+> **Documento histórico.** Este documento registra la ronda de decisiones del 2026-09-22 y sus instrucciones de migración documental. Sus decisiones ya fueron incorporadas en la documentación vigente; no usarlo como fuente actual. Consultar [`CONTEXT.md`](../.agents/CONTEXT.md), [`architecture-overview.md`](./architecture-overview.md), [`pbp-development.md`](./pbp-development.md) y [`taskboard.md`](./taskboard.md).
+>
 > **Propósito de este documento.**
 > Este es un prompt operativo de alto nivel dirigido a cualquier agente, desarrollador o colaborador que trabaje en el proyecto Englove. Recoge todas las decisiones tomadas en la sesión del 2026-09-22 que corrigen incongruencias existentes en la documentación de planificación, eliminan riesgos futuros y fijan convenciones definitivas que **no pueden ser contradichas, ignoradas ni cuestionadas** sin registrar primero una nueva decisión en `CONTEXT.md §14`.
 >

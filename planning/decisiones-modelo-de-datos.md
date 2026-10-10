@@ -206,7 +206,7 @@ Todas las tareas deben ser idempotentes (decisión 64, A55), pero con la cola en
 | `Student` → `Attempt`, `GroupMembership`, `ProgressEvent`, `BadgeAward` | `Cascade` | Red de seguridad; el borrado real lo orquesta el servicio de architecture §8.4 (R2 primero) |
 | `Attempt` → `Review`, `MediaAsset`, `ProgressEvent.attempt_id` | `Cascade` | Ídem |
 | `Attempt.previous_attempt_id` → `Attempt` | `NoAction` | Se comprueba al final de la sentencia: el borrado conjunto de los intentos de un alumno funciona |
-| `AuditLog.target_student_id` → `Student` | `Cascade` | Según la propuesta vigente de P-4; si P-4 se decide distinto, pasa a uuid sin FK |
+| `AuditLog.target_student_id` → `Student` | `SetNull` | Decisión 92: se conserva el evento técnico tras borrar al alumno; se redactan los datos personales y la FK es nullable |
 | `Activity` ← `Assignment` | `Restrict` | Una actividad asignada se archiva, no se borra |
 | `Activity` → tablas de detalle | `Cascade` | Un borrador sin asignaciones se puede borrar con su detalle |
 | `Activity.parent_id` → `Activity` | `Restrict` | El historial de versiones no se rompe |

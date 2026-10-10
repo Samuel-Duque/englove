@@ -47,3 +47,6 @@ coverage/
 
 # Misc
 *.tsbuildinfo
+
+# Scratch prototypes
+scratch/

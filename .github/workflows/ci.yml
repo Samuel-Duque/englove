@@ -1,0 +1,75 @@
+name: CI Quality Gates and Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-gates:
+    name: Lint, Typecheck, Test and Guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # guardrails-ignore G-A04: verificacion de compuerta CI que prohibe el comando (SPEC-01 RF-17)
+      - name: Gate check prohibiting schema push in versioned scripts (RF-17 / G-A04)
+        run: |
+          node scripts/check-no-db-push.mjs
+
+      - name: Guardrails verification
+        run: node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs --all
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run unit & integration tests
+        run: pnpm test
+
+  staging-migration:
+    name: Staging Database Migration
+    needs: [quality-gates]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Staging migration uses direct Neon connection (MIGRATION_DATABASE_URL)
+      - name: Apply Prisma Migrations (staging)
+        run: pnpm --filter @englove/api db:migrate
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}

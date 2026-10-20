@@ -11,62 +11,146 @@ Plataforma web educativa, interactiva y gamificada para enseñar inglés a niño
 - Gamificación: estrellas, insignias, rachas semanales perdonables y misiones.
 - PWA instalable. Sin publicación en tiendas de aplicaciones durante el piloto.
 
-## Stack
+## Stack tecnológico
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | **Next.js 16.4** (App Router, Turbopack, React Compiler) / **React 19.3**, TypeScript 5.9, Tailwind CSS 4, shadcn/ui, Framer Motion, `@atlaskit/pragmatic-drag-and-drop` (microjuegos) |
-| Backend | NestJS 11, Prisma ORM 7, JWT + Guards RBAC |
-| Base de datos | PostgreSQL 18 en Neon (solo Postgres; pooler para el runtime, conexión directa para migraciones) |
-| Archivos | Cloudflare R2 (audios raw y MP4 transcodificados con ffmpeg) |
-| Monorepo | pnpm workspaces + Turborepo (`apps/web`, `apps/api`, `packages/shared`) |
-| Hosting | Frontend → Cloudflare Workers (`vinext`) · Backend → Render |
-| Correo | Resend |
+| Frontend (`apps/web`) | **Next.js 16.4** (App Router, Turbopack, React Compiler) / **React 19.3**, TypeScript 5.9, Tailwind CSS 4, shadcn/ui, `@atlaskit/pragmatic-drag-and-drop`, adaptador Cloudflare Workers con `vinext` |
+| Backend (`apps/api`) | **NestJS 11**, Prisma ORM 7, Node.js 24 LTS, `ffmpeg` / `ffprobe` (medición y transcodificación de audio) |
+| Base de datos | **PostgreSQL 18** en Neon (pooler PgBouncer para runtime, conexión directa para migraciones) |
+| Archivos | **Cloudflare R2** (buckets privados vía S3 API con URLs prefirmadas de corta duración) |
+| Paquete compartido (`packages/shared`) | Contrato de actividad, enums canónicos, DTOs y validaciones compartidas |
+| Monorepo | **pnpm 11** workspaces + **Turborepo 2** |
+| Hosting | Web → Cloudflare Workers (`vinext`) · API → Render (instancia única Docker, sin autoescalado) |
+| Correo | **Resend** (8 plantillas transaccionales; modo log seguro en local) |
 
-### Requisitos previos
+---
 
-- **Node.js 24 LTS** y **pnpm 11**.
-- Docker (PostgreSQL 18 local) y `ffmpeg` / `ffprobe` instalados para la transcodificación de audios en local.
+## Guía de arranque local (< 30 minutos)
 
-### Entornos y costes (decisión 82)
+Sigue estos pasos para poner en marcha el proyecto en tu máquina de desarrollo.
 
-| Entorno | Web | API | Postgres | Coste |
-|---|---|---|---|---|
-| `local` | `next dev` | `nest start` | Docker | $0 |
-| `staging` y demo | Cloudflare Free | Render Free | Neon Free | **$0** |
-| `production` (piloto inicial ~10 alumnos; preparado para ~30 activos) | Cloudflare Workers Paid | Render Starter | Neon Launch | **~$16–19/mes** |
+### 1. Requisitos previos
 
-La demo gratuita (~11 personas, 1–2 semanas, sesiones guiadas) **no es apta para clases reales**: Render Free duerme a los 15 minutos y Neon Free suspende el cómputo a los 5. El bundle de Workers Free tiene un límite de 3 MB comprimido. Detalle y protocolo en [`CONTEXT.md`](./.agents/CONTEXT.md) §6 y §14 (decisiones 81 y 82).
+- **Node.js 24 LTS** (se recomienda usar `.nvmrc`: `nvm use`).
+- **pnpm 11** (`corepack enable` o `npm i -g pnpm@11.5.1`).
+- **Docker** y **Docker Compose** (para PostgreSQL 18 local).
+- **ffmpeg** y **ffprobe** instalados en el sistema operativo:
+  - Windows: `winget install Gyan.FFmpeg` o `choco install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt-get install ffmpeg`
+
+### 2. Configurar variables de entorno
+
+Copia el archivo de plantilla a `.env` en la raíz del proyecto:
+
+```bash
+cp .env.example .env
+```
+
+Las variables vienen preconfiguradas con valores funcionales para desarrollo local con Docker.
+
+### 3. Instalar dependencias
+
+```bash
+pnpm install
+```
+
+### 4. Iniciar PostgreSQL 18 con Docker Compose
+
+Levanta el contenedor de base de datos local:
+
+```bash
+docker compose up -d postgres
+```
+
+*(Opcional: Si deseas emular el almacenamiento S3 de R2 en local, ejecuta `docker compose --profile storage up -d`)*.
+
+### 5. Aplicar migraciones del esquema de base de datos
+
+Aplica las migraciones con Prisma:
+
+```bash
+pnpm db:migrate
+```
+
+### 6. Cargar datos de prueba (Seeds)
+
+Elige y ejecuta el seed correspondiente:
+
+- **Seed de desarrollo (recomendado para desarrollo y pruebas):**
+  ```bash
+  pnpm seed:dev
+  ```
+  Crea la organización piloto, profesora, 11 alumnos (Kids y Teens, niveles A1–B2, aprobados y pendientes), actividades de los 5 tipos, las 5 mecánicas de juego, asignaciones abiertas/cerradas/próximas, intentos calificados y pendientes, y rachas.
+
+- **Seed mínimo (organización y profesora únicamente):**
+  ```bash
+  pnpm seed
+  ```
+
+- **Seed de volumen (100 alumnos y 3 meses de intentos para pruebas de carga):**
+  ```bash
+  pnpm seed:volume
+  ```
+
+*Nota:* Cada seed está diseñado para ejecutarse sobre una base migrada limpia.
+
+### 7. Iniciar servidores de desarrollo
+
+Inicia todas las aplicaciones y paquetes en modo watch:
+
+```bash
+pnpm dev
+```
+
+### 8. Verificar la instalación
+
+Una vez iniciados los servicios, comprueba en tu navegador:
+
+- **Web Frontend:** [http://localhost:3000](http://localhost:3000) — Muestra *"Englove — Plataforma en preparación"*.
+- **API Health Check:** [http://localhost:3001/health](http://localhost:3001/health) — Retorna `{"status":"ok"}` comprobando la conexión a PostgreSQL.
+- **Documentación Swagger / OpenAPI:** [http://localhost:3001/docs](http://localhost:3001/docs) — Interfaz Swagger de la API (habilitada en local y staging).
+
+---
+
+## Scripts y comandos disponibles
+
+| Comando | Descripción |
+|---|---|
+| `pnpm dev` | Inicia el frontend Next.js y el backend NestJS en modo desarrollo |
+| `pnpm build` | Compila todos los workspaces (`shared`, `web`, `api`) |
+| `pnpm lint` | Ejecuta ESLint en todos los workspaces |
+| `pnpm typecheck` | Ejecuta TypeScript typecheck en todos los workspaces |
+| `pnpm test` | Ejecuta la suite de pruebas unitarias e integración con Vitest |
+| `pnpm guardrails` | Verifica de forma automatizada las reglas invariantes de arquitectura y persistencia |
+| `pnpm db:migrate` | Aplica las migraciones de Prisma en la base de datos |
+| `pnpm db:generate` | Regenera el Prisma Client a partir de `schema.prisma` |
+| `pnpm seed` | Ejecuta el seed mínimo de arranque |
+| `pnpm seed:dev` | Ejecuta el seed completo para desarrollo |
+| `pnpm seed:volume` | Ejecuta el seed de volumen (100 alumnos) |
+
+---
 
 ## Estructura del repositorio
 
 ```
-.agents/          # Contexto raíz del proyecto (CONTEXT.md)
-planning/         # Documentos de planificación
-  architecture-overview.md
-  pbp-development.md
-  sdd-process.md
-  taskboard.md
-specs/            # Especificaciones por capacidad (se crean en Etapa 0)
+.agents/              # Contexto de negocio y especificaciones de agentes (CONTEXT.md)
+planning/             # Documentos de arquitectura y proceso SDD
+specs/                # Especificaciones SDD formales (SPEC-01 Scaffold implementada)
 apps/
-  web/            # Frontend Next.js
-  api/            # Backend NestJS
+  web/                # Frontend Next.js 16.4 (React 19, Tailwind, Cloudflare Workers con vinext)
+  api/                # Backend NestJS 11 (Prisma, PostgreSQL 18, ffmpeg)
 packages/
-  shared/         # Tipos y esquemas Zod compartidos
+  shared/             # Enums canónicos, contrato de actividad, DTOs y tipos compartidos
+tooling/              # Configuraciones compartidas de ESLint, Prettier y TypeScript
 ```
 
 ## Metodología
 
-Englove usa **Spec-Driven Development (SDD)**: cada capacidad tiene una especificación escrita, revisada y aprobada antes de escribir código. Ver [`planning/sdd-process.md`](./planning/sdd-process.md).
+Englove sigue **Spec-Driven Development (SDD)**: ninguna línea de código de producción se escribe sin una especificación aprobada previamente en `specs/`.
 
-## Documentación de planificación
-
-- [`CONTEXT.md`](./.agents/CONTEXT.md) — Visión, decisiones de producto y arquitectura.
-- [`architecture-overview.md`](./planning/architecture-overview.md) — Arquitectura técnica detallada.
-- [`pbp-development.md`](./planning/pbp-development.md) — Etapas e hitos de desarrollo.
-- [`taskboard.md`](./planning/taskboard.md) — Estado actual de tareas.
-- [`sdd-process.md`](./planning/sdd-process.md) — Proceso de desarrollo guiado por specs.
-
-## Estado actual
-
-> Etapa 0 — Planificación. El código aún no ha comenzado.
+- [`CONTEXT.md`](./.agents/CONTEXT.md) — Visión, reglas normativas y registro de decisiones.
+- [`planning/architecture-overview.md`](./planning/architecture-overview.md) — Arquitectura técnica integral.
+- [`planning/taskboard.md`](./planning/taskboard.md) — Tablero operativo de tareas del proyecto.
+- [`planning/sdd-process.md`](./planning/sdd-process.md) — Proceso SDD y ciclo de vida de especificaciones.

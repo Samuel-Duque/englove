@@ -1,0 +1,31 @@
+{
+  "name": "englove",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@11.5.1",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "seed": "pnpm --filter @englove/api seed",
+    "seed:dev": "pnpm --filter @englove/api seed:dev",
+    "seed:volume": "pnpm --filter @englove/api seed:volume",
+    "db:migrate": "pnpm --filter @englove/api db:migrate",
+    "db:generate": "pnpm --filter @englove/api db:generate",
+    "guardrails": "node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs --all",
+    "check:no-db-push": "node scripts/check-no-db-push.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}

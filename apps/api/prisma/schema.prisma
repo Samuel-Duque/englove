@@ -1,0 +1,603 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  teacher
+  student
+  parent
+  admin
+}
+
+enum Level {
+  A1
+  A2
+  B1
+  B2
+}
+
+enum AgeSegment {
+  kids
+  teens
+}
+
+enum ActivityType {
+  fill_blank
+  open_question
+  speaking
+  game
+  exam
+}
+
+enum ActivityStatus {
+  draft
+  published
+  archived
+}
+
+enum GameMechanic {
+  match
+  order_words
+  drag_drop
+  memory
+  timed_choice
+}
+
+enum AttemptStatus {
+  in_progress
+  pending_review
+  graded
+  abandoned
+}
+
+enum ApprovalStatus {
+  pending_approval
+  approved
+}
+
+enum ProgressEventType {
+  attempt_completed
+  audio_submitted
+  review_received
+  retry_granted
+  streak_week
+  badge_awarded
+}
+
+enum MediaAssetStatus {
+  pending_upload
+  ready
+  pending_delete
+  deleted
+}
+
+enum AuditAction {
+  student_email_changed
+}
+
+enum JobRunStatus {
+  running
+  done
+  failed
+}
+
+model Organization {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String   @unique
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  users               User[]
+  auth_sessions       AuthSession[]
+  reset_tokens        PasswordResetToken[]
+  email_requests      EmailChangeRequest[]
+  students            Student[]
+  groups              Group[]
+  memberships         GroupMembership[]
+  activities          Activity[]
+  fill_blank_details  FillBlankDetail[]
+  open_q_details      OpenQuestionDetail[]
+  speaking_details    SpeakingDetail[]
+  game_details        GameDetail[]
+  exam_details        ExamDetail[]
+  assignments         Assignment[]
+  attempts            Attempt[]
+  reviews             Review[]
+  progress_events     ProgressEvent[]
+  badge_rules         BadgeRule[]
+  badge_awards        BadgeAward[]
+  media_assets        MediaAsset[]
+  audit_logs          AuditLog[]
+  job_runs            ScheduledJobRun[]
+  external_resources  ExternalResource[]
+  feature_flags       FeatureFlag[]
+
+  @@map("organizations")
+}
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organization_id    String    @db.Uuid
+  name               String
+  email              String    @unique
+  password_hash      String    @map("password_hash")
+  role               Role
+  failed_login_count Int       @default(0) @map("failed_login_count")
+  locked_until       DateTime? @db.Timestamptz @map("locked_until")
+  terms_accepted_at  DateTime? @db.Timestamptz @map("terms_accepted_at")
+  terms_version      String?   @map("terms_version")
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+
+  organization           Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  student                Student?
+  sessions               AuthSession[]
+  password_reset_tokens  PasswordResetToken[]
+  email_change_requests  EmailChangeRequest[]
+  activities             Activity[]           @relation("ActivityCreator")
+  reviews                Review[]             @relation("ReviewAuthor")
+  retries_granted        Attempt[]            @relation("AttemptRetryGrantor")
+  audit_logs             AuditLog[]           @relation("AuditLogActor")
+  external_resources     ExternalResource[]   @relation("ExternalResourceCreator")
+
+  @@index([organization_id, role])
+  @@map("users")
+}
+
+model AuthSession {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organization_id    String    @db.Uuid
+  user_id            String    @db.Uuid
+  refresh_token_hash String    @unique @map("refresh_token_hash")
+  expires_at         DateTime  @db.Timestamptz @map("expires_at")
+  rotated_at         DateTime? @db.Timestamptz @map("rotated_at")
+  last_used_at       DateTime? @db.Timestamptz @map("last_used_at")
+  revoked_at         DateTime? @db.Timestamptz @map("revoked_at")
+  created_at         DateTime  @default(now()) @db.Timestamptz
+  updated_at         DateTime  @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("auth_sessions")
+}
+
+model PasswordResetToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  user_id         String    @db.Uuid
+  token_hash      String    @unique @map("token_hash")
+  expires_at      DateTime  @db.Timestamptz @map("expires_at")
+  used_at         DateTime? @db.Timestamptz @map("used_at")
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("password_reset_tokens")
+}
+
+model EmailChangeRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  user_id         String    @db.Uuid
+  new_email       String    @map("new_email")
+  otp_hash        String    @map("otp_hash")
+  failed_attempts Int       @default(0) @db.SmallInt @map("failed_attempts")
+  expires_at      DateTime  @db.Timestamptz @map("expires_at")
+  used_at         DateTime? @db.Timestamptz @map("used_at")
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, expires_at])
+  @@map("email_change_requests")
+}
+
+model Student {
+  id                   String         @id @default(uuid()) @db.Uuid
+  organization_id      String         @db.Uuid
+  user_id              String         @unique @db.Uuid
+  birth_date           DateTime       @db.Date @map("birth_date")
+  age_segment          AgeSegment     @map("age_segment")
+  level                Level?
+  guardian_name        String?        @map("guardian_name")
+  guardian_contact     String?        @map("guardian_contact")
+  can_switch_interface Boolean        @default(false) @map("can_switch_interface")
+  approval_status      ApprovalStatus @default(pending_approval) @map("approval_status")
+  created_at           DateTime       @default(now()) @db.Timestamptz
+  updated_at           DateTime       @updatedAt @db.Timestamptz
+
+  organization    Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user            User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  memberships     GroupMembership[]
+  attempts        Attempt[]
+  media_assets    MediaAsset[]
+  progress_events ProgressEvent[]
+  badge_awards    BadgeAward[]
+  audit_logs      AuditLog[]        @relation("AuditLogTargetStudent")
+
+  @@index([organization_id, approval_status])
+  @@map("students")
+}
+
+model Group {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  name            String
+  archived_at     DateTime? @db.Timestamptz @map("archived_at")
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  organization Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  memberships  GroupMembership[]
+  assignments  Assignment[]
+
+  @@map("groups")
+}
+
+model GroupMembership {
+  id              String    @id @default(uuid()) @db.Uuid
+  organization_id String    @db.Uuid
+  group_id        String    @db.Uuid
+  student_id      String    @db.Uuid
+  joined_at       DateTime  @default(now()) @db.Timestamptz @map("joined_at")
+  left_at         DateTime? @db.Timestamptz @map("left_at")
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  group        Group        @relation(fields: [group_id], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([group_id, student_id])
+  @@map("group_memberships")
+}
+
+model Activity {
+  id                        String         @id @default(uuid()) @db.Uuid
+  organization_id           String         @db.Uuid
+  type                      ActivityType
+  level                     Level
+  title                     String
+  status                    ActivityStatus @default(draft)
+  version                   Int            @default(1)
+  parent_id                 String?        @db.Uuid @map("parent_id")
+  expected_duration_seconds Int?           @map("expected_duration_seconds")
+  // guardrails-ignore G-C06: min_plausible_seconds es el umbral de duracion plausible de actividad (decision 79), no la herramienta Plausible
+  min_plausible_seconds     Int?           @map("min_plausible_seconds")
+  created_by                String         @db.Uuid @map("created_by")
+  created_at                DateTime       @default(now()) @db.Timestamptz
+  updated_at                DateTime       @updatedAt @db.Timestamptz
+
+  organization         Organization        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator              User                @relation("ActivityCreator", fields: [created_by], references: [id], onDelete: Restrict)
+  parent               Activity?           @relation("ActivityVersion", fields: [parent_id], references: [id], onDelete: Restrict)
+  children             Activity[]          @relation("ActivityVersion")
+  fill_blank_detail    FillBlankDetail?
+  open_question_detail OpenQuestionDetail?
+  speaking_detail      SpeakingDetail?
+  game_detail          GameDetail?
+  exam_detail          ExamDetail?
+  assignments          Assignment[]
+
+  @@index([organization_id, level, type, status])
+  @@map("activities")
+}
+
+model FillBlankDetail {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  activity_id     String   @unique @db.Uuid
+  config          Json
+  answer_key      Json     @map("answer_key")
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  activity     Activity     @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@map("fill_blank_details")
+}
+
+model OpenQuestionDetail {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  activity_id     String   @unique @db.Uuid
+  config          Json
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  activity     Activity     @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@map("open_question_details")
+}
+
+model SpeakingDetail {
+  id                   String   @id @default(uuid()) @db.Uuid
+  organization_id      String   @db.Uuid
+  activity_id          String   @unique @db.Uuid
+  prompt               String
+  example_url          String?  @map("example_url")
+  min_duration_seconds Int      @default(2) @map("min_duration_seconds")
+  max_duration_seconds Int      @default(120) @map("max_duration_seconds")
+  created_at           DateTime @default(now()) @db.Timestamptz
+  updated_at           DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  activity     Activity     @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@map("speaking_details")
+}
+
+model GameDetail {
+  id              String       @id @default(uuid()) @db.Uuid
+  organization_id String       @db.Uuid
+  activity_id     String       @unique @db.Uuid
+  mechanic        GameMechanic
+  config          Json
+  answer_key      Json         @map("answer_key")
+  created_at      DateTime     @default(now()) @db.Timestamptz
+  updated_at      DateTime     @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  activity     Activity     @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@map("game_details")
+}
+
+model ExamDetail {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  activity_id     String   @unique @db.Uuid
+  config          Json
+  answer_key      Json     @map("answer_key")
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  activity     Activity     @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@map("exam_details")
+}
+
+model Assignment {
+  id                       String    @id @default(uuid()) @db.Uuid
+  organization_id          String    @db.Uuid
+  activity_id              String    @db.Uuid
+  group_id                 String    @db.Uuid
+  opens_at                 DateTime  @db.Timestamptz @map("opens_at")
+  due_at                   DateTime  @db.Timestamptz @map("due_at")
+  historical_student_count Int?      @map("historical_student_count")
+  created_at               DateTime  @default(now()) @db.Timestamptz
+  updated_at               DateTime  @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  activity     Activity     @relation(fields: [activity_id], references: [id], onDelete: Restrict)
+  group        Group        @relation(fields: [group_id], references: [id], onDelete: Restrict)
+  attempts     Attempt[]
+
+  @@index([group_id, opens_at, due_at])
+  @@index([activity_id])
+  @@map("assignments")
+}
+
+model Attempt {
+  id                 String        @id @default(uuid()) @db.Uuid
+  organization_id    String        @db.Uuid
+  assignment_id      String        @db.Uuid
+  student_id         String        @db.Uuid
+  attempt_number     Int           @db.SmallInt @map("attempt_number")
+  status             AttemptStatus @default(in_progress)
+  score              Decimal?      @db.Decimal(2, 1)
+  graded_at          DateTime?     @db.Timestamptz @map("graded_at")
+  started_at         DateTime      @default(now()) @db.Timestamptz @map("started_at")
+  finished_at        DateTime?     @db.Timestamptz @map("finished_at")
+  payload            Json          @default("{}")
+  flags              String[]      @default([])
+  previous_attempt_id String?      @unique @db.Uuid @map("previous_attempt_id")
+  retry_granted_at   DateTime?     @db.Timestamptz @map("retry_granted_at")
+  retry_granted_by   String?       @db.Uuid @map("retry_granted_by")
+  retry_extend_until DateTime?     @db.Timestamptz @map("retry_extend_until")
+  created_at         DateTime      @default(now()) @db.Timestamptz
+  updated_at         DateTime      @updatedAt @db.Timestamptz
+
+  organization     Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  assignment       Assignment      @relation(fields: [assignment_id], references: [id], onDelete: Restrict)
+  student          Student         @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  previous_attempt Attempt?        @relation("AttemptChain", fields: [previous_attempt_id], references: [id], onDelete: NoAction)
+  next_attempt     Attempt?        @relation("AttemptChain")
+  retry_grantor    User?           @relation("AttemptRetryGrantor", fields: [retry_granted_by], references: [id], onDelete: Restrict)
+  review           Review?
+  media_assets     MediaAsset[]
+  progress_events  ProgressEvent[]
+
+  @@unique([assignment_id, student_id, attempt_number])
+  @@index([student_id, finished_at])
+  @@index([previous_attempt_id])
+  @@map("attempts")
+}
+
+model Review {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  attempt_id      String   @unique @db.Uuid
+  reviewer_id     String   @db.Uuid
+  comment         String?
+  stickers        String[] @default([])
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  attempt      Attempt      @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  reviewer     User         @relation("ReviewAuthor", fields: [reviewer_id], references: [id], onDelete: Restrict)
+
+  @@map("reviews")
+}
+
+model ProgressEvent {
+  id              String            @id @default(uuid()) @db.Uuid
+  organization_id String            @db.Uuid
+  student_id      String            @db.Uuid
+  type            ProgressEventType
+  value           Decimal?          @db.Decimal(6, 1)
+  attempt_id      String?           @db.Uuid @map("attempt_id")
+  payload         Json?
+  period_key      String?           @map("period_key")
+  occurred_at     DateTime          @default(now()) @db.Timestamptz @map("occurred_at")
+  created_at      DateTime          @default(now()) @db.Timestamptz
+  updated_at      DateTime          @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  attempt      Attempt?     @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+
+  @@index([student_id, occurred_at])
+  @@index([attempt_id])
+  @@map("progress_events")
+}
+
+model BadgeRule {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  key             String
+  name            String
+  description     String
+  icon            String
+  rule            Json
+  active          Boolean  @default(true)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  awards       BadgeAward[]
+
+  @@unique([organization_id, key])
+  @@map("badge_rules")
+}
+
+model BadgeAward {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  student_id      String   @db.Uuid
+  badge_rule_id   String   @db.Uuid
+  awarded_at      DateTime @default(now()) @db.Timestamptz @map("awarded_at")
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  badge_rule   BadgeRule    @relation(fields: [badge_rule_id], references: [id], onDelete: Restrict)
+
+  @@unique([student_id, badge_rule_id])
+  @@map("badge_awards")
+}
+
+model MediaAsset {
+  id                   String           @id @default(uuid()) @db.Uuid
+  organization_id      String           @db.Uuid
+  attempt_id           String           @db.Uuid
+  student_id           String           @db.Uuid
+  key                  String
+  converted_key        String?          @map("converted_key")
+  mime_type            String           @map("mime_type")
+  duration_seconds     Int?             @map("duration_seconds")
+  size_bytes           BigInt           @map("size_bytes")
+  status               MediaAssetStatus @default(pending_upload)
+  transcode_attempts   Int              @default(0) @map("transcode_attempts")
+  transcode_failed_at  DateTime?        @db.Timestamptz @map("transcode_failed_at")
+  retention_until      DateTime?        @db.Timestamptz @map("retention_until")
+  deleted_at           DateTime?        @db.Timestamptz @map("deleted_at")
+  created_at           DateTime         @default(now()) @db.Timestamptz
+  updated_at           DateTime         @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  attempt      Attempt      @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([attempt_id])
+  @@index([status, created_at])
+  @@index([retention_until])
+  @@map("media_assets")
+}
+
+model AuditLog {
+  id                 String      @id @default(uuid()) @db.Uuid
+  organization_id    String      @db.Uuid
+  actor_user_id      String      @db.Uuid @map("actor_user_id")
+  action             AuditAction
+  target_student_id  String?     @db.Uuid @map("target_student_id")
+  details            Json
+  created_at         DateTime    @default(now()) @db.Timestamptz
+  updated_at         DateTime    @updatedAt @db.Timestamptz
+
+  organization   Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  actor          User         @relation("AuditLogActor", fields: [actor_user_id], references: [id], onDelete: Restrict)
+  target_student Student?     @relation("AuditLogTargetStudent", fields: [target_student_id], references: [id], onDelete: SetNull)
+
+  @@index([organization_id, target_student_id, created_at])
+  @@map("audit_logs")
+}
+
+model ScheduledJobRun {
+  id              String       @id @default(uuid()) @db.Uuid
+  organization_id String       @db.Uuid
+  job_key         String       @map("job_key")
+  period_key      String       @map("period_key")
+  status          JobRunStatus
+  started_at      DateTime     @default(now()) @db.Timestamptz @map("started_at")
+  finished_at     DateTime?    @db.Timestamptz @map("finished_at")
+  created_at      DateTime     @default(now()) @db.Timestamptz
+  updated_at      DateTime     @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, job_key, period_key])
+  @@map("scheduled_job_runs")
+}
+
+model ExternalResource {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  title           String
+  url             String
+  description     String?
+  level           Level?
+  position        Int      @default(0)
+  created_by      String   @db.Uuid @map("created_by")
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator      User         @relation("ExternalResourceCreator", fields: [created_by], references: [id], onDelete: Restrict)
+
+  @@map("external_resources")
+}
+
+model FeatureFlag {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  key             String
+  enabled         Boolean  @default(false)
+  config          Json     @default("{}")
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, key])
+  @@map("feature_flags")
+}

@@ -39,7 +39,7 @@ Thumbs.db
 .turbo/
 
 # Prisma
-prisma/migrations/
+# prisma/migrations/ is tracked
 
 # Testing
 coverage/

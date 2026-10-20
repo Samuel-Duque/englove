@@ -1,0 +1,43 @@
+# Render Blueprint Specification
+# Englove API Web Service (SPEC-01 Scaffold, RF-18, Regla G-B08)
+# Instancia unica, sin autoescalado (decision 64 de CONTEXT §14)
+services:
+  - type: web
+    name: englove-api-staging
+    env: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: COOKIE_DOMAIN
+        value: .englove.org
+      - key: COOKIE_PREFIX
+        value: englove_staging_
+      - key: WEB_BASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: MAIL_FROM
+        value: notificaciones@englove.org
+      - key: RESEND_API_KEY
+        sync: false

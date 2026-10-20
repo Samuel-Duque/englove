@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | En revisión |
+| Estado | Implementada |
 | Etapa | 1 — Scaffold |
 | Tareas | ENG-010, ENG-011, ENG-012, ENG-013, ENG-014, ENG-015, ENG-016, ENG-017, ENG-018, ENG-019 |
 | Referencias | CONTEXT §2.4, §4, §6–§11, §14–§17 · architecture §2–§6, §8.5, §11–§14 · decisiones 20, 21, 23–27, 30, 32–56, 58–85 · pbp §2.1, §3, Etapa 1 · sdd-process §5–§9 |
-| Aprobada por / fecha | — |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-20 |
 
 ## 1. Contexto y objetivo
 
@@ -282,3 +282,5 @@ Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: en
 | 2026-10-10 | Next.js 16/React 19 (RF-1, RF-2), Neon y Cloudflare (variables, RF-18) y Q-4 | Decisiones 81 y 82; sigue en Borrador |
 | 2026-10-10 | Cierre de Q-1 (prefijo de API y Swagger 404 en producción), Q-2 (configuración canónica en games.config) y ratificación de P-1 a P-4 (decisiones 83 y 84); solo Q-4 (PoC ENG-140) queda bloqueante | Confirmación del líder del proyecto; sigue en Borrador a la espera de ENG-140 |
 | 2026-10-10 | Cierre de Q-4 con PoC ENG-140 en verde (7/7 comprobaciones, informe planning/poc-eng-140-informe.md, decisión 85: vinext). Sin preguntas bloqueantes restantes; pasa a En revisión | PoC ENG-140 finalizado exitosamente (Decisión 85) |
+| 2026-10-20 | Aprobación formal de la spec por el líder del proyecto tras verificar estructura, compuertas y PoC ENG-140 | Pasa a estado Aprobada; desbloquea la compuerta de inicio de la Etapa 1 (scaffold) |
+| 2026-10-20 | Implementación completa de SPEC-01 Scaffold (ENG-010 a ENG-019, RF-1 a RF-19): monorepo, web, api, shared, Prisma, migraciones, seeds, docker-compose, render.yaml, CI y pruebas | Pasa a estado Implementada tras verificar suites de pruebas y guardrails |

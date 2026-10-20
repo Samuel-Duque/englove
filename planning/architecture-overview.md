@@ -10,7 +10,7 @@
 >
 > Documentos hermanos: [`sdd-process.md`](./sdd-process.md) (metodología), [`pbp-development.md`](./pbp-development.md) (etapas de construcción) y [`taskboard.md`](./taskboard.md) (tareas y estado). Las specs de `specs/` detallan cada capacidad a partir de este documento.
 >
-> Última actualización: 2026-10-10 (Ronda 7, decisiones 86–92 de CONTEXT §14). Fija la capacidad por horizonte, Cloudflare Workers como destino único, la matriz explícita de tenant, el acceso a intentos tras cambio de grupo y la preservación redactada de auditoría; actualiza las versiones base a Next.js 16.4, React 19.3, Node.js 24 LTS, TypeScript 5.9, pnpm 11, Tailwind 4, NestJS 11, Prisma 7, PostgreSQL 18 y Turborepo 2. SPEC-01 permanece en revisión. Sin cambios en el alcance funcional del piloto.
+> Última actualización: 2026-10-20. Refleja la aprobación formal de SPEC-01 Scaffold por el líder del proyecto (tarea SPEC-01 a Hecho). Actualización anterior: 2026-10-10 (Ronda 7, decisiones 86–92 de CONTEXT §14).
 >
 > Actualización anterior (2026-10-08, Ronda 6): corrige tres incongruencias: `ValidationPipe` configurado solo con `whitelist: true` (campos no declarados se ignoran, no se rechazan con 400; A71), `MediaAsset.student_id` como propietario explícito del asset (A72) con diagrama ER y política `onDelete` actualizados, y aclaración de A28 en §8.1. Sin cambios de comportamiento ni nuevas decisiones de producto.
 >

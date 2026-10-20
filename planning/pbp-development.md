@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-10 (Ronda 7, decisiones 86–92 de CONTEXT §14: capacidad inicial ~10, compromiso de corto/medio plazo ~30 activos y crecimiento objetivo hasta 100; Next.js 16.4 + React 19.3, Node 24 LTS, PostgreSQL 18, Cloudflare Workers mediante `vinext`, matriz explícita de tenant, continuidad de intentos tras cambio de grupo y auditoría redactada; SPEC-01 en revisión; sin cambios de alcance). Ronda anterior: 2026-09-28 (Ronda 5).
+> Última actualización: 2026-10-20 (Aprobación formal de SPEC-01 Scaffold por el líder del proyecto; tarea SPEC-01 a Hecho y compuerta de la Etapa 1 superada). Actualización anterior: 2026-10-10 (Ronda 7, decisiones 86–92, SPEC-01 en revisión).
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -136,7 +136,7 @@ Una tarea o etapa está Hecha cuando:
 **Alcance.**
 
 - Repositorio git con remoto (el local y el remoto ya existen a 2026-09-28; faltan la protección de la rama principal y la plantilla de PR).
-- Arranque de SDD: carpeta `specs/` con plantilla e índice (SPEC-00) y redacción de SPEC-01 (Scaffold). A 2026-10-10, SPEC-00 está Hecho y SPEC-01 es la primera spec redactada, En revisión y pendiente de aprobación; la compuerta de la Etapa 1 sigue cerrada.
+- Arranque de SDD: carpeta `specs/` con plantilla e índice (SPEC-00) y redacción de SPEC-01 (Scaffold). A 2026-10-20, SPEC-00 está Hecho y SPEC-01 está Aprobada formalmente por el líder del proyecto, superando la compuerta de la Etapa 1 (junto con ENG-001).
 - **PoC go/no-go de plataforma (ENG-140, decisiones 81 y 82):** antes de aprobar SPEC-01, una prueba de 1–2 días con siete comprobaciones (architecture §11.5) que valida Next.js 16.4 sobre Cloudflare Workers, Neon y Render: adaptador `vinext` (Decidido, decisión 85), `proxy.ts`, React Compiler, tamaño de bundle, `ffmpeg` en Render Free, 30 logins simulados contra el pooler de Neon y despertar de Neon. Si falla, se registra una decisión nueva en CONTEXT §14; no se ajusta el código en silencio.
 - Cuentas en Cloudflare y Render (hosting Decidido, CONTEXT §6, decisión 82) con proyectos de staging y producción apuntando al repositorio; dominio provisional con `app.`, `api.`, `app-staging.` y `api-staging.`. **Todos los subdominios de la raíz quedan bajo control del proyecto** y no se publica ninguno no controlado, porque las cookies de sesión se comparten con `Domain=.<dominio>` (Decidido, decisión 58). El servicio de Render de la API se crea con una sola instancia, sin autoescalado (decisión 64).
 - Proyectos Neon de staging y producción (solo PostgreSQL, pooler y conexión directa; plan Free en staging, Launch en producción al iniciar el piloto). Cuenta de Cloudflare R2 con un bucket privado por entorno y credenciales con alcance a su bucket (Decidido, decisión 34 §21).

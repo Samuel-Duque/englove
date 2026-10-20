@@ -384,7 +384,7 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 - Las specs viven en `specs/`, una por etapa de construcción (`SPEC-01` a `SPEC-10`), se redactan una etapa por delante de la implementación y siguen la plantilla y el ciclo de vida definidos en [`planning/sdd-process.md`](../planning/sdd-process.md).
 - Jerarquía: `CONTEXT.md` → `architecture-overview.md` → `sdd-process.md` → `pbp-development.md` → `taskboard.md` → `specs/` → código. Una spec nunca contradice un documento superior; si necesita hacerlo, primero se cambia la decisión en §14.
 - Ninguna tarea del taskboard pasa a "En curso" sin su spec Aprobada. La Definición de Hecho de `pbp-development.md` §3 lo exige.
-- **La redacción de las specs empezó durante la Etapa 0.** A 2026-10-10, SPEC-00 está Hecho y [`SPEC-01 — Scaffold`](../specs/SPEC-01-scaffold.md) está En revisión, sin aprobación. El índice vigente está en [`specs/README.md`](../specs/README.md); se mantiene el calendario de `sdd-process.md` §7.
+- **La redacción de las specs empezó durante la Etapa 0.** A 2026-10-20, SPEC-00 está Hecho y [`SPEC-01 — Scaffold`](../specs/SPEC-01-scaffold.md) está Aprobada formalmente por el líder del proyecto. El índice vigente está en [`specs/README.md`](../specs/README.md); se mantiene el calendario de `sdd-process.md` §7.
 
 ### 11.2 Calidad y operación
 

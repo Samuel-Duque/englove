@@ -4,7 +4,7 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-10-10. Refleja en §7 el arranque completado de SPEC-00 y la primera spec redactada (SPEC-01, En revisión). En esta fecha también se añadió la regla 7 de §9: la skill propia `englove-spec` como apoyo para agentes (DOC-07). Sin cambios de proceso.
+> Última actualización: 2026-10-20. Refleja la aprobación de SPEC-01 Scaffold por el líder del proyecto (tarea SPEC-01 a Hecho y compuerta de inicio de la Etapa 1 superada). Actualización anterior: 2026-10-10 (SPEC-01 en revisión, DOC-07).
 >
 > Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 
@@ -222,7 +222,7 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 
 **Pendientes P-1 a P-5 cerrados (Decidido, decisión 84).** Los pendientes menores P-1 a P-4 de CONTEXT §15 fueron formalizados y confirmados por el líder del proyecto el 2026-10-10 (decisión 84). Las specs que los cubren ya no necesitan dejarlos en §11 como preguntas abiertas: pueden redactarse directamente con los valores decididos. P-5 (identidad multi-organización) queda diferido a la compuerta de Fase 2 y no pertenece a ninguna spec del piloto.
 
-A 2026-10-10, SPEC-00 está Hecho y **SPEC-01 — Scaffold está En revisión**, pendiente de aprobación. Es la primera spec y se redacta durante la Etapa 0; el índice vigente está en [`specs/README.md`](../specs/README.md). Su redacción no habilita el inicio de la Etapa 1.
+A 2026-10-20, SPEC-00 está Hecho y **SPEC-01 — Scaffold está Aprobada** formalmente por el líder del proyecto. Su aprobación supera la compuerta de inicio de la Etapa 1 (junto con ENG-001). El índice vigente está en [`specs/README.md`](../specs/README.md).
 
 ---
 

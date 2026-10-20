@@ -43,6 +43,11 @@
       "skillPath": "skills/email-best-practices/SKILL.md",
       "computedHash": "cf53e0d7ad72c440818c64a104ab220f527f26f10c7d8163fa99e066bf747eed"
     },
+    "englove-guardrails": {
+      "source": "./.agents/skills/englove-guardrails",
+      "sourceType": "local",
+      "computedHash": "599b3420eab58a190e7899ef5eb628b9adb3eaf6e7dcdd7de8385bac398119bc"
+    },
     "englove-spec": {
       "source": "./.agents/skills/englove-spec",
       "sourceType": "local",

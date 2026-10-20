@@ -2,7 +2,7 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-10-10 (Decisiones 86–92 de CONTEXT §14). PoC go/no-go de plataforma ENG-140 completado con veredicto GO condicionado (7 de 7 comprobaciones en verde; informe en [`planning/poc-eng-140-informe.md`](./poc-eng-140-informe.md)). ENG-140 pasa a Hecho. Preguntas Q-1, Q-2, Q-4 y pendientes P-1 a P-5 formalmente cerrados. SPEC-01 está En revisión, lista para firma de aprobación del líder del proyecto para desbloquear la Etapa 1.
+> Última actualización: 2026-10-19 (DOC-08: skill propia `englove-guardrails`; decisiones 86–92 de CONTEXT §14). PoC go/no-go de plataforma ENG-140 completado con veredicto GO condicionado (7 de 7 comprobaciones en verde; informe en [`planning/poc-eng-140-informe.md`](./poc-eng-140-informe.md)). ENG-140 pasa a Hecho. Preguntas Q-1, Q-2, Q-4 y pendientes P-1 a P-5 formalmente cerrados. SPEC-01 está En revisión, lista para firma de aprobación del líder del proyecto para desbloquear la Etapa 1.
 >
 > Ronda 7: 2026-10-10. Decisiones 86 a 92 de CONTEXT §14: capacidad por horizonte, versiones base, matriz explícita de tenant, continuidad de intentos al cambiar de grupo, procedimiento operativo externo de datos de menores y auditoría administrativa redactada. Las decisiones 81 a 85 y ENG-140 permanecen vigentes.
 
@@ -28,14 +28,14 @@
 
 | Estado    | Tareas  |
 | --------- | ------- |
-| Hecho     | 11      |
+| Hecho     | 12      |
 | En curso  | 1       |
 | Por hacer | 16      |
 | Bloqueado | 0       |
 | Backlog   | 85      |
-| **Total** | **113** |
+| **Total** | **114** |
 
-Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `englove-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes.
+Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `englove-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). Creada y cerrada el 2026-10-19: DOC-08 (skill propia `englove-guardrails`). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes.
 
 ---
 
@@ -60,6 +60,7 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 | DOC-07  | Skill propia `englove-spec` (`.agents/skills/englove-spec/`, copias en `.claude/skills/` y `.kiro/skills/`, registrada en `skills-lock.json`): redactar, revisar y actualizar specs según `sdd-process.md`, con guía por sección, lista de validación contra CONTEXT §14, §2.4, §15 y §16, y script `check-spec.mjs` de verificación estructural. Ver `planning/skills-propias-pendientes.md` §1 | 2026-10-08 |
 | SPEC-00 | Crear `specs/` con `README.md` (índice) y `_template.md` según `sdd-process.md` §4 y §5 | 2026-10-08 |
 | ENG-140 | PoC go/no-go de plataforma (decisiones 81, 82 y 85). Siete comprobaciones con evidencia; adaptador elegido: `vinext` (decisión 85). Informe en `planning/poc-eng-140-informe.md` | 2026-10-10 |
+| DOC-08  | Skill propia `englove-guardrails` (`.agents/skills/englove-guardrails/`, copias en `.claude/skills/` y `.kiro/skills/`, registrada en `skills-lock.json`): verificación automatizada e interactiva de las invariantes del proyecto (`CONTEXT.md` §16 y `architecture-overview.md`), con catálogo `references/reglas.md` y script `scripts/check-guardrails.mjs`. Ver `planning/skills-propias-pendientes.md` §2 | 2026-10-19 |
 
 ---
 

@@ -18,7 +18,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 5. `planning/taskboard.md` — tareas.
 6. `specs/` — especificaciones (`SPEC-00` a `SPEC-10`).
 
-Otros documentos: `planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-modelo-de-datos.md`, `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` creada; las demás, pendientes).
+Otros documentos: `planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-modelo-de-datos.md`, `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
 
 ## Para las skills que buscan `GLOSSARY.md` y `docs/adr/`
 
@@ -45,3 +45,4 @@ Las skills del proyecto están en `.agents/skills/` (con copias versionadas en `
 Skills propias del proyecto (fuente en `.agents/skills/`; al modificarlas, actualiza también sus copias en `.claude/skills/` y `.kiro/skills/`):
 
 - `englove-spec`: redactar, revisar o actualizar specs `SPEC-NN` y crear `specs/` (SPEC-00). Úsala antes de tocar cualquier archivo de `specs/` y antes de empezar una tarea `ENG`, para comprobar que su spec está Aprobada. Incluye `scripts/check-spec.mjs` para verificar la estructura de una spec.
+- `englove-guardrails`: verificar de forma automatizada e interactiva las invariantes de persistencia (Neon y Prisma), despliegue (Cloudflare Workers con `vinext`, Render en instancia única y Cloudflare R2) y negocio (`CONTEXT.md` §16 y `architecture-overview.md`). Úsala antes de escribir o cerrar código de producción y junto con `code-review` y `security-review`. Incluye `scripts/check-guardrails.mjs` y el catálogo `references/reglas.md`.

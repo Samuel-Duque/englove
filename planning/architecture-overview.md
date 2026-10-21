@@ -10,7 +10,7 @@
 >
 > Documentos hermanos: [`sdd-process.md`](./sdd-process.md) (metodología), [`pbp-development.md`](./pbp-development.md) (etapas de construcción) y [`taskboard.md`](./taskboard.md) (tareas y estado). Las specs de `specs/` detallan cada capacidad a partir de este documento.
 >
-> Última actualización: 2026-10-21. SPEC-02 Implementada: implementación completa de identidad, sesiones, guards, extensión Prisma conectada en PrismaService con ciclo de vida completo y pruebas frontend de routing/proxy, higiene de almacenamiento y formularios (108/108 tests monorepo). Actualización anterior: 2026-10-20 (decisiones 93–94 de CONTEXT §14: delimitación de la API de alumnos en Etapa 2 y bloqueo sin enumeración).
+> Última actualización: 2026-10-21. SPEC-02 Verificada: verificación completa de identidad, sesiones, guards, extensión Prisma conectada en PrismaService con ciclo de vida completo y pruebas frontend de routing/proxy, higiene de almacenamiento y formularios (108/108 tests monorepo). Actualización anterior: 2026-10-20 (decisiones 93–94 de CONTEXT §14: delimitación de la API de alumnos en Etapa 2 y bloqueo sin enumeración).
 >
 > Actualización anterior (2026-10-08, Ronda 6): corrige tres incongruencias: `ValidationPipe` configurado solo con `whitelist: true` (campos no declarados se ignoran, no se rechazan con 400; A71), `MediaAsset.student_id` como propietario explícito del asset (A72) con diagrama ER y política `onDelete` actualizados, y aclaración de A28 en §8.1. Sin cambios de comportamiento ni nuevas decisiones de producto.
 >

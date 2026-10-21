@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-21. SPEC-01 figura Verificada; SPEC-02 pasa a Implementada con las tareas ENG-020, ENG-021, ENG-023 a ENG-029 en Hecho (103/103 tests en monorepo, extensión tenant en PrismaService y pruebas frontend de routing/proxy, higiene de almacenamiento y formularios). Prerrequisitos operativos pendientes en SPEC-02 §11 para verificación formal en staging.
+> Última actualización: 2026-10-21. SPEC-01 y SPEC-02 figuran Verificadas; SPEC-03 en redacción (borrador redactado, no revisado ni aprobado, con preguntas abiertas Q-01 a Q-03 en §11 pendientes del líder del proyecto). Prerrequisitos operativos de staging en seguimiento continuo.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >

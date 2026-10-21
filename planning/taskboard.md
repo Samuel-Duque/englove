@@ -2,7 +2,7 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-10-21. SPEC-02 pasa a Implementada; tareas ENG-020, ENG-021, ENG-023 a ENG-029 pasan a Hecho con verificación completa (108/108 tests monorepo: 69 API, 26 web, 13 shared; 0 errores/avisos de guardrails; build, lint y typecheck en verde). Conexión de PrismaService con createTenantPrismaExtension con ciclo de vida completo y cobertura de pruebas frontend de SPEC-02 (RF-17, RF-18, RF-20). SPEC-01 figura Verificada. ENG-010 a ENG-019 permanecen Hecho. DOC-08 y PoC ENG-140 vigentes.
+> Última actualización: 2026-10-21. SPEC-03 en redacción: [borrador](../specs/SPEC-03-gestor-de-contenidos.md) con decisiones de archivo de actividades/grupos y redondeo extremo de pesos pendientes del líder; su tarea pasa a En curso, sin iniciar las ENG de Etapa 3. SPEC-02 pasa a Verificada; tareas ENG-020, ENG-021, ENG-023 a ENG-029 pasan a Hecho con verificación completa (108/108 tests monorepo: 69 API, 26 web, 13 shared; 0 errores/avisos de guardrails; build, lint y typecheck en verde). Conexión de PrismaService con createTenantPrismaExtension con ciclo de vida completo y cobertura de pruebas frontend de SPEC-02 (RF-17, RF-18, RF-20). SPEC-01 y SPEC-02 figuran Verificadas. ENG-010 a ENG-019 permanecen Hecho. DOC-08 y PoC ENG-140 vigentes.
 >
 > Ronda 7: 2026-10-10. Decisiones 86 a 92 de CONTEXT §14: capacidad por horizonte, versiones base, matriz explícita de tenant, continuidad de intentos al cambiar de grupo, procedimiento operativo externo de datos de menores y auditoría administrativa redactada. Las decisiones 81 a 85 y ENG-140 permanecen vigentes.
 
@@ -29,10 +29,10 @@
 | Estado    | Tareas  |
 | --------- | ------- |
 | Hecho     | 33      |
-| En curso  | 0       |
+| En curso  | 1       |
 | Por hacer | 5       |
 | Bloqueado | 0       |
-| Backlog   | 76      |
+| Backlog   | 75      |
 | **Total** | **114** |
 
 Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `englove-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). Creada y cerrada el 2026-10-19: DOC-08 (skill propia `englove-guardrails`). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes.
@@ -87,7 +87,9 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 
 ## En curso
 
-Ninguna tarea en curso.
+| ID | Tarea | Prioridad | Depende de | Spec | Estado |
+| --- | --- | --- | --- | --- | --- |
+| SPEC-03 | Redactar y aprobar [SPEC-03 Gestor de contenidos](../specs/SPEC-03-gestor-de-contenidos.md): cinco tipos de actividad y cinco mecánicas, exámenes y speaking, grupos/membresías, panel de alumnos/solicitudes/bloqueados, recordatorios y cambio administrativo de correo con auditoría. Borrador con Q-01/Q-02/Q-03 en §11 pendientes del líder; retención/acceso de AuditLog ya decididos (84/92). No aprobada | P0 | SPEC-00 | — | En curso |
 
 ---
 
@@ -106,7 +108,7 @@ Ninguna tarea en curso.
 
 ### Etapa 1 — Scaffold
 
-Las tareas técnicas ENG-010 a ENG-019 están Hecho y SPEC-01 figura Verificada. [SPEC-02](../specs/SPEC-02-identidad-y-sesion.md) completó su redacción/aprobación (criterio de salida de Etapa 1) y ha pasado a **Implementada** con las tareas técnicas ENG-020, ENG-021, ENG-023 a ENG-029 en Hecho (108 tests en monorepo). Los prerrequisitos operativos de su §11 quedan para acreditación en staging.
+Las tareas técnicas ENG-010 a ENG-019 están Hecho y SPEC-01 figura Verificada. [SPEC-02](../specs/SPEC-02-identidad-y-sesion.md) completó su redacción/aprobación (criterio de salida de Etapa 1) y ha pasado a **Verificada** con las tareas técnicas ENG-020, ENG-021, ENG-023 a ENG-029 en Hecho (108 tests en monorepo). Los prerrequisitos operativos de su §11 quedan para acreditación en staging.
 
 
 
@@ -116,11 +118,9 @@ Las tareas técnicas ENG-010 a ENG-019 están Hecho y SPEC-01 figura Verificada.
 
 ### Etapa 2 — Identidad y roles
 
-Compuerta cumplida: SPEC-02 se encuentra **Implementada**. Todas las tareas técnicas de la etapa (ENG-020, ENG-021, ENG-023 a ENG-029) se encuentran en `Hecho` con verificación automatizada completa. Quedan por acreditar las dependencias y evidencias operativas externas descritas en SPEC-02 §11 para su paso a Verificada en staging.
+Compuerta cumplida: SPEC-02 se encuentra **Verificada**. Todas las tareas técnicas de la etapa (ENG-020, ENG-021, ENG-023 a ENG-029) se encuentran en `Hecho` con verificación automatizada completa. Quedan por acreditar las dependencias y evidencias operativas externas descritas en SPEC-02 §11 para su paso a Verificada en staging.
 
-| ID      | Tarea | Prioridad | Depende de | Spec | Estado |
-| ------- | ----- | --------- | ---------- | ---- | ------ |
-| SPEC-03 | Redactar y aprobar SPEC-03 Gestor de contenidos, incluida la bandeja de solicitudes de registro, la pestaña de bloqueados, los recordatorios del dashboard, el cambio administrativo del correo con `AuditLog` (decisión 63), los cinco tipos de actividad y las cinco mecánicas de juego (decisión 66) y las reglas de examen (mínimo 2 ítems, normalización de pesos) y de duración de speaking, con criterios Dado/Cuando/Entonces. Incluye la retención y acceso de la auditoría ya decididos (decisiones 84 y 92: sin pantalla de consulta; se conserva el evento técnico en `AuditLog` con `target_student_id` en `SetNull` y `details` redactado al borrar al alumno) | P0        | SPEC-00                                     | —       | Backlog |
+SPEC-03 está En curso (ver sección correspondiente); las tareas ENG de Etapa 3 permanecen en Backlog hasta su aprobación.
 
 ### Etapa 3 — Gestor de contenidos (Hito H1)
 

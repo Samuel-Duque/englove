@@ -137,7 +137,7 @@ Una vez iniciados los servicios, comprueba en tu navegador:
 ```
 .agents/              # Contexto de negocio y especificaciones de agentes (CONTEXT.md)
 planning/             # Documentos de arquitectura y proceso SDD
-specs/                # Specs SDD: SPEC-01 Verificada; SPEC-02 Implementada
+specs/                # Specs SDD: SPEC-01 y SPEC-02 Verificadas; SPEC-03 Borrador
 apps/
   web/                # Frontend Next.js 16.4 (React 19, Tailwind, Cloudflare Workers con vinext)
   api/                # Backend NestJS 11 (Prisma, PostgreSQL 18, ffmpeg)

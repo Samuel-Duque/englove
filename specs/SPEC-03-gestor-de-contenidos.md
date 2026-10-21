@@ -5,7 +5,7 @@
 | Estado | Borrador |
 | Etapa | 3 — Gestor de contenidos |
 | Tareas | ENG-030, ENG-031, ENG-032, ENG-033, ENG-034, ENG-035, ENG-036, ENG-037, ENG-038, ENG-040, ENG-041, ENG-043, ENG-044, ENG-045, ENG-046 |
-| Referencias | CONTEXT §4.1, §5.1, §5.3, §14–§16 · architecture §3.1–§3.2, §4.1–§4.4, §5.1–§6.5, §7.2–§7.3, §8, §13 · pbp §3 y Etapa 3 · decisiones 33, 37, 42, 45–47, 59, 63, 66, 70, 73, 75, 79–80, 83, 89–94 |
+| Referencias | CONTEXT §4.1, §5.1, §5.3, §14–§16 · architecture §3.1–§3.2, §4.1–§4.4, §5.1–§6.5, §7.2–§7.3, §8, §13 · pbp §3 y Etapa 3 · decisiones 20, 24, 33, 37, 42, 45–47, 59, 63, 66, 67, 70, 73, 75, 79–80, 83, 89–94 |
 | Aprobada por / fecha | — |
 
 ## 1. Contexto y objetivo

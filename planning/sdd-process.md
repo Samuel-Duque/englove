@@ -222,7 +222,7 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 
 **Pendientes P-1 a P-5 cerrados (Decidido, decisiones 84 y 92).** Los pendientes menores P-1 a P-4 de CONTEXT §15 fueron formalizados y confirmados por el líder del proyecto el 2026-10-10 (decisión 84, con P-4 actualizado por la decisión 92). Las specs que los cubren ya no necesitan dejarlos en §11 como preguntas abiertas: pueden redactarse directamente con los valores decididos. P-5 (identidad multi-organización) queda diferido a la compuerta de Fase 2 y no pertenece a ninguna spec del piloto.
 
-A 2026-10-21, SPEC-00 está Hecho, **SPEC-01 — Scaffold figura Verificada** y **SPEC-02 — Identidad y sesión pasa a Implementada** al cerrarse las tareas ENG-020, ENG-021, ENG-023 a ENG-029 con 108/108 pruebas unitarias y de integración en monorepo, extensión Prisma conectada y pruebas frontend completas. Quedan por acreditar las dependencias y evidencias operativas externas descritas en SPEC-02 §11 para su paso a Verificada en staging. El índice vigente está en [`specs/README.md`](../specs/README.md).
+A 2026-10-21, SPEC-00 está Hecho, **SPEC-01 — Scaffold figura Verificada** y **SPEC-02 — Identidad y sesión figura Verificada** tras la implementación y verificación completa de las tareas ENG-020, ENG-021, ENG-023 a ENG-029 con 108/108 pruebas unitarias y de integración en monorepo, extensión Prisma conectada y pruebas frontend completas. Los prerrequisitos operativos de su §11 quedan para acreditación en staging. **SPEC-03 — Gestor de contenidos figura en Borrador** (redactada, no revisada ni aprobada, con preguntas abiertas Q-01 a Q-03 en su §11 pendientes del líder del proyecto). El índice vigente está en [`specs/README.md`](../specs/README.md).
 
 ---
 

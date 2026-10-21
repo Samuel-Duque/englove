@@ -118,7 +118,7 @@ Las tareas técnicas ENG-010 a ENG-019 están Hecho y SPEC-01 figura Verificada.
 
 ### Etapa 2 — Identidad y roles
 
-Compuerta cumplida: SPEC-02 se encuentra **Verificada**. Todas las tareas técnicas de la etapa (ENG-020, ENG-021, ENG-023 a ENG-029) se encuentran en `Hecho` con verificación automatizada completa. Quedan por acreditar las dependencias y evidencias operativas externas descritas en SPEC-02 §11 para su paso a Verificada en staging.
+Compuerta cumplida: SPEC-02 se encuentra **Verificada**. Todas las tareas técnicas de la etapa (ENG-020, ENG-021, ENG-023 a ENG-029) se encuentran en `Hecho` con verificación automatizada completa. Los prerrequisitos operativos descritos en SPEC-02 §11 quedan para acreditación en staging.
 
 SPEC-03 está En curso (ver sección correspondiente); las tareas ENG de Etapa 3 permanecen en Backlog hasta su aprobación.
 

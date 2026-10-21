@@ -4,7 +4,7 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-10-20. Refleja la aprobación de SPEC-01 Scaffold por el líder del proyecto (tarea SPEC-01 a Hecho y compuerta de inicio de la Etapa 1 superada). Actualización anterior: 2026-10-10 (SPEC-01 en revisión, DOC-07).
+> Última actualización: 2026-10-20. SPEC-01 figura Verificada por solicitud del líder (trazabilidad en su §9/§12); SPEC-02 Aprobada tras aceptar Q-01/Q-02 (CONTEXT 93–94), con tarea de redacción/aprobación Hecho. No se inicia Etapa 2 ni se presumen satisfechos sus prerrequisitos operativos (SPEC-02 §11).
 >
 > Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 
@@ -222,7 +222,7 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 
 **Pendientes P-1 a P-5 cerrados (Decidido, decisiones 84 y 92).** Los pendientes menores P-1 a P-4 de CONTEXT §15 fueron formalizados y confirmados por el líder del proyecto el 2026-10-10 (decisión 84, con P-4 actualizado por la decisión 92). Las specs que los cubren ya no necesitan dejarlos en §11 como preguntas abiertas: pueden redactarse directamente con los valores decididos. P-5 (identidad multi-organización) queda diferido a la compuerta de Fase 2 y no pertenece a ninguna spec del piloto.
 
-A 2026-10-20, SPEC-00 está Hecho y **SPEC-01 — Scaffold está Implementada** tras completarse la Etapa 1 (ENG-010 a ENG-019). El índice vigente está en [`specs/README.md`](../specs/README.md).
+A 2026-10-20, SPEC-00 está Hecho y **SPEC-01 — Scaffold figura Verificada**, por solicitud del líder tras el cierre técnico de ENG-010 a ENG-019 (sin nueva evidencia de CI en este cambio documental; véase su §9/§12). **SPEC-02 — Identidad y sesión está Aprobada** por el líder tras aceptar las decisiones 93–94. Su tarea de redacción/aprobación está Hecho y cumple ese criterio de salida de Etapa 1. No quedan preguntas funcionales bloqueantes; iniciar Etapa 2 exige además las dependencias técnicas de decisión 65 y los prerrequisitos operativos de SPEC-02 §11. El índice vigente está en [`specs/README.md`](../specs/README.md).
 
 ---
 

@@ -10,7 +10,7 @@
 >
 > Documentos hermanos: [`sdd-process.md`](./sdd-process.md) (metodología), [`pbp-development.md`](./pbp-development.md) (etapas de construcción) y [`taskboard.md`](./taskboard.md) (tareas y estado). Las specs de `specs/` detallan cada capacidad a partir de este documento.
 >
-> Última actualización: 2026-10-20. Refleja la aprobación formal de SPEC-01 Scaffold por el líder del proyecto (tarea SPEC-01 a Hecho). Actualización anterior: 2026-10-10 (Ronda 7, decisiones 86–92 de CONTEXT §14).
+> Última actualización: 2026-10-20. Incorpora las decisiones 93–94 de CONTEXT §14: delimitación de la API de alumnos en Etapa 2 y bloqueo sin enumeración, aceptadas por el líder al aprobar SPEC-02. Alinea el log local de correo con la privacidad de CONTEXT §16/SPEC-01, sin implementar. Actualización anterior: aprobación formal de SPEC-01 y Ronda 7 (decisiones 86–92).
 >
 > Actualización anterior (2026-10-08, Ronda 6): corrige tres incongruencias: `ValidationPipe` configurado solo con `whitelist: true` (campos no declarados se ignoran, no se rechazan con 400; A71), `MediaAsset.student_id` como propietario explícito del asset (A72) con diagrama ER y política `onDelete` actualizados, y aclaración de A28 en §8.1. Sin cambios de comportamiento ni nuevas decisiones de producto.
 >
@@ -296,6 +296,8 @@ Cada módulo es `controller` → `service` → Prisma. Sin repositorios genéric
 | `health`        | liveness y conexión a base de datos                                                                                                                                                                                                                                                                                                               | `GET /health`                                                                                                                                                                                                                                                                                                                                |
 
 No existe módulo `guardians` ni ningún endpoint de consentimiento (decisión 34 §1 y §2). No existe `POST /students`: la única vía de alta es `POST /auth/signup`.
+
+**Entrega por etapas (decisión 93):** la tabla es el inventario del piloto, no el alcance íntegro de SPEC-02. Etapa 2 / ENG-023 entrega lista, ficha, edición y solicitudes con aprobación/rechazo; solo `POST /students/:id/reject` elimina solicitudes pendientes. `DELETE /students/:id` se entrega con la cascada completa de §8.4 en Etapa 5 / SPEC-05 / ENG-070, nunca como baja parcial por FK. Grupos y gestión visual/cambio administrativo conservan SPEC-03; perfil y alternancia, SPEC-05.
 
 ### 4.2 Validación en dos niveles — Decidido (A5)
 
@@ -599,19 +601,19 @@ Eliminados por la decisión 34: `ConsentStatus`, `ConsentMethod` (§2) y `Regist
 
 ## 7. Flujos clave
 
-### 7.1 Login y sesión (profesora y alumno) — Decidido (A3, decisiones 22 y 23)
+### 7.1 Login y sesión (profesora y alumno) — Decidido (A3, decisiones 22, 23 y 94)
 
 Un único flujo para todos los roles.
 
-1. `POST /auth/login` con correo y contraseña, **sin identificador de organización**: como el correo es globalmente único (decisión 59), identifica una sola cuenta y la organización sale de `User.organization_id`. Hash con argon2id. La respuesta de error es la misma para "correo no existe" y "contraseña incorrecta" (`AUTH_INVALID_CREDENTIALS`).
+1. `POST /auth/login` con correo y contraseña, **sin identificador de organización**: como el correo es globalmente único (decisión 59), identifica una sola cuenta y la organización sale de `User.organization_id`. Hash con argon2id. Correo inexistente o contraseña incorrecta devuelven siempre el mismo `401 AUTH_INVALID_CREDENTIALS`, incluso si la cuenta real está bloqueada (decisión 94). Solo tras verificar la contraseña se comprueba bloqueo y, después, aprobación; no se emiten cookies hasta superar ambos.
 2. La API responde con dos cookies `HttpOnly; Secure; SameSite=Lax; Domain=.<dominio>` (Decidido, decisión 58; §8.2): `access_token` (15 min, `Path=/`) y `refresh_token` (`Path=/api/v1/auth/refresh`, rotativo) con duración según rol: **30 días profesora, 90 días alumno**. Con `Domain=.<dominio>`, el `access_token` también llega a `app.<dominio>`, donde el `proxy.ts` lo usa solo para redirigir; el `refresh_token`, por su `Path`, solo viaja al endpoint de refresh de la API. El "Recuérdame" de CONTEXT §4 es implícito para el alumno.
 3. El login crea una `AuthSession` (decisión 68): su `id` es el `sid` del JWT y guarda el hash del refresh emitido, que lleva el `sid` y un secreto aleatorio. El frontend nunca lee los tokens. Al expirar el acceso, llama a `POST /auth/refresh`; la API emite un par nuevo, sustituye `refresh_token_hash` y fija `rotated_at`.
 4. Reutilización de un refresh ya rotado (el `sid` existe pero el hash no coincide con el vigente) → se fija `revoked_at` en toda la familia de sesión y se exige login de nuevo.
 5. `POST /auth/logout` revoca la familia (`revoked_at`) y borra las cookies.
 6. El frontend redirige según `role` de la respuesta: `(teacher)` o `(student)`.
-7. **Cuenta `pending_approval` (Decidido, CONTEXT §4.1 y decisión 33):** si el `Student` de la cuenta tiene `approval_status = pending_approval`, el login responde `403 ACCOUNT_PENDING_APPROVAL` aunque la contraseña sea correcta, sin emitir cookies. Una solicitud rechazada ya no existe (se borra en el acto, decisión 77), así que su login responde `AUTH_INVALID_CREDENTIALS` como cualquier cuenta inexistente.
+7. **Cuenta `pending_approval` (Decidido, CONTEXT §4.1 y decisiones 33 y 94):** con contraseña correcta y sin bloqueo activo, si el `Student` tiene `approval_status = pending_approval`, el login responde `403 ACCOUNT_PENDING_APPROVAL`, sin emitir cookies. Una solicitud rechazada ya no existe (se borra en el acto, decisión 77), así que su login responde `AUTH_INVALID_CREDENTIALS` como cualquier cuenta inexistente.
 
-**Bloqueo por intentos fallidos (Decidido, decisión 23):** cada login fallido incrementa `User.failed_login_count`. Al llegar a **10**, se fija `locked_until = now() + 10 min` y todo intento hasta esa hora responde `AUTH_ACCOUNT_LOCKED` con el tiempo restante, sin comprobar la contraseña. Un login correcto pone el contador a cero. El panel de la profesora muestra los alumnos bloqueados y puede desbloquearlos anticipadamente. La misma regla aplica a la profesora, sin desbloqueo anticipado (Decidido).
+**Bloqueo por intentos fallidos (Decidido, decisiones 23 y 94):** antes de evaluar un nuevo login, un bloqueo vencido (`locked_until <= now()`) se limpia y reinicia el contador, sin esperar al cron. Fuera de bloqueo activo, cada contraseña incorrecta incrementa atómicamente `User.failed_login_count`; el décimo fallo persiste contador **10** y `locked_until = now() + 10 min`, pero responde el mismo **401** uniforme. Durante el bloqueo, ni contador ni plazo cambian: contraseña incorrecta → `401 AUTH_INVALID_CREDENTIALS`; correcta → `423 AUTH_ACCOUNT_LOCKED` con segundos restantes en `Retry-After`, sin sesión. Al vencer, el primer fallo del ciclo nuevo cuenta 1; el acierto deja contador cero/bloqueo null y permite login si está aprobada. El bloqueo activo precede al estado pendiente, siempre después de verificar la contraseña. Misma política para profesora y alumno; solo alumnos admiten desbloqueo administrativo. El rate limiting HTTP (`429`, §8.3) se aplica por separado.
 
 ### 7.2 Auto-registro del estudiante y aprobación por la profesora — Decidido (CONTEXT §4.1 y decisión 33)
 
@@ -646,7 +648,7 @@ sequenceDiagram
 3. La API responde `201` sin emitir cookies: el alumno no queda dentro de la sesión aunque la cuenta exista. Se envía un correo de "solicitud recibida" (no bloqueante para el flujo). La pantalla dice "Recibimos tu solicitud. Revisa tu correo." en ambos casos del paso 2. La carrera entre dos registros simultáneos con el mismo correo la resuelve el índice único de `User(email)`: el segundo se trata como correo ya registrado.
 4. `GET /students/requests` (solo `teacher`) lista los `Student` en `pending_approval` con los datos capturados en el registro.
 5. `POST /students/:id/approve { level, groupId, ageSegment?, guardianName?, guardianContact? }`: fija `level`, crea la **única membresía vigente** del alumno en `groupId` (decisión 73; el grupo no puede estar archivado), permite corregir `age_segment` (solo si la fecha de nacimiento era errónea) y los datos del acudiente directamente en el `Student`, y pasa `approval_status` a `approved`. No hay ningún otro control previo a la aprobación.
-6. `POST /students/:id/reject`: borra la solicitud completa (`User` y `Student`) con el mismo mecanismo que el borrado en cascada de §8.4. No hay "correo de rechazo": simplemente la cuenta deja de existir.
+6. `POST /students/:id/reject`: solo sobre `pending_approval`, borra `User`, `Student` y dependientes de identidad sin huérfanos (§8.4). Sobre aprobado responde `409 STUDENT_NOT_PENDING`, sin borrar. Se entrega en Etapa 2 (decisión 93); no sustituye la baja general de Etapa 5. No hay "correo de rechazo": simplemente la cuenta deja de existir.
 7. Al aprobar, `MailService` envía el correo "cuenta aprobada"; el alumno inicia sesión con la contraseña que fijó en el paso 1.
 8. **Cambio de grupo (Decidido, decisión 73):** `PUT /students/:id/group { groupId }` (solo `teacher`) cierra la membresía vigente (`left_at = now()`) y abre la nueva en una transacción. Desde ese momento el alumno ve e inicia solo las asignaciones del grupo nuevo; los intentos que ya tenía se conservan y pueden completarse dentro de su ventana.
 
@@ -673,7 +675,7 @@ Un único `MailService` sobre Resend, con un solo remitente y dominio verificado
 3. `POST /auth/reset-password { token, newPassword }`. Verifica hash, caducidad y no uso; fija la nueva contraseña; marca `used_at`; **revoca todas las familias de sesión** del usuario (`AuthSession.revoked_at`); responde `200`.
 4. **Requisitos de contraseña (Decidido, decisión 34 §1): mínimo 8 caracteres, máximo 16, sin espacios.** Sin requisitos de complejidad que un niño no pueda recordar; para Kids la pantalla sugiere una frase corta memorable que cumpla el rango. Los mismos requisitos aplican en el auto-registro (§7.2) y en el restablecimiento (§7.3). Código de error: `PASSWORD_POLICY`.
 5. **Cambio de correo del alumno con OTP (Decidido, decisión 62):** desde `perfil/`, `POST /me/email-change { newEmail, password }` verifica la contraseña actual y que el correo nuevo sea globalmente único; crea `EmailChangeRequest` con un OTP de 6 dígitos de un solo uso (hash, 10 min) y lo envía **al correo nuevo** (así se comprueba que el alumno controla la nueva dirección). `POST /me/email-change/confirm { otp }` aplica el cambio, envía la plantilla `email-changed` **al correo anterior** (aviso informativo: el correo anterior no autoriza ni puede bloquear el cambio) y revoca las demás sesiones. Cada OTP incorrecto incrementa `EmailChangeRequest.failed_attempts`; al tercero la solicitud queda invalidada y hay que pedir otra (decisión 69). Cubre el caso del alumno que se registró con el correo del acudiente y luego quiere el suyo. Este endpoint es autenticado y limitado a 5 por hora (§8.3), por eso puede responder `EMAIL_TAKEN`.
-6. `MailService` tiene una única implementación (Resend) con ocho plantillas que comparten remitente, diseño y pie: `signup-received`, `signup-existing-account`, `approved`, `password-reset`, `email-change-otp`, `email-changed`, `grading-notification` y `teacher-pending-summary`. En `local` escribe el enlace o el aviso en el log en vez de enviarlo, sin incluir el correo del destinatario (§8.5).
+6. `MailService` tiene una única implementación (Resend) con ocho plantillas que comparten remitente, diseño y pie: `signup-received`, `signup-existing-account`, `approved`, `password-reset`, `email-change-otp`, `email-changed`, `grading-notification` y `teacher-pending-summary`. En `local` no envía: registra solo plantilla, resultado e identificador operativo; nunca destinatario, cuerpo, enlace, token ni OTP (CONTEXT §16, SPEC-01 RF-16 y §8.5).
 
 ### 7.5 Intento de actividad y puntaje en servidor
 
@@ -840,7 +842,7 @@ Al superar un límite la API responde `429 RATE_LIMITED` con `Retry-After`. Los 
 
 ### 8.4 Borrado en cascada de un alumno — Decidido (test primero)
 
-`DELETE /students/:id`:
+`DELETE /students/:id` se entrega en **Etapa 5 / SPEC-05 / ENG-070** (decisión 93), con el procedimiento completo, no una versión parcial en Etapa 2:
 
 1. **Congela el denominador histórico (Decidido, decisiones 34 §14 y 73):** para cada `Assignment` a la que el alumno estaba obligado (grupos con membresía suya solapada con `[opens_at, due_at]`, vigente o pasada), si `historical_student_count` es `null` se fija con el número de alumnos obligados en ese momento (incluido el que se va a borrar). Si ya estaba fijado, no se toca.
 2. Marca los `MediaAsset` del alumno como `pending_delete`.
@@ -850,7 +852,7 @@ Al superar un límite la API responde `429 RATE_LIMITED` con `Retry-After`. Los 
 
 El test de integración se escribe antes que el endpoint y comprueba que no queda ninguna fila ni objeto huérfano, y que el denominador congelado no cambia después del borrado. Las claves foráneas con `Cascade` de §6.2 son solo una red de seguridad: el orden (R2 primero, filas después) lo impone este servicio. La autorreferencia `Attempt.previous_attempt_id` es `NoAction`, así que el borrado conjunto de todos los intentos del alumno en una sentencia no falla.
 
-**Rechazo de una solicitud de auto-registro:** `POST /students/:id/reject` ejecuta el mismo procedimiento sobre un `Student` en `approval_status = pending_approval`. Como nunca tuvo grupos, `Attempt`, `Review` ni `MediaAsset`, el borrado es inmediato (solo `Student` y `User`).
+**Rechazo de una solicitud de auto-registro (Etapa 2 / SPEC-02, decisión 93):** `POST /students/:id/reject` elimina exclusivamente un `Student` en `pending_approval` y su `User`, con sus dependientes de identidad (`AuthSession`, `PasswordResetToken`, `EmailChangeRequest`) sin huérfanos. Nunca tuvo membresías ni historial pedagógico/multimedia; no requiere adelantar integración R2. No admite aprobados (`409 STUDENT_NOT_PENDING`) ni sustituye `DELETE /students/:id`.
 
 ### 8.5 Datos personales en logs y errores
 
@@ -986,7 +988,7 @@ Serwist como service worker: precache del shell de la app, estrategia `NetworkFi
 
 | Entorno      | Web                       | API                                           | Base de datos                | Archivos (Cloudflare R2)                           | Correo                     | Uso                          |
 | ------------ | ------------------------- | --------------------------------------------- | ---------------------------- | -------------------------------------------------- | -------------------------- | ---------------------------- |
-| `local`      | `next dev`                | `nest start --watch` (con `ffmpeg` instalado) | Postgres 18 en Docker        | bucket R2 `englove-dev` (o MinIO local por S3 API) | enlaces al log             | desarrollo diario            |
+| `local`      | `next dev`                | `nest start --watch` (con `ffmpeg` instalado) | Postgres 18 en Docker        | bucket R2 `englove-dev` (o MinIO local por S3 API) | log sanitizado (plantilla/resultado/ID) | desarrollo diario            |
 | `staging`    | Cloudflare Free (rama `main`) | Render Free (rama `main`)                 | proyecto Neon Free staging   | bucket R2 `englove-staging`                        | Resend, dominio de pruebas | CI, E2E, **demo** (~11 personas, $0) |
 | `production` | Cloudflare Workers Paid (promoción manual) | Render Starter (promoción manual) | proyecto Neon Launch producción | bucket R2 `englove-prod`                  | Resend, dominio real       | piloto inicial (~10; preparado para ~30 activos, ~$16–19/mes) |
 
@@ -1051,6 +1053,7 @@ Resultado: un informe breve en [`planning/poc-eng-140-informe.md`](./poc-eng-140
 - Prefijo `/api/v1` para todos los endpoints de negocio (Decidido, decisiones 20 y 83). Excepción explícita para endpoints operacionales (decisión 83): `GET /health` y `GET /docs` se exponen en la raíz sin prefijo de versión (`/health` y `/docs`). `GET /docs` (Swagger UI) queda deshabilitado en producción (`APP_ENV === 'production'`) respondiendo `404`. Por legibilidad, este documento y las specs citan con frecuencia las rutas relativas sin prefijo (ej. `POST /auth/login`, `POST /attempts/:id/review`); en tiempo de ejecución todas llevan el prefijo `/api/v1`. JSON. Fechas ISO-8601 en UTC; el frontend muestra en `America/Bogota`.
 - Calificaciones: número con un decimal en la API (`4.5`); la interfaz lo muestra con coma (`4,5`).
 - Errores: `{ statusCode, code, message }` con `code` estable por caso (`AUTH_INVALID_CREDENTIALS`, `AUTH_ACCOUNT_LOCKED`, `ACCOUNT_PENDING_APPROVAL`, `PASSWORD_POLICY`, `EMAIL_TAKEN`, `OTP_INVALID`, `RATE_LIMITED`, `ATTEMPT_CLOSED`, `ATTEMPT_ALREADY_EXISTS`, `RETRY_ALREADY_GRANTED`, `RETRY_EXTEND_INVALID`, `SCORE_OUT_OF_RANGE`, `SCORE_NOT_EDITABLE` (decisión 72), `GROUP_ARCHIVED` (decisión 79), `ACTIVITY_HAS_ATTEMPTS`, `EXAM_MIN_ITEMS`, `AUDIO_IMPLAUSIBLE_DURATION`, `AUDIO_EXCEEDS_MAX_DURATION`, `INTERFACE_SWITCH_NOT_ALLOWED`, `ATTEMPT_NOT_OPEN` (Decidido, decisión 84)). `EMAIL_TAKEN` solo lo devuelven endpoints autenticados (`POST /me/email-change`, `POST /students/:id/change-email`); ningún endpoint público revela si un correo existe (decisión 59). **Ningún error devuelve datos técnicos internos** (stack traces, consultas, rutas de archivo, identificadores de infraestructura): `message` es un texto neutro y el detalle queda solo en el log del servidor (Decidido, decisión 34 §17). El cliente traduce `code` a mensajes en español por interfaz (§3.6).
+- Concreciones del catálogo para identidad (SPEC-02 §5): `AUTH_UNAUTHORIZED` (401, sesión inválida), `FORBIDDEN` (403), `VALIDATION_ERROR` (400), `PAYLOAD_TOO_LARGE` (413), `PASSWORD_RESET_INVALID` (400) y `STUDENT_NOT_PENDING` (409). `NOT_FOUND` (404) e `INTERNAL_ERROR` (500) conservan SPEC-01. En login, credenciales inválidas dan 401 uniforme; `AUTH_ACCOUNT_LOCKED` (423) y `ACCOUNT_PENDING_APPROVAL` (403) solo tras contraseña correcta, con precedencia del bloqueo (decisión 94). Estos detalles no añaden endpoints ni capacidades.
 - Paginación por `offset` y `limit`. Suficiente para 100 alumnos.
 - Textos de interfaz en español directamente en los componentes; sin librería i18n en el piloto. El contenido pedagógico es en inglés y lo escribe la profesora.
 - Todo cambio de comportamiento pasa primero por su spec en `specs/` (CONTEXT §11.1).
@@ -1187,6 +1190,7 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
 - ~~¿La profesora necesita exportar datos (CSV) en el piloto?~~ Cerrada: fuera del alcance del piloto (CONTEXT §2.4). Si la profesora lo pide, se evalúa como mejora post-piloto.
 - Sin endpoints para cambio de contraseña desde perfil autenticado (`POST /me/change-password`): decisión consciente de diseño; el cambio de contraseña se gestiona únicamente a través del flujo de recuperación (`POST /auth/forgot-password` y `POST /auth/reset-password`).
 - Re-registro tras rechazo: ratificado como comportamiento previsto; al rechazar un alumno en `pending_approval` se eliminan completamente sus datos (`Student` y `User`), por lo que ese correo queda habilitado para registrarse nuevamente si fue un error (decisiones 59 y 77).
+- Cerradas el 2026-10-20 (decisiones 93 y 94, SPEC-02): Q-01 delimita rechazo de pendientes en Etapa 2 y baja general completa en Etapa 5; Q-02 precisa credenciales inválidas uniformes, bloqueo solo tras contraseña correcta y reinicio del ciclo al vencer (§7.1, §8.4). No quedan preguntas funcionales bloqueantes de SPEC-02; sus prerrequisitos operativos se siguen en su §11.
 - Cerradas el 2026-10-10 (decisiones 83 y 84): pendientes de CONTEXT §15 formalizados por el líder del proyecto:
   - **P-1 — Inicio antes de `opens_at`** (cierra SPEC-05): `409 ATTEMPT_NOT_OPEN` sin crear el intento, con la fecha de apertura en el mensaje (§3.6, §7.5).
   - **P-2 — Comentario en autocalificados** (cierra SPEC-07): obligatorio solo en revisión manual; opcional en fichas, exámenes y microjuegos (§7.7).

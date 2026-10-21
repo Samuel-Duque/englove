@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Implementada |
+| Estado | Verificada |
 | Etapa | 1 — Scaffold |
 | Tareas | ENG-010, ENG-011, ENG-012, ENG-013, ENG-014, ENG-015, ENG-016, ENG-017, ENG-018, ENG-019 |
 | Referencias | CONTEXT §2.4, §4, §6–§11, §14–§17 · architecture §2–§6, §8.5, §11–§14 · decisiones 20, 21, 23–27, 30, 32–56, 58–85 · pbp §2.1, §3, Etapa 1 · sdd-process §5–§9 |
@@ -224,7 +224,7 @@ ENG-019 verifica DNS/credenciales, no basta validar variables. URLs sin credenci
 
 ## 9. Pruebas
 
-Nombres trazables para implementar después de la aprobación; esta redacción no afirma que existan o pasen.
+Matriz de verificación de la capacidad. El estado Verificada se actualiza el 2026-10-20 por solicitud explícita del líder, a partir del cierre de ENG-010 a ENG-019 y las verificaciones previamente registradas en el taskboard. Este cambio documental no añade una ejecución de CI ni una comprobación de staging; no constituye nueva evidencia de sus resultados.
 
 | RF | Nivel | Nombre y alcance |
 | --- | --- | --- |
@@ -285,3 +285,4 @@ Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: en
 | 2026-10-20 | Aprobación formal de la spec por el líder del proyecto tras verificar estructura, compuertas y PoC ENG-140 | Pasa a estado Aprobada; desbloquea la compuerta de inicio de la Etapa 1 (scaffold) |
 | 2026-10-20 | Implementación completa de SPEC-01 Scaffold (ENG-010 a ENG-019, RF-1 a RF-19): monorepo, web, api, shared, Prisma, migraciones, seeds, docker-compose, render.yaml, CI y pruebas | Pasa a estado Implementada tras verificar suites de pruebas y guardrails |
 | 2026-10-20 | Limpieza de referencias residuales en §4, §5, §9 y §11: P-4 alineado con la decisión 92 (`onDelete: SetNull` y redacción de `details`), Q-2 marcada como Decidida (decisión 83) y PG18 en tabla de pruebas | Sincronización documental con las decisiones 83, 88 y 92 |
+| 2026-10-20 | Estado Implementada → Verificada y sincronización del índice y seguimiento | Solicitud explícita del líder del proyecto; se conserva el cierre previo del scaffold, sin atribuir una nueva ejecución de CI o validación de staging a este cambio documental |

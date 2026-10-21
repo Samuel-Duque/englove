@@ -36,6 +36,7 @@ const RULES = {
   'G-A08': { title: 'onDelete explícito en toda relación', source: 'decisiones 80 y 92; architecture §6.2' },
   'G-A09': { title: 'Modelo de datos vigente, sin campos retirados', source: 'decisiones 22, 25, 35, 72, 77 y 79; architecture §6.3–§6.4' },
   'G-A10': { title: 'Attempt.score numeric(2,1) con CHECK', source: 'decisiones 24 y 72; architecture §4.4' },
+  'G-A11': { title: 'Prevención de IDOR y acceso a datos de tenant', source: 'decisiones 82 y 89; architecture §4.3 y §8.1' },
   'G-B01': { title: 'Sin Vercel, Cloudflare Pages ni OpenNext', source: 'decisiones 82, 85 y 87; architecture §11.3' },
   'G-B02': { title: 'proxy.ts, nunca middleware.ts ni Edge', source: 'decisiones 81 y 88; architecture §3.8' },
   'G-B03': { title: 'proxy.ts solo redirige', source: 'decisiones 58 y 81; architecture §8.2' },
@@ -48,6 +49,7 @@ const RULES = {
   'G-B10': { title: 'Archivos en R2 privado con URL prefirmada', source: 'decisión 55; CONTEXT §16; architecture §11.3' },
   'G-B11': { title: 'Cookies, tokens y CORS', source: 'decisión 58; CONTEXT §10; architecture §8.2' },
   'G-B12': { title: 'Entornos y planes coherentes', source: 'decisiones 82 y 86; architecture §11.1' },
+  'G-B13': { title: 'Ejecución segura de ffmpeg y validación R2', source: 'decisiones 55, 64 y 84; architecture §3.5 y §7.6' },
   'G-C01': { title: 'Identificadores en inglés', source: 'decisión 20; CONTEXT §16' },
   'G-C02': { title: 'Nota calculada en el servidor', source: 'decisiones 24 y 72; architecture §4.4' },
   'G-C03': { title: 'Timestamps del servidor y whitelist', source: 'decisión 37; architecture §4.4 y §5.2' },
@@ -59,6 +61,8 @@ const RULES = {
   'G-C09': { title: 'Tareas periódicas con ScheduledJobRun', source: 'decisiones 64 y 76; architecture §4.5' },
   'G-C10': { title: 'Sin datos personales en logs ni errores', source: 'CONTEXT §9; architecture §4.6 y §8.5' },
   'G-C11': { title: 'Secretos solo en variables de entorno', source: 'CONTEXT §10; architecture §8.1' },
+  'G-C12': { title: 'Tipado estricto y validación en dos niveles', source: 'decisión 20; architecture §4.2; SPEC-01 RF-1 y RF-13' },
+  'G-C13': { title: 'Higiene en dispositivos compartidos y enlaces seguros', source: 'decisiones 20 y 51; architecture §8.5 y §10.1' },
 };
 
 // ---------------------------------------------------------------- utilidades
@@ -299,6 +303,7 @@ const isPrisma = (p) => ext(p) === 'prisma';
 const isDto = (p) => /\.dto\.[cm]?ts$/.test(p);
 const isSharedApi = (p) => /^packages\/shared\/src\/api\//.test(p) && isCode(p);
 const isSharedActivity = (p) => /^packages\/shared\/src\/activities\//.test(p) && isCode(p);
+const isSharedSrc = (p) => p.startsWith('packages/shared/src/') && isCode(p);
 const isSeed = (p) => /(^|\/)seeds?(\/|[-.])|seed[-.]/i.test(p);
 const isMigrationSql = (p) => /(^|\/)migrations\/.+\.sql$/.test(p);
 const isExecutable = (p) =>
@@ -334,6 +339,12 @@ const LINE_RULES = [
     msg: 'SQL crudo sin organization_id visible; toda consulta de tenant filtra por organización',
   },
   {
+    id: 'G-A11', sev: 'AVISO', files: (p) => isApiSrc(p) && !isTest(p) && !isSeed(p),
+    re: /\b(?:this\.)?(?:prisma|tx|db|client|trx)\.(\w+)\.findUnique\(/,
+    skip: (line) => /\.(organization|user)\.findUnique\(/.test(line),
+    msg: 'findUnique sobre entidad de tenant; para prevenir IDOR usa findFirst con filtro de organization_id o clave compuesta con organization_id',
+  },
+  {
     id: 'G-A08', sev: 'ERROR', files: isPrisma, re: /@relation\([^)]*fields\s*:/,
     when: ({ lines, i }) => !/onDelete\s*:/.test(lines[i]),
     msg: 'relación sin onDelete explícito; usa el valor de la tabla de architecture §6.2',
@@ -367,6 +378,11 @@ const LINE_RULES = [
   { id: 'G-B11', sev: 'ERROR', files: (p) => isCode(p), re: /(localStorage|sessionStorage)\.setItem\(\s*[^,]*(token|jwt|session|auth|refresh)/i, msg: 'token en almacenamiento del navegador; los tokens viven solo en cookies httpOnly' },
   { id: 'G-B11', sev: 'ERROR', files: (p) => isApiSrc(p), re: /origin\s*:\s*(['"]\*['"]|true)\b|enableCors\(\s*\)/, msg: 'CORS abierto; allowlist explícita con credentials: true y validación de Origin' },
   { id: 'G-B11', sev: 'AVISO', files: (p) => isCode(p), re: /sameSite\s*:\s*['"]none['"]/i, msg: 'SameSite=None; la decisión es SameSite=Lax con Domain=.<dominio>' },
+  {
+    id: 'G-B13', sev: 'AVISO', files: (p) => isApiSrc(p) && !isTest(p),
+    re: /\bexec\(\s*`[^`]*ffmpeg/,
+    msg: 'ejecución de ffmpeg interpolando comandos en shell; usa array de argumentos con shell: false o fluent-ffmpeg',
+  },
 
   // C. Negocio, integridad y seguridad
   { id: 'G-C01', sev: 'AVISO', files: (p) => isCode(p) || isPrisma(p), re: /\b(const|let|var|function|class|interface|type|enum|model)\s+[\w$]*[áéíóúñÁÉÍÓÚÑü]/, msg: 'identificador con tildes o ñ; los identificadores van en inglés' },
@@ -427,6 +443,17 @@ const LINE_RULES = [
   },
   { id: 'G-C11', sev: 'ERROR', files: notDoc, re: /\bsk_live_[0-9a-zA-Z]{10,}|\bre_[A-Za-z0-9]{20,}\b|\bAKIA[0-9A-Z]{16}\b/, msg: 'clave con forma de secreto en el repositorio' },
   { id: 'G-C11', sev: 'ERROR', files: any, re: /\bNEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE|PASSWORD|DATABASE|R2_SECRET)/, msg: 'variable secreta con prefijo NEXT_PUBLIC_ (iría al bundle web)' },
+  {
+    id: 'G-C12', sev: 'ERROR',
+    files: (p) => (isApiSrc(p) || isWeb(p) || isSharedSrc(p)) && !isTest(p) && !isMigrationSql(p),
+    re: /\b(?:as\s+any\b|:\s*any\b|@ts-ignore|@ts-nocheck)/,
+    msg: 'uso de any, @ts-ignore o @ts-nocheck en código de runtime; usa tipado estricto, unknown o esquemas Zod',
+  },
+  {
+    id: 'G-C13', sev: 'AVISO', files: (p) => isWeb(p) && isCode(p) && !isTest(p),
+    re: /dangerouslySetInnerHTML/,
+    msg: 'uso de dangerouslySetInnerHTML; prohibido para renderizar consignas o feedback por riesgo de XSS',
+  },
 ];
 
 // ---------------------------------------------------------------- reglas de archivo

@@ -8,8 +8,8 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 1. `.agents/CONTEXT.md` — fuente única de verdad.
    - §2.4: lo que queda **fuera del piloto**.
-   - §14: registro de decisiones (1–80).
-   - §15: pendientes abiertos (P-1 a P-5).
+   - §14: registro de decisiones (1–92).
+   - §15: pendientes abiertos (cerrados para el piloto).
    - §16: **convenciones obligatorias para agentes**.
    - §17: **glosario** del dominio.
 2. `planning/architecture-overview.md` — arquitectura.
@@ -32,9 +32,15 @@ Si una skill pide crear un ADR o un término de glosario, añádelo en esas secc
 ## Reglas clave (resumen de CONTEXT.md §16)
 
 - Identificadores de código en inglés; documentación y textos de UI en español.
-- Toda consulta filtra por `organization_id`.
+- Tipado estricto sin `any`, `@ts-ignore`, `@ts-nocheck` ni aserciones ciegas (`as Type`). Contratos únicos en `packages/shared`.
+- Validación en dos niveles: `class-validator` para envoltura HTTP con `whitelist: true` (sin `forbidNonWhitelisted`); `Zod` en `packages/shared` para actividades.
+- Toda consulta filtra por `organization_id`. Prohibido `findUnique` por id en tablas de tenant sin validar `organization_id` (anti-IDOR); aislar `student_id` en peticiones de alumnos.
 - La nota se calcula siempre en el servidor, en escala 0.0–5.0.
 - Los timestamps los pone el servidor, nunca el cliente.
+- Frontend en Cloudflare Workers: Server Components (RSC) por defecto; TanStack Query para la API; jamás `'use cache'` en datos autenticados.
+- `proxy.ts` (nunca `middleware.ts`) solo redirige por rol; la autorización de negocio es exclusiva de NestJS.
+- Archivos en Cloudflare R2 con URLs prefirmadas validadas; transcodificación `ffmpeg` estructurada (`shell: false`) y cola serial (1 tarea en 512 MB).
+- Privacidad y seguridad: cero PII en logs y Sentry; sin `dangerouslySetInnerHTML`; limpiar IndexedDB y caché al hacer logout en tablets compartidas.
 - No reintroducir `Guardian`, `ConsentRecord` ni Supabase Storage (los archivos van a Cloudflare R2).
 - No construir nada de la lista fuera de alcance del piloto (§2.4).
 

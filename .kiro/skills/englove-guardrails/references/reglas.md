@@ -87,6 +87,13 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 - **Verificación:** Heurística — `AVISO` si `score` en `Attempt` no declara `@db.Decimal(2, 1)` o si hay migraciones sin ningún `CHECK` sobre `score`.
 - **Excepciones:** ninguna.
 
+### G-A11 — Prevención de IDOR y acceso a datos de tenant
+
+- **Regla:** toda consulta sobre modelos de tenant debe restringirse por `organization_id`. Prohibido usar `findUnique({ where: { id } })` sobre entidades de tenant sin incluir `organization_id` (usar `findFirst({ where: { id, organization_id } })` o claves compuestas con `organization_id`). En rutas y servicios de alumno (`role === 'student'`), toda consulta o mutación sobre `Attempt`, `MediaAsset` y `ProgressEvent` debe validar además que el registro pertenezca a su propio `student_id = currentUser.studentId` (aislamiento horizontal estricto). Las mutaciones concurrentes sobre `Attempt.payload` deben combinarse de forma atómica en PostgreSQL (`payload || $nuevas` o bajo `SELECT ... FOR UPDATE`), nunca mediante *read-modify-write* en memoria.
+- **Fuente:** decisiones 82 y 89; architecture §4.3, §6.2, §8.1 y §8.4; CONTEXT §16.
+- **Verificación:** Heurística — `AVISO` en llamadas a `findUnique` sobre entidades de tenant distintas de `User` y `Organization`. Revisión manual de la comprobación de `student_id` en controladores y servicios de alumno.
+- **Excepciones:** `findUnique` sobre `User.email` en login y auto-registro (el correo es globalmente único, decisión 59); `Organization.id`.
+
 ---
 
 ## B. Despliegue y hosting
@@ -113,10 +120,10 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 - **Revisión manual:** que ninguna decisión de acceso a datos dependa de que `proxy.ts` haya dejado pasar la petición.
 - **Excepciones:** decodificar (sin verificar) el claim de rol para elegir la redirección.
 
-### G-B04 — Caché explícita y nunca de datos autenticados
+### G-B04 — Caché explícita, composición RSC y nunca de datos autenticados
 
-- **Regla:** modelo de caché explícito de Next.js 16 con `use cache` y `cacheComponents: true`; React Compiler habilitado. Nada se cachea por defecto y ninguna respuesta autenticada se cachea.
-- **Fuente:** decisiones 81 y 88; architecture §3.8 y §10.2; CONTEXT §6 (Convenciones de Next.js 16).
+- **Regla:** modelo de caché explícito de Next.js 16 con `use cache` y `cacheComponents: true`; React Compiler habilitado. Server Components (RSC) por defecto en `page.tsx` y `layout.tsx`; componentes cliente (`"use client"`) reducidos a las hojas interactivas. Acceso a la API y mutaciones mediante TanStack Query contra `api.<dominio>`; no usar Server Actions como backend de negocio. Nada se cachea por defecto y ninguna respuesta autenticada se cachea jamás. Carga diferida de variantes de animación (`Kids`/`Teens`).
+- **Fuente:** decisiones 81 y 88; architecture §3.2, §3.8 y §10.2; CONTEXT §6 (Convenciones de Next.js 16).
 - **Verificación:** Heurística — `AVISO` si `next.config.*` no tiene `cacheComponents: true` o `reactCompiler: true`; `AVISO` por APIs de caché implícita (`unstable_cache`, `export const revalidate`, `force-static`); `ERROR` si un archivo con `'use cache'` lee `cookies()`, `headers()` o la sesión.
 - **Excepciones:** contenido público estático (por ejemplo, la página de Términos y Condiciones).
 
@@ -175,6 +182,13 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 - **Regla:** `staging` y la demo usan el combo gratuito y **no son aptos para clases reales**; `production` usa Workers Paid, Render Starter siempre activo y Neon Launch (scale-to-zero desactivado en horario de clase). Recursos y secretos separados por entorno.
 - **Fuente:** decisiones 82 (e)–(g) y 86; CONTEXT §6 (Entornos y costes); architecture §11.1.
 - **Verificación:** Heurística — `AVISO` si un servicio de `render.yaml` cuyo nombre contiene `prod` usa `plan: free`. El resto es **Manual**.
+- **Excepciones:** ninguna.
+
+### G-B13 — Ejecución segura de ffmpeg y validación de subidas a R2
+
+- **Regla:** la ejecución de `ffmpeg` y `ffprobe` debe realizarse siempre con array de argumentos y `shell: false` (o `fluent-ffmpeg`), sin concatenar ni interpolar comandos en shell. Los archivos temporales deben residir en `os.tmpdir()` con nombres UUID generados por el servidor y borrarse obligatoriamente en un bloque `finally`. La transcodificación mantiene concurrencia serial de 1 tarea a la vez (G-B09). Las subidas a R2 se limitan a 10 MB y tipos MIME permitidos (`audio/webm`, `audio/mp4`, `audio/ogg`) validados al firmar en `POST /media/upload-url`, y al procesar `complete` el backend debe verificar por `HEAD` contra R2 que el objeto existe y su tamaño real no excede el límite antes de descargarlo para transcodificación.
+- **Fuente:** decisiones 55, 64 y 84; architecture §3.5, §7.6 y §11.3.
+- **Verificación:** Heurística — `AVISO` por llamadas a `exec(` que contengan `ffmpeg` o `ffprobe`. Revisión manual de la limpieza en `finally` y de la comprobación `HEAD` en el servicio de media.
 - **Excepciones:** ninguna.
 
 ---
@@ -258,6 +272,20 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 - **Fuente:** CONTEXT §10; architecture §4.6 y §8.1; SPEC-01 §5.
 - **Verificación:** Automática — archivos `.env` versionados (salvo `.env.example`), claves privadas PEM, cadenas de conexión con contraseña, claves con forma de secreto (`sk_live_…`, `re_…` de Resend) y variables `NEXT_PUBLIC_*` con `SECRET`, `PRIVATE`, `PASSWORD`, `DATABASE` o `R2_SECRET`.
 - **Excepciones:** credenciales evidentes de desarrollo local en `docker-compose.yml` (por ejemplo, `postgres:postgres@localhost`).
+
+### G-C12 — Tipado estricto y validación en dos niveles
+
+- **Regla:** prohibido el uso de `any`, `@ts-ignore`, `@ts-nocheck` y aserciones inseguras (`as Type`) en código de producción; usar `unknown` junto con *type narrowing* (`typeof`, `in`, `instanceof`) o esquemas Zod (`schema.parse()` / `schema.safeParse()`). Validación en dos niveles estricta: `class-validator` valida exclusivamente la envoltura HTTP en `apps/api` (`ValidationPipe` global con `whitelist: true` y `transform: true`, sin `forbidNonWhitelisted: true` para ignorar campos desconocidos como timestamps según A71); `Zod` (`packages/shared`) valida exclusivamente la configuración y respuestas por tipo de actividad (`ZodValidationPipe`). Los tipos y contratos compartidos residen como fuente única en `packages/shared` y nunca se duplican entre aplicaciones.
+- **Fuente:** decisión 20; architecture §2, §4.2 (A5), §4.4 (A71) y §13; SPEC-01 RF-1 y RF-13; CONTEXT §16.
+- **Verificación:** Automática — `ERROR` por `as any`, `: any`, `@ts-ignore` o `@ts-nocheck` en archivos de código de runtime de `apps/` y `packages/shared/`.
+- **Excepciones:** archivos de prueba (`*.spec.ts`, `*.test.ts`, fixtures) o mocks explícitos.
+
+### G-C13 — Higiene en dispositivos compartidos, PWA y enlaces seguros
+
+- **Regla:** al cerrar sesión (`logout`) o cambiar de alumno en el cliente web, se debe vaciar obligatoriamente la caché de TanStack Query y las colecciones locales de IndexedDB (`pendingEvents`, `pendingUploads`) para evitar fuga de información entre alumnos que comparten la misma tablet o equipo. El Service Worker (Serwist) jamás debe cachear respuestas autenticadas de `/api/v1/*`. Toda URL externa en `ExternalResource` debe validar protocolo `https:` estricto (bloqueando `javascript:`, `data:`, `http:`) y abrirse con `rel="noopener noreferrer" target="_blank"`. Queda prohibido el uso de `dangerouslySetInnerHTML` para renderizar consignas pedagógicas, respuestas o comentarios de retroalimentación.
+- **Fuente:** decisiones 20 y 51; CONTEXT §5.2 y §9; architecture §7.6, §8.5, §10.1 y §10.2; SPEC-01 RF-15.
+- **Verificación:** Automática — `AVISO` por `dangerouslySetInnerHTML` en componentes de `apps/web`. Revisión manual para vaciado de IndexedDB/QueryClient en logout y validación de URLs en `ExternalResource`.
+- **Excepciones:** ninguna.
 
 ---
 

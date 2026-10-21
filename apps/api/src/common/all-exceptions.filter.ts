@@ -39,6 +39,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
           code = 'NOT_FOUND';
         } else if (statusCode === HttpStatus.BAD_REQUEST) {
           code = 'VALIDATION_ERROR';
+        } else if (statusCode === HttpStatus.UNAUTHORIZED) {
+          code = 'AUTH_UNAUTHORIZED';
+        } else if (statusCode === HttpStatus.FORBIDDEN) {
+          code = 'FORBIDDEN';
+        } else if (statusCode === HttpStatus.PAYLOAD_TOO_LARGE) {
+          code = 'PAYLOAD_TOO_LARGE';
+        } else if (statusCode === HttpStatus.TOO_MANY_REQUESTS) {
+          code = 'RATE_LIMITED';
+        } else if (statusCode === 423) {
+          code = 'AUTH_ACCOUNT_LOCKED';
+        }
+
+        if (typeof resObj.retryAfter === 'number' || typeof resObj.retryAfter === 'string') {
+          response.setHeader('Retry-After', String(resObj.retryAfter));
         }
 
         if (typeof resObj.message === 'string') {

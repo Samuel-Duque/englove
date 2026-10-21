@@ -27,6 +27,7 @@ const baseEnvSchema = z.object({
   NEXT_PUBLIC_API_URL: z.string().url('NEXT_PUBLIC_API_URL must be a valid URL'),
   MAIL_FROM: z.string().min(1, 'MAIL_FROM is required'),
   RESEND_API_KEY: z.string().optional().default(''),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').default('englove-dev-jwt-secret-min-32-chars-long-local-secret!'),
 });
 
 export type ValidatedEnv = z.infer<typeof baseEnvSchema>;

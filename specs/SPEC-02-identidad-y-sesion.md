@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Aprobada |
+| Estado | Implementada |
 | Etapa | 2 — Identidad y roles |
 | Tareas | ENG-020, ENG-021, ENG-023, ENG-024, ENG-025, ENG-026, ENG-027, ENG-028, ENG-029 |
 | Referencias | CONTEXT §2.4, §3–§4.1, §9–§12, §14–§17 · architecture §3.1–§3.2, §3.6, §3.8, §4.1–§4.3, §4.5–§4.6, §6.2–§6.5, §7.1–§7.4, §8, §13, §15 · pbp §2.1, §3, Etapas 1–3 y 5 · sdd-process §5–§9 |
@@ -260,3 +260,4 @@ SPEC-03 Aprobada es criterio de salida, no de inicio. Los insumos/evidencias ant
 | 2026-10-20 | Revisión semántica del borrador: logout caducado, segmento acotado y recuperación sin invalidación por terceros | Precisar casos límite sin adelantar implementación |
 | 2026-10-20 | Q-01/Q-02 Decididas por el líder (CONTEXT 93–94); integradas en RF, API y pruebas; fuentes superiores sincronizadas | Aceptación explícita de ambas propuestas |
 | 2026-10-20 | Borrador → En revisión → Aprobada por el líder; prerrequisitos operativos en §11 | Contrato listo, sin implementar ni certificar dependencias externas |
+| 2026-10-21 | Estado Aprobada → Implementada: implementación completa de ENG-020, ENG-021, ENG-023 a ENG-029 con conexión de PrismaService a la extensión de tenant, pruebas frontend (RF-17, RF-18, RF-20) y 108/108 tests unitarios/integración en monorepo (69 en API, 26 en web) | Ejecución de la implementación de SPEC-02 |

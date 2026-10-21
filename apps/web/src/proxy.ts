@@ -12,26 +12,45 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
-    pathname.includes('.')
+    /\.(?:ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot|webp|map|txt)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
 
   // Session cookie detection (with prefix convention, Decision 58)
-  const sessionCookie = request.cookies.get('englove_session') || request.cookies.get('access_token');
+  const cookiePrefix = process.env.COOKIE_PREFIX || 'englove_';
+  const sessionCookie =
+    request.cookies.get(`${cookiePrefix}access_token`) ||
+    request.cookies.get('access_token') ||
+    request.cookies.get('englove_access_token') ||
+    request.cookies.get('englove_session');
 
-  const isPublicRoute =
-    pathname === '/' ||
+  const isPublicAuthRoute =
     pathname.startsWith('/login') ||
     pathname.startsWith('/registro') ||
     pathname.startsWith('/recuperar-contrasena') ||
     pathname.startsWith('/restablecer');
 
-  // If unauthenticated and attempting private route, redirect to login
+  const isPublicRoute = pathname === '/' || isPublicAuthRoute;
+
+  // If unauthenticated and attempting private route, redirect to login with safe next parameter (RF-17)
   if (!sessionCookie && !isPublicRoute) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
+    if (
+      pathname.startsWith('/') &&
+      !pathname.startsWith('//') &&
+      !pathname.includes('\\') &&
+      !isPublicAuthRoute
+    ) {
+      const search = request.nextUrl.search || '';
+      loginUrl.searchParams.set('next', `${pathname}${search}`);
+    }
     return NextResponse.redirect(loginUrl);
+  }
+
+  // If authenticated and attempting public auth route, redirect to role destination or /inicio
+  if (sessionCookie && isPublicAuthRoute) {
+    return NextResponse.redirect(new URL('/inicio', request.url));
   }
 
   return NextResponse.next();

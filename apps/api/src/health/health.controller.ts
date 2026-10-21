@@ -2,11 +2,14 @@ import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { Public } from '../common/decorators/public.decorator';
+
 @ApiTags('Operations')
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Operational liveness and database connectivity check' })
   @ApiResponse({ status: 200, description: 'Service is operational' })

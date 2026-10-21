@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import * as express from 'express';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
@@ -13,6 +16,19 @@ async function bootstrap() {
   const appEnv = configService.get<string>('APP_ENV', 'local');
   const port = configService.get<number>('PORT', 3001);
   const webBaseUrl = configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
+
+  // Trust reverse proxy for single hop (Render) to reliably determine client IP (SPEC-02 §4)
+  const expressInstance = app.getHttpAdapter().getInstance() as express.Application;
+  expressInstance.set('trust proxy', 1);
+
+  // Security headers with Helmet (Rule G-C10, SPEC-02 RF-16)
+  app.use(helmet());
+
+  // Cookie parser for reading session cookies (Rule G-B11)
+  app.use(cookieParser());
+
+  // Body parser with 1 MB limit (Rule G-C10, Architecture §8.3)
+  app.use(express.json({ limit: '1mb' }));
 
   // Structured logging
   app.useLogger(app.get(Logger));

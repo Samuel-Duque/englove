@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { createTenantPrismaExtension } from '../common/tenant/tenant-prisma.extension';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -30,6 +31,25 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         },
       },
     });
+
+    const extended = this.$extends(createTenantPrismaExtension());
+    Object.defineProperties(extended, {
+      onModuleInit: {
+        value: async () => {
+          await (extended as PrismaClient).$connect();
+        },
+        writable: true,
+        configurable: true,
+      },
+      onModuleDestroy: {
+        value: async () => {
+          await (extended as PrismaClient).$disconnect();
+        },
+        writable: true,
+        configurable: true,
+      },
+    });
+    return extended as unknown as PrismaService;
   }
 
   async onModuleInit() {

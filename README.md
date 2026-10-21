@@ -108,7 +108,7 @@ pnpm dev
 
 Una vez iniciados los servicios, comprueba en tu navegador:
 
-- **Web Frontend:** [http://localhost:3000](http://localhost:3000) — Muestra *"Englove — Plataforma en preparación"*.
+- **Web Frontend:** [http://localhost:3000](http://localhost:3000) — Rutas públicas de autenticación (`/login`, `/registro`, `/recuperar-contrasena`, `/restablecer/[token]`) y contenedor `/inicio` autenticado.
 - **API Health Check:** [http://localhost:3001/health](http://localhost:3001/health) — Retorna `{"status":"ok"}` comprobando la conexión a PostgreSQL.
 - **Documentación Swagger / OpenAPI:** [http://localhost:3001/docs](http://localhost:3001/docs) — Interfaz Swagger de la API (habilitada en local y staging).
 
@@ -137,7 +137,7 @@ Una vez iniciados los servicios, comprueba en tu navegador:
 ```
 .agents/              # Contexto de negocio y especificaciones de agentes (CONTEXT.md)
 planning/             # Documentos de arquitectura y proceso SDD
-specs/                # Specs SDD: SPEC-01 Verificada; SPEC-02 Aprobada (sin implementar)
+specs/                # Specs SDD: SPEC-01 Verificada; SPEC-02 Implementada
 apps/
   web/                # Frontend Next.js 16.4 (React 19, Tailwind, Cloudflare Workers con vinext)
   api/                # Backend NestJS 11 (Prisma, PostgreSQL 18, ffmpeg)

@@ -1,11 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnvironment } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { MailModule } from './mail/mail.module';
+import { AuthModule } from './auth/auth.module';
+import { StudentsModule } from './students/students.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { OriginGuard } from './common/guards/origin.guard';
+import { RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
+import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
   imports: [
@@ -36,6 +45,31 @@ import { MailModule } from './mail/mail.module';
     HealthModule,
     FeatureFlagsModule,
     MailModule,
+    AuthModule,
+    StudentsModule,
+    MaintenanceModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: OriginGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimiterGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TenantInterceptor,
+    },
   ],
 })
 export class AppModule {}

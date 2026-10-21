@@ -209,20 +209,20 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 | Plantilla e índice de `specs/`       | Etapa 0            | Etapa 1                      | —                                                                         |
 | SPEC-01 Scaffold                     | Etapa 0            | Etapa 1                      | —                                                                         |
 | SPEC-02 Identidad y sesión           | Etapa 1            | Etapa 2                      | —                                                                         |
-| SPEC-03 Gestor de contenidos         | Etapa 2            | Etapa 3                      | P-4 (auditoría administrativa)                                            |
+| SPEC-03 Gestor de contenidos         | Etapa 2            | Etapa 3                      | ~~P-4~~ (cerrado, decisiones 84 y 92)                                     |
 | SPEC-04 Asignación                   | Etapa 3            | Etapa 4                      | —                                                                         |
-| SPEC-05 Portal e intentos            | Etapa 3–4          | Etapa 5                      | P-1 (inicio antes de `opens_at`), P-3 (recuperación de transcodificación) |
+| SPEC-05 Portal e intentos            | Etapa 3–4          | Etapa 5                      | ~~P-1~~, ~~P-3~~ (cerrados, decisión 84)                                  |
 | SPEC-06 Microjuegos                  | Etapa 5            | Etapa 6                      | —                                                                         |
-| SPEC-07 Revisión y feedback          | Etapa 5            | Etapa 7                      | P-2 (comentario en autocalificados)                                       |
+| SPEC-07 Revisión y feedback          | Etapa 5            | Etapa 7                      | ~~P-2~~ (cerrado, decisión 84)                                            |
 | SPEC-08 Estadísticas                 | Etapa 6–7          | Etapa 8                      | —                                                                         |
 | SPEC-09 PWA, offline y accesibilidad | Etapa 8            | Etapa 9                      | —                                                                         |
 | SPEC-10 Contenido extra              | Cualquier hueco    | Etapa 10                     | —                                                                         |
 
 **La aprobación es la compuerta de inicio (Decidido, CONTEXT §14, decisión 65).** "Debe estar Aprobada antes de" es literal: la Etapa 1 empieza cuando SPEC-01 está Aprobada, y la Etapa 2 cuando SPEC-02 está Aprobada y las dependencias técnicas de la Etapa 1 están entregadas. La Etapa 0 no corre en paralelo con las Etapas 1 y 2 en lo que respecta a esas dependencias; solo la preparación que no las bloquea (cuentas, dominio, repositorio, tokens de diseño, observación con niños) puede solaparse. Lo mismo vale para el resto: redactar la spec de la etapa N+1 durante la etapa N no autoriza a empezar su código.
 
-**Pendientes P-1 a P-5 cerrados (Decidido, decisión 84).** Los pendientes menores P-1 a P-4 de CONTEXT §15 fueron formalizados y confirmados por el líder del proyecto el 2026-10-10 (decisión 84). Las specs que los cubren ya no necesitan dejarlos en §11 como preguntas abiertas: pueden redactarse directamente con los valores decididos. P-5 (identidad multi-organización) queda diferido a la compuerta de Fase 2 y no pertenece a ninguna spec del piloto.
+**Pendientes P-1 a P-5 cerrados (Decidido, decisiones 84 y 92).** Los pendientes menores P-1 a P-4 de CONTEXT §15 fueron formalizados y confirmados por el líder del proyecto el 2026-10-10 (decisión 84, con P-4 actualizado por la decisión 92). Las specs que los cubren ya no necesitan dejarlos en §11 como preguntas abiertas: pueden redactarse directamente con los valores decididos. P-5 (identidad multi-organización) queda diferido a la compuerta de Fase 2 y no pertenece a ninguna spec del piloto.
 
-A 2026-10-20, SPEC-00 está Hecho y **SPEC-01 — Scaffold está Aprobada** formalmente por el líder del proyecto. Su aprobación supera la compuerta de inicio de la Etapa 1 (junto con ENG-001). El índice vigente está en [`specs/README.md`](../specs/README.md).
+A 2026-10-20, SPEC-00 está Hecho y **SPEC-01 — Scaffold está Implementada** tras completarse la Etapa 1 (ENG-010 a ENG-019). El índice vigente está en [`specs/README.md`](../specs/README.md).
 
 ---
 

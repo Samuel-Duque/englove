@@ -845,7 +845,7 @@ Al superar un límite la API responde `429 RATE_LIMITED` con `Retry-After`. Los 
 1. **Congela el denominador histórico (Decidido, decisiones 34 §14 y 73):** para cada `Assignment` a la que el alumno estaba obligado (grupos con membresía suya solapada con `[opens_at, due_at]`, vigente o pasada), si `historical_student_count` es `null` se fija con el número de alumnos obligados en ese momento (incluido el que se va a borrar). Si ya estaba fijado, no se toca.
 2. Marca los `MediaAsset` del alumno como `pending_delete`.
 3. Borra los objetos de R2 (raw y `_converted.mp4`).
-4. En una transacción borra `Attempt`, `Review`, `ProgressEvent`, `BadgeAward`, `GroupMembership` (vigente e históricas), `MediaAsset`, `AuthSession`, `PasswordResetToken`, `EmailChangeRequest`, los `AuditLog` cuyo `target_student_id` es el alumno (Decidido, decisión 84), `Student` y su `User`.
+4. En una transacción redacta los datos personales (`details`) de los `AuditLog` cuyo `target_student_id` es el alumno y los desvincula (`target_student_id = null`, `onDelete: SetNull`; Decidido, decisión 92: se conserva el evento técnico sin PII), y borra `Attempt`, `Review`, `ProgressEvent`, `BadgeAward`, `GroupMembership` (vigente e históricas), `MediaAsset`, `AuthSession`, `PasswordResetToken`, `EmailChangeRequest`, `Student` y su `User`.
 5. Si el paso 3 falla a mitad, el job nocturno reintenta los `pending_delete` y la transacción del paso 4 no se ejecuta hasta que el bucket quede limpio.
 
 El test de integración se escribe antes que el endpoint y comprueba que no queda ninguna fila ni objeto huérfano, y que el denominador congelado no cambia después del borrado. Las claves foráneas con `Cascade` de §6.2 son solo una red de seguridad: el orden (R2 primero, filas después) lo impone este servicio. La autorreferencia `Attempt.previous_attempt_id` es `NoAction`, así que el borrado conjunto de todos los intentos del alumno en una sentencia no falla.
@@ -1177,7 +1177,7 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
 | A79 | Neon sustituye a Supabase: `DATABASE_URL` por el pooler y `MIGRATION_DATABASE_URL` directa; `pg_dump` semanal a R2; estas dos variables sustituyen a la mención de Supabase/Prisma del scaffold | §11.3, §11.4, §12 |
 | A80 | `staging` y demo con planes gratuitos ($0); `production` con Cloudflare Workers Paid, Render Starter y Neon Launch (~$16–19/mes); cola de transcodificación serial en 512 MB; compuerta ENG-140 de siete comprobaciones | §11.1, §11.3, §11.5 |
 | A81 | `/health` y `/docs` fuera del prefijo `/api/v1`; `/docs` 404 en producción; `games.config` como ubicación canónica de los 4 parámetros organizacionales (decisión 83) | §6.4, §13 |
-| A82 | Cierre formal de P-1 a P-5: `ATTEMPT_NOT_OPEN`, feedback autocalificado opcional, transcode máx 3 intentos y fallback raw, AuditLog ligado a Student, y multi-org diferido a Fase 2 (decisión 84) | §3.5, §3.6, §4.5, §6.4, §7.5, §7.7 |
+| A82 | Cierre formal de P-1 a P-5: `ATTEMPT_NOT_OPEN`, feedback autocalificado opcional, transcode máx 3 intentos y fallback raw, `AuditLog` conservado con `target_student_id` en `SetNull` y `details` redactado al borrar al alumno (decisión 92, que actualiza P-4), y multi-org diferido a Fase 2 (decisiones 84 y 92) | §3.5, §3.6, §4.5, §6.4, §7.5, §7.7, §8.4 |
 | A83 | Adaptador de Cloudflare: `vinext` elegido (decisión 85, verificado en ENG-140) | §3.8 |
 
 ---
@@ -1191,7 +1191,7 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
   - **P-1 — Inicio antes de `opens_at`** (cierra SPEC-05): `409 ATTEMPT_NOT_OPEN` sin crear el intento, con la fecha de apertura en el mensaje (§3.6, §7.5).
   - **P-2 — Comentario en autocalificados** (cierra SPEC-07): obligatorio solo en revisión manual; opcional en fichas, exámenes y microjuegos (§7.7).
   - **P-3 — Recuperación de transcodificación** (cierra SPEC-05): máximo 3 intentos en total en `transcode_attempts`; al agotarlos, `transcode_failed_at` y fallback definitivo al raw; sin reconversión manual en el piloto (§3.5, §4.5).
-  - **P-4 — Auditoría administrativa** (cierra SPEC-03): `AuditLog` conservado mientras exista el alumno y borrado en su cascada; sin pantalla de consulta; acceso solo del equipo técnico a petición de la profesora (§6.4, §8.4).
+  - **P-4 — Auditoría administrativa** (cerrado por decisiones 84 y 92): `AuditLog` conserva el evento técnico al borrar al alumno desvinculando `target_student_id` (`onDelete: SetNull`) y redactando los correos de `details`; sin pantalla de consulta; acceso solo del equipo técnico a petición de la profesora (§6.4, §8.4).
   - **P-5 — Identidad multi-organización** (compuerta de Fase 2): una sola organización en el piloto; modelo de membresías postergado a la compuerta de Fase 2.
   - **Q-1 y Q-2 (scaffold):** excepción para `/health` y `/docs` en la raíz; configuración canónica en `games.config` con `enabled: false`.
 - Cerradas el 2026-10-10 (decisiones 81 y 82): versión del framework y convenciones de Next.js 16, hosting del frontend (Cloudflare) y motor SQL (Neon), con la compuerta ENG-140 como único condicionante.

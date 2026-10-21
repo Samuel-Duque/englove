@@ -224,7 +224,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Pantallas de login, registro, recuperación y restablecimiento de contraseña; redirección por rol.
 - **Endurecimiento HTTP y rate limiting (Decidido, decisión 34 §20):** helmet, CORS con allowlist, comprobación de `Origin` y la tabla de límites de architecture §8.3 (login 10 / 15 min por IP; signup 10 / hora por IP; forgot-password 5 / hora por IP y correo; 120 / min autenticado; 30 / min anónimo). Contadores en memoria, válidos solo con una instancia (decisión 64).
 - Pruebas de integración de auth, auto-registro, bloqueo, recuperación, cambio de correo, rate limiting y aislamiento de tenant.
-- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados, recordatorios y el cambio administrativo del correo con auditoría; cierra P-4, ya decidido (decisión 84)).
+- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados, recordatorios y el cambio administrativo del correo con auditoría; P-4 ya decidido, decisiones 84 y 92).
 
 **Fuera de alcance.** Pantallas de `parent` y `admin`; el enum existe (Decidido). Aprobación o rechazo de solicitudes desde el panel (necesita grupos, Etapa 3; aquí solo se construye la API sin interfaz). Acceso por código de aula, PIN o avatar: descartado (decisión 22). Alta directa por la profesora y contraseñas temporales: eliminadas (decisión 34 §1). Cualquier entidad de acudiente o de consentimiento: eliminadas (decisión 34 §1 y §2).
 
@@ -269,7 +269,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - CRUD de grupos (archivables) y membresías con **un solo grupo vigente por alumno** (decisión 73): cambio de grupo con `PUT /students/:id/group`, que cierra la membresía vigente y abre la nueva conservando el historial.
 - **Bandeja de solicitudes de registro (Decidido, CONTEXT §4.1, decisión 33):** interfaz sobre `GET /students/requests`, `POST /students/:id/approve` y `POST /students/:id/reject`, con asignación de nivel y un único grupo (`groupId`, decisión 73) y corrección de `guardian_name`, `guardian_contact` y `age_segment` al aprobar. Es la única vía de alta.
 - Gestión de alumnos: edición de nivel, segmento y datos del acudiente (solo la profesora), botón para enviar el enlace de recuperación de contraseña al alumno; **pestaña "Bloqueados"** con desbloqueo en un clic (Decidido, decisión 34 §8).
-- **Cambio administrativo del correo (Decidido, decisión 63):** `POST /students/:id/change-email` y acción "Cambiar correo de acceso" en la ficha del alumno, con diálogo de confirmación explícita; correo globalmente único, `AuditLog` en la misma transacción, invalidación de tokens pendientes, revocación de todas las sesiones del alumno y aviso `email-changed` al correo nuevo y al anterior (architecture §7.3). Retención y acceso a la auditoría: Decidido, decisión 84 (AuditLog ligado al alumno, borrado en cascada, sin pantalla de consulta).
+- **Cambio administrativo del correo (Decidido, decisión 63):** `POST /students/:id/change-email` y acción "Cambiar correo de acceso" en la ficha del alumno, con diálogo de confirmación explícita; correo globalmente único, `AuditLog` en la misma transacción, invalidación de tokens pendientes, revocación de todas las sesiones del alumno y aviso `email-changed` al correo nuevo y al anterior (architecture §7.3). Retención y acceso a la auditoría: Decidido, decisiones 84 y 92 (`AuditLog` sin pantalla de consulta; al borrar al alumno se conserva el evento técnico con `target_student_id` en `SetNull` y `details` redactado).
 - **Recordatorios del dashboard (Decidido, decisión 34 §8):** `GET /dashboard/reminders` y tarjetas de solicitudes pendientes y actividades sin calificar más de `ungraded_reminder_days` (esta segunda se llena con datos reales desde la Etapa 7).
 - Sesión cronometrada de onboarding: la profesora crea su primera actividad en menos de 10 minutos (CONTEXT §5.1).
 - Redacción de SPEC-04 y SPEC-05 en paralelo.
@@ -292,7 +292,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - El cambio administrativo del correo: rechaza un correo ya usado en cualquier organización (`EMAIL_TAKEN`), da 404 para un alumno de otra organización y 403 para un `student`; al aplicarse escribe exactamente un `AuditLog` con correo anterior y nuevo, revoca todas las sesiones del alumno (su refresh deja de funcionar), invalida sus tokens de recuperación pendientes y envía `email-changed` a ambos correos; ningún log de la aplicación contiene los correos (tests).
 - SPEC-04 Aprobada; SPEC-05 al menos En revisión.
 
-**Dependencias.** SPEC-03 Aprobada (P-4 cerrado, decisión 84). Etapa 2.
+**Dependencias.** SPEC-03 Aprobada (P-4 cerrado, decisiones 84 y 92). Etapa 2.
 
 **Riesgos.** Uso del cambio administrativo del correo como atajo habitual en lugar del flujo con OTP; mitigación: la acción está en la ficha, no en la lista, exige confirmación explícita y el manual de la profesora (DOC-06) explica cuándo usarla. Formularios de microjuego demasiado abstractos para la profesora; mitigación: plantillas de ejemplo por mecánica y texto de ayuda en cada campo. El editor de huecos es el componente más complejo de la etapa; mitigación: empezar con una sintaxis simple en texto (`[correcta|distractor|distractor]`) y sumar un editor visual solo si la profesora lo pide.
 
@@ -354,7 +354,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - `ProgressEvent` (con `attempt_id`, `payload` y `period_key`, decisión 71), motor de insignias con `BadgeRule` por organización y rachas semanales con el **algoritmo de 4 reglas** de architecture §9.3; seed de reglas iniciales (primera tarea, primer audio, 4/8/12 semanas, 5 años).
 - Vista de progreso personal: estrellas, insignias, rachas.
 - **Perfil del alumno** (`perfil/`): cambio de correo con OTP (API de la Etapa 2) y alternar Kids/Teens si `can_switch_interface`; **job mensual** que recalcula la edad y activa `can_switch_interface` a los 11 años (Decidido, decisión 34 §15).
-- Borrado en cascada de alumno, con el test escrito antes; congela `Assignment.historical_student_count` antes de borrar (decisión 34 §14).
+- Borrado en cascada de alumno, con el test escrito antes; congela `Assignment.historical_student_count` antes de borrar (decisión 34 §14) y conserva los `AuditLog` técnicos redactando sus `details` y desvinculando `target_student_id` (`SetNull`, decisión 92).
 - Texto a voz en consignas Kids; objetivos táctiles grandes.
 - Vista previa de actividad en el panel reutilizando el renderizador (cierra ENG-039, nacida en la Etapa 3).
 - E2E flujo 2: el alumno completa una actividad.
@@ -370,11 +370,11 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - El scorer de fill in the blanks tiene pruebas unitarias con casos límite: respuesta vacía, ítem faltante (puntaje 0, peso en el denominador), duplicados; la conversión a 0,0–5,0 tiene pruebas de redondeo y de rango.
 - Cada zona del portal respeta su techo de clics (revisión contra la tabla de architecture §3.1 en la spec).
 - Un segundo `POST /assignments/:id/attempts` del mismo alumno responde `ATTEMPT_ALREADY_EXISTS`, también cuando las dos peticiones llegan a la vez: solo se crea un intento (tests, incluido uno concurrente). Iniciar tras `due_at` responde `ATTEMPT_CLOSED`; iniciar exactamente en `due_at` es válido; un intento iniciado antes y completado 23 h después del cierre se califica normalmente; completarlo 25 h después responde `ATTEMPT_CLOSED` y el job nocturno lo marca `abandoned` (tests con reloj simulado).
-- Un DTO de `start`, `events` o `complete` con `startedAt` o `finishedAt` es rechazado por `forbidNonWhitelisted` (test).
+- Un DTO de `start`, `events` o `complete` con `startedAt` o `finishedAt` ignora los timestamps del cliente (`whitelist: true` sin `forbidNonWhitelisted`, según A71) y usa exclusivamente el reloj del servidor (test).
 - Un audio grabado con la red cortada a mitad de subida no se pierde: queda en IndexedDB y se puede reintentar manualmente.
 - Un audio de 1 s es rechazado con `AUDIO_IMPLAUSIBLE_DURATION`; uno que supera el máximo de la actividad, con `AUDIO_EXCEEDS_MAX_DURATION` (tests). Tras confirmar una subida, `converted_key` queda fijado y el raw desaparece de R2; si `ffmpeg` falla, `converted_key` es `null` y el raw sigue (tests). Si la API se reinicia con una conversión en cola, al arrancar la rutina de recuperación la retoma y termina sin duplicar objetos en R2; `transcode_attempts` refleja los intentos (test de integración).
 - El motor de rachas pasa los tests de las 4 reglas: racha 0 no consume perdón, perdón usado se recupera tras 2 semanas activas, no acumulación, dos inactivas rompen.
-- El test de borrado en cascada pasa, no deja objetos en R2 y el `historical_student_count` de las asignaciones cerradas del alumno queda fijado.
+- El test de borrado en cascada pasa, no deja objetos en R2, conserva los `AuditLog` desvinculados (`target_student_id = null`) con `details` redactado (decisión 92) y el `historical_student_count` de las asignaciones cerradas del alumno queda fijado.
 - El job mensual activa `can_switch_interface` a quien cumplió 11 años y no cambia `age_segment` (test con reloj simulado).
 - El E2E del flujo 2 pasa en CI.
 - SPEC-06 y SPEC-07 Aprobadas.

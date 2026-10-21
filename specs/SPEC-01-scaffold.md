@@ -117,7 +117,7 @@ Esquema y fixtures respetan las reglas enlazadas; sus consumidores no se impleme
 | Cinco tipos/cinco mecánicas; examen solo fill_blank, publicación/pesos/omisiones y speaking 2/120/300 s | architecture §4.4, §6.4; decisiones 45–47, 66 y 70 |
 | Eventos append-only; fixtures de racha cumplen las cuatro reglas y rendimiento usa último calificado | architecture §9.1–§9.3; decisiones 43, 71 y 76 |
 | Kids 7–10 sin alternancia; 11+ puede alternar sin cambio automático | CONTEXT §3; decisión 49 |
-| Retención 30/7 días; R2 y denominador congelado antes de cascada, no garantizados por FK; auditoría Propuesto P-4 | architecture §6.4, §8.4; decisiones 27, 48, 63 y 80 |
+| Retención 30/7 días; R2 y denominador congelado antes de cascada, no garantizados por FK; auditoría conservada con `SetNull` y `details` redactado | architecture §6.4, §8.4; decisiones 27, 48, 63, 80 y 92 |
 | Instancia única; idempotencia y registro persistente de jobs, sin ejecutarlos | architecture §4.5; decisiones 64 y 76 |
 
 ## 5. Contrato de API
@@ -150,7 +150,7 @@ Secretos JWT y allowlist: SPEC-02, sin autenticación simulada.
 
 ### Servicio interno de configuración
 
-Sin ruta pública en esta etapa. Contrato preparado para `GET /api/v1/feature-flags` autenticado en SPEC-02: `{ flags: { games: boolean, extra_content: boolean }, config: { passing_score: number, retention_days: number, pending_upload_ttl_days: number, ungraded_reminder_days: number } }`. Tenant confiable, nunca recibido del cuerpo del cliente. `passing_score` entre 0 y 5; plazos enteros positivos. Valores iniciales 3.0/30/7/3. Persistencia **Propuesto**, Q-2; no se trasladan a columnas de `Organization`.
+Sin ruta pública en esta etapa. Contrato preparado para `GET /api/v1/feature-flags` autenticado en SPEC-02: `{ flags: { games: boolean, extra_content: boolean }, config: { passing_score: number, retention_days: number, pending_upload_ttl_days: number, ungraded_reminder_days: number } }`. Tenant confiable, nunca recibido del cuerpo del cliente. `passing_score` entre 0 y 5; plazos enteros positivos. Valores iniciales 3.0/30/7/3. Persistencia **Decidido** (decisión 83, cierra Q-2): en `games.config`; no se trasladan a columnas de `Organization`.
 
 ### Servicio interno de correo
 
@@ -234,8 +234,8 @@ Nombres trazables para implementar después de la aprobación; esta redacción n
 | RF-4 | Integración HTTP | `RF-4: health verifica Postgres y docs genera OpenAPI`; incluye timeout/503 |
 | RF-5 | Integración | `RF-5: filtro y pino eliminan PII y errores internos`; inyectar valores centinela |
 | RF-6 | Smoke contenedor | `RF-6: imagen final arranca y contiene ffmpeg y ffprobe` |
-| RF-7 | Integración PG16 | `RF-7: migración vacía contiene inventario, tipos y enums completos`; inspeccionar catálogo |
-| RF-8 | Integración PG16 | `RF-8: onDelete explícito en Prisma y catálogo compatible`; duplicados, notas -0.1/5.1/0/5, cadena de intentos y Restrict |
+| RF-7 | Integración PG18 | `RF-7: migración vacía contiene inventario, tipos y enums completos`; inspeccionar catálogo |
+| RF-8 | Integración PG18 | `RF-8: onDelete explícito en Prisma y catálogo compatible`; duplicados, notas -0.1/5.1/0/5, cadena de intentos y Restrict |
 | RF-9 | Integración Prisma | `RF-9: answer_key se omite en lecturas directas y anidadas de tres detalles` |
 | RF-10 | Integración | `RF-10: seed mínimo crea solo organización, profesora y configuración` |
 | RF-11 | Integración | `RF-11: seed operativo cumple cobertura y reglas de fixtures` |
@@ -258,7 +258,7 @@ SPEC-06 revisará la excepción de clave de microjuegos (architecture §5.3) fre
 
 ## 11. Preguntas abiertas
 
-No hay P-n asignados a SPEC-01 (P-1 a P-4 quedaron ratificados y cerrados por la decisión 84). Todas las preguntas propias (Q-1, Q-2 y Q-4) han sido cerradas (decisiones 83 y 85). No quedan preguntas abiertas ni dependencias bloqueantes para SPEC-01.
+No hay P-n asignados a SPEC-01 (P-1 a P-4 quedaron cerrados por las decisiones 84 y 92). Todas las preguntas propias (Q-1, Q-2 y Q-4) han sido cerradas (decisiones 83 y 85). No quedan preguntas abiertas ni dependencias bloqueantes para SPEC-01.
 
 | # | Pregunta / propuesta vigente | Responsable | Fecha límite | Bloquea |
 | --- | --- | --- | --- | --- |
@@ -268,7 +268,7 @@ No hay P-n asignados a SPEC-01 (P-1 a P-4 quedaron ratificados y cerrados por la
 | P-1 | Inicio antes de apertura. **Cerrada (Decidido, decisión 84):** `409 ATTEMPT_NOT_OPEN`, no crear intento y mostrar fecha de apertura (CONTEXT §14). El mapa funcional lo completa SPEC-05. | Líder del proyecto | 2026-10-10 | No |
 | P-2 | Comentario autocalificados. **Cerrada (Decidido, decisión 84):** obligatorio solo en revisión manual, opcional en autocalificados. Comentario nullable permite ambos en el esquema; SPEC-07 adapta fixtures/validación. | Líder del proyecto | 2026-10-10 | No |
 | P-3 | Transcodificación. **Cerrada (Decidido, decisión 84):** máximo 3 intentos totales persistidos; fallo definitivo y raw como fallback, sin reconversión manual. Scaffold crea campos; SPEC-05 completa rutina. | Líder del proyecto | 2026-10-10 | No |
-| P-4 | Auditoría. **Cerrada (Decidido, decisión 84):** conservar mientras exista alumno, borrar en cascada (`onDelete: Cascade` en FK a `Student`), sin pantalla, consulta técnica a petición de profesora, nunca logs. | Líder del proyecto | 2026-10-10 | No |
+| P-4 | Auditoría. **Cerrada (Decidido, decisiones 84 y 92):** conservar el evento técnico tras borrar al alumno (`onDelete: SetNull` en `target_student_id` y redacción de correos en `details`), sin pantalla, consulta técnica a petición de profesora, nunca logs. | Líder del proyecto | 2026-10-19 | No |
 | Q-3 | Valores de duración por tipo y catálogo `STICKERS` sin valores concretos en planeación. **Propuesto:** duraciones nullable y stickers vacíos en fixtures iniciales; fijar defaults/catálogo en SPEC-03/SPEC-07 antes de sus consumidores, no inventarlos aquí. | Líder del proyecto | Antes de aprobar specs consumidoras | No |
 
 Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: enlaces al log local (architecture §7.4/§11.1) frente a prohibición de tokens/PII (CONTEXT §9 y architecture §8.5): manda privacidad, RF-16; E2E de `main` (architecture §11.2) se incorporan al cerrar los flujos según sdd-process §8/pbp §1.4. ENG-016 depende de ENG-012 para empezar, pero verificar sus seeds requiere ENG-013. Grupos de rutas con `/inicio` duplicado se resuelven antes de crear páginas funcionales, no en scaffold.
@@ -284,3 +284,4 @@ Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: en
 | 2026-10-10 | Cierre de Q-4 con PoC ENG-140 en verde (7/7 comprobaciones, informe planning/poc-eng-140-informe.md, decisión 85: vinext). Sin preguntas bloqueantes restantes; pasa a En revisión | PoC ENG-140 finalizado exitosamente (Decisión 85) |
 | 2026-10-20 | Aprobación formal de la spec por el líder del proyecto tras verificar estructura, compuertas y PoC ENG-140 | Pasa a estado Aprobada; desbloquea la compuerta de inicio de la Etapa 1 (scaffold) |
 | 2026-10-20 | Implementación completa de SPEC-01 Scaffold (ENG-010 a ENG-019, RF-1 a RF-19): monorepo, web, api, shared, Prisma, migraciones, seeds, docker-compose, render.yaml, CI y pruebas | Pasa a estado Implementada tras verificar suites de pruebas y guardrails |
+| 2026-10-20 | Limpieza de referencias residuales en §4, §5, §9 y §11: P-4 alineado con la decisión 92 (`onDelete: SetNull` y redacción de `details`), Q-2 marcada como Decidida (decisión 83) y PG18 en tabla de pruebas | Sincronización documental con las decisiones 83, 88 y 92 |

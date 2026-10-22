@@ -85,6 +85,16 @@ export class AssignmentsService {
       // Sort group IDs deterministically to prevent deadlocks across concurrent multi-group batches
       const sortedGroupIds = [...dto.groupIds].sort();
 
+      // Transaction-scoped advisory locks per (tenant, activity, group) in deterministic order
+      // to guarantee serialization and prevent race conditions on active duplicate check (SPEC-04 §6, Decision 99).
+      // Uses a 64-bit uniform integer hash derived from md5 to eliminate collision risks.
+      for (const grpId of sortedGroupIds) {
+        if ('$executeRaw' in tx && typeof tx.$executeRaw === 'function') {
+          const lockKey = `assign:${organizationId}:${dto.activityId}:${grpId}`;
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(('x' || substr(md5(${lockKey}), 1, 16))::bit(64)::bigint)`;
+        }
+      }
+
       const groups = await tx.group.findMany({
         where: {
           id: { in: sortedGroupIds },
@@ -436,25 +446,16 @@ export class AssignmentsService {
     if (!cancelledAt) {
       const now = new Date();
       // Atomic conditional update scoped to organizationId to enforce multi-tenant isolation
-      if (typeof this.prisma.assignment.updateMany === 'function') {
-        await this.prisma.assignment.updateMany({
-          where: {
-            id: row.id,
-            organization_id: organizationId,
-            cancelled_at: null,
-          },
-          data: {
-            cancelled_at: now,
-          },
-        });
-      } else {
-        await this.prisma.assignment.update({
-          where: { id: row.id },
-          data: {
-            cancelled_at: now,
-          },
-        });
-      }
+      await this.prisma.assignment.updateMany({
+        where: {
+          id: row.id,
+          organization_id: organizationId,
+          cancelled_at: null,
+        },
+        data: {
+          cancelled_at: now,
+        },
+      });
 
       const reloaded = await this.prisma.assignment.findFirst({
         where: {

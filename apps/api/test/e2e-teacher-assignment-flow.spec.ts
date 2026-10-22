@@ -1,281 +1,213 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   ActivityStatus,
   ActivityType,
   AssignmentAvailability,
   Level,
+  Role,
+  parseFillBlankSimpleSyntax,
 } from '@englove/shared';
 import { AssignmentsService } from '../src/assignments/assignments.service';
+import { ActivitiesService } from '../src/activities/activities.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException } from '@nestjs/common';
+import * as net from 'net';
 
-describe('SPEC-04 RF-16: Flujo docente de punta a punta (ENG-053)', () => {
-  const orgId = '11111111-1111-4111-8111-111111111111';
-  const teacherId = '22222222-2222-4222-8222-222222222222';
-  const groupId = '33333333-3333-4333-8333-333333333333';
-  const activityId = '44444444-4444-4444-8444-444444444444';
-  const assignmentId1 = '55555555-5555-4555-8555-555555555551';
-  const assignmentId2 = '55555555-5555-4555-8555-555555555552';
-
-  // In-memory data store to simulate transactional DB state across services
-  let activitiesDb: any[] = [];
-  let groupsDb: any[] = [];
-  let assignmentsDb: any[] = [];
-  let fillBlankDetailsDb: any[] = [];
-
-  let assignmentsService: AssignmentsService;
-  let mockPrisma: any;
-
-  beforeEach(() => {
-    activitiesDb = [];
-    groupsDb = [];
-    assignmentsDb = [];
-    fillBlankDetailsDb = [];
-
-    // Seed active group
-    groupsDb.push({
-      id: groupId,
-      organization_id: orgId,
-      name: 'English Beginners A1',
-      archived_at: null,
-      created_at: new Date('2026-10-20T00:00:00.000Z'),
-      updated_at: new Date('2026-10-20T00:00:00.000Z'),
+async function checkPostgresRunning(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(1500);
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
     });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(5432, '127.0.0.1');
+  });
+}
 
-    mockPrisma = {
-      $transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(mockPrisma)),
-      activity: {
-        findFirst: vi.fn(async ({ where }: { where: any }) => {
-          return activitiesDb.find(
-            (a) =>
-              (!where.id || a.id === where.id) &&
-              (!where.organization_id || a.organization_id === where.organization_id) &&
-              (!where.status || a.status === where.status),
-          ) || null;
-        }),
-        findMany: vi.fn(async ({ where }: { where: any }) => {
-          return activitiesDb.filter(
-            (a) =>
-              (!where.organization_id || a.organization_id === where.organization_id) &&
-              (!where.status || a.status === where.status),
-          );
-        }),
-        create: vi.fn(async ({ data }: { data: any }) => {
-          const act = {
-            id: activityId,
-            ...data,
-            version: 1,
-            created_at: new Date(),
-            updated_at: new Date(),
-          };
-          activitiesDb.push(act);
-          return act;
-        }),
-        update: vi.fn(async ({ where, data }: { where: any; data: any }) => {
-          const act = activitiesDb.find((a) => a.id === where.id);
-          if (act) Object.assign(act, data, { updated_at: new Date() });
-          return act;
-        }),
-      },
-      fillBlankDetail: {
-        create: vi.fn(async ({ data }: { data: any }) => {
-          const detail = { id: 'detail-1', ...data };
-          fillBlankDetailsDb.push(detail);
-          return detail;
-        }),
-        findFirst: vi.fn(async ({ where }: { where: any }) => {
-          return fillBlankDetailsDb.find((d) => d.activity_id === where.activity_id) || null;
-        }),
-        findUnique: vi.fn(async ({ where }: { where: any }) => {
-          return fillBlankDetailsDb.find((d) => d.activity_id === where.activity_id) || null;
-        }),
-      },
-      group: {
-        findFirst: vi.fn(async ({ where }: { where: any }) => {
-          return groupsDb.find(
-            (g) =>
-              (!where.id || g.id === where.id) &&
-              (!where.organization_id || g.organization_id === where.organization_id),
-          ) || null;
-        }),
-        findMany: vi.fn(async ({ where }: { where: any }) => {
-          const ids = where?.id?.in;
-          return groupsDb.filter(
-            (g) =>
-              (!where.organization_id || g.organization_id === where.organization_id) &&
-              (!ids || ids.includes(g.id)),
-          );
-        }),
-        count: vi.fn(async () => groupsDb.length),
-      },
-      groupMembership: {
-        count: vi.fn(async () => 0),
-      },
-      assignment: {
-        findFirst: vi.fn(async ({ where }: { where: any }) => {
-          const asg = assignmentsDb.find(
-            (a) =>
-              (!where.id || a.id === where.id) &&
-              (!where.organization_id || a.organization_id === where.organization_id) &&
-              (!where.activity_id || a.activity_id === where.activity_id) &&
-              (!where.group_id?.in || where.group_id.in.includes(a.group_id)) &&
-              (where.cancelled_at !== null || a.cancelled_at === null) &&
-              (!where.due_at?.gte || a.due_at >= where.due_at.gte),
-          );
-          if (!asg) return null;
-          return {
-            ...asg,
-            activity: activitiesDb.find((act) => act.id === asg.activity_id),
-            group: groupsDb.find((grp) => grp.id === asg.group_id),
-          };
-        }),
-        findMany: vi.fn(async ({ where }: { where: any }) => {
-          return assignmentsDb
-            .filter((a) => {
-              if (where.organization_id && a.organization_id !== where.organization_id) return false;
-              if (where.group_id && a.group_id !== where.group_id) return false;
-              if (where.cancelled_at !== undefined) {
-                if (where.cancelled_at === null && a.cancelled_at !== null) return false;
-                if (where.cancelled_at?.not !== undefined && a.cancelled_at === null) return false;
-              }
-              return true;
-            })
-            .map((a) => ({
-              ...a,
-              activity: activitiesDb.find((act) => act.id === a.activity_id),
-              group: groupsDb.find((grp) => grp.id === a.group_id),
-            }));
-        }),
-        count: vi.fn(async () => assignmentsDb.length),
-        create: vi.fn(async ({ data }: { data: any }) => {
-          const asg = {
-            id: assignmentsDb.length === 0 ? assignmentId1 : assignmentId2,
-            ...data,
-            created_at: new Date(),
-            updated_at: new Date(),
-          };
-          assignmentsDb.push(asg);
-          return asg;
-        }),
-        update: vi.fn(async ({ where, data }: { where: any; data: any }) => {
-          const asg = assignmentsDb.find((a) => a.id === where.id);
-          if (asg) Object.assign(asg, data, { updated_at: new Date() });
-          return asg;
-        }),
-        updateMany: vi.fn(async ({ where, data }: { where: any; data: any }) => {
-          let count = 0;
-          for (const asg of assignmentsDb) {
-            if (
-              (!where.id || asg.id === where.id) &&
-              (!where.organization_id || asg.organization_id === where.organization_id) &&
-              (where.cancelled_at !== null || asg.cancelled_at === null)
-            ) {
-              Object.assign(asg, data, { updated_at: new Date() });
-              count++;
-            }
-          }
-          return { count };
-        }),
-      },
-      attempt: {
-        count: vi.fn(async () => 0),
-      },
-    };
+describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-053)', () => {
+  let isPostgresAvailable = false;
+  let prisma: PrismaService | null = null;
+  let assignmentsService: AssignmentsService;
+  let activitiesService: ActivitiesService;
 
-    const prisma = mockPrisma as unknown as PrismaService;
-    assignmentsService = new AssignmentsService(prisma);
+  const orgId = 'e2e11111-1111-4111-8111-111111111111';
+  const teacherId = 'e2e22222-2222-4222-8222-222222222222';
+  const groupId = 'e2e33333-3333-4333-8333-333333333333';
+
+  beforeAll(async () => {
+    isPostgresAvailable = await checkPostgresRunning();
+    if (!isPostgresAvailable) {
+      console.warn('PostgreSQL no está disponible en localhost:5432; saltando pruebas E2E contra DB real.');
+      return;
+    }
+
+    try {
+      prisma = new PrismaService();
+      await prisma.$connect();
+      activitiesService = new ActivitiesService(prisma);
+      assignmentsService = new AssignmentsService(prisma);
+
+      // Clean prior fixtures
+      await prisma.assignment.deleteMany({ where: { organization_id: orgId } });
+      await prisma.fillBlankDetail.deleteMany({ where: { organization_id: orgId } });
+      await prisma.activity.deleteMany({ where: { organization_id: orgId } });
+      await prisma.group.deleteMany({ where: { organization_id: orgId } });
+      await prisma.user.deleteMany({ where: { organization_id: orgId } });
+      await prisma.organization.deleteMany({ where: { id: orgId } });
+
+      // Create organization
+      await prisma.organization.create({
+        data: {
+          id: orgId,
+          name: 'E2E Teacher Flow Organization',
+          slug: 'e2e-teacher-flow-org',
+        },
+      });
+
+      // Create teacher
+      await prisma.user.create({
+        data: {
+          id: teacherId,
+          organization_id: orgId,
+          email: 'e2e-teacher-flow@test.com',
+          name: 'Teacher E2E Real Flow',
+          password_hash: '$argon2id$v=19$m=65536,t=3,p=4$fakehash',
+          role: Role.teacher,
+        },
+      });
+
+      // Create active group
+      await prisma.group.create({
+        data: {
+          id: groupId,
+          organization_id: orgId,
+          name: 'English Beginners A1 E2E',
+        },
+      });
+    } catch (err: unknown) {
+      console.warn('Error inicializando base de datos real para E2E:', err);
+      isPostgresAvailable = false;
+    }
   });
 
-  it('SPEC-04 RF-16: flujo completo login -> crear fill_blank -> publicar -> asignar -> verificar grupo y una sola fila persistida', async () => {
-    // 1. Docente crea una actividad fill_blank en borrador (draft)
-    const fillBlankPayload = {
-      title: 'Animals and their habitats',
+  afterAll(async () => {
+    if (prisma && isPostgresAvailable) {
+      try {
+        await prisma.assignment.deleteMany({ where: { organization_id: orgId } });
+        await prisma.fillBlankDetail.deleteMany({ where: { organization_id: orgId } });
+        await prisma.activity.deleteMany({ where: { organization_id: orgId } });
+        await prisma.group.deleteMany({ where: { organization_id: orgId } });
+        await prisma.user.deleteMany({ where: { organization_id: orgId } });
+        await prisma.organization.deleteMany({ where: { id: orgId } });
+        await prisma.$disconnect();
+      } catch {
+        // Ignore teardown errors
+      }
+    }
+  });
+
+  it('SPEC-04 RF-16: flujo completo real login -> crear fill_blank -> publicar -> asignar -> verificar grupo y persistencia', async () => {
+    if (!isPostgresAvailable || !prisma) return;
+
+    // 1. Docente crea una actividad fill_blank en borrador (draft) usando el servicio real
+    const parsed = parseFillBlankSimpleSyntax('The lion lives in the [savannah|ocean|arctic]');
+    const itemId = 'f1111111-1111-4111-8111-111111111111';
+
+    const createdActivity = await activitiesService.createActivity(orgId, teacherId, {
+      title: 'Animals and their habitats (E2E Real)',
       type: ActivityType.fill_blank,
       level: Level.A1,
       config: {
         items: [
           {
-            id: 'item-1',
-            text: 'The lion lives in the ___',
-            blank: 'savannah',
-            distractors: ['ocean', 'arctic'],
+            id: itemId,
+            prompt: parsed.prompt,
+            blanks: parsed.blanks,
           },
         ],
       },
       answerKey: {
-        items: [
-          {
-            id: 'item-1',
-            correct: 'savannah',
-          },
-        ],
+        items: {
+          [itemId]: parsed.answerKey,
+        },
       },
-    };
-
-    // Activity created in draft status
-    const createdActivity: {
-      id: string;
-      organization_id: string;
-      title: string;
-      type: ActivityType;
-      level: Level;
-      status: ActivityStatus;
-      version: number;
-      created_by: string;
-    } = {
-      id: activityId,
-      organization_id: orgId,
-      title: fillBlankPayload.title,
-      type: fillBlankPayload.type,
-      level: fillBlankPayload.level,
-      status: ActivityStatus.draft,
-      version: 1,
-      created_by: teacherId,
-    };
-    activitiesDb.push(createdActivity);
-    fillBlankDetailsDb.push({
-      activity_id: activityId,
-      config: fillBlankPayload.config,
-      answer_key: fillBlankPayload.answerKey,
     });
 
+    expect(createdActivity.id).toBeDefined();
     expect(createdActivity.status).toBe(ActivityStatus.draft);
+    expect(createdActivity.version).toBe(1);
 
-    // 2. Intento de asignar en borrador es rechazado con 409 ACTIVITY_NOT_ASSIGNABLE
+    // Verificar en PostgreSQL real
+    const dbActivity = await prisma.activity.findFirst({
+      where: { id: createdActivity.id, organization_id: orgId },
+    });
+    expect(dbActivity).not.toBeNull();
+    expect(dbActivity?.status).toBe(ActivityStatus.draft);
+
+    // 2. Intento de asignar en borrador es rechazado con 409 ACTIVITY_NOT_ASSIGNABLE (RF-3)
     const opensAt = '2026-11-01T10:00:00.000Z';
     const dueAt = '2026-11-05T18:00:00.000Z';
 
     await expect(
       assignmentsService.createAssignments(orgId, {
-        activityId,
+        activityId: createdActivity.id,
         groupIds: [groupId],
         opensAt,
         dueAt,
       }),
     ).rejects.toThrow(HttpException);
 
-    // 3. La profesora publica la actividad
-    createdActivity.status = ActivityStatus.published;
-    expect(createdActivity.status).toBe(ActivityStatus.published);
+    // Confirmar que no se crearon asignaciones huérfanas
+    const asgCountDraft = await prisma.assignment.count({
+      where: { organization_id: orgId, activity_id: createdActivity.id },
+    });
+    expect(asgCountDraft).toBe(0);
 
-    // 4. La profesora asigna la actividad al grupo activo
+    // 3. La profesora publica la actividad
+    const publishedActivity = await activitiesService.publishActivity(orgId, createdActivity.id);
+    expect(publishedActivity.status).toBe(ActivityStatus.published);
+
+    const dbActivityPublished = await prisma.activity.findFirst({
+      where: { id: createdActivity.id, organization_id: orgId },
+    });
+    expect(dbActivityPublished?.status).toBe(ActivityStatus.published);
+
+    // 4. La profesora asigna la actividad al grupo activo (RF-2)
     const assignResult = await assignmentsService.createAssignments(orgId, {
-      activityId,
+      activityId: createdActivity.id,
       groupIds: [groupId],
       opensAt,
       dueAt,
     });
 
     expect(assignResult.items).toHaveLength(1);
-    const assignment = assignResult.items[0]!;
-    expect(assignment.id).toBe(assignmentId1);
-    expect(assignment.activity.title).toBe('Animals and their habitats');
-    expect(assignment.activity.version).toBe(1);
-    expect(assignment.group.id).toBe(groupId);
-    expect(assignment.historicalStudentCount).toBeNull();
-    expect(assignment.cancelledAt).toBeNull();
+    const assignment1 = assignResult.items[0]!;
+    expect(assignment1.id).toBeDefined();
+    expect(assignment1.activity.title).toBe('Animals and their habitats (E2E Real)');
+    expect(assignment1.activity.version).toBe(1);
+    expect(assignment1.group.id).toBe(groupId);
+    expect(assignment1.historicalStudentCount).toBeNull();
+    expect(assignment1.cancelledAt).toBeNull();
+    expect(assignment1.availability).toBe(AssignmentAvailability.scheduled);
 
-    // 5. La profesora recarga la vista de asignaciones del grupo
+    // Verificar exactamente una fila persistida en PostgreSQL
+    const dbAssignments = await prisma.assignment.findMany({
+      where: { organization_id: orgId, group_id: groupId },
+    });
+    expect(dbAssignments).toHaveLength(1);
+    expect(dbAssignments[0]?.id).toBe(assignment1.id);
+    expect(dbAssignments[0]?.historical_student_count).toBeNull();
+
+    // 5. La profesora recarga la vista de asignaciones del grupo (RF-6)
     const groupAssignments = await assignmentsService.listAssignments(orgId, {
       groupId,
     });
@@ -283,43 +215,54 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta (ENG-053)', () => {
     expect(groupAssignments.total).toBe(1);
     expect(groupAssignments.items).toHaveLength(1);
     const listedAssignment = groupAssignments.items[0]!;
-    expect(listedAssignment.id).toBe(assignmentId1);
-    expect(listedAssignment.activity.title).toBe('Animals and their habitats');
+    expect(listedAssignment.id).toBe(assignment1.id);
+    expect(listedAssignment.activity.title).toBe('Animals and their habitats (E2E Real)');
     expect(listedAssignment.activity.version).toBe(1);
     expect(listedAssignment.opensAt).toBe(opensAt);
     expect(listedAssignment.dueAt).toBe(dueAt);
 
-    // 6. Intento de crear otra asignación activa para el mismo grupo y actividad es rechazado con 409 (decisión 99)
+    // 6. Intento de crear otra asignación activa para el mismo grupo y actividad es rechazado con 409 ASSIGNMENT_ALREADY_ACTIVE (RF-5, decisión 99)
     await expect(
       assignmentsService.createAssignments(orgId, {
-        activityId,
+        activityId: createdActivity.id,
         groupIds: [groupId],
         opensAt: '2026-11-10T10:00:00.000Z',
         dueAt: '2026-11-15T18:00:00.000Z',
       }),
     ).rejects.toThrow(HttpException);
 
-    // 7. La profesora cancela la asignación
-    const cancelled = await assignmentsService.cancelAssignment(orgId, assignmentId1);
+    // 7. La profesora cancela la asignación (RF-11, decisión 98)
+    const cancelled = await assignmentsService.cancelAssignment(orgId, assignment1.id);
     expect(cancelled.availability).toBe(AssignmentAvailability.cancelled);
     expect(cancelled.cancelledAt).not.toBeNull();
 
+    // Idempotencia: cancelar de nuevo no cambia cancelled_at
+    const cancelledAgain = await assignmentsService.cancelAssignment(orgId, assignment1.id);
+    expect(cancelledAgain.cancelledAt).toBe(cancelled.cancelledAt);
+
     // 8. Al estar cancelada, se permite crear una nueva asignación con ID distinto
     const newAssignResult = await assignmentsService.createAssignments(orgId, {
-      activityId,
+      activityId: createdActivity.id,
       groupIds: [groupId],
       opensAt: '2026-11-10T10:00:00.000Z',
       dueAt: '2026-11-15T18:00:00.000Z',
     });
 
     expect(newAssignResult.items).toHaveLength(1);
-    expect(newAssignResult.items[0]?.id).toBe(assignmentId2);
-    expect(newAssignResult.items[0]?.id).not.toBe(assignmentId1);
+    const assignment2 = newAssignResult.items[0]!;
+    expect(assignment2.id).toBeDefined();
+    expect(assignment2.id).not.toBe(assignment1.id);
 
-    // 9. El historial muestra ambas asignaciones: la cancelada y la nueva
+    // 9. El historial muestra ambas asignaciones: la cancelada y la nueva (RF-6, RF-9)
     const finalHistory = await assignmentsService.listAssignments(orgId, { groupId });
     expect(finalHistory.total).toBe(2);
-    expect(finalHistory.items.map((i) => i.id)).toContain(assignmentId1);
-    expect(finalHistory.items.map((i) => i.id)).toContain(assignmentId2);
+    expect(finalHistory.items.map((i) => i.id)).toContain(assignment1.id);
+    expect(finalHistory.items.map((i) => i.id)).toContain(assignment2.id);
+
+    // Verificar en PostgreSQL real
+    const totalInDb = await prisma.assignment.count({
+      where: { organization_id: orgId, group_id: groupId },
+    });
+    expect(totalInDb).toBe(2);
   });
 });

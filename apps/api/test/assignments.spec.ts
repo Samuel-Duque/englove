@@ -32,6 +32,7 @@ describe('SPEC-04: Asignación — AssignmentsService (ENG-050)', () => {
   beforeEach(() => {
     mockPrisma = {
       $transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(mockPrisma)),
+      $executeRaw: vi.fn().mockResolvedValue(1),
       activity: {
         findFirst: vi.fn(),
       },

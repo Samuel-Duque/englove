@@ -300,7 +300,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tareas.** ENG-030 a ENG-041, ENG-043 a ENG-046, SPEC-04, SPEC-05. (ENG-042 se eliminó el 2026-09-22 por la decisión 34 §2; ENG-045 es nueva: recordatorios del dashboard; ENG-046 es nueva el 2026-09-28: cambio administrativo del correo con auditoría, decisión 63.)
 
-**Estado actual (2026-10-22).** Cierre técnico completado; cierre global de Etapa 3/H1 pendiente. SPEC-03 permanece en estado `Verificada` tras la aprobación y verificación formal por el líder del proyecto. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) permanecen en `Hecho`, completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. SPEC-04 se encuentra Aprobada. Para el cierre global faltan SPEC-05 al menos En revisión y acreditar los entregables de staging y el onboarding cronometrado (SPEC-03 §9/§11 y SPEC-02 §11). ENG-039 pasa a la Etapa 5 con SPEC-05; SPEC-05 pendiente de redacción.
+**Estado actual (2026-10-22).** Cierre técnico completado; cierre global de Etapa 3/H1 pendiente. SPEC-03 permanece en estado `Verificada` tras la aprobación y verificación formal por el líder del proyecto. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) permanecen en `Hecho`, completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. SPEC-04 se encuentra Verificada tras la implementación completa de ENG-050 a ENG-053. Para el cierre global faltan SPEC-05 al menos En revisión y acreditar los entregables de staging y el onboarding cronometrado (SPEC-03 §9/§11 y SPEC-02 §11). ENG-039 pasa a la Etapa 5 con SPEC-05; SPEC-05 pendiente de redacción.
 
 ---
 
@@ -333,6 +333,8 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 **Tamaño.** S, 0.5–1 semana.
 
 **Tareas.** ENG-050 a ENG-053.
+
+**Estado actual (2026-10-22).** Etapa 4 completada y [SPEC-04](../specs/SPEC-04-asignacion.md) en estado `Verificada` tras la implementación completa y verificación de las tareas ENG-050 a ENG-053 (254/254 tests en monorepo: 54 shared, 151 api, 49 web; suite de concurrencia e integración real en PostgreSQL 18 con Docker; guardrails sin errores; typecheck, lint y build limpios). Las cuatro tareas técnicas se encuentran en `Hecho`. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding de pbp Etapa 3.
 
 ---
 

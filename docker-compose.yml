@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - englove_pgdata:/var/lib/postgresql/data
+      - englove_pgdata:/var/lib/postgresql
 
   # MinIO es opcional como emulador S3 para Cloudflare R2 en local (RF-19)
   # Para levantarlo: docker compose --profile storage up -d

@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-21. SPEC-01 y SPEC-02 figuran Verificadas; SPEC-03 en redacción (borrador redactado, no revisado ni aprobado, con preguntas abiertas Q-01 a Q-03 en §11 pendientes del líder del proyecto). Prerrequisitos operativos de staging en seguimiento continuo.
+> Última actualización: 2026-10-21. SPEC-01 y SPEC-02 figuran Verificadas; SPEC-03 en estado Implementada (tareas técnicas ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046 en Hecho con 188 tests en monorepo; Hito H1 alcanzado a nivel de desarrollo; sesión de onboarding y staging pendientes para Verificada). SPEC-04 y SPEC-05 en redacción.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -224,7 +224,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Pantallas de login, registro, recuperación y restablecimiento de contraseña; redirección por rol.
 - **Endurecimiento HTTP y rate limiting (Decidido, decisión 34 §20):** helmet, CORS con allowlist, comprobación de `Origin` y la tabla de límites de architecture §8.3 (login 10 / 15 min por IP; signup 10 / hora por IP; forgot-password 5 / hora por IP y correo; 120 / min autenticado; 30 / min anónimo). Contadores en memoria, válidos solo con una instancia (decisión 64).
 - Pruebas de integración de auth, auto-registro, bloqueo, recuperación, cambio de correo, rate limiting y aislamiento de tenant.
-- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados, recordatorios y el cambio administrativo del correo con auditoría; P-4 ya decidido, decisiones 84 y 92).
+- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados, recordatorios y el cambio administrativo del correo con auditoría; P-4 ya decidido, decisiones 84 y 92). A 2026-10-21 está Aprobada por el líder e Implementada (decisiones 95–97); este criterio de salida está cumplido.
 
 **Fuera de alcance.** Baja general de alumnos (`DELETE /students/:id`, SPEC-05 / ENG-070, decisión 93). Pantallas de `parent` y `admin`; el enum existe (Decidido). Aprobación o rechazo de solicitudes desde el panel (necesita grupos, Etapa 3; aquí solo se construye la API sin interfaz). Acceso por código de aula, PIN o avatar: descartado (decisión 22). Alta directa por la profesora y contraseñas temporales: eliminadas (decisión 34 §1). Cualquier entidad de acudiente o de consentimiento: eliminadas (decisión 34 §1 y §2).
 
@@ -243,7 +243,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Verificación en staging: las cookies llevan `Domain=.<dominio>`, `Secure`, `HttpOnly` y `SameSite=Lax`; el `proxy.ts` de `app-staging.` las ve y redirige por rol; una petición mutante con `Origin` fuera de la allowlist recibe 403; las cookies de staging no interfieren con las de producción (prefijo por entorno).
 - Test: cada límite de la tabla de rate limiting responde `429` al superarse.
 - Test: el correo de solicitud recibida y el de recuperación salen del mismo remitente.
-- SPEC-03 Aprobada.
+- SPEC-03 Aprobada (cumplido; implementada el 2026-10-21).
 
 **Dependencias.** Compuerta de inicio (decisión 65): SPEC-02 Aprobada y dependencias técnicas de la Etapa 1 entregadas (ENG-011 a ENG-015 y ENG-019; §2.1). ENG-019 (correo transaccional) es además necesario para la recuperación en staging.
 
@@ -263,10 +263,10 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 - Esquemas Zod completos por tipo de actividad con separación `config` / `answerKey`: `fill_blank`, `open_question`, `speaking` (con `min_duration_seconds` fijo en 2 y `max_duration_seconds` entre 2 y 300, 120 por defecto), `game` con sus cinco mecánicas de juego, `exam` (pesos normalizados).
 - Tablas de detalle 1:1 y migración.
-- Endpoints `activities`: CRUD, estados `draft` / `published` / `archived`, duplicar, versionado por duplicación; **normalización automática de pesos al guardar un examen y mínimo de 2 ítems validado en `publish`** (Decidido, decisión 34 §11 y §12).
+- Endpoints `activities`: CRUD, estados `draft` / `published` / `archived`, archivo sin cancelar asignaciones y restauración al catálogo (decisión 95), duplicar, versionado por duplicación; **normalización automática de pesos al guardar un examen y mínimo de 2 ítems validado en `publish`** (Decidido, decisión 34 §11 y §12).
 - Panel: layout, navegación, dashboard `inicio/` con tarjetas de recordatorio, lista de actividades con filtros por nivel y tipo de actividad. El selector de creación muestra las cinco opciones principales (los cinco tipos de actividad); la mecánica se elige después de escoger "Microjuego".
 - Formularios: fill in the blanks (editor de oraciones con huecos y opciones), pregunta abierta, speaking (con duración máxima configurable), microjuegos (uno por mecánica de juego, derivados del esquema Zod), examen (composición de ítems `fill_blank` con pesos, decisión 70; muestra el peso ajustado tras la normalización con un mensaje del ajuste).
-- CRUD de grupos (archivables) y membresías con **un solo grupo vigente por alumno** (decisión 73): cambio de grupo con `PUT /students/:id/group`, que cierra la membresía vigente y abre la nueva conservando el historial.
+- CRUD de grupos (archivables) y membresías con **un solo grupo vigente por alumno** (decisión 73): archivo de grupo solo sin miembros vigentes (decisión 96), cambio de grupo con `PUT /students/:id/group`, que cierra la membresía vigente y abre la nueva conservando el historial.
 - **Bandeja de solicitudes de registro (Decidido, CONTEXT §4.1, decisión 33):** interfaz sobre `GET /students/requests`, `POST /students/:id/approve` y `POST /students/:id/reject`, con asignación de nivel y un único grupo (`groupId`, decisión 73) y corrección de `guardian_name`, `guardian_contact` y `age_segment` al aprobar. Es la única vía de alta.
 - Gestión de alumnos: edición de nivel, segmento y datos del acudiente (solo la profesora), botón para enviar el enlace de recuperación de contraseña al alumno; **pestaña "Bloqueados"** con desbloqueo en un clic (Decidido, decisión 34 §8).
 - **Cambio administrativo del correo (Decidido, decisión 63):** `POST /students/:id/change-email` y acción "Cambiar correo de acceso" en la ficha del alumno, con diálogo de confirmación explícita; correo globalmente único, `AuditLog` en la misma transacción, invalidación de tokens pendientes, revocación de todas las sesiones del alumno y aviso `email-changed` al correo nuevo y al anterior (architecture §7.3). Retención y acceso a la auditoría: Decidido, decisiones 84 y 92 (`AuditLog` sin pantalla de consulta; al borrar al alumno se conserva el evento técnico con `target_student_id` en `SetNull` y `details` redactado).
@@ -280,7 +280,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Criterios de salida.**
 
-- Los cinco tipos de actividad (y las cinco mecánicas de juego dentro de `game`) se crean, editan, publican y archivan desde el panel.
+- Los cinco tipos de actividad (y las cinco mecánicas de juego dentro de `game`) se crean, editan, publican, archivan y restauran desde el panel.
 - Una actividad publicada con intentos no se puede editar en sitio; solo duplicar o archivar (test).
 - Un examen con un solo ítem no se puede publicar (`EXAM_MIN_ITEMS`) pero sí guardar como borrador (test). Guardar un examen con pesos 30/30/30 devuelve 33,3/33,3/33,4 y el formulario muestra el ajuste (test).
 - El formulario de speaking rechaza una duración máxima mayor de 300 s o menor de 2 s (test del esquema Zod).
@@ -299,6 +299,8 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 **Tamaño.** XL, 3–4 semanas.
 
 **Tareas.** ENG-030 a ENG-041, ENG-043 a ENG-046, SPEC-04, SPEC-05. (ENG-042 se eliminó el 2026-09-22 por la decisión 34 §2; ENG-045 es nueva: recordatorios del dashboard; ENG-046 es nueva el 2026-09-28: cambio administrativo del correo con auditoría, decisión 63.)
+
+**Estado actual (2026-10-21).** Implementada. SPEC-03 en estado `Implementada`. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) están completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. ENG-039 pasa a la Etapa 5 con SPEC-05. La sesión presencial de onboarding (ENG-043) y las pruebas operativas en staging quedan pendientes para la acreditación definitiva de H1 y paso a Verificada. SPEC-04 y SPEC-05 en redacción.
 
 ---
 

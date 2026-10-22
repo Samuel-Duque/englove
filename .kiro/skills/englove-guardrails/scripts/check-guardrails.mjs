@@ -21,7 +21,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Lo último que este script conoce de la planeación. Si CONTEXT avanza, el script avisa.
-const KNOWN_MAX_DECISION = 94;
+const KNOWN_MAX_DECISION = 97;
 const KNOWN_OUT_OF_SCOPE_ROWS = 9; // filas de la tabla de CONTEXT §2.4
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -416,7 +416,14 @@ const LINE_RULES = [
   { id: 'G-C06', sev: 'ERROR', files: (p) => isCode(p) || ext(p) === 'html', re: /<iframe\b/i, msg: 'contenido embebido (iframe); Educaplay va como enlace externo en Contenido extra' },
   { id: 'G-C06', sev: 'ERROR', files: notDoc, re: /@capacitor\//, msg: 'Capacitor es Fase 2; el piloto es PWA' },
   { id: 'G-C06', sev: 'ERROR', files: notDoc, re: /['"](stripe|@stripe\/[\w-]+|wompi[\w-]*|epayco[\w-]*|mercadopago|@paypal\/[\w-]+)['"]|api\.stripe\.com|checkout\.wompi|epayco\.co/i, msg: 'pasarela de pagos fuera del piloto' },
-  { id: 'G-C06', sev: 'ERROR', files: notDoc, re: /googletagmanager|google-analytics|\bgtag\(|@vercel\/analytics|mixpanel|@segment\/|hotjar|\bfbq\(|connect\.facebook\.net|posthog|plausible|@amplitude\//i, msg: 'analítica de terceros o píxeles; prohibidos en el portal del estudiante (CONTEXT §9)' },
+  {
+    id: 'G-C06',
+    sev: 'ERROR',
+    files: notDoc,
+    skip: (line) => /(?:min|umbral|m[ií]nimo|duraci[oó]n)_?\s*plausible|minPlausible/i.test(line),
+    re: /googletagmanager|google-analytics|\bgtag\(|@vercel\/analytics|mixpanel|@segment\/|hotjar|\bfbq\(|connect\.facebook\.net|posthog|plausible|@amplitude\//i,
+    msg: 'analítica de terceros o píxeles; prohibidos en el portal del estudiante (CONTEXT §9)',
+  },
   { id: 'G-C07', sev: 'AVISO', files: isApiSrc, re: /@Controller\(\s*['"]\/?api\//, msg: 'el controlador repite el prefijo; /api/v1 se fija con setGlobalPrefix' },
   {
     id: 'G-C08', sev: 'ERROR', files: (p) => isApiSrc(p), re: /@Cron\(/,

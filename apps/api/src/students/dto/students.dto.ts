@@ -8,6 +8,7 @@ import {
   IsInt,
   Min,
   Max,
+  IsEmail,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -16,6 +17,8 @@ import {
   ApproveStudentInput,
   UpdateStudentInput,
   StudentListQuery,
+  TransferStudentGroupInput,
+  ChangeStudentEmailInput,
 } from '@englove/shared';
 
 export class ApproveStudentDto implements ApproveStudentInput {
@@ -76,6 +79,32 @@ export class UpdateStudentDto implements UpdateStudentInput {
 }
 
 export class StudentQueryDto implements StudentListQuery {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'offset debe ser un entero' })
+  @Min(0, { message: 'offset debe ser mayor o igual a 0' })
+  offset?: number = 0;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'limit debe ser un entero' })
+  @Min(1, { message: 'limit debe ser como mínimo 1' })
+  @Max(100, { message: 'limit no puede exceder 100' })
+  limit?: number = 20;
+}
+
+export class TransferStudentGroupDto implements TransferStudentGroupInput {
+  @IsUUID('4', { message: 'groupId debe ser un UUID válido' })
+  groupId!: string;
+}
+
+export class ChangeStudentEmailDto implements ChangeStudentEmailInput {
+  @IsEmail({}, { message: 'newEmail debe ser un correo electrónico válido' })
+  @MaxLength(255, { message: 'El correo no puede exceder 255 caracteres' })
+  newEmail!: string;
+}
+
+export class StudentMembershipsQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'offset debe ser un entero' })

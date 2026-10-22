@@ -11,8 +11,11 @@ import {
   ApprovalStatus,
   AgeSegment,
   Level,
+  AuditAction,
   StudentView,
   StudentListResponse,
+  MembershipView,
+  MembershipListResponse,
   MessageResponse,
 } from '@englove/shared';
 import {
@@ -361,29 +364,6 @@ export class StudentsService {
       });
     }
 
-    const group = await this.prisma.group.findFirst({
-      where: {
-        id: dto.groupId,
-        organization_id: organizationId,
-      },
-    });
-
-    if (!group) {
-      throw new NotFoundException({
-        statusCode: 404,
-        code: 'NOT_FOUND',
-        message: 'Grupo no encontrado',
-      });
-    }
-
-    if (group.archived_at !== null) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'GROUP_ARCHIVED',
-        message: 'El grupo está archivado',
-      });
-    }
-
     // ageSegment is derived strictly from birthDate, never as an administrative preference (SPEC-02 §4, Decision 49)
     let nextAgeSegment = student.age_segment;
     let nextCanSwitch = student.can_switch_interface;
@@ -402,6 +382,30 @@ export class StudentsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      const groupDelegate = (tx as unknown as { group?: PrismaService['group'] }).group ?? this.prisma.group;
+      const group = await groupDelegate.findFirst({
+        where: {
+          id: dto.groupId,
+          organization_id: organizationId,
+        },
+      });
+
+      if (!group) {
+        throw new NotFoundException({
+          statusCode: 404,
+          code: 'NOT_FOUND',
+          message: 'Grupo no encontrado',
+        });
+      }
+
+      if (group.archived_at !== null) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'GROUP_ARCHIVED',
+          message: 'El grupo está archivado',
+        });
+      }
+
       // Update student to approved atomically, rejecting if already approved concurrently (RF-10)
       const updateResult = await tx.student.updateMany({
         where: {
@@ -432,6 +436,7 @@ export class StudentsService {
       const existingActiveMembership = await tx.groupMembership.findFirst({
         where: {
           student_id: student.id,
+          organization_id: organizationId,
           left_at: null,
         },
       });
@@ -562,6 +567,283 @@ export class StudentsService {
 
     return {
       message: 'Solicitamos el envío del enlace al correo del alumno.',
+    };
+  }
+
+  async listMemberships(
+    organizationId: string,
+    studentId: string,
+    query: { offset?: number; limit?: number },
+  ): Promise<MembershipListResponse> {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        organization_id: organizationId,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Alumno no encontrado',
+      });
+    }
+
+    const offset = query.offset ?? 0;
+    const limit = query.limit ?? 20;
+
+    const [total, items] = await Promise.all([
+      this.prisma.groupMembership.count({
+        where: {
+          student_id: studentId,
+          organization_id: organizationId,
+        },
+      }),
+      this.prisma.groupMembership.findMany({
+        where: {
+          student_id: studentId,
+          organization_id: organizationId,
+        },
+        include: {
+          group: true,
+        },
+        orderBy: [{ joined_at: 'desc' }, { id: 'asc' }],
+        skip: offset,
+        take: limit,
+      }),
+    ]);
+
+    const membershipViews: MembershipView[] = items.map((m) => ({
+      id: m.id,
+      groupId: m.group_id,
+      groupName: m.group.name,
+      joinedAt: m.joined_at.toISOString(),
+      leftAt: m.left_at ? m.left_at.toISOString() : null,
+    }));
+
+    return {
+      items: membershipViews,
+      total,
+      offset,
+      limit,
+    };
+  }
+
+  async transferStudentGroup(
+    organizationId: string,
+    studentId: string,
+    groupId: string,
+  ): Promise<StudentView> {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        organization_id: organizationId,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Alumno no encontrado',
+      });
+    }
+
+    if (student.approval_status !== ApprovalStatus.approved) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'STUDENT_NOT_APPROVED',
+        message: 'El alumno no ha sido aprobado',
+      });
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const destinationGroup = await tx.group.findFirst({
+        where: {
+          id: groupId,
+          organization_id: organizationId,
+        },
+      });
+
+      if (!destinationGroup) {
+        throw new NotFoundException({
+          statusCode: 404,
+          code: 'NOT_FOUND',
+          message: 'Grupo de destino no encontrado',
+        });
+      }
+
+      if (destinationGroup.archived_at !== null) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'GROUP_ARCHIVED',
+          message: 'El grupo de destino está archivado',
+        });
+      }
+
+      const currentActive = await tx.groupMembership.findFirst({
+        where: {
+          student_id: studentId,
+          left_at: null,
+          organization_id: organizationId,
+        },
+      });
+
+      // Repeating active destination doesn't add history (RF-13)
+      if (currentActive && currentActive.group_id === groupId) {
+        return this.getStudent(organizationId, studentId);
+      }
+
+      const now = new Date();
+      if (currentActive) {
+        await tx.groupMembership.update({
+          where: { id: currentActive.id },
+          data: { left_at: now },
+        });
+      }
+
+      await tx.groupMembership.create({
+        data: {
+          organization_id: organizationId,
+          group_id: groupId,
+          student_id: studentId,
+          joined_at: now,
+          left_at: null,
+        },
+      });
+
+      return this.getStudent(organizationId, studentId);
+    });
+  }
+
+  async changeStudentEmail(
+    organizationId: string,
+    actorUserId: string,
+    studentId: string,
+    newEmail: string,
+  ): Promise<MessageResponse> {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        organization_id: organizationId,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Alumno no encontrado',
+      });
+    }
+
+    const normalizedEmail = newEmail.trim().toLowerCase();
+    const oldEmail = student.user.email.toLowerCase();
+
+    if (normalizedEmail === oldEmail) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'El nuevo correo debe ser diferente al actual',
+      });
+    }
+
+    // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'EMAIL_TAKEN',
+        message: 'Ese correo no está disponible',
+      });
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: student.user_id },
+          data: { email: normalizedEmail },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            organization_id: organizationId,
+            actor_user_id: actorUserId,
+            target_student_id: student.id,
+            action: AuditAction.student_email_changed,
+            details: {
+              old_email: student.user.email,
+              new_email: normalizedEmail,
+            },
+          },
+        });
+
+        await tx.passwordResetToken.deleteMany({
+          where: { user_id: student.user_id, organization_id: organizationId },
+        });
+
+        await tx.emailChangeRequest.deleteMany({
+          where: { user_id: student.user_id, organization_id: organizationId },
+        });
+
+        await tx.authSession.updateMany({
+          where: {
+            user_id: student.user_id,
+            organization_id: organizationId,
+            revoked_at: null,
+          },
+          data: {
+            revoked_at: new Date(),
+          },
+        });
+      });
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === 'P2002') {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'EMAIL_TAKEN',
+          message: 'Ese correo no está disponible',
+        });
+      }
+      throw err;
+    }
+
+    // Post-commit: send notification to both new and old emails (RF-20, architecture §7.3)
+    const now = Date.now();
+    try {
+      await this.mailService.sendMail({
+        template: 'email-changed',
+        to: normalizedEmail,
+        variables: {},
+        idempotencyKey: `idem-new-${student.id}-${now}`,
+      });
+    } catch {
+      // Failure does not revert change
+    }
+
+    try {
+      await this.mailService.sendMail({
+        template: 'email-changed',
+        to: student.user.email,
+        variables: {},
+        idempotencyKey: `idem-old-${student.id}-${now}`,
+      });
+    } catch {
+      // Failure does not revert change
+    }
+
+    return {
+      message: 'Correo actualizado. El alumno debe iniciar sesión de nuevo.',
     };
   }
 }

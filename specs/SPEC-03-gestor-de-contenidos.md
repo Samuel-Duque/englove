@@ -2,22 +2,22 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Borrador |
+| Estado | Implementada |
 | Etapa | 3 — Gestor de contenidos |
 | Tareas | ENG-030, ENG-031, ENG-032, ENG-033, ENG-034, ENG-035, ENG-036, ENG-037, ENG-038, ENG-040, ENG-041, ENG-043, ENG-044, ENG-045, ENG-046 |
-| Referencias | CONTEXT §4.1, §5.1, §5.3, §14–§16 · architecture §3.1–§3.2, §4.1–§4.4, §5.1–§6.5, §7.2–§7.3, §8, §13 · pbp §3 y Etapa 3 · decisiones 20, 24, 33, 37, 42, 45–47, 59, 63, 66, 67, 70, 73, 75, 79–80, 83, 89–94 |
-| Aprobada por / fecha | — |
+| Referencias | CONTEXT §4.1, §5.1, §5.3, §14–§16 · architecture §3.1–§3.2, §4.1–§4.4, §5.1–§6.5, §7.2–§7.3, §8, §13 · pbp §3 y Etapa 3 · decisiones 20, 24, 33, 37, 42, 45–47, 59, 63, 66, 67, 70, 73, 75, 79–80, 83, 89–97 |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-21 |
 
 ## 1. Contexto y objetivo
 
 La profesora necesita cargar contenido real antes de que entren los alumnos ([CONTEXT §5.1](../.agents/CONTEXT.md#51-panel-de-la-profesora-se-construye-primero)). Esta capacidad entrega el gestor de los cinco tipos de actividad y las cinco mecánicas de juego, junto con grupos y gestión visual de alumnos. Cierra **H1: la profesora puede crear contenido**, previa validación en staging y onboarding sin ayuda.
 
-Reutiliza identidad, consultas de alumnos y correo de [SPEC-01](./SPEC-01-scaffold.md) y [SPEC-02](./SPEC-02-identidad-y-sesion.md). No entrega todavía la experiencia jugable ni el ciclo de calificación. Las propuestas de §11 no son decisiones aprobadas.
+Reutiliza identidad, consultas de alumnos y correo de [SPEC-01](./SPEC-01-scaffold.md) y [SPEC-02](./SPEC-02-identidad-y-sesion.md). No entrega todavía la experiencia jugable ni el ciclo de calificación. Las tres preguntas de §11 (Q-01 a Q-03) las cerró el líder en las decisiones 95 a 97.
 
 ## 2. Alcance
 
-- Incluye: esquemas completos, formularios, catálogo, publicación, duplicación/versionado, archivo/borrado permitido, grupos/membresías, solicitudes, bloqueados, recordatorios y cambio administrativo de correo.
-- No incluye: asignaciones (SPEC-04), renderizador/vista previa interactiva, intentos, multimedia y baja general de alumnos (SPEC-05), ejecución/scorers de microjuegos (SPEC-06), revisión (SPEC-07), correo periódico de pendientes/estadísticas (SPEC-08), PWA/offline (SPEC-09) ni contenido extra (SPEC-10).
+- Incluye: esquemas completos, formularios, catálogo, publicación, duplicación/versionado, archivo y restauración de actividades, borrado permitido, grupos/membresías con archivo previo traslado de miembros, solicitudes, bloqueados, recordatorios y cambio administrativo de correo.
+- No incluye: asignaciones y su cancelación (SPEC-04), renderizador/vista previa interactiva, intentos, multimedia y baja general de alumnos (SPEC-05), ejecución/scorers de microjuegos (SPEC-06), revisión (SPEC-07), correo periódico de pendientes/estadísticas (SPEC-08), PWA/offline (SPEC-09) ni contenido extra (SPEC-10).
 - Aplican las exclusiones de [CONTEXT §2.4](../.agents/CONTEXT.md#24-explícitamente-fuera-del-piloto--decidido). ENG-039 pertenece a SPEC-05; ENG-042 está eliminada. Redactar SPEC-04/05 no autoriza implementarlas.
 
 ## 3. Requisitos funcionales
@@ -52,7 +52,7 @@ Reutiliza identidad, consultas de alumnos y correo de [SPEC-01](./SPEC-01-scaffo
 
 **RF-8 — Pesos efectivos y omisiones.** ENG-030/032/038; decisiones 45–46.
 
-- **Dado** pesos 30/30/30 **Cuando** guarda **Entonces** persiste/devuelve 33.3/33.3/33.4; el formulario muestra 33,3/33,3/33,4 y anuncia el ajuste. El contrato de corrección conserva todos los pesos: un ítem omitido aporta cero, no reduce el denominador. Casos extremos: Q-03.
+- **Dado** pesos 30/30/30 **Cuando** guarda **Entonces** persiste/devuelve 33.3/33.3/33.4; el formulario muestra 33,3/33,3/33,4 y anuncia el ajuste. El contrato de corrección conserva todos los pesos: un ítem omitido aporta cero, no reduce el denominador. Residuos de redondeo: método del mayor resto (decisión 97, §4).
 
 **RF-9 — Publicación consistente.** ENG-032; architecture §4.4 y §6.4.
 
@@ -64,11 +64,11 @@ Reutiliza identidad, consultas de alumnos y correo de [SPEC-01](./SPEC-01-scaffo
 
 **RF-11 — Archivo y borrado seguro.** ENG-032; architecture §6.2.
 
-- **Dado** una actividad **Cuando** la archiva **Entonces** pasa a `archived` conservando relaciones; repetir es inocuo. Borrar un borrador sin asignaciones ni versiones hijas devuelve `204` y elimina su detalle; los demás casos devuelven `409 ACTIVITY_DELETE_NOT_ALLOWED`. Efecto sobre asignaciones existentes: Q-01.
+- **Dado** una actividad **Cuando** la archiva **Entonces** pasa a `archived`, sale del catálogo activo y de la selección para asignar y conserva relaciones; repetir es inocuo. Las asignaciones existentes no se cancelan ni cambian sus ventanas o la continuidad de intentos (decisión 95); la profesora puede restaurarla (RF-24) o cancelar asignaciones (SPEC-04). Borrar un borrador sin asignaciones ni versiones hijas devuelve `204` y elimina su detalle; los demás casos, `409 ACTIVITY_DELETE_NOT_ALLOWED`.
 
 **RF-12 — Grupos e historial.** ENG-040; decisiones 73 y 79–80.
 
-- **Dado** una profesora **Cuando** crea/renombra/lista un grupo **Entonces** conserva nombre y estado, sin código de aula. Borrar sin membresías ni asignaciones devuelve `204`; con historia, `409 GROUP_HAS_HISTORY`. Archivar conserva historia; requisitos sobre miembros vigentes: Q-02.
+- **Dado** una profesora **Cuando** crea/renombra/lista un grupo **Entonces** conserva nombre y estado, sin código de aula. Borrar sin membresías ni asignaciones devuelve `204`; con historia, `409 GROUP_HAS_HISTORY`. Archivar conserva historia, pero solo se permite sin miembros vigentes: con alguno responde `409 GROUP_HAS_ACTIVE_STUDENTS` sin efectos (decisión 96); no traslada alumnos automáticamente ni deja aprobados sin grupo. La comprobación y el archivo son atómicos frente a traslados y aprobaciones concurrentes.
 
 **RF-13 — Cambio de grupo atómico.** ENG-040; decisiones 73 y 90.
 
@@ -116,11 +116,15 @@ Reutiliza identidad, consultas de alumnos y correo de [SPEC-01](./SPEC-01-scaffo
 
 - **Dado** la profesora real, sesión iniciada y formularios vacíos **Cuando** crea su primera actividad sin ayuda **Entonces** termina en menos de 10 minutos; además crea una de cada tipo sin ayuda. Si falla, se iteran formularios y se repite antes de cerrar H1, con evidencia sin datos de alumnos.
 
+**RF-24 — Restauración de actividades archivadas.** ENG-032/033; decisión 95.
+
+- **Dado** una actividad `archived` **Cuando** elige «Restaurar al catálogo» **Entonces** revalida el contenido como en RF-9 y pasa a `published` en una transacción, vuelve al catálogo y a la selección para asignar, sin nueva versión ni cambios en asignaciones o intentos. Si falla la revalidación, sigue archivada con el error de publicación; fuera de `archived` responde `409 ACTIVITY_NOT_ARCHIVED`.
+
 ## 4. Reglas de negocio
 
-Ciclo permitido: `draft → published → archived`, también `draft → archived`; sin restauración/despublicación. Duplicar cualquier estado produce borrador. Solo se edita en sitio sin intentos y fuera de `archived`; `type`/mecánica no cambian al editar. Archivo no equivale a borrado. Q-01/Q-02 bloquean sus efectos todavía no decididos.
+Ciclo permitido: `draft → published → archived`, también `draft → archived`, y `archived → published` solo por la restauración de RF-24 (decisión 95); sin despublicación. Duplicar cualquier estado produce borrador. Solo se edita en sitio sin intentos y fuera de `archived`; `type`/mecánica no cambian. Archivar no borra ni cancela asignaciones: retira la actividad del catálogo activo y de la selección de SPEC-04 (solo `published`); SPEC-04/05 deben dejar continuar sus ventanas, lecturas e intentos. Los grupos archivados no se restauran y solo se archivan sin miembros vigentes (decisión 96).
 
-**Normalización:** examen vacío conserva `[]`; no tiene denominador. Con ítems, pesos finitos ≥0 y suma >0. `peso × 100 / suma`, redondeo decimal a un decimal, residuo en el último ítem (architecture §4.4); devolver `weightsAdjusted` si cambió algún peso. Sin cambiar orden ni borrar ítems de peso cero. Q-03 resuelve el caso de residuo negativo, sin dar por aprobado otro algoritmo.
+**Normalización:** examen vacío conserva `[]`; no tiene denominador. Con ítems, pesos finitos ≥0 y suma >0. `peso × 100 / suma` con aritmética decimal exacta, repartido por **mayor resto en décimas** (decisión 97, architecture §4.4): cada peso se trunca a una décima y las décimas que faltan para 100,0 se asignan a los de mayor resto; el empate se rompe desde el último ítem. 30/30/30 da 33.3/33.3/33.4 y 33.36/33.36/33.26/0.01 da 33.4/33.4/33.2/0.0: sin negativos y con suma exacta 100,0. Devolver `weightsAdjusted` si cambió algún peso; no cambiar el orden ni borrar ítems de peso cero.
 
 **Contrato de corrección para etapas posteriores:** fracción 0–1; servidor convierte con `round(fracción × 5, 1)` (decisión 24). Identificadores desconocidos, repeticiones imposibles y referencias inválidas no suman aciertos; son entradas inválidas. Omitidas/timeout aportan cero. Sin premio por rapidez ni nota declarada por cliente. Propuesta pedagógica concreta para revisión al aprobar esta spec:
 
@@ -170,17 +174,18 @@ Clave obligatoria en fill_blank/exam/game y prohibida en los demás. `config` no
 
 | Método/ruta relativa | Entrada | Éxito / error propio |
 | --- | --- | --- |
-| `GET /activities` | offset/limit, `level?`, `type?`, `status?`; sin filtro incluye todos los estados | `200` lista de Summary, sin claves |
+| `GET /activities` | offset/limit, `level?`, `type?`, `status?`; sin `status` lista `draft` y `published` (catálogo activo); `status=archived` lista las archivadas | `200` lista de Summary, sin claves |
 | `GET /activities/:id` | Sin cuerpo | `200 ActivityEditor` |
 | `POST /activities` | `{ title, type, level, config, answerKey?, expectedDurationSeconds?, minPlausibleSeconds? }` | `201 ActivityEditor`, draft/versión 1/parent null |
 | `PATCH /activities/:id` | ≥1 campo editable, sin type; config/clave juntas cuando aplica, reemplazo completo validado | `200 ActivityEditor`; `409 ACTIVITY_HAS_ATTEMPTS` o `ACTIVITY_NOT_EDITABLE` |
 | `POST /activities/:id/publish` | Sin cuerpo | `200 ActivityEditor`; `409 EXAM_MIN_ITEMS` o `ACTIVITY_NOT_EDITABLE` |
 | `POST /activities/:id/duplicate` | Sin cuerpo; título inicial `Copia de …`, truncado a 100 | `201 ActivityEditor` |
-| `POST /activities/:id/archive` | Sin cuerpo | `200 ActivityEditor`; Q-01 |
+| `POST /activities/:id/archive` | Sin cuerpo; repetición inocua | `200 ActivityEditor`; no toca asignaciones (decisión 95) |
+| `POST /activities/:id/restore` | Sin cuerpo | `200 ActivityEditor` en `published`; `409 ACTIVITY_NOT_ARCHIVED`, `409 EXAM_MIN_ITEMS` |
 | `DELETE /activities/:id` | Sin cuerpo | `204`; `409 ACTIVITY_DELETE_NOT_ALLOWED` |
 | `GET /groups`, `GET /groups/:id` | Lista offset/limit, `archived?` boolean; ausente incluye ambos | `200` lista / GroupView |
 | `POST /groups`, `PATCH /groups/:id` | `{ name }` | `201` / `200 GroupView`; renombrar archivado: `409 GROUP_ARCHIVED` |
-| `POST /groups/:id/archive` | Sin cuerpo; repetición inocua | `200 GroupView`; Q-02 |
+| `POST /groups/:id/archive` | Sin cuerpo; repetición inocua | `200 GroupView`; `409 GROUP_HAS_ACTIVE_STUDENTS` si hay miembros vigentes (decisión 96) |
 | `DELETE /groups/:id` | Sin cuerpo | `204`; `409 GROUP_HAS_HISTORY` |
 | `GET /groups/:id/members` | offset/limit; vigentes; orden de SPEC-02 | `200` lista StudentView de SPEC-02 |
 | `GET /students/:id/memberships` | offset/limit; orden joined_at DESC, id ASC | `200` lista `{ id, groupId, groupName, joinedAt, leftAt }` |
@@ -205,8 +210,8 @@ Tema neutro docente, RSC por defecto y hojas cliente; TanStack Query para API, r
 | Ruta | Contenido / vacío |
 | --- | --- |
 | `/inicio` | Solicitudes: contador/enlace; cero «No tienes solicitudes pendientes». Revisión: estado reservado de RF-17; enlace `/revision` y conteo real se activan en SPEC-07. |
-| `/actividades` | Filtros, cinco tipos, «Crear actividad»; vacío «Aún no tienes actividades»; filtrado vacío «No encontramos actividades con estos filtros» |
-| `/actividades/nueva`, `/actividades/:id` | Formulario por tipo/mecánica; guardar/publicar/duplicar/archivar y borrado permitido; resumen textual; duración mínima de speaking solo lectura |
+| `/actividades` | Filtros (incluye «Archivadas»), cinco tipos, «Crear actividad»; vacío «Aún no tienes actividades»; filtrado vacío «No encontramos actividades con estos filtros» |
+| `/actividades/nueva`, `/actividades/:id` | Formulario por tipo/mecánica; guardar/publicar/duplicar/archivar/restaurar y borrado permitido; resumen textual; duración mínima de speaking solo lectura |
 | `/grupos`, `/grupos/:id` | Nombre, estado, miembros, archivo/borrado; vacío «Crea tu primer grupo para aprobar solicitudes» |
 | `/alumnos`, `/alumnos/:id` | Pestañas Alumnos/Solicitudes/Bloqueados; ficha, contactos, recuperación, grupo e historial; no botón de alta/baja general |
 | `/alumnos/solicitudes`, `/alumnos/bloqueados` | Vacíos «No tienes solicitudes pendientes» / «No hay alumnos bloqueados»; aprobación con selector de grupo activo y acceso a crear grupo si no hay |
@@ -215,7 +220,7 @@ Desde inicio: catálogo/solicitudes a un clic; editor/ficha a dos. Objetivos del
 
 Cargando: «Cargando…»; envío: «Guardando…»; éxito: «Cambios guardados». Error de red mantiene formulario y «No pudimos guardar los cambios. Intenta de nuevo», sin reintento automático de mutaciones. Éxito invalida listas/fichas/contadores afectados; no anuncia éxito antes del servidor.
 
-Textos: pesos «Ajustamos los pesos para que sumen 100 %»; examen «Agrega al menos dos ítems para publicar»; historial protegido «Esta actividad ya tiene intentos. Duplícala para hacer cambios»; archivo «Esta actividad está archivada. Duplícala para editarla»; grupo archivado «Este grupo está archivado. Elige uno activo»; grupo con historia «Este grupo tiene historial. Archívalo en lugar de borrarlo»; correo ocupado «Ese correo no está disponible». Otros códigos: mensajes comunes SPEC-02 o genérico SPEC-01, nunca códigos técnicos en pantalla.
+Textos: pesos «Ajustamos los pesos para que sumen 100 %»; examen «Agrega al menos dos ítems para publicar»; historial protegido «Esta actividad ya tiene intentos. Duplícala para hacer cambios»; archivo «Esta actividad está archivada. Restáurala al catálogo o duplícala para editarla»; grupo archivado «Este grupo está archivado. Elige uno activo»; grupo con miembros «Este grupo tiene alumnos. Trasládalos a otro grupo antes de archivarlo»; grupo con historia «Este grupo tiene historial. Archívalo en lugar de borrarlo»; correo ocupado «Ese correo no está disponible». Otros códigos: mensajes comunes SPEC-02 o genérico SPEC-01, nunca códigos técnicos en pantalla.
 
 Editor de huecos inicia con sintaxis simple `[correcta|distractor|distractor]`; convierte a IDs/config/clave separados, sin exponer esta notación en config pública. Formulario de juego trae un ejemplo editable por mecánica y ayudas. Diálogos con foco contenido/restaurado y confirmaciones accesibles; contraste AA y errores asociados a campos. Sin variantes Kids/Teens en este panel.
 
@@ -240,11 +245,11 @@ Matriz **por implementar**, no evidencia ejecutada. Integración con PostgreSQL 
 | RF-5 | Unitaria/componente | `RF-5: valida speaking 2/120/300`; límites, mínimo fijo y HTTPS |
 | RF-6 | Unitaria/componente | `RF-6: valida cinco esquemas y sus respuestas`; fórmulas, tokens repetidos equivalentes, memory vacío y >100 selecciones |
 | RF-7 | Integración/componente | `RF-7: guarda examen de cero o un ítem sin publicarlo`; mínimo, tipo y claves |
-| RF-8 | Unitaria/integración/componente | `RF-8: normaliza pesos y conserva omitidas`; 30/30/30, ceros, suma cero, ajuste y Q-03 |
+| RF-8 | Unitaria/integración/componente | `RF-8: normaliza pesos y conserva omitidas`; 30/30/30, ceros, suma cero, ajuste y mayor resto (33.36/33.36/33.26/0.01, empates, suma exacta 100,0, sin negativos) |
 | RF-9 | Integración | `RF-9: publica sin permitir contenido inválido por PATCH`; repetición y carreras |
 | RF-10 | Integración | `RF-10: duplica versión sin modificar historia`; todos los estados, primer intento concurrente |
-| RF-11 | Integración | `RF-11: archiva sin borrar historia y protege borrado`; asignación/hijo concurrente, Q-01 |
-| RF-12 | Integración/componente | `RF-12: gestiona grupos sin borrar historia`; FK y Q-02 |
+| RF-11 | Integración | `RF-11: archiva sin borrar historia ni cancelar asignaciones y protege borrado`; asignación/hijo concurrente, asignaciones y ventanas intactas |
+| RF-12 | Integración/componente | `RF-12: gestiona grupos sin borrar historia`; FK, archivo con miembros (`GROUP_HAS_ACTIVE_STUDENTS`), archivo sin miembros y carrera con traslado/aprobación |
 | RF-13 | Integración PostgreSQL | `RF-13: traslados serializados mantienen una membresía`; mismo destino, rollback, índice único, historia, intentos intactos; continuidad ejecutable en SPEC-05 |
 | RF-14 | Componente/integración | `RF-14: ficha edita solo campos permitidos y solicita recuperación`; segmento y 403 |
 | RF-15 | Componente/integración | `RF-15: aprueba o rechaza desde solicitudes`; login aprobado, correo, sin huérfanos, conflicto y grupo archivado concurrente |
@@ -256,6 +261,7 @@ Matriz **por implementar**, no evidencia ejecutada. Integración con PostgreSQL 
 | RF-21 | Integración HTTP | `RF-21: aísla cada ruta y no filtra PII`; 401/403/404, relaciones ajenas, extras, 1 MB, 120/min, Origin y no-store |
 | RF-22 | Componente | `RF-22: estados y diálogos permiten teclado`; validación, foco, formularios conservados, mapas de errores |
 | RF-23 | Manual staging | `RF-23: profesora crea sin ayuda en menos de diez minutos`; primera actividad y una de cada tipo |
+| RF-24 | Integración/componente | `RF-24: restaura actividad archivada al catálogo`; vuelve a `published` y a la selección, asignaciones/intentos intactos, examen inválido rechazado, `ACTIVITY_NOT_ARCHIVED`, doble clic |
 
 Fixtures de corrección: total/parcial/cero/omitidas; memory dos parejas/un fallo = 2/3; intercambiar ambos `had` en «I had had enough» conserva 4/4. Se verifican contratos/ejemplos, no scorers ejecutables (SPEC-05/06). E2E crear→asignar: SPEC-04.
 
@@ -263,25 +269,26 @@ H1: commit/CI, contenido real, aprobación/desbloqueo en staging y acta de onboa
 
 ## 10. Fuera de alcance y decisiones diferidas
 
-Destinos en §2. Sin duplicar APIs de SPEC-02 ni adelantar scoring/multimedia para probar continuidad. Redacción de auditoría al borrar: SPEC-05/ENG-070. Excluidos: correo periódico, outbox/entrega durable, visor de auditoría, exportaciones, edición de notas, nuevos tipos/subtipos, restauración y editor visual avanzado.
+Destinos en §2. Sin duplicar APIs de SPEC-02 ni adelantar scoring/multimedia para probar continuidad. Redacción de auditoría al borrar: SPEC-05/ENG-070. Excluidos: cancelación de asignaciones (SPEC-04), restauración de grupos, despublicación, correo periódico, outbox/entrega durable, visor de auditoría, exportaciones, edición de notas, nuevos tipos/subtipos y editor visual avanzado.
 
 Sin alta directa, contraseñas temporales, pantallas de acudientes, consentimiento legal ni CONTEXT §2.4/Fase 2–3. Flag games controla el portal, no la preparación de contenido docente.
 
 ## 11. Preguntas abiertas
 
-Sin P-n abiertos; auditoría resuelta por decisiones 84/92. Estas preguntas requieren confirmación del líder y actualización de fuentes superiores **antes de cerrar el contrato**:
+Sin P-n abiertos. Q-01 a Q-03 las cerró el líder el 2026-10-21 (decisiones 95 a 97 de CONTEXT §14) y no quedan preguntas que bloqueen un RF.
 
-| # | Pregunta | Propuesta vigente | Responsable / fecha límite | Bloquea |
+| # | Pregunta | Decisión | Responsable / fecha | Aplicada en |
 | --- | --- | --- | --- | --- |
-| Q-01 | ¿Archivar actividad cancela asignaciones existentes? architecture §6.4 permite archivo, pero no define sus efectos | **Propuesto:** retira del catálogo asignable sin cancelar asignaciones ni ventanas/continuidad ya existentes; sin restauración | Líder / antes de aprobar SPEC-03 | RF-11; frontera SPEC-04/05 |
-| Q-02 | ¿Puede archivarse un grupo con miembros vigentes? architecture §6.4 prohíbe recibir alumnos nuevos, no resuelve los actuales | **Propuesto:** exigir traslado previo de todos los miembros; `409 GROUP_HAS_ACTIVE_STUDENTS`. No trasladar automáticamente ni dejar aprobados sin grupo | Líder / antes de aprobar SPEC-03 | RF-12/RF-13 |
-| Q-03 | ¿Cómo corregir residuos que darían un peso negativo? El redondeo y corrección solo en el último ítem de architecture §4.4 no cubre todos los casos | **Propuesto:** mayor resto en décimas, desempate desde el último ítem; conserva 33.3/33.3/33.4 para 30/30/30 y garantiza pesos no negativos con suma 100. Requiere precisar architecture antes de adoptarlo | Líder / antes de aprobar SPEC-03 | RF-8 |
+| Q-01 | ¿Archivar actividad cancela asignaciones existentes? | **Decidido (95):** archivar retira la actividad del catálogo y de la selección para asignar sin cancelar asignaciones; la profesora decide después restaurarla al catálogo (RF-24) o cancelar las asignaciones (capacidad de SPEC-04) | Líder / 2026-10-21 | RF-11, RF-24, §4, §5, §7 |
+| Q-02 | ¿Puede archivarse un grupo con miembros vigentes? | **Decidido (96):** se acepta la propuesta: exige traslado previo de todos los miembros; `409 GROUP_HAS_ACTIVE_STUDENTS`; sin traslado automático ni aprobados sin grupo | Líder / 2026-10-21 | RF-12, §5, §7 |
+| Q-03 | ¿Cómo corregir residuos que darían un peso negativo? | **Decidido (97):** se acepta la propuesta: mayor resto en décimas, desempate desde el último ítem; architecture §4.4 precisada | Líder / 2026-10-21 | RF-8, §4 |
 
-Ejemplo Q-03: pesos 33.36/33.36/33.26/0.01 suman 99.99; redondear los tres primeros normalizados da 33.4/33.4/33.3 y dejar el residuo al cuarto daría −0.1. No implementar silenciosamente una política alternativa.
 
-Concreciones para revisar al aprobar: fórmulas de juego, crédito por posición en order_words y penalización de memory, límites/defaults de contenido/duraciones, sintaxis simple de huecos y códigos nuevos `ACTIVITY_NOT_EDITABLE`, `ACTIVITY_DELETE_NOT_ALLOWED`, `GROUP_HAS_HISTORY`, `STUDENT_NOT_APPROVED`; `GROUP_HAS_ACTIVE_STUDENTS` solo propuesto. Los códigos se incorporarán al catálogo architecture §13 al confirmar el contrato.
+Concreciones aceptadas al aprobar: fórmulas de juego, límites/defaults, sintaxis simple de huecos, restauración siempre a `published` con revalidación, catálogo activo sin archivadas por defecto y códigos nuevos `ACTIVITY_NOT_EDITABLE`, `ACTIVITY_DELETE_NOT_ALLOWED`, `ACTIVITY_NOT_ARCHIVED`, `GROUP_HAS_HISTORY`, `GROUP_HAS_ACTIVE_STUDENTS`, `STUDENT_NOT_APPROVED` (architecture §13).
 
-Pendientes operativos: SPEC-02 §11, acceso/correo real en staging y profesora para ENG-043. Desajustes documentales no bloqueantes: ENG-031 dice crear tablas ya existentes; solo verificar/completar. ENG-043 enumera tres dependencias, pero la salida superior exige los cinco tipos.
+Dependencia para SPEC-04 (no bloquea esta spec): definir la cancelación de asignaciones por la profesora (el modelo no tiene estado de cancelación) y que las asignaciones de una actividad archivada sigan abiertas hasta su cierre.
+
+Pendientes operativos: SPEC-02 §11, correo real en staging y profesora para ENG-043. Desajustes documentales no bloqueantes: ENG-031 solo verifica/completa tablas existentes; ENG-043 enumera tres dependencias, pero la salida superior exige los cinco tipos.
 
 ## 12. Registro de cambios
 
@@ -289,3 +296,5 @@ Pendientes operativos: SPEC-02 §11, acceso/correo real en staging y profesora p
 | --- | --- | --- |
 | 2026-10-21 | Creación del borrador: 23 RF, contratos, seguridad y pruebas; Q-01/Q-02/Q-03 pendientes | Redacción de SPEC-03 sin implementación ni cambios de decisiones |
 | 2026-10-21 | Revisión: concurrencia de identidad, revisión reservada hasta ENG-090, tokens repetidos y límites/defaults | Corregir casos límite sin adelantar etapas |
+| 2026-10-21 | Auditoría de alcance y aprobación: Q-01 a Q-03 cerradas (decisiones 95–97); se añade RF-24 (restauración de actividades archivadas), el archivo de grupos exige traslado previo de miembros y el reparto de pesos usa mayor resto; Estado `Aprobada` | Decisiones del líder y auditoría sin hallazgos bloqueantes |
+| 2026-10-21 | Transición de estado a "Implementada": 24 RF y 15 tareas ENG completadas, 188 tests en verde en el monorepo (110 API, 34 web, 44 shared), 0 violaciones de guardrails | Culminación de la implementación técnica de la Etapa 3 (Hito H1) |

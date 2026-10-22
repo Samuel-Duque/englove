@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Post,
+  Put,
   Param,
   Body,
   Query,
@@ -20,11 +21,15 @@ import {
   ApproveStudentDto,
   UpdateStudentDto,
   StudentQueryDto,
+  TransferStudentGroupDto,
+  ChangeStudentEmailDto,
+  StudentMembershipsQueryDto,
 } from './dto/students.dto';
 import {
   Role,
   StudentView,
   StudentListResponse,
+  MembershipListResponse,
   MessageResponse,
 } from '@englove/shared';
 
@@ -125,5 +130,40 @@ export class StudentsController {
     @Param('id', uuidPipe) id: string,
   ): Promise<MessageResponse> {
     return this.studentsService.resetPasswordInitiatedByTeacher(user.organizationId, id);
+  }
+
+  @Get(':id/memberships')
+  @HttpCode(HttpStatus.OK)
+  async listMemberships(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+    @Query() query: StudentMembershipsQueryDto,
+  ): Promise<MembershipListResponse> {
+    return this.studentsService.listMemberships(user.organizationId, id, query);
+  }
+
+  @Put(':id/group')
+  @HttpCode(HttpStatus.OK)
+  async transferGroup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+    @Body() dto: TransferStudentGroupDto,
+  ): Promise<StudentView> {
+    return this.studentsService.transferStudentGroup(user.organizationId, id, dto.groupId);
+  }
+
+  @Post(':id/change-email')
+  @HttpCode(HttpStatus.OK)
+  async changeEmail(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+    @Body() dto: ChangeStudentEmailDto,
+  ): Promise<MessageResponse> {
+    return this.studentsService.changeStudentEmail(
+      user.organizationId,
+      user.id,
+      id,
+      dto.newEmail,
+    );
   }
 }

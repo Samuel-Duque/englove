@@ -45,3 +45,7 @@ export interface StudentListQuery {
   offset?: number;
   limit?: number;
 }
+
+export interface ChangeStudentEmailInput {
+  newEmail: string;
+}

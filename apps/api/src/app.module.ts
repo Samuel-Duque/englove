@@ -9,6 +9,9 @@ import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 import { StudentsModule } from './students/students.module';
+import { ActivitiesModule } from './activities/activities.module';
+import { GroupsModule } from './groups/groups.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { OriginGuard } from './common/guards/origin.guard';
 import { RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
@@ -47,6 +50,9 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     MailModule,
     AuthModule,
     StudentsModule,
+    ActivitiesModule,
+    GroupsModule,
+    DashboardModule,
     MaintenanceModule,
   ],
   providers: [

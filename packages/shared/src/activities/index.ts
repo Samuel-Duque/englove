@@ -3,4 +3,6 @@ export * from './open-question';
 export * from './speaking';
 export * from './game';
 export * from './exam';
+export * from './scoring';
+export * from './durations';
 export * from './registry';

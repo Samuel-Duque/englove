@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-21. SPEC-01 y SPEC-02 figuran Verificadas; SPEC-03 en estado Implementada (tareas técnicas ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046 en Hecho con 188 tests en monorepo; Hito H1 alcanzado a nivel de desarrollo; sesión de onboarding y staging pendientes para Verificada). SPEC-04 y SPEC-05 en redacción.
+> Última actualización: 2026-10-22. SPEC-01, SPEC-02 y SPEC-03 figuran Verificadas; SPEC-04 figura Aprobada tras auditoría integral y confirmación del líder. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. SPEC-05 pendiente de redacción.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -224,7 +224,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Pantallas de login, registro, recuperación y restablecimiento de contraseña; redirección por rol.
 - **Endurecimiento HTTP y rate limiting (Decidido, decisión 34 §20):** helmet, CORS con allowlist, comprobación de `Origin` y la tabla de límites de architecture §8.3 (login 10 / 15 min por IP; signup 10 / hora por IP; forgot-password 5 / hora por IP y correo; 120 / min autenticado; 30 / min anónimo). Contadores en memoria, válidos solo con una instancia (decisión 64).
 - Pruebas de integración de auth, auto-registro, bloqueo, recuperación, cambio de correo, rate limiting y aislamiento de tenant.
-- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados, recordatorios y el cambio administrativo del correo con auditoría; P-4 ya decidido, decisiones 84 y 92). A 2026-10-21 está Aprobada por el líder e Implementada (decisiones 95–97); este criterio de salida está cumplido.
+- Redacción de SPEC-03 en paralelo (incluye la bandeja de solicitudes de registro, bloqueados, recordatorios y el cambio administrativo del correo con auditoría; P-4 ya decidido, decisiones 84 y 92). A 2026-10-22 figura Verificada tras aprobación y verificación formal por el líder (decisiones 95–97); este criterio de salida está cumplido.
 
 **Fuera de alcance.** Baja general de alumnos (`DELETE /students/:id`, SPEC-05 / ENG-070, decisión 93). Pantallas de `parent` y `admin`; el enum existe (Decidido). Aprobación o rechazo de solicitudes desde el panel (necesita grupos, Etapa 3; aquí solo se construye la API sin interfaz). Acceso por código de aula, PIN o avatar: descartado (decisión 22). Alta directa por la profesora y contraseñas temporales: eliminadas (decisión 34 §1). Cualquier entidad de acudiente o de consentimiento: eliminadas (decisión 34 §1 y §2).
 
@@ -243,7 +243,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Verificación en staging: las cookies llevan `Domain=.<dominio>`, `Secure`, `HttpOnly` y `SameSite=Lax`; el `proxy.ts` de `app-staging.` las ve y redirige por rol; una petición mutante con `Origin` fuera de la allowlist recibe 403; las cookies de staging no interfieren con las de producción (prefijo por entorno).
 - Test: cada límite de la tabla de rate limiting responde `429` al superarse.
 - Test: el correo de solicitud recibida y el de recuperación salen del mismo remitente.
-- SPEC-03 Aprobada (cumplido; implementada el 2026-10-21).
+- SPEC-03 Aprobada (cumplido; verificada el 2026-10-22 por el líder del proyecto).
 
 **Dependencias.** Compuerta de inicio (decisión 65): SPEC-02 Aprobada y dependencias técnicas de la Etapa 1 entregadas (ENG-011 a ENG-015 y ENG-019; §2.1). ENG-019 (correo transaccional) es además necesario para la recuperación en staging.
 
@@ -300,7 +300,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tareas.** ENG-030 a ENG-041, ENG-043 a ENG-046, SPEC-04, SPEC-05. (ENG-042 se eliminó el 2026-09-22 por la decisión 34 §2; ENG-045 es nueva: recordatorios del dashboard; ENG-046 es nueva el 2026-09-28: cambio administrativo del correo con auditoría, decisión 63.)
 
-**Estado actual (2026-10-21).** Implementada. SPEC-03 en estado `Implementada`. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) están completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. ENG-039 pasa a la Etapa 5 con SPEC-05. La sesión presencial de onboarding (ENG-043) y las pruebas operativas en staging quedan pendientes para la acreditación definitiva de H1 y paso a Verificada. SPEC-04 y SPEC-05 en redacción.
+**Estado actual (2026-10-22).** Cierre técnico completado; cierre global de Etapa 3/H1 pendiente. SPEC-03 permanece en estado `Verificada` tras la aprobación y verificación formal por el líder del proyecto. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) permanecen en `Hecho`, completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. SPEC-04 se encuentra Aprobada. Para el cierre global faltan SPEC-05 al menos En revisión y acreditar los entregables de staging y el onboarding cronometrado (SPEC-03 §9/§11 y SPEC-02 §11). ENG-039 pasa a la Etapa 5 con SPEC-05; SPEC-05 pendiente de redacción.
 
 ---
 
@@ -312,8 +312,9 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 - Modelo y endpoints `assignments` con `opens_at`, `due_at` y `historical_student_count` (nullable; lo fija el borrado en cascada de la Etapa 5). Regla de un intento por asignación (Decidido, decisión 25); la habilitación de un nuevo intento llega en la Etapa 7.
 - Semántica de `due_at` (Decidido, decisiones 34 §10 y 60): el cierre se compara con el `started_at` del servidor al iniciar el intento; un intento iniciado a tiempo puede terminarse hasta 24 horas después del cierre. La validación se implementa en la Etapa 5 con el ciclo de intento; aquí se documenta en la interfaz ("los alumnos pueden empezar hasta esta hora; quien haya empezado tendrá hasta 24 horas más para terminar").
-- Interfaz de asignación y vista por grupo; fechas en zona America/Bogota.
-- Validaciones: solo actividades `published`; `opens_at < due_at`; no duplicar una asignación activa del mismo par actividad-grupo.
+- Interfaz de asignación y cancelación y vista por grupo; fechas en zona America/Bogota.
+- Cancelación definitiva por asignación, incluso cerrada, mediante `cancelled_at` nullable del servidor; repetir conserva la primera fecha. No borra ni reprograma, no restaura ni envía correo; conserva historial e intentos ya iniciados con sus plazos (decisión 98; [SPEC-04](../specs/SPEC-04-asignacion.md)). El bloqueo de nuevos inicios, las habilitaciones y los indicadores se implementan en SPEC-05/07/08 según esa decisión.
+- Validaciones: solo actividades `published`; `opens_at < due_at`; no duplicar una asignación activa del mismo tenant, actividad concreta y grupo: no cancelada y con `due_at ≥ ahora` del servidor, incluidas futuras aunque sus ventanas no se solapen. Tras cierre o cancelación puede reasignarse con ID nuevo y su propio intento inicial. Comprobación e inserción serializadas con referencias, archivo y cancelación, sin éxito parcial multigrupo; la garantía concurrente no equivale a idempotencia general para ventanas ya cerradas (decisión 99; [SPEC-04](../specs/SPEC-04-asignacion.md)).
 - E2E flujo 1: la profesora crea y asigna una actividad.
 - Cierre de SPEC-05 en paralelo.
 
@@ -325,7 +326,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Un borrador no se puede asignar (test).
 - SPEC-05 Aprobada.
 
-**Dependencias.** SPEC-04 Aprobada. Etapa 3.
+**Dependencias.** SPEC-04 Aprobada (cumplida el 2026-10-22). Etapa 3.
 
 **Riesgos.** Bajo. La etapa es pequeña; el riesgo es dejarla incompleta por parecer obvia.
 

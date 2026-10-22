@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Implementada |
+| Estado | Verificada |
 | Etapa | 3 — Gestor de contenidos |
 | Tareas | ENG-030, ENG-031, ENG-032, ENG-033, ENG-034, ENG-035, ENG-036, ENG-037, ENG-038, ENG-040, ENG-041, ENG-043, ENG-044, ENG-045, ENG-046 |
-| Referencias | CONTEXT §4.1, §5.1, §5.3, §14–§16 · architecture §3.1–§3.2, §4.1–§4.4, §5.1–§6.5, §7.2–§7.3, §8, §13 · pbp §3 y Etapa 3 · decisiones 20, 24, 33, 37, 42, 45–47, 59, 63, 66, 67, 70, 73, 75, 79–80, 83, 89–97 |
-| Aprobada por / fecha | Líder del proyecto / 2026-10-21 |
+| Referencias | CONTEXT §4.1, §5.1, §5.3, §14–§16 · architecture §3.1–§3.2, §4.1–§4.4, §5.1–§6.5, §7.2–§7.3, §8, §13 · pbp §3 y Etapa 3 · decisiones 20, 24, 33, 37, 42, 45–47, 59, 63, 66, 67, 70, 73, 75, 79–80, 83, 89–98 |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-21 (Aprobada) · 2026-10-22 (Verificada) |
 
 ## 1. Contexto y objetivo
 
@@ -286,9 +286,11 @@ Sin P-n abiertos. Q-01 a Q-03 las cerró el líder el 2026-10-21 (decisiones 95 
 
 Concreciones aceptadas al aprobar: fórmulas de juego, límites/defaults, sintaxis simple de huecos, restauración siempre a `published` con revalidación, catálogo activo sin archivadas por defecto y códigos nuevos `ACTIVITY_NOT_EDITABLE`, `ACTIVITY_DELETE_NOT_ALLOWED`, `ACTIVITY_NOT_ARCHIVED`, `GROUP_HAS_HISTORY`, `GROUP_HAS_ACTIVE_STUDENTS`, `STUDENT_NOT_APPROVED` (architecture §13).
 
-Dependencia para SPEC-04 (no bloquea esta spec): definir la cancelación de asignaciones por la profesora (el modelo no tiene estado de cancelación) y que las asignaciones de una actividad archivada sigan abiertas hasta su cierre.
+Dependencia de implementación para SPEC-04 (no bloquea esta spec): la cancelación de asignaciones por la profesora ya está decidida en CONTEXT §14, decisión 98, pero no implementada. Archivar una actividad sigue sin cancelar sus asignaciones (decisión 95); la cancelación explícita se implementará en SPEC-04, Aprobada el 2026-10-22 y lista para implementación.
 
 Pendientes operativos: SPEC-02 §11, correo real en staging y profesora para ENG-043. Desajustes documentales no bloqueantes: ENG-031 solo verifica/completa tablas existentes; ENG-043 enumera tres dependencias, pero la salida superior exige los cinco tipos.
+
+Seguimiento de cierre: SPEC-03 permanece `Verificada` y las tareas técnicas permanecen en `Hecho`; SPEC-04 pasa a `Aprobada` el 2026-10-22. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y la evidencia operativa exigida en §9 y aquí, incluidas la validación en staging y la sesión de onboarding.
 
 ## 12. Registro de cambios
 
@@ -298,3 +300,5 @@ Pendientes operativos: SPEC-02 §11, correo real en staging y profesora para ENG
 | 2026-10-21 | Revisión: concurrencia de identidad, revisión reservada hasta ENG-090, tokens repetidos y límites/defaults | Corregir casos límite sin adelantar etapas |
 | 2026-10-21 | Auditoría de alcance y aprobación: Q-01 a Q-03 cerradas (decisiones 95–97); se añade RF-24 (restauración de actividades archivadas), el archivo de grupos exige traslado previo de miembros y el reparto de pesos usa mayor resto; Estado `Aprobada` | Decisiones del líder y auditoría sin hallazgos bloqueantes |
 | 2026-10-21 | Transición de estado a "Implementada": 24 RF y 15 tareas ENG completadas, 188 tests en verde en el monorepo (110 API, 34 web, 44 shared), 0 violaciones de guardrails | Culminación de la implementación técnica de la Etapa 3 (Hito H1) |
+| 2026-10-22 | Estado Implementada → Verificada y sincronización documental | Aprobación y verificación formal por el líder del proyecto tras verificar 188/188 tests (110 API, 34 web, 44 shared), Docker PostgreSQL, endpoints en vivo y guardrails (Hito H1 verificado) |
+| 2026-10-22 | Corrección del seguimiento global: SPEC-03 permanece Verificada y las tareas técnicas Hecho; SPEC-04 Aprobada; Etapa 3/H1 pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. Dependencia de cancelación decidida (98) y formalizada en SPEC-04 Aprobada | La declaración histórica de H1 verificado no acredita el cierre global; se conserva el historial y la evidencia técnica, sin nuevas pruebas de aplicación |

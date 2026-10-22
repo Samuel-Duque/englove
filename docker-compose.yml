@@ -4,7 +4,7 @@ services:
     container_name: englove-postgres
     restart: unless-stopped
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - englove_pgdata:/var/lib/postgresql
+      - englove_pgdata:/var/lib/postgresql/data
 
   # MinIO es opcional como emulador S3 para Cloudflare R2 en local (RF-19)
   # Para levantarlo: docker compose --profile storage up -d

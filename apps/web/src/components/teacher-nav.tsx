@@ -16,6 +16,7 @@ export function TeacherNav({ teacherName }: TeacherNavProps) {
   const navItems = [
     { label: 'Inicio', href: '/inicio' },
     { label: 'Actividades', href: '/actividades' },
+    { label: 'Asignaciones', href: '/asignaciones' },
     { label: 'Grupos', href: '/grupos' },
     { label: 'Alumnos', href: '/alumnos' },
   ];

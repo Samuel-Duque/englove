@@ -4,7 +4,7 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-10-22. SPEC-01, SPEC-02 y SPEC-03 figuran Verificadas; SPEC-04 figura Aprobada tras auditoría integral y confirmación del líder del proyecto. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. SPEC-05 pendiente de redacción.
+> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03 y SPEC-04 figuran Verificadas; tareas de Etapa 4 (ENG-050 a ENG-053) en Hecho con suite E2E de asignación. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. SPEC-05 pendiente de redacción.
 >
 > Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 

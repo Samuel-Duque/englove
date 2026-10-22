@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Aprobada |
+| Estado | Verificada |
 | Etapa | 4 — Asignación |
 | Tareas | ENG-050, ENG-051, ENG-052, ENG-053 |
 | Referencias | CONTEXT §5.1, §7.1–§7.2, §10, §11.2, §14–§16 · architecture §3.1–§3.2, §3.6, §4.1–§4.3, §6.2–§6.5, §7.5, §7.7, §8, §9.4, §13 · pbp §3 y Etapa 4 · decisiones 25, 37, 44, 48, 60–61, 73–75, 79–80, 89–90, 95–96, 98–99 |
-| Aprobada por / fecha | Líder del proyecto / 2026-10-22 |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-22 (Aprobada y Verificada) |
 
 ## 1. Contexto y objetivo
 
@@ -228,7 +228,9 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (CONTEXT §15). Q-01/Q-02 
 
 **Aprobación integral:** Estado Aprobada por el líder del proyecto el 2026-10-22 tras auditoría de contratos, modelo, UI y plan de pruebas. Q-01 y Q-02 formalizadas en decisiones 98 y 99; autoriza el inicio de la implementación de la Etapa 4 (ENG-050 a ENG-053).
 
-**Seguimiento de Etapa 3/H1:** SPEC-03 sigue Verificada y sus ENG técnicos Hecho; con SPEC-04 Aprobada, el cierre global de Etapa 3/H1 queda pendiente de **SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding**, incluidos los prerrequisitos de SPEC-02 §11 (CONTEXT §15, pbp Etapa 3, SPEC-03 §9/§11).
+**Verificación técnica:** Estado Verificada el 2026-10-22 tras la implementación completa y verificación de las tareas ENG-050 a ENG-053 (248/248 tests en monorepo: 54 shared, 145 api, 49 web; suite E2E de asignación; guardrails sin errores; typecheck, lint y build limpios).
+
+**Seguimiento de Etapa 3/H1:** SPEC-03 sigue Verificada y sus ENG técnicos Hecho; con SPEC-04 Verificada, el cierre global de Etapa 3/H1 queda pendiente de **SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding**, incluidos los prerrequisitos de SPEC-02 §11 (CONTEXT §15, pbp Etapa 3, SPEC-03 §9/§11).
 
 ## 12. Registro de cambios
 
@@ -238,3 +240,4 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (CONTEXT §15). Q-01/Q-02 
 | 2026-10-22 | Revisión semántica y concisión: garantía concurrente solo con cierres no vencidos, exclusión de membresías vacías y separación de obligaciones futuras | Corregir casos límite, respetar etapas y mantener lectura inferior a 20 minutos |
 | 2026-10-22 | Borrador → En revisión; Q-01/Q-02 cerradas por decisiones 98/99, contratos/modelo y pruebas alineados; seguimiento de H1 corregido | Aceptación de recomendaciones sin aprobación integral ni implementación; preservar cierre técnico e identificar compuertas globales pendientes |
 | 2026-10-22 | Estado En revisión → Aprobada tras auditoría integral | Aprobación formal por el líder del proyecto; contratos de API, modelo de datos, UI y plan de pruebas validados para iniciar implementación de la Etapa 4 (ENG-050 a ENG-053) |
+| 2026-10-22 | Estado Aprobada → Verificada tras implementación completa de ENG-050 a ENG-053 | Verificación automatizada con 248/248 tests en monorepo, suite E2E docente, guardrails en verde y builds exitosos |

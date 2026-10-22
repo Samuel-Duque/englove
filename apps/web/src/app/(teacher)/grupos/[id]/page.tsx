@@ -197,6 +197,12 @@ function GroupDetailContent({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/asignaciones?groupId=${id}`}
+            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+          >
+            Ver asignaciones
+          </Link>
           {!isArchived && (
             <button
               type="button"

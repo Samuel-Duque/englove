@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-22. SPEC-01, SPEC-02 y SPEC-03 figuran Verificadas; SPEC-04 figura Aprobada tras auditoría integral y confirmación del líder. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. SPEC-05 pendiente de redacción.
+> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03 y SPEC-04 figuran Verificadas (tareas ENG-050 a ENG-053 en Hecho). El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. SPEC-05 pendiente de redacción.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -326,7 +326,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Un borrador no se puede asignar (test).
 - SPEC-05 Aprobada.
 
-**Dependencias.** SPEC-04 Aprobada (cumplida el 2026-10-22). Etapa 3.
+**Dependencias.** SPEC-04 Verificada (cumplida el 2026-10-22). Etapa 3.
 
 **Riesgos.** Bajo. La etapa es pequeña; el riesgo es dejarla incompleta por parecer obvia.
 

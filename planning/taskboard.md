@@ -2,7 +2,7 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-10-22. Cierre técnico de Etapa 3 completado: SPEC-03 Verificada por el líder y su tarea en Hecho; ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046 en Hecho con evidencia técnica registrada (188/188 tests monorepo: 110 API, 34 web, 44 shared; 0 errores de guardrails; builds limpios). [SPEC-04 Asignación](../specs/SPEC-04-asignacion.md) Aprobada por el líder tras auditoría integral (decisiones 98–99 formalizadas); habilita la implementación de la Etapa 4 (ENG-050 a ENG-053). Cierre global de Etapa 3/H1 pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. ENG-039 permanece en Backlog con SPEC-05; SPEC-05 pendiente de redacción. Resumen: 50 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 59 Backlog (Total 114).
+> Última actualización: 2026-10-22. Cierre técnico de Etapa 4 completado: [SPEC-04 Asignación](../specs/SPEC-04-asignacion.md) Verificada; tareas ENG-050 a ENG-053 en Hecho con evidencia técnica registrada (248/248 tests monorepo: 145 API, 49 web, 54 shared; 0 errores de guardrails; builds limpios; suite E2E de asignación). Cierre global de Etapa 3/H1 sigue pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. ENG-039 permanece en Backlog con SPEC-05; SPEC-05 pendiente de redacción. Resumen: 54 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 55 Backlog (Total 114).
 >
 > Ronda 7: 2026-10-10. Decisiones 86 a 92 de CONTEXT §14: capacidad por horizonte, versiones base, matriz explícita de tenant, continuidad de intentos al cambiar de grupo, procedimiento operativo externo de datos de menores y auditoría administrativa redactada. Las decisiones 81 a 85 y ENG-140 permanecen vigentes.
 
@@ -28,11 +28,11 @@
 
 | Estado    | Tareas  |
 | --------- | ------- |
-| Hecho     | 50      |
+| Hecho     | 54      |
 | En curso  | 0       |
 | Por hacer | 5       |
 | Bloqueado | 0       |
-| Backlog   | 59      |
+| Backlog   | 55      |
 | **Total** | **114** |
 
 Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `englove-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). Creada y cerrada el 2026-10-19: DOC-08 (skill propia `englove-guardrails`). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes.
@@ -98,7 +98,11 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 | ENG-044 | Bandeja de solicitudes de registro: pestaña Solicitudes en alumnos/ sobre GET /students/requests, aprobación transaccional con asignación de nivel y grupo único (POST /students/:id/approve), rechazo (POST /students/:id/reject) | 2026-10-21 |
 | ENG-045 | Recordatorios del dashboard de la profesora: PendingSummaryService y GET /dashboard/reminders; ruta (teacher)/inicio con tarjetas de solicitudes pendientes y aviso reservado de actividades sin calificar (RF-17) | 2026-10-21 |
 | ENG-046 | Cambio administrativo del correo del alumno: POST /students/:id/change-email con validación multitenant, unicidad global (EMAIL_TAKEN), AuditLog en transacción, revocación de sesiones, invalidación de tokens, doble correo y confirmación explícita de identidad en modal | 2026-10-21 |
-| SPEC-04 | Redactar y aprobar [SPEC-04 Asignación](../specs/SPEC-04-asignacion.md): asignación multigrupo, fechas y tolerancia comunicada a la profesora, continuidad tras archivo (decisiones 34 §10, 60 y 95) y cancelación directa. Aprobada el 2026-10-22 tras auditoría integral de contratos, modelo, UI y plan de pruebas; Q-01/Q-02 formalizadas en decisiones 98–99; autoriza la implementación de la Etapa 4 (ENG-050 a ENG-053) | 2026-10-22 |
+| SPEC-04 | Redactar y aprobar [SPEC-04 Asignación](../specs/SPEC-04-asignacion.md): asignación multigrupo, fechas y tolerancia comunicada a la profesora, continuidad tras archivo (decisiones 34 §10, 60 y 95) y cancelación directa. Aprobada y Verificada el 2026-10-22 tras auditoría integral de contratos, modelo, UI y plan de pruebas, e implementación completa de ENG-050 a ENG-053 (248/248 tests en monorepo, guardrails en verde) | 2026-10-22 |
+| ENG-050 | Modelo y endpoints assignments: POST/GET/GET :id/POST :id/cancel con creación multigrupo atómica en transacción, validación de referencias, fechas coherentes, prevención de duplicados activos (decisión 99) y cancelación definitiva idempotente (decisión 98) | 2026-10-22 |
+| ENG-051 | Interfaz docente de asignación multigrupo con selectores de fecha en America/Bogota, texto obligatorio de tolerancia de 24 h y resumen con hora extendida de finalización | 2026-10-22 |
+| ENG-052 | Vista de asignaciones por grupo y detalle, historial preservado con grupos archivados, disponibilidad derivada (scheduled, open, closed, cancelled) y modal accesible de cancelación | 2026-10-22 |
+| ENG-053 | Suite E2E de flujo 1 integrado: la profesora crea borrador fill_blank, lo publica, lo asigna a grupos y verifica persistencia de una sola fila al recargar | 2026-10-22 |
 
 ---
 
@@ -147,14 +151,7 @@ Verificación técnica cumplida: SPEC-03 permanece **Verificada** por el líder 
 
 ### Etapa 4 — Asignación
 
-Compuerta cumplida: [SPEC-04](../specs/SPEC-04-asignacion.md) se encuentra **Aprobada** por el líder del proyecto (2026-10-22). Las tareas técnicas ENG-050 a ENG-053 quedan habilitadas para implementación respetando sus dependencias.
-
-| ID      | Tarea                                                                                                                                                                                                                                                                      | Prioridad | Depende de                | Spec    | Estado  |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- | ------- | ------- |
-| ENG-050 | Modelo y endpoints `assignments`: actividad, grupos, `opens_at`, `due_at`, `historical_student_count` (nullable, lo fija ENG-070) y `cancelled_at` (nullable del servidor); cancelación definitiva idempotente (98); validaciones (solo `published`, fechas coherentes y duplicado activo según 99), creación multigrupo atómica. Sin `max_attempts`: un intento por asignación (25) | P0        | SPEC-04, ENG-032, ENG-040 | SPEC-04 | Backlog |
-| ENG-051 | Interfaz de asignación a uno o varios grupos y confirmación de cancelación definitiva (98), con fechas en America/Bogota; junto a la fecha de cierre, el texto "los alumnos pueden empezar hasta esta hora; quien haya empezado tendrá hasta 24 horas más para terminar" (decisión 60)                                    | P0        | ENG-050                   | SPEC-04 | Backlog |
-| ENG-052 | Vista de asignaciones por grupo, incluidas canceladas e historial (98), con disponibilidad derivada                                                                                                                                                                                                                                            | P1        | ENG-051                   | SPEC-04 | Backlog |
-| ENG-053 | E2E flujo 1 (Playwright): la profesora crea y asigna una actividad                                                                                                                                                                                                         | P0        | ENG-051                   | SPEC-04 | Backlog |
+Verificación técnica cumplida: [SPEC-04](../specs/SPEC-04-asignacion.md) se encuentra **Verificada** (2026-10-22). Todas las tareas técnicas de la etapa (ENG-050 a ENG-053) se encuentran en `Hecho` con verificación automatizada completa (248/248 tests en monorepo: 54 shared, 145 api, 49 web; guardrails 0 errores; typecheck, lint y build limpios).
 
 ### Etapa 5 — Portal del estudiante (Hito H2)
 

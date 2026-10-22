@@ -13,6 +13,7 @@ import { ActivitiesModule } from './activities/activities.module';
 import { GroupsModule } from './groups/groups.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { AssignmentsModule } from './assignments/assignments.module';
 import { OriginGuard } from './common/guards/origin.guard';
 import { RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -54,6 +55,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     GroupsModule,
     DashboardModule,
     MaintenanceModule,
+    AssignmentsModule,
   ],
   providers: [
     {

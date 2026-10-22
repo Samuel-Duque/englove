@@ -88,3 +88,13 @@ export const JobRunStatus = {
   failed: 'failed',
 } as const;
 export type JobRunStatus = (typeof JobRunStatus)[keyof typeof JobRunStatus];
+
+export const AssignmentAvailability = {
+  scheduled: 'scheduled',
+  open: 'open',
+  closed: 'closed',
+  cancelled: 'cancelled',
+} as const;
+export type AssignmentAvailability =
+  (typeof AssignmentAvailability)[keyof typeof AssignmentAvailability];
+

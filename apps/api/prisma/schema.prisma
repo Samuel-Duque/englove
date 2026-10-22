@@ -382,6 +382,7 @@ model Assignment {
   opens_at                 DateTime  @db.Timestamptz @map("opens_at")
   due_at                   DateTime  @db.Timestamptz @map("due_at")
   historical_student_count Int?      @map("historical_student_count")
+  cancelled_at             DateTime? @db.Timestamptz @map("cancelled_at")
   created_at               DateTime  @default(now()) @db.Timestamptz
   updated_at               DateTime  @updatedAt @db.Timestamptz
 

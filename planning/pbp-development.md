@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03 y SPEC-04 figuran Verificadas (tareas ENG-050 a ENG-053 en Hecho). El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. SPEC-05 pendiente de redacción.
+> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03 y SPEC-04 figuran Verificadas (tareas ENG-050 a ENG-053 en Hecho). El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) está redactada como Borrador, con Q-01 a Q-04 de su §11 pendientes de decisión; sin aprobación ni implementación de Etapa 5.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -300,7 +300,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tareas.** ENG-030 a ENG-041, ENG-043 a ENG-046, SPEC-04, SPEC-05. (ENG-042 se eliminó el 2026-09-22 por la decisión 34 §2; ENG-045 es nueva: recordatorios del dashboard; ENG-046 es nueva el 2026-09-28: cambio administrativo del correo con auditoría, decisión 63.)
 
-**Estado actual (2026-10-22).** Cierre técnico completado; cierre global de Etapa 3/H1 pendiente. SPEC-03 permanece en estado `Verificada` tras la aprobación y verificación formal por el líder del proyecto. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) permanecen en `Hecho`, completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. SPEC-04 se encuentra Verificada tras la implementación completa de ENG-050 a ENG-053. Para el cierre global faltan SPEC-05 al menos En revisión y acreditar los entregables de staging y el onboarding cronometrado (SPEC-03 §9/§11 y SPEC-02 §11). ENG-039 pasa a la Etapa 5 con SPEC-05; SPEC-05 pendiente de redacción.
+**Estado actual (2026-10-22).** Cierre técnico completado; cierre global de Etapa 3/H1 pendiente. SPEC-03 permanece en estado `Verificada` tras la aprobación y verificación formal por el líder del proyecto. Las 15 tareas técnicas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046) permanecen en `Hecho`, completadas y verificadas con 188 tests automatizados en el monorepo (110 API, 34 web, 44 shared), 0 infracciones de guardrails y builds de producción limpios. SPEC-04 se encuentra Verificada tras la implementación completa de ENG-050 a ENG-053. Para el cierre global faltan SPEC-05 al menos En revisión y acreditar los entregables de staging y el onboarding cronometrado (SPEC-03 §9/§11 y SPEC-02 §11). ENG-039 pasa a la Etapa 5 con SPEC-05; SPEC-05 está redactada como Borrador, pendiente de resolver Q-01 a Q-04 de su §11 antes de proponerla En revisión/aprobarla.
 
 ---
 

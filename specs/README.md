@@ -16,8 +16,9 @@
 | [SPEC-02](./SPEC-02-identidad-y-sesion.md) | Identidad y sesión | Verificada | 2 — Identidad y roles | ENG-020, ENG-021, ENG-023 a ENG-029 |
 | [SPEC-03](./SPEC-03-gestor-de-contenidos.md) | Gestor de contenidos | Verificada | 3 — Gestor de contenidos | ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046 |
 | [SPEC-04](./SPEC-04-asignacion.md) | Asignación | Verificada | 4 — Asignación | ENG-050 a ENG-053 |
+| [SPEC-05](./SPEC-05-portal-e-intentos.md) | Portal e intentos | Borrador | 5 — Portal del estudiante | ENG-039, ENG-060 a ENG-073 |
 
-El calendario de las specs pendientes vive en sdd-process §7; este índice solo lista archivos ya redactados.
+El calendario de las specs pendientes vive en sdd-process §7; este índice solo lista archivos ya redactados. SPEC-05 está redactada como **Borrador**, pendiente de resolver Q-01 a Q-04 de su §11; no está Aprobada ni autoriza implementación.
 
 SPEC-00 es la tarea de arranque que crea este índice y la plantilla; no es una spec de capacidad ni tiene un archivo `SPEC-00`. A 2026-10-20, SPEC-01 figura Verificada por solicitud del líder (trazabilidad en su §9 y §12). A 2026-10-21, SPEC-02 pasa a Verificada tras la implementación completa y verificación de las tareas técnicas cubiertas (ENG-020, ENG-021, ENG-023 a ENG-029). A 2026-10-22, SPEC-03 pasa a Verificada tras la aprobación y verificación por el líder del proyecto de todas sus tareas (ENG-030 a ENG-038, ENG-040, ENG-041, ENG-043 a ENG-046), con cobertura de pruebas unitarias e integración en verde (188/188 en monorepo: 44 en shared, 110 en api, 34 en web; guardrails en verde). A 2026-10-22, SPEC-04 pasa a Verificada tras la implementación completa y verificación de la Etapa 4 (ENG-050 a ENG-053) con 254/254 tests en monorepo (54 en shared, 151 en api, 49 en web), suite concurrente en PostgreSQL real con Docker, guardrails sin errores y builds exitosos. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding.
 

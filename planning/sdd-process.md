@@ -4,7 +4,7 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03 y SPEC-04 figuran Verificadas; tareas de Etapa 4 (ENG-050 a ENG-053) en Hecho con suite E2E de asignación. El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) redactada como Borrador; Q-01 a Q-04 de su §11 pendientes de decisión, sin aprobación ni implementación.
+> Última actualización: 2026-10-22. SPEC-01 a SPEC-05 figuran Verificadas; tareas de Etapa 5 (ENG-039 y ENG-060 a ENG-073) en Hecho con 314/314 tests monorepo y suite E2E de intento de alumno en PostgreSQL real. Cierre global de Etapa 3/H1 y Etapa 5/H2 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) Verificada con Q-01 a Q-04 resueltas (Decisiones 100 a 103 de CONTEXT §14).
 >
 > Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 

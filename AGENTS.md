@@ -8,7 +8,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 1. `.agents/CONTEXT.md` — fuente única de verdad.
    - §2.4: lo que queda **fuera del piloto**.
-   - §14: registro de decisiones (1–99).
+   - §14: registro de decisiones (1–103).
    - §15: pendientes abiertos (cerrados para el piloto).
    - §16: **convenciones obligatorias para agentes**.
    - §17: **glosario** del dominio.

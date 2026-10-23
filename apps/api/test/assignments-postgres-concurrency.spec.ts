@@ -12,6 +12,17 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import * as net from 'net';
 
+function getPostgresPort(): number {
+  const url = process.env.DATABASE_URL;
+  if (!url) return 5432;
+  try {
+    const parsed = new URL(url);
+    return parsed.port ? parseInt(parsed.port, 10) : 5432;
+  } catch {
+    return 5432;
+  }
+}
+
 async function checkPostgresRunning(): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -28,7 +39,7 @@ async function checkPostgresRunning(): Promise<boolean> {
       socket.destroy();
       resolve(false);
     });
-    socket.connect(5432, '127.0.0.1');
+    socket.connect(getPostgresPort(), '127.0.0.1');
   });
 }
 

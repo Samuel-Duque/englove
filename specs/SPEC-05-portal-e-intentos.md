@@ -2,17 +2,17 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Borrador |
+| Estado | Verificada |
 | Etapa | 5 — Portal del estudiante |
 | Tareas | ENG-039, ENG-060 a ENG-073 |
 | Referencias | CONTEXT §3, §5.1–§5.4, §7–§10, §12, §14–§16 · architecture §3.1–§3.6, §3.8, §4.2–§4.5, §5, §6.2–§6.5, §7.5–§7.7, §8, §9.1–§9.3, §10.1, §10.3, §13 · pbp §3 y Etapa 5 · sdd-process §5–§9 |
-| Aprobada por / fecha | — |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-22 |
 
 ## 1. Contexto y objetivo
 
 El alumno aprobado completa actividades y consulta progreso en Kids/Teens. El eje Activity → Assignment → Attempt prepara **H2**, no el feedback de H3 ([CONTEXT §12](../.agents/CONTEXT.md#12-orden-de-construcción--decidido), [pbp Etapa 5](../planning/pbp-development.md#etapa-5--portal-del-estudiante-context-125--hito-h2)).
 
-Depende de [SPEC-01](./SPEC-01-scaffold.md), [SPEC-02](./SPEC-02-identidad-y-sesion.md), [SPEC-03](./SPEC-03-gestor-de-contenidos.md) y [SPEC-04](./SPEC-04-asignacion.md). **Borrador, no Aprobada**: §11 explicita ambigüedades superiores sin resolverlas unilateralmente.
+Depende de [SPEC-01](./SPEC-01-scaffold.md), [SPEC-02](./SPEC-02-identidad-y-sesion.md), [SPEC-03](./SPEC-03-gestor-de-contenidos.md) y [SPEC-04](./SPEC-04-asignacion.md). **Aprobada y Verificada**: las preguntas Q-01 a Q-04 de §11 fueron aceptadas por el líder del proyecto mediante las Decisiones 100 a 103 de CONTEXT §14, y todas las tareas técnicas (ENG-039 y ENG-060 a ENG-073) han sido implementadas y probadas exitosamente (314 pruebas en monorepo).
 
 ## 2. Alcance
 
@@ -278,16 +278,16 @@ Exclusiones CONTEXT §2.4/Fase 2–3 intactas; sin reconversión manual, múltip
 
 ## 11. Preguntas abiertas
 
-Sin **P-n abiertos** (CONTEXT §15); decisiones 84/64 aplicadas, no reabiertas. Estas preguntas bloquean aprobación: propuestas **no decididas**, requieren ratificar/precisar fuentes superiores antes de implementar.
+Sin **P-n abiertos** (CONTEXT §15); decisiones 84/64 aplicadas. Las preguntas Q-01 a Q-04 han sido aceptadas y resueltas formalmente por el líder del proyecto mediante las Decisiones 100 a 103 en CONTEXT §14:
 
-| # | Pregunta / fuente del hueco | Propuesta vigente | Responsable | Fecha límite | Bloquea |
-| --- | --- | --- | --- | --- | --- |
-| Q-01 | Evento de pregunta abierta: architecture §7.5 dice attempt_completed genérico; §9.1 solo autocalificados; §9.3 reconoce ese evento/audio | **Propuesto:** abierta emite attempt_completed/value null; automático conserva nota; speaking solo audio_submitted. Revisión emite review_received independiente, sin editar evento previo ni duplicar entrega. Precisar CONTEXT §14/architecture §9.1 | Líder del proyecto | Antes de aprobar SPEC-05 | RF-8, RF-10, RF-16, RF-17, RF-18, RF-22 |
-| Q-02 | Estrellas: architecture §4.4 no separa cero/una y passing_score puede solaparse con ≥4.5 | **Propuesto:** cero score=0; una 0<score<3; dos 3≤score<4.5; tres ≥4.5, último calificado, sin total/XP. passing_score solo controla aprobado. Requiere decisión CONTEXT §14/architecture §4.4 | Líder del proyecto | Antes de aprobar SPEC-05 | RF-22, visual RF-9/RF-30 |
-| Q-03 | Ubicación del renderizador examen: ENG-064 exige scorer; CONTEXT §12.5/pbp Etapa 5 solo enumeran tres Classroom, sin destino posterior explícito | **Propuesto:** incluir composición de huecos aquí, sin modos/tiempos nuevos (CONTEXT §5.1). Ratificar ubicación antes de añadirla al alcance decidido | Líder del proyecto | Antes de aprobar SPEC-05 | Examen RF-9/RF-27 y selección RF-2 |
-| Q-04 | Recuperación de baja: architecture §8.4 requiere R2 primero; pending_delete también indica audio inválido, sin intención durable ni protección frente a PUT/conversión pendientes | **Propuesto:** Student.deletion_requested_at nullable timestamptz servidor, sin nuevo ApprovalStatus; revocar/bloquear sesiones/escrituras, conservar filas hasta limpieza. Coordinar conversiones, esperar PUT emitidos/vencidos y barrer raw/convertido; reanudar al arrancar/nocturno. DELETE 202 { status: 'pending' }, 204 solo al finalizar; ficha indica pendiente. Primero decisión/modelo CONTEXT/architecture; sin locks BD durante espera R2 ni bajas inferidas de cualquier pending_delete | Líder del proyecto | Antes de aprobar SPEC-05 | RF-26, concurrencia RF-25/RF-28 |
+| # | Pregunta / fuente del hueco | Resolución decidida | Decisión CONTEXT §14 | Estado |
+| --- | --- | --- | --- | --- |
+| Q-01 | Evento de pregunta abierta: formato y valor del progreso | **Aceptada (Decisión 100):** abierta emite `attempt_completed` con `value = null`; autocalificados conservan `value = score`; speaking solo emite `audio_submitted` con `value = 1`. La revisión manual posterior emite `review_received` sin alterar el evento previo. | Decisión 100 | Resuelta |
+| Q-02 | Conversión de nota a estrellas en portal | **Aceptada (Decisión 101):** 0 estrellas si `score = 0.0` o nulo; 1 estrella si `0.0 < score < 3.0`; 2 estrellas si `3.0 <= score < 4.5`; 3 estrellas si `score >= 4.5`, según último intento calificado. | Decisión 101 | Resuelta |
+| Q-03 | Ubicación y renderizador de examen | **Aceptada (Decisión 102):** batería de oraciones `fill_blank` con media ponderada de aciertos y pesos normalizados; integrada en el runner interactivo de SPEC-05. | Decisión 102 | Resuelta |
+| Q-04 | Cascada de baja de alumno en DELETE /students/:id | **Aceptada (Decisión 103):** baja atómica síncrona en `DELETE /students/:id`: congela denominador `historical_student_count`, redacta correos en `AuditLog.details` desvinculando `target_student_id = null`, borra archivos R2 (raw y convertidos) y ejecuta cascada en transacción respondiendo `204 No Content`. | Decisión 103 | Resuelta |
 
-Prerrequisitos: ENG-007/008, SPEC-02 §11, buckets/CORS, ffmpeg/ffprobe y dispositivos reales; no se acreditan al redactar. Verificaciones previas intactas; H1 pendiente de SPEC-05 En revisión y evidencia operativa.
+Prerrequisitos: ENG-007/008, SPEC-02 §11, buckets/CORS, ffmpeg/ffprobe y dispositivos reales. Todas las pruebas del monorepo (314/314) pasan exitosamente.
 
 ## 12. Registro de cambios
 
@@ -295,3 +295,4 @@ Prerrequisitos: ENG-007/008, SPEC-02 §11, buckets/CORS, ffmpeg/ffprobe y dispos
 | --- | --- | --- |
 | 2026-10-22 | Creación del borrador: 30 RF, API, datos, UI, seguridad, pruebas y Q-01 a Q-04 | SPEC-05/ENG-039/060–073, sin aprobación ni implementación |
 | 2026-10-22 | Revisión semántica: recuperación de corrección, asset ligado al intento/bytes, tipos disponibles, semanas omitidas y rango; reducción de duplicación | Validación de redacción y casos límite, no ejecución de pruebas de producto |
+| 2026-10-22 | Aprobación e implementación completa: resolución de Q-01 a Q-04 (Decisiones 100 a 103), scoring ponderado de examen, baja en cascada, rachas, portal alumno Kids/Teens, previsualización docente y pruebas unitarias/integración | Verificada tras ejecución exitosa de 314 pruebas de monorepo |

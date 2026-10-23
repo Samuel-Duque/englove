@@ -239,6 +239,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
   const [type, setType] = useState<ActivityType>(
     initialActivity?.type ?? ActivityType.fill_blank,
   );
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [gameMechanic, setGameMechanic] = useState<GameMechanicType>(
     initialActivity?.type === ActivityType.game ? initialMechanic : 'order_words',
   );
@@ -800,6 +801,15 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-500 min-h-[44px] flex items-center gap-1.5"
+          >
+            <span>👁️</span>
+            <span>Previsualizar</span>
+          </button>
+
           {isEditing && currentStatus === ActivityStatus.draft && (
             <button
               type="button"
@@ -1709,6 +1719,106 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
           </div>
         )}
       </div>
+
+      {/* Activity Preview Modal (ENG-039, RF-16 SPEC-04, RF-12 SPEC-05) */}
+      {isPreviewOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        >
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">👀</span>
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-900">Previsualización Docente</h2>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-4" data-theme="kids">
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900">
+                  Nivel {level}
+                </span>
+                <span className="text-xs font-semibold text-zinc-500 capitalize">{type}</span>
+              </div>
+              <h3 className="text-xl font-black text-amber-950">{title || 'Actividad sin título'}</h3>
+
+              {type === ActivityType.fill_blank && (
+                <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
+                  <p className="text-base text-zinc-800">{fbPrompt}</p>
+                  <div className="flex gap-2 pt-2">
+                    <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
+                      Opción A: {fbOption1}
+                    </span>
+                    <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
+                      Opción B: {fbOption2}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {type === ActivityType.speaking && (
+                <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200 text-center">
+                  <p className="text-sm font-bold text-amber-900">{spPrompt || 'Pronuncia la frase en voz alta'}</p>
+                  <div className="p-4 rounded-xl bg-amber-50 inline-block text-xs font-semibold text-zinc-600">
+                    🎙️ Grabadora de voz simulada (2 a 120 segundos)
+                  </div>
+                </div>
+              )}
+
+              {type === ActivityType.open_question && (
+                <div className="space-y-2 bg-white p-4 rounded-xl border border-amber-200">
+                  <p className="text-sm font-semibold text-zinc-800">{oqPrompt || 'Consigna abierta'}</p>
+                  <textarea
+                    disabled
+                    placeholder="Aquí el alumno escribirá su respuesta..."
+                    className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-500"
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {type === ActivityType.exam && (
+                <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
+                  <p className="text-xs font-bold text-zinc-500">Ítems ponderados del examen</p>
+                  <p className="text-sm text-zinc-800">1. {fbPrompt}</p>
+                  {examItem2Prompt && <p className="text-sm text-zinc-800">2. {examItem2Prompt}</p>}
+                </div>
+              )}
+
+              {type === ActivityType.game && (
+                <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
+                  <p className="text-xs font-bold text-purple-700 uppercase">Mecánica: {gameMechanic}</p>
+                  <p className="text-sm text-zinc-700 mt-1">Interacción lúdica para el estudiante.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-zinc-100">
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="rounded-xl bg-zinc-900 text-white font-bold px-5 py-2 text-xs hover:bg-zinc-800"
+              >
+                Cerrar previsualización
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

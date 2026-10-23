@@ -7,12 +7,14 @@ import { MeController } from './me.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MailModule } from '../mail/mail.module';
 import { RateLimiterService } from '../common/rate-limiting/rate-limiter.service';
+import { AttemptsModule } from '../attempts/attempts.module';
 
 @Module({
   imports: [
     PrismaModule,
     MailModule,
     ConfigModule,
+    AttemptsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

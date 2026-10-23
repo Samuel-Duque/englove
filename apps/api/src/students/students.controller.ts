@@ -4,6 +4,7 @@ import {
   Patch,
   Post,
   Put,
+  Delete,
   Param,
   Body,
   Query,
@@ -165,5 +166,14 @@ export class StudentsController {
       id,
       dto.newEmail,
     );
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteStudent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+  ): Promise<void> {
+    await this.studentsService.deleteStudentCascade(user.organizationId, id);
   }
 }

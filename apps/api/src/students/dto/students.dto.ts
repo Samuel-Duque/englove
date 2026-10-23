@@ -118,3 +118,8 @@ export class StudentMembershipsQueryDto {
   @Max(100, { message: 'limit no puede exceder 100' })
   limit?: number = 20;
 }
+
+export class UpdateInterfaceDto {
+  @IsEnum(AgeSegment, { message: 'El segmento debe ser kids o teens' })
+  ageSegment!: AgeSegment;
+}

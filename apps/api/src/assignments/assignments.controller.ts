@@ -10,6 +10,8 @@ import {
   UseInterceptors,
   ParseUUIDPipe,
   BadRequestException,
+  Optional,
+  NotFoundException,
 } from '@nestjs/common';
 import { AssignmentsService } from './assignments.service';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -37,7 +39,36 @@ const uuidPipe = new ParseUUIDPipe({
 @Roles(Role.teacher)
 @UseInterceptors(NoCacheInterceptor)
 export class AssignmentsController {
-  constructor(private readonly assignmentsService: AssignmentsService) {}
+  constructor(
+    private readonly assignmentsService: AssignmentsService,
+    @Optional() private readonly attemptsService?: import('../attempts/attempts.service').AttemptsService,
+  ) {}
+
+  @Post(':id/attempts')
+  @Roles(Role.student)
+  @HttpCode(HttpStatus.CREATED)
+  async startAttempt(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+  ): Promise<import('@englove/shared').RuntimeView> {
+    if (!user.studentId) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'STUDENT_PROFILE_REQUIRED',
+        message: 'Se requiere perfil de estudiante para iniciar un intento',
+      });
+    }
+
+    if (!this.attemptsService) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'ATTEMPTS_NOT_CONFIGURED',
+        message: 'Módulo de intentos no disponible',
+      });
+    }
+
+    return this.attemptsService.startAttempt(user.organizationId, user.studentId, id);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)

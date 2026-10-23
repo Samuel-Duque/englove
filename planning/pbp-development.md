@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03 y SPEC-04 figuran Verificadas (tareas ENG-050 a ENG-053 en Hecho). El cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding. [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) está redactada como Borrador, con Q-01 a Q-04 de su §11 pendientes de decisión; sin aprobación ni implementación de Etapa 5.
+> Última actualización: 2026-10-22. SPEC-01, SPEC-02, SPEC-03, SPEC-04 y SPEC-05 figuran Verificadas (tareas ENG-050 a ENG-053 y ENG-060 a ENG-073 más ENG-039 en Hecho, con 314/314 tests en monorepo). El cierre global de Etapa 3/H1 y Etapa 5/H2 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) aprobada y verificada tras resolución de Q-01 a Q-04 (decisiones 100–103).
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -391,6 +391,8 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 **Tamaño.** XL, 3–4 semanas.
 
 **Tareas.** ENG-060 a ENG-073, ENG-039, SPEC-06, SPEC-07. (ENG-073 es nueva: perfil del alumno y job mensual de `age_segment`.)
+
+**Estado actual (2026-10-22).** Etapa 5 completada a nivel técnico y [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) en estado `Verificada` tras la resolución de Q-01 a Q-04 (Decisiones 100 a 103 de CONTEXT §14) y la implementación completa de ENG-039 y ENG-060 a ENG-073 (314/314 tests en monorepo: 54 shared, 201 api, 59 web; suite concurrente de intentos, racha semanal con 4 reglas, audios R2 con transcodificación y fallback, borrado en cascada con denominador congelado y redacción de AuditLog; 0 errores de guardrails; builds limpios). Acreditación operativa de Hito H2 sujeta a pruebas de usuario en dispositivos reales.
 
 ---
 

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { Suspense } from 'react';
+import { StudentShell } from '../../components/student-shell';
 
 export default function StudentLayout({
   children,
@@ -6,9 +7,8 @@ export default function StudentLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-amber-50/50" data-theme="kids">
-      {/* Student portal scaffold layout */}
-      {children}
-    </div>
+    <Suspense fallback={<div className="min-h-screen bg-amber-50/50" />}>
+      <StudentShell>{children}</StudentShell>
+    </Suspense>
   );
 }

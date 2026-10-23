@@ -76,6 +76,73 @@ export async function seedMinimal() {
     },
   });
 
+  // Badge rules (canonical initial rules: RF-17, ENG-068)
+  const initialBadgeRules = [
+    {
+      key: 'first_activity',
+      name: 'Primera tarea completada',
+      description: 'Completaste tu primera actividad',
+      icon: 'star',
+      rule: { type: 'event_count', event: 'attempt_completed', threshold: 1 },
+    },
+    {
+      key: 'first_audio',
+      name: 'Primer audio enviado',
+      description: 'Enviaste tu primera grabación de speaking',
+      icon: 'mic',
+      rule: { type: 'event_count', event: 'audio_submitted', threshold: 1 },
+    },
+    {
+      key: 'streak_4',
+      name: 'Constancia de 4 semanas',
+      description: 'Mantuviste tu racha durante 4 semanas consecutivas',
+      icon: 'flame',
+      rule: { type: 'streak_weeks', threshold: 4 },
+    },
+    {
+      key: 'streak_8',
+      name: 'Constancia de 8 semanas',
+      description: 'Mantuviste tu racha durante 8 semanas consecutivas',
+      icon: 'trophy',
+      rule: { type: 'streak_weeks', threshold: 8 },
+    },
+    {
+      key: 'streak_12',
+      name: 'Constancia de 12 semanas',
+      description: 'Mantuviste tu racha durante 12 semanas consecutivas',
+      icon: 'crown',
+      rule: { type: 'streak_weeks', threshold: 12 },
+    },
+    {
+      key: 'anniversary_5',
+      name: '5 años en Englove',
+      description: 'Cumpliste 5 años de trayectoria en la plataforma',
+      icon: 'medal',
+      rule: { type: 'anniversary_years', threshold: 5 },
+    },
+  ];
+
+  for (const bRule of initialBadgeRules) {
+    await prisma.badgeRule.upsert({
+      where: {
+        organization_id_key: {
+          organization_id: org.id,
+          key: bRule.key,
+        },
+      },
+      update: {},
+      create: {
+        organization_id: org.id,
+        key: bRule.key,
+        name: bRule.name,
+        description: bRule.description,
+        icon: bRule.icon,
+        rule: bRule.rule,
+        active: true,
+      },
+    });
+  }
+
   return { org, teacher };
 }
 

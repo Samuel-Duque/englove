@@ -111,6 +111,43 @@ export class AuthService {
     });
   }
 
+  reissueAccessToken(
+    res: Response,
+    user: { id: string; email: string; role: Role; organization_id: string },
+    student: { id: string; age_segment: AgeSegment },
+    sessionId: string,
+  ): void {
+    const domainOption =
+      this.cookieDomain && this.cookieDomain.trim() !== ''
+        ? { domain: this.cookieDomain }
+        : {};
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        org: user.organization_id,
+        sid: sessionId,
+        student_id: student.id,
+        age_segment: student.age_segment,
+      },
+      {
+        secret: this.jwtSecret,
+        expiresIn: '15m',
+      },
+    );
+
+    res.cookie(`${this.cookiePrefix}access_token`, accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 15 * 60 * 1000,
+      ...domainOption,
+    });
+  }
+
   clearSessionCookies(res: Response): void {
     const domainOption =
       this.cookieDomain && this.cookieDomain.trim() !== ''

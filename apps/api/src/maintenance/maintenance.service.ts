@@ -1,13 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { JobRunStatus } from '@englove/shared';
+import { GamificationService } from '../gamification/gamification.service';
+import { MediaService } from '../media/media.service';
+import {
+  JobRunStatus,
+  AttemptStatus,
+  MediaAssetStatus,
+  ProgressEventType,
+} from '@englove/shared';
 
 @Injectable()
 export class MaintenanceService {
   private readonly logger = new Logger(MaintenanceService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly gamificationService?: GamificationService,
+    @Optional() private readonly mediaService?: MediaService,
+  ) {}
 
   @Cron('0 0 0 * * *', { timeZone: 'America/Bogota' })
   async handleNightlyMaintenance(): Promise<void> {
@@ -21,10 +33,32 @@ export class MaintenanceService {
     await this.runIdentityMaintenance(periodKey);
   }
 
+  @Cron('0 5 0 * * 1', { timeZone: 'America/Bogota' })
+  async handleWeeklyStreaks(): Promise<void> {
+    const now = new Date();
+    // Monday 00:05 Bogota evaluates the closed week (ending Sunday)
+    const lastWeekDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const periodKey =
+      this.gamificationService?.getBogotaIsoWeekKey(lastWeekDate) ?? '2026-W42';
+    await this.runWeeklyStreaks(periodKey);
+  }
+
+  @Cron('0 10 0 1 * *', { timeZone: 'America/Bogota' })
+  async handleMonthlyAgeReview(): Promise<void> {
+    const periodKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+    }).format(new Date());
+
+    await this.runMonthlyAgeReview(periodKey);
+  }
+
   async runIdentityMaintenance(periodKey: string): Promise<void> {
     const orgs = await this.prisma.organization.findMany();
     const now = new Date();
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     for (const org of orgs) {
       // Check existing scheduled job run (RF-21, Rule G-C09)
@@ -111,6 +145,57 @@ export class MaintenanceService {
           },
         });
 
+        // 4. Mark expired in_progress attempts as abandoned (RF-5, Decision 60)
+        if (this.prisma.attempt) {
+          const inProgressAttempts = await this.prisma.attempt.findMany({
+            where: {
+              organization_id: org.id,
+              status: AttemptStatus.in_progress,
+            },
+            include: {
+              assignment: true,
+              previous_attempt: true,
+            },
+          });
+
+          for (const att of inProgressAttempts) {
+            const effectiveDueAt = att.previous_attempt?.retry_extend_until ?? att.assignment.due_at;
+            const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+            if (now > completeUntil) {
+              await this.prisma.attempt.update({
+                where: { id: att.id },
+                data: { status: AttemptStatus.abandoned },
+              });
+            }
+          }
+        }
+
+        // 5. Purge expired pending_delete and abandoned pending_upload media assets
+        if (this.prisma.mediaAsset) {
+          const mediaToPurge = await this.prisma.mediaAsset.findMany({
+            where: {
+              organization_id: org.id,
+              OR: [
+                { status: MediaAssetStatus.pending_delete },
+                { status: MediaAssetStatus.pending_upload, created_at: { lt: sevenDaysAgo } },
+              ],
+            },
+          });
+
+          for (const media of mediaToPurge) {
+            if (this.mediaService) {
+              await this.mediaService.deleteFile(media.key);
+              if (media.converted_key) {
+                await this.mediaService.deleteFile(media.converted_key);
+              }
+            }
+            await this.prisma.mediaAsset.update({
+              where: { id: media.id },
+              data: { status: MediaAssetStatus.deleted, deleted_at: new Date() },
+            });
+          }
+        }
+
         // Mark ScheduledJobRun as done
         await this.prisma.scheduledJobRun.updateMany({
           where: {
@@ -137,6 +222,193 @@ export class MaintenanceService {
             status: JobRunStatus.failed,
             finished_at: new Date(),
           },
+        });
+      }
+    }
+  }
+
+  async runWeeklyStreaks(periodKey: string): Promise<void> {
+    const orgs = await this.prisma.organization.findMany();
+    const now = new Date();
+
+    for (const org of orgs) {
+      const existingJob = await this.prisma.scheduledJobRun.findFirst({
+        where: {
+          organization_id: org.id,
+          job_key: 'streak_calculation',
+          period_key: periodKey,
+        },
+      });
+
+      if (existingJob && existingJob.status === JobRunStatus.done) {
+        continue;
+      }
+
+      await this.prisma.scheduledJobRun.upsert({
+        where: {
+          organization_id_job_key_period_key: {
+            organization_id: org.id,
+            job_key: 'streak_calculation',
+            period_key: periodKey,
+          },
+        },
+        create: {
+          organization_id: org.id,
+          job_key: 'streak_calculation',
+          period_key: periodKey,
+          status: JobRunStatus.running,
+          started_at: now,
+        },
+        update: { status: JobRunStatus.running, started_at: now },
+      });
+
+      try {
+        const students = await this.prisma.student.findMany({
+          where: { organization_id: org.id },
+        });
+
+        if (!this.gamificationService) {
+          continue;
+        }
+
+        for (const st of students) {
+          const streak = await this.gamificationService.calculateStreak(org.id, st.id);
+
+          const existingEvent = await this.prisma.progressEvent.findFirst({
+            where: {
+              organization_id: org.id,
+              student_id: st.id,
+              type: ProgressEventType.streak_week,
+              period_key: periodKey,
+            },
+          });
+
+          if (!existingEvent) {
+            await this.prisma.progressEvent.create({
+              data: {
+                organization_id: org.id,
+                student_id: st.id,
+                type: ProgressEventType.streak_week,
+                period_key: periodKey,
+                value: new Prisma.Decimal(streak.weeks),
+                payload: {
+                  weeks: streak.weeks,
+                  forgivenessAvailable: streak.forgivenessAvailable,
+                  activeWeeksSinceForgivenessUsed: streak.activeWeeksSinceForgivenessUsed,
+                },
+              },
+            });
+          }
+
+          await this.gamificationService.evaluateBadges(org.id, st.id);
+        }
+
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'streak_calculation',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.done, finished_at: new Date() },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Error en cálculo de rachas para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+        );
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'streak_calculation',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.failed, finished_at: new Date() },
+        });
+      }
+    }
+  }
+
+  async runMonthlyAgeReview(periodKey: string): Promise<void> {
+    const orgs = await this.prisma.organization.findMany();
+    const now = new Date();
+
+    for (const org of orgs) {
+      const existingJob = await this.prisma.scheduledJobRun.findFirst({
+        where: {
+          organization_id: org.id,
+          job_key: 'student_age_review',
+          period_key: periodKey,
+        },
+      });
+
+      if (existingJob && existingJob.status === JobRunStatus.done) {
+        continue;
+      }
+
+      await this.prisma.scheduledJobRun.upsert({
+        where: {
+          organization_id_job_key_period_key: {
+            organization_id: org.id,
+            job_key: 'student_age_review',
+            period_key: periodKey,
+          },
+        },
+        create: {
+          organization_id: org.id,
+          job_key: 'student_age_review',
+          period_key: periodKey,
+          status: JobRunStatus.running,
+          started_at: now,
+        },
+        update: { status: JobRunStatus.running, started_at: now },
+      });
+
+      try {
+        const students = await this.prisma.student.findMany({
+          where: { organization_id: org.id },
+        });
+
+        for (const st of students) {
+          const birthDate = new Date(st.birth_date);
+          const age =
+            now.getFullYear() -
+            birthDate.getFullYear() -
+            (now.getMonth() < birthDate.getMonth() ||
+            (now.getMonth() === birthDate.getMonth() && now.getDate() < birthDate.getDate())
+              ? 1
+              : 0);
+
+          if (age >= 11 && !st.can_switch_interface) {
+            // RF-24: Activa permiso sin cambiar tema (age_segment intacto)
+            await this.prisma.student.update({
+              where: { id: st.id },
+              data: { can_switch_interface: true },
+            });
+          }
+
+          if (this.gamificationService) {
+            await this.gamificationService.evaluateBadges(org.id, st.id);
+          }
+        }
+
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'student_age_review',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.done, finished_at: new Date() },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Error en revisión de edad para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+        );
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'student_age_review',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.failed, finished_at: new Date() },
         });
       }
     }

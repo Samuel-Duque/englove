@@ -14,6 +14,10 @@ import { GroupsModule } from './groups/groups.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { AssignmentsModule } from './assignments/assignments.module';
+import { ScoringModule } from './scoring/scoring.module';
+import { MediaModule } from './media/media.module';
+import { GamificationModule } from './gamification/gamification.module';
+import { AttemptsModule } from './attempts/attempts.module';
 import { OriginGuard } from './common/guards/origin.guard';
 import { RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -56,6 +60,10 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     DashboardModule,
     MaintenanceModule,
     AssignmentsModule,
+    ScoringModule,
+    MediaModule,
+    GamificationModule,
+    AttemptsModule,
   ],
   providers: [
     {

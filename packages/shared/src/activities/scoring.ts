@@ -158,3 +158,17 @@ export function calculateTimedChoiceScore(
 
   return correct / questionIds.length;
 }
+
+/**
+ * Converts score to star rating (Decisión 101, Q-02):
+ * 0 stars: score === 0.0 or null/undefined
+ * 1 star: 0.0 < score < 3.0
+ * 2 stars: 3.0 <= score < 4.5
+ * 3 stars: score >= 4.5
+ */
+export function scoreToStars(score: number | null | undefined): number {
+  if (score === null || score === undefined || score <= 0) return 0;
+  if (score < 3.0) return 1;
+  if (score < 4.5) return 2;
+  return 3;
+}

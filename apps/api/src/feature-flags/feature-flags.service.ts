@@ -98,4 +98,12 @@ export class FeatureFlagsService {
       },
     };
   }
+
+  async isFeatureEnabled(
+    organizationId: string,
+    feature: keyof OrganizationFlags,
+  ): Promise<boolean> {
+    const config = await this.getConfiguration(organizationId);
+    return Boolean(config.flags[feature]);
+  }
 }

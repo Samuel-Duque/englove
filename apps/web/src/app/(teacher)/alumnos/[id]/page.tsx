@@ -49,6 +49,33 @@ function StudentDetailContent({
   const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
   const [changeEmailError, setChangeEmailError] = useState<string | null>(null);
 
+  // Delete Student state (ENG-070, Decision 103)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteStudent = async () => {
+    setIsDeletingStudent(true);
+    setDeleteError(null);
+    try {
+      await apiFetch<void>(`/api/v1/students/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Origin: window.location.origin,
+        },
+      });
+      window.location.href = '/alumnos';
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setDeleteError(err.message);
+      } else {
+        setDeleteError('No se pudo dar de baja al estudiante');
+      }
+      setIsDeletingStudent(false);
+    }
+  };
+
   const loadStudentData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -533,6 +560,29 @@ function StudentDetailContent({
         )}
       </div>
 
+      {/* Danger Zone: Delete Student (ENG-070, Decision 103) */}
+      <div className="rounded-2xl border border-rose-300 bg-rose-50/50 p-6 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-rose-950">Zona de peligro — Dar de baja al estudiante</h2>
+            <p className="text-xs text-rose-800 mt-1 max-w-xl">
+              Esta acción congela los denominadores históricos en asignaciones anteriores, anonimiza registros de auditoría eliminando referencias de correo, borra los audios en almacenamiento y retira al estudiante de forma definitiva.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteConfirmText('');
+              setDeleteError(null);
+              setIsDeleteModalOpen(true);
+            }}
+            className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 text-xs shadow-xs transition-colors"
+          >
+            Dar de baja al estudiante
+          </button>
+        </div>
+      </div>
+
       {/* Change Email Dialog (RF-18, RF-19, Decision 63) */}
       {isChangeEmailOpen && (
         <div
@@ -617,6 +667,82 @@ function StudentDetailContent({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Student Confirmation Modal (ENG-070, Decision 103) */}
+      {isDeleteModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <h2 className="text-lg font-bold text-rose-950 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Confirmar baja definitiva</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs text-zinc-700 space-y-2 leading-relaxed">
+              <p className="font-semibold text-zinc-900">
+                ¿Estás segura/o de dar de baja a <span className="font-bold text-rose-900">{student?.name}</span>?
+              </p>
+              <p className="font-bold text-rose-800 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                Se eliminarán la cuenta, las respuestas y los audios. Esta acción no se puede deshacer.
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-zinc-600">
+                <li>Congelación del denominador histórico en asignaciones abiertas y cerradas.</li>
+                <li>Anonimización y redacción de direcciones de correo en registros de auditoría.</li>
+                <li>Eliminación de archivos multimedia de voz en Cloudflare R2.</li>
+                <li>Eliminación en cascada limpia de membresías, intentos y usuario.</li>
+              </ul>
+              <p className="pt-2 font-bold text-zinc-900">
+                Para confirmar, escribe <span className="text-rose-600 font-mono font-bold">ELIMINAR</span> a continuación:
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800">
+                {deleteError}
+              </div>
+            )}
+
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+            />
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+              <button
+                type="button"
+                disabled={isDeletingStudent}
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingStudent || deleteConfirmText !== 'ELIMINAR'}
+                onClick={handleDeleteStudent}
+                className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 text-xs shadow-xs disabled:opacity-50"
+              >
+                {isDeletingStudent ? 'Dando de baja…' : 'Confirmar baja definitiva'}
+              </button>
+            </div>
           </div>
         </div>
       )}

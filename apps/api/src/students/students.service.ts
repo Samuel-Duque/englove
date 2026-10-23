@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +29,8 @@ import {
   hashSha256,
   generateRandomSecret,
 } from '../common/utils/identity.utils';
+import { Prisma } from '@prisma/client';
+import { MediaService } from '../media/media.service';
 
 @Injectable()
 export class StudentsService {
@@ -37,6 +40,7 @@ export class StudentsService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    @Optional() private readonly mediaService?: MediaService,
   ) {
     this.webBaseUrl = this.configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
   }
@@ -845,5 +849,151 @@ export class StudentsService {
     return {
       message: 'Correo actualizado. El alumno debe iniciar sesión de nuevo.',
     };
+  }
+
+  async deleteStudentCascade(organizationId: string, studentId: string): Promise<void> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, organization_id: organizationId },
+      include: {
+        user: true,
+        memberships: true,
+        attempts: {
+          select: { id: true },
+        },
+        media_assets: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'STUDENT_NOT_FOUND',
+        message: 'Alumno no encontrado',
+      });
+    }
+
+    // Step 1: Freeze historical denominator (RF-25, Decision 34 §14, Decision 73)
+    for (const membership of student.memberships) {
+      const assignments = await this.prisma.assignment.findMany({
+        where: {
+          organization_id: organizationId,
+          group_id: membership.group_id,
+          historical_student_count: null,
+          opens_at: { lte: membership.left_at ?? new Date(8640000000000000) },
+          due_at: { gte: membership.joined_at },
+        },
+      });
+
+      for (const assignment of assignments) {
+        // Count distinct students who had a membership in this group overlapping [opens_at, due_at]
+        const overlappingMemberships = await this.prisma.groupMembership.findMany({
+          where: {
+            organization_id: organizationId,
+            group_id: assignment.group_id,
+            joined_at: { lte: assignment.due_at },
+            OR: [
+              { left_at: null },
+              { left_at: { gte: assignment.opens_at } },
+            ],
+          },
+          select: { student_id: true },
+        });
+
+        const distinctStudentIds = new Set(overlappingMemberships.map((m) => m.student_id));
+        await this.prisma.assignment.update({
+          where: { id: assignment.id },
+          data: { historical_student_count: distinctStudentIds.size },
+        });
+      }
+    }
+
+    // Step 2: Redact AuditLog and disconnect target_student_id (RF-26, Decision 92)
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        organization_id: organizationId,
+        target_student_id: studentId,
+      },
+    });
+
+    for (const log of logs) {
+      const details = (log.details as Record<string, unknown>) || {};
+      const redactedDetails: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(details)) {
+        if (typeof v === 'string' && v.includes('@')) {
+          redactedDetails[k] = '[REDACTADO]';
+        } else {
+          redactedDetails[k] = v;
+        }
+      }
+
+      await this.prisma.auditLog.update({
+        where: { id: log.id },
+        data: {
+          target_student_id: null,
+          details: redactedDetails as Prisma.InputJsonObject,
+        },
+      });
+    }
+
+    // Step 3: Delete R2 storage objects (raw and converted)
+    if (this.mediaService) {
+      for (const media of student.media_assets) {
+        await this.mediaService.deleteFile(media.key);
+        if (media.converted_key) {
+          await this.mediaService.deleteFile(media.converted_key);
+        }
+      }
+    }
+
+    // Step 4: Relational database cascade in transaction
+    const attemptIds = student.attempts.map((a) => a.id);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (attemptIds.length > 0) {
+        await tx.review.deleteMany({
+          where: { organization_id: organizationId, attempt_id: { in: attemptIds } },
+        });
+      }
+
+      await tx.progressEvent.deleteMany({
+        where: { organization_id: organizationId, student_id: studentId },
+      });
+
+      await tx.badgeAward.deleteMany({
+        where: { organization_id: organizationId, student_id: studentId },
+      });
+
+      await tx.attempt.deleteMany({
+        where: { organization_id: organizationId, student_id: studentId },
+      });
+
+      await tx.groupMembership.deleteMany({
+        where: { organization_id: organizationId, student_id: studentId },
+      });
+
+      await tx.mediaAsset.deleteMany({
+        where: { organization_id: organizationId, student_id: studentId },
+      });
+
+      await tx.authSession.deleteMany({
+        where: { organization_id: organizationId, user_id: student.user_id },
+      });
+
+      await tx.passwordResetToken.deleteMany({
+        where: { organization_id: organizationId, user_id: student.user_id },
+      });
+
+      await tx.emailChangeRequest.deleteMany({
+        where: { organization_id: organizationId, user_id: student.user_id },
+      });
+
+      await tx.student.delete({
+        where: { id: studentId },
+      });
+
+      await tx.user.delete({
+        where: { id: student.user_id },
+      });
+    });
   }
 }

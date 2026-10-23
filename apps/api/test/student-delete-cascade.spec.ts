@@ -205,4 +205,16 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
       service.deleteStudentCascade(orgId, 'missing-student'),
     ).rejects.toThrow(NotFoundException);
   });
+
+  it('si falla el borrado en R2, se interrumpe el flujo y no se ejecuta la transacción de cascada (RF-26, Decisión 103)', async () => {
+    mockMediaService.deleteFile.mockRejectedValueOnce(new Error('R2 storage connection timeout'));
+
+    await expect(
+      service.deleteStudentCascade(orgId, studentId),
+    ).rejects.toThrow('R2 storage connection timeout');
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.student.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.user.delete).not.toHaveBeenCalled();
+  });
 });

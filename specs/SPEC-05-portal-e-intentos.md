@@ -12,7 +12,7 @@
 
 El alumno aprobado completa actividades y consulta progreso en Kids/Teens. El eje Activity → Assignment → Attempt prepara **H2**, no el feedback de H3 ([CONTEXT §12](../.agents/CONTEXT.md#12-orden-de-construcción--decidido), [pbp Etapa 5](../planning/pbp-development.md#etapa-5--portal-del-estudiante-context-125--hito-h2)).
 
-Depende de [SPEC-01](./SPEC-01-scaffold.md), [SPEC-02](./SPEC-02-identidad-y-sesion.md), [SPEC-03](./SPEC-03-gestor-de-contenidos.md) y [SPEC-04](./SPEC-04-asignacion.md). **Aprobada y Verificada**: las preguntas Q-01 a Q-04 de §11 fueron aceptadas por el líder del proyecto mediante las Decisiones 100 a 103 de CONTEXT §14, y todas las tareas técnicas (ENG-039 y ENG-060 a ENG-073) han sido implementadas y probadas exitosamente (314 pruebas en monorepo).
+Depende de [SPEC-01](./SPEC-01-scaffold.md), [SPEC-02](./SPEC-02-identidad-y-sesion.md), [SPEC-03](./SPEC-03-gestor-de-contenidos.md) y [SPEC-04](./SPEC-04-asignacion.md). **Aprobada y Verificada**: las preguntas Q-01 a Q-04 de §11 fueron aceptadas por el líder del proyecto mediante las Decisiones 100 a 103 de CONTEXT §14, y todas las tareas técnicas (ENG-039 y ENG-060 a ENG-073) han sido implementadas y probadas exitosamente (326 pruebas en monorepo).
 
 ## 2. Alcance
 
@@ -287,7 +287,7 @@ Sin **P-n abiertos** (CONTEXT §15); decisiones 84/64 aplicadas. Las preguntas Q
 | Q-03 | Ubicación y renderizador de examen | **Aceptada (Decisión 102):** batería de oraciones `fill_blank` con media ponderada de aciertos y pesos normalizados; integrada en el runner interactivo de SPEC-05. | Decisión 102 | Resuelta |
 | Q-04 | Cascada de baja de alumno en DELETE /students/:id | **Aceptada (Decisión 103):** baja atómica síncrona en `DELETE /students/:id`: congela denominador `historical_student_count`, redacta correos en `AuditLog.details` desvinculando `target_student_id = null`, borra archivos R2 (raw y convertidos) y ejecuta cascada en transacción respondiendo `204 No Content`. | Decisión 103 | Resuelta |
 
-Prerrequisitos: ENG-007/008, SPEC-02 §11, buckets/CORS, ffmpeg/ffprobe y dispositivos reales. Todas las pruebas del monorepo (314/314) pasan exitosamente.
+Prerrequisitos: ENG-007/008, SPEC-02 §11, buckets/CORS, ffmpeg/ffprobe y dispositivos reales. Todas las pruebas del monorepo (326/326) pasan exitosamente.
 
 ## 12. Registro de cambios
 
@@ -296,3 +296,4 @@ Prerrequisitos: ENG-007/008, SPEC-02 §11, buckets/CORS, ffmpeg/ffprobe y dispos
 | 2026-10-22 | Creación del borrador: 30 RF, API, datos, UI, seguridad, pruebas y Q-01 a Q-04 | SPEC-05/ENG-039/060–073, sin aprobación ni implementación |
 | 2026-10-22 | Revisión semántica: recuperación de corrección, asset ligado al intento/bytes, tipos disponibles, semanas omitidas y rango; reducción de duplicación | Validación de redacción y casos límite, no ejecución de pruebas de producto |
 | 2026-10-22 | Aprobación e implementación completa: resolución de Q-01 a Q-04 (Decisiones 100 a 103), scoring ponderado de examen, baja en cascada, rachas, portal alumno Kids/Teens, previsualización docente y pruebas unitarias/integración | Verificada tras ejecución exitosa de 314 pruebas de monorepo |
+| 2026-10-23 | Verificación profunda en Docker/PostgreSQL: suite de jobs de mantenimiento (abandono +24h, purga R2, transición edad 11), concurrencia real startAttempt (garantía 201/409), propagación de error R2 en baja de alumno, scoring de examen ponderado y speaking con audio_submitted | Verificada con 326/326 pruebas en monorepo (54 shared, 213 api, 59 web) |

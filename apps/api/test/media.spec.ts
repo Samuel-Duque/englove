@@ -212,4 +212,35 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       await expect(service.getPlaybackUrl(orgId, 'missing-id')).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('deleteFile (RF-14, RF-26)', () => {
+    it('envía DeleteObjectCommand al bucket de R2', async () => {
+      const sendSpy = vi.spyOn(service['s3Client'], 'send').mockResolvedValueOnce({} as never);
+
+      await service.deleteFile('org/student/attempt/rec.webm');
+
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({
+            Key: 'org/student/attempt/rec.webm',
+          }),
+        }),
+      );
+    });
+
+    it('propaga errores de R2 en entornos de staging o producción (RF-26)', async () => {
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'APP_ENV') return 'staging';
+        return null;
+      });
+
+      vi.spyOn(service['s3Client'], 'send').mockRejectedValueOnce(
+        new Error('R2 service unavailable'),
+      );
+
+      await expect(
+        service.deleteFile('org/student/attempt/rec.webm'),
+      ).rejects.toThrow('R2 service unavailable');
+    });
+  });
 });

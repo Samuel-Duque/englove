@@ -389,8 +389,12 @@ export class MediaService implements OnModuleInit {
           Key: key,
         }),
       );
-    } catch {
-      // Ignored if file already absent in storage
+    } catch (err: unknown) {
+      if (this.configService.get<string>('APP_ENV') === 'local') {
+        this.logger.warn(`deleteFile simulado en local para key: ${key}`);
+        return;
+      }
+      throw err;
     }
   }
 

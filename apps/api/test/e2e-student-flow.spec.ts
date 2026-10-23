@@ -18,6 +18,7 @@ import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { ConflictException } from '@nestjs/common';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -375,5 +376,73 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
     expect(progress.activities[0]?.stars).toBe(3); // 5.0 score -> 3 stars (Decision 101)
     expect(progress.streak.weeks).toBeGreaterThanOrEqual(1);
     expect(progress.streak.forgivenessAvailable).toBe(true);
+  });
+
+  it('Paso 5: Concurrencia real en PostgreSQL garantiza exactamente 1 intento creado y 1 conflicto 409 (RF-3, RF-4)', async () => {
+    if (!isPostgresAvailable || !prisma) return;
+
+    // Crear una segunda actividad publicada para tener una nueva asignación activa en el grupo
+    const parsed2 = parseFillBlankSimpleSyntax('The dog is [running|walking]');
+    const itemId2 = 'e2e77777-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const activity2 = await activitiesService.createActivity(orgId, teacherId, {
+      title: 'Fill Blank E2E Concurrent Attempt',
+      type: ActivityType.fill_blank,
+      level: Level.A1,
+      config: {
+        items: [
+          {
+            id: itemId2,
+            prompt: parsed2.prompt,
+            blanks: parsed2.blanks,
+          },
+        ],
+      },
+      answerKey: {
+        items: {
+          [itemId2]: parsed2.answerKey,
+        },
+      },
+    });
+    await activitiesService.publishActivity(orgId, activity2.id);
+
+    // Crear una segunda asignación para probar concurrencia de inicio
+    const assignResult2 = await assignmentsService.createAssignments(orgId, {
+      activityId: activity2.id,
+      groupIds: [groupId],
+      opensAt: new Date(Date.now() - 3600000).toISOString(),
+      dueAt: new Date(Date.now() + 86400000).toISOString(),
+    });
+    const concurrentAssignmentId = assignResult2.items[0]!.id;
+
+    // Ejecutar dos startAttempt en paralelo inmediato contra PostgreSQL real
+    const results = await Promise.allSettled([
+      attemptsService.startAttempt(orgId, studentId, concurrentAssignmentId),
+      attemptsService.startAttempt(orgId, studentId, concurrentAssignmentId),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+
+    const error = (rejected[0] as PromiseRejectedResult).reason;
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error.getResponse()).toEqual(
+      expect.objectContaining({
+        statusCode: 409,
+        code: 'ATTEMPT_ALREADY_EXISTS',
+      }),
+    );
+
+    // Verificar en DB que solo existe 1 registro
+    const attemptsInDb = await prisma.attempt.findMany({
+      where: {
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: concurrentAssignmentId,
+      },
+    });
+    expect(attemptsInDb.length).toBe(1);
   });
 });

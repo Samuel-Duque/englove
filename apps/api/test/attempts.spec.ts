@@ -16,6 +16,7 @@ import {
 import {
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -415,6 +416,114 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
         attemptId,
         null, // Decisión 100: value = null para open_question
       );
+    });
+
+    it('autocalifica inmediatamente actividades de examen ponderado marcándolas como graded (RF-9, Decisión 102)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 120000),
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.exam,
+            title: 'Examen Final A1',
+            level: Level.A1,
+            exam_detail: { config: { items: [] } },
+          },
+        },
+      });
+
+      const completion = await service.completeAttempt(orgId, studentId, attemptId, validToken, {});
+
+      expect(completion.attempt.status).toBe(AttemptStatus.graded);
+      expect(mockScoringService.calculateExam).toHaveBeenCalled();
+      expect(mockGamificationService.recordAttemptCompleted).toHaveBeenCalledWith(
+        orgId,
+        studentId,
+        attemptId,
+        5.0,
+      );
+    });
+
+    it('speaking requiere mediaId y pasa a pending_review registrando audio_submitted (RF-13, Decisión 100)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValue({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 60000),
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.speaking,
+            title: 'Speaking practice',
+            level: Level.A1,
+            speaking_detail: { max_duration_seconds: 120 },
+          },
+        },
+      });
+
+      // Sin mediaId -> 400 MEDIA_REQUIRED
+      await expect(
+        service.completeAttempt(orgId, studentId, attemptId, validToken, {}),
+      ).rejects.toThrow(BadRequestException);
+
+      // Con mediaId -> confirmUpload y audio_submitted
+      const completion = await service.completeAttempt(orgId, studentId, attemptId, validToken, {
+        mediaId: 'media-speaking-1',
+      });
+
+      expect(mockMediaService.confirmUpload).toHaveBeenCalledWith(
+        orgId,
+        studentId,
+        attemptId,
+        'media-speaking-1',
+        120,
+      );
+      expect(completion.attempt.status).toBe(AttemptStatus.pending_review);
+      expect(mockGamificationService.recordAudioSubmitted).toHaveBeenCalledWith(
+        orgId,
+        studentId,
+        attemptId,
+      );
+    });
+
+    it('la finalización es idempotente y devuelve el recibo existente sin duplicar eventos (RF-8)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.graded,
+        started_at: new Date(Date.now() - 120000),
+        finished_at: new Date(Date.now() - 60000),
+        graded_at: new Date(Date.now() - 60000),
+        score: 4.5,
+        flags: [],
+        payload: { answers: {} },
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.fill_blank,
+            title: 'Fill blank',
+            level: Level.A1,
+          },
+        },
+      });
+
+      const completion = await service.completeAttempt(orgId, studentId, attemptId, validToken, {});
+
+      expect(completion.attempt.status).toBe(AttemptStatus.graded);
+      expect(mockGamificationService.recordAttemptCompleted).not.toHaveBeenCalled();
+      expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
     });
   });
 });

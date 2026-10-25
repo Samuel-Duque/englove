@@ -17,12 +17,17 @@ export type ActivityEvent =
   | { type: 'completed'; at: string };
 
 /**
- * Properties supplied to any activity component rendered on the student portal.
+ * Properties supplied to any activity component rendered on the student portal or preview.
  */
-export interface ActivityRuntimeProps<TConfig = unknown> {
-  attemptToken: string;
+export interface ActivityRuntimeProps<TConfig = unknown, TAnswer = unknown> {
   config: TConfig;
-  onEvent: (event: ActivityEvent) => void;
+  initialState?: TAnswer;
+  theme?: 'kids' | 'teens';
+  soundEnabled?: boolean;
+  previewMode?: boolean;
+  attemptToken?: string;
+  onEvent?: (event: ActivityEvent | { itemId: string; answer: unknown }) => void;
+  onComplete?: (answer: TAnswer) => void;
 }
 
 /**

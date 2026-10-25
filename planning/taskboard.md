@@ -2,7 +2,7 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-10-24. [SPEC-06 Microjuegos](../specs/SPEC-06-microjuegos.md) en estado `En revisión` tras el cierre de `Q-01` a `Q-03` mediante las Decisiones 104 a 106 de CONTEXT §14 (intentos individuales y calificados por separado en microjuegos para seguimiento de evolución en el panel estadístico; interacción híbrida de serie en `match` y `drag_drop`; reinicio desde la primera pregunta y del temporizador al recargar en `timed_choice`; tarea `SPEC-06` en `En curso` a la espera de aprobación formal para iniciar ENG-080 a ENG-087). Cierre técnico de Etapa 5 completado: [SPEC-05 Portal e intentos](../specs/SPEC-05-portal-e-intentos.md) Verificada; tareas ENG-039 (Etapa 3) y ENG-060 a ENG-073 (Etapa 5) en Hecho con evidencia técnica registrada (326/326 tests monorepo: 213 API, 59 web, 54 shared; suite concurrente de intentos en PostgreSQL real con Docker, suite de jobs de mantenimiento con abandono y purga R2, racha semanal con 4 reglas, audios en R2 con transcodificación y fallback, borrado en cascada con denominador congelado, propagación de error R2 y redacción de AuditLog; 0 errores de guardrails; builds limpios; suite E2E de intento de alumno). Cierre global de Etapa 3/H1 y Etapa 5/H2 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. Resumen: 70 Hecho, 1 En curso, 5 Por hacer, 0 Bloqueado, 38 Backlog (Total 114).
+> Última actualización: 2026-10-25. [SPEC-06 Microjuegos](../specs/SPEC-06-microjuegos.md) en estado `Verificada` tras la aprobación formal del líder del proyecto e implementación técnica integral de ENG-080 a ENG-087 con 354/354 tests en monorepo (225 API, 75 web, 54 shared; scorers deterministas 0.0–5.0 en ScoringService para 5 mecánicas, generación de intentos individuales secuenciales según Decisión 104, flag implausible_duration, 5 componentes microjuegos desacoplados bajo ActivityRuntimeProps con interacción híbrida y a11y, GameRenderer con simulación in-memory en previewMode = true, efectos de sonido con Howler.js/Web Audio API, confeti temático, chunks diferidos kids/teens y zona /juegos; 0 errores de guardrails; builds y linters limpios). Cierre global de Etapa 3/H1, Etapa 5/H2 y Etapa 6 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. Resumen: 79 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 30 Backlog (Total 114).
 >
 > Ronda 7: 2026-10-10. Decisiones 86 a 92 de CONTEXT §14: capacidad por horizonte, versiones base, matriz explícita de tenant, continuidad de intentos al cambiar de grupo, procedimiento operativo externo de datos de menores y auditoría administrativa redactada. Las decisiones 81 a 85 y ENG-140 permanecen vigentes.
 
@@ -28,11 +28,11 @@
 
 | Estado    | Tareas  |
 | --------- | ------- |
-| Hecho     | 70      |
-| En curso  | 1       |
+| Hecho     | 79      |
+| En curso  | 0       |
 | Por hacer | 5       |
 | Bloqueado | 0       |
-| Backlog   | 38      |
+| Backlog   | 30      |
 | **Total** | **114** |
 
 Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `englove-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). Creada y cerrada el 2026-10-19: DOC-08 (skill propia `englove-guardrails`). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes.
@@ -119,14 +119,21 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 | ENG-071 | Síntesis de voz en consignas Kids mediante Web Speech API (`SpeechSynthesis`) y objetivos táctiles de al menos 48 px | 2026-10-22 |
 | ENG-072 | Suite E2E de flujo 2 integrado: alumno inicia sesión, carga asignación, completa actividad, recibe estrellas/retroalimentación y actualiza progreso | 2026-10-22 |
 | ENG-073 | Pantalla de perfil de estudiante (`(student)/perfil`), cambio de contraseña/correo, conmutación de tema Kids/Teens si `can_switch_interface` y mantenimiento mensual de edad | 2026-10-22 |
+| SPEC-06 | Redactar, aprobar y verificar [SPEC-06 Microjuegos](../specs/SPEC-06-microjuegos.md): cinco mecánicas de juego en React detrás de ActivityRuntimeProps, scorers deterministas 0.0–5.0 en ScoringService, múltiples intentos individuales secuenciales según Decisión 104, flag implausible_duration, GameRenderer con simulación in-memory, audio Howler.js, confeti, chunks diferidos kids/teens y zona /juegos tras flag games (Decisiones 104-106). Aprobada y Verificada el 2026-10-25 con 354/354 tests en verde | 2026-10-25 |
+| ENG-080 | Microjuego Emparejar (`MatchGame`) con interacción híbrida (`@atlaskit/pragmatic-drag-and-drop` + toque/clic en dos pasos y teclado con `aria-pressed`, Decisiones 81 y 105) | 2026-10-25 |
+| ENG-081 | Microjuego Ordenar palabras (`OrderWordsGame`) con banco barajado deterministamente, botones reordenables y navegación por teclado y clics | 2026-10-25 |
+| ENG-082 | Microjuego Arrastrar y soltar (`DragDropGame`) con clasificación en destinos, interacción híbrida táctil/clic/teclado y tarjetas de tamaño >= 48 px | 2026-10-25 |
+| ENG-083 | Microjuego Memoria de tarjetas (`MemoryGame`) con barajado determinista y reconstrucción secuencial de hasta 200 volteos en servidor | 2026-10-25 |
+| ENG-084 | Microjuego Elección múltiple con temporizador (`TimedChoiceGame`) con cuenta regresiva, auto-avance y reinicio a pregunta 0 y tiempo completo al recargar intento (Decisión 106) | 2026-10-25 |
+| ENG-085 | Scorers de servidor en `ScoringService` para las 5 mecánicas de `GameMechanic` (escala 0.0–5.0), flag `implausible_duration` con `min_plausible_seconds`, generación en `AttemptsService` de un `Attempt` individual con `graded` por partida en ventana abierta sin autorización previa (Decisión 104) y reemplazo de eventos en `submitEvents` | 2026-10-25 |
+| ENG-086 | Motor de sonido (`Howler.js` / Web Audio API) para hit/miss/complete con conmutador en cabecera, confeti temático y carga diferida de chunks de animación `motion/kids` y `motion/teens` | 2026-10-25 |
+| ENG-087 | Zona "Juegos" en el portal del alumno (`/juegos`) bajo el feature flag `games` (a <= 3 clics de inicio), con acción «Jugar de nuevo» e integración en `ActividadRunnerPage` | 2026-10-25 |
 
 ---
 
 ## En curso
 
-| ID      | Tarea                                                                                                                 | Prioridad | Depende de | Spec | Estado   |
-| ------- | --------------------------------------------------------------------------------------------------------------------- | --------- | ---------- | ---- | -------- |
-| SPEC-06 | Redactar y aprobar [SPEC-06 Microjuegos](../specs/SPEC-06-microjuegos.md): las cinco mecánicas de juego del tipo `game` (decisión 66; en `En revisión` con `Q-01` a `Q-03` cerradas mediante las Decisiones 104 a 106 de CONTEXT §14) | P1        | SPEC-00    | —    | En curso |
+Ninguna tarea en curso (límite: 3).
 
 ---
 
@@ -176,16 +183,11 @@ Verificación técnica cumplida: [SPEC-05](../specs/SPEC-05-portal-e-intentos.md
 
 ### Etapa 6 — Microjuegos
 
+Verificación técnica cumplida: [SPEC-06](../specs/SPEC-06-microjuegos.md) se encuentra **Verificada** (2026-10-25). Todas las tareas técnicas de la etapa (ENG-080 a ENG-087) se encuentran en `Hecho` con verificación automatizada completa (354/354 tests en monorepo: 54 shared, 225 api, 75 web; scorers deterministas 0.0–5.0 en ScoringService para 5 mecánicas, múltiples intentos individuales sin autorización de reintento según Decisión 104, flag implausible_duration, 5 microjuegos con interacción híbrida y a11y, GameRenderer con simulación in-memory, audio Howler.js, confeti, chunks diferidos kids/teens y zona /juegos; guardrails 0 errores; typecheck, lint y build limpios). Acreditación operativa en tablets reales pendiente de validación física con alumnos.
+
+
 | ID      | Tarea                                                                                                                          | Prioridad | Depende de                 | Spec    | Estado  |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------ | --------- | -------------------------- | ------- | ------- |
-| ENG-080 | Emparejar (`@atlaskit/pragmatic-drag-and-drop` + interacción híbrida con toque en dos pasos y teclado, decisiones 81 y 105; reemplaza a dnd-kit) | P1        | SPEC-06, ENG-063           | SPEC-06 | Backlog |
-| ENG-081 | Ordenar palabras                                                                                                               | P1        | SPEC-06, ENG-063           | SPEC-06 | Backlog |
-| ENG-082 | Arrastrar y soltar (`@atlaskit/pragmatic-drag-and-drop` + interacción híbrida de serie con toque en dos pasos y teclado, decisiones 81 y 105; prueba táctil en tablet real) | P1        | SPEC-06, ENG-063           | SPEC-06 | Backlog |
-| ENG-083 | Memoria de tarjetas                                                                                                            | P1        | SPEC-06, ENG-063           | SPEC-06 | Backlog |
-| ENG-084 | Elección múltiple con temporizador (al recargar o reanudar un intento `in_progress` reinicia desde la primera pregunta y reinicia el temporizador `timeLimitSeconds`, decisión 106) | P1        | SPEC-06, ENG-063           | SPEC-06 | Backlog |
-| ENG-085 | Scorers de servidor por mecánica de juego con salida en 0,0–5,0; validación de duraciones plausibles con `flags`; soporte de múltiples intentos individuales secuenciales (`attempt_number` incremental y `graded` aparte por cada `Attempt` dentro de la ventana abierta, decisión 104) | P0        | ENG-080 a ENG-084          | SPEC-06 | Backlog |
-| ENG-086 | Sonido (Howler) y confeti por tema; carga diferida de bundles de animación Kids y Teens; verificación con analizador de bundle | P1        | ENG-060                    | SPEC-06 | Backlog |
-| ENG-087 | Zona "Juegos" en el portal del alumno bajo el flag `games` (3 clics), con acción «Jugar de nuevo» que genera un nuevo `Attempt` individual calificado por separado mientras la asignación esté abierta (decisión 104); prueba táctil en tablet Android real | P1        | ENG-080 a ENG-084, ENG-018 | SPEC-06 | Backlog |
 | SPEC-08 | Redactar y aprobar SPEC-08 Estadísticas de rendimiento y constancia                                                            | P0        | SPEC-00                    | —       | Backlog |
 
 ### Etapa 7 — Calificación, feedback y nuevo intento (Hito H3)

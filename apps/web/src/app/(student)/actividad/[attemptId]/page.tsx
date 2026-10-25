@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ActivityType,
   AttemptStatus,
@@ -9,8 +10,12 @@ import {
   CompletionView,
   FillBlankConfig,
   ExamConfig,
+  GamePublicConfig,
+  GameAnswers,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
+import { GameRenderer } from '../../../../components/activities/GameRenderer';
+import { fireCelebrationConfetti } from '../../../../lib/confetti';
 
 interface PageProps {
   params: Promise<{ attemptId: string }>;
@@ -18,6 +23,7 @@ interface PageProps {
 
 export default function ActividadRunnerPage({ params }: PageProps) {
   const { attemptId } = use(params);
+  const router = useRouter();
 
   const [runtime, setRuntime] = useState<RuntimeView | null>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -25,6 +31,8 @@ export default function ActividadRunnerPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completion, setCompletion] = useState<CompletionView | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [theme, setTheme] = useState<'kids' | 'teens'>('kids');
 
   // Speaking state
   const [mediaId, setMediaId] = useState<string | null>(null);
@@ -163,8 +171,14 @@ export default function ActividadRunnerPage({ params }: PageProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`);
+        const [data, profile] = await Promise.all([
+          apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`),
+          apiFetch<{ student?: { ageSegment?: 'kids' | 'teens' } }>('/api/v1/me').catch(() => null),
+        ]);
         if (isMounted) {
+          const ageSegment = profile?.student?.ageSegment ?? 'kids';
+          setTheme(ageSegment);
+          setSoundEnabled(ageSegment === 'kids'); // soundEnabled starts true for kids, false for teens (RF-9)
           setRuntime(data);
           setAnswers(data.answers || {});
           if (data.mediaId) setMediaId(data.mediaId);
@@ -381,11 +395,13 @@ export default function ActividadRunnerPage({ params }: PageProps) {
   };
 
   // Submit attempt completion
-  const handleCompleteAttempt = async () => {
+  const handleCompleteAttempt = async (overrideAnswers?: Record<string, unknown>) => {
     if (!runtime?.attemptToken) {
       alert('Token de intento no disponible');
       return;
     }
+
+    const payloadAnswers = overrideAnswers ?? answers;
 
     setIsSubmitting(true);
     try {
@@ -414,7 +430,7 @@ export default function ActividadRunnerPage({ params }: PageProps) {
         },
         credentials: 'include',
         body: JSON.stringify({
-          answers,
+          answers: payloadAnswers,
           mediaId: finalMediaId,
         }),
       });
@@ -426,10 +442,36 @@ export default function ActividadRunnerPage({ params }: PageProps) {
 
       const compData: CompletionView = await res.json();
       setCompletion(compData);
+
+      // Trigger celebration confetti when student scores >= 3.0 (RF-9, ENG-086)
+      if (compData.attempt.score !== null && compData.attempt.score !== undefined && compData.attempt.score >= 3.0) {
+        fireCelebrationConfetti({ theme });
+      }
+
       // Clean local storage upon confirmed completion (RF-13, RF-28)
       await clearLocalRecording(attemptId);
     } catch (err: unknown) {
       alert((err as Error)?.message || 'No se pudo completar la entrega');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Play again for microgames (Decision 104, RF-4)
+  const handlePlayAgain = async () => {
+    if (!runtime?.attempt?.assignmentId) return;
+    setIsSubmitting(true);
+    try {
+      const res = await apiFetch<RuntimeView>(
+        `/api/v1/assignments/${runtime.attempt.assignmentId}/attempts`,
+        {
+          method: 'POST',
+        },
+      );
+      router.push(`/actividad/${res.attempt.id}`);
+      router.refresh();
+    } catch (err: unknown) {
+      alert((err as Error)?.message || 'No se pudo iniciar un nuevo intento del juego');
     } finally {
       setIsSubmitting(false);
     }
@@ -534,6 +576,16 @@ export default function ActividadRunnerPage({ params }: PageProps) {
           )}
 
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+            {activity.type === ActivityType.game && runtime?.attempt?.assignmentId && (
+              <button
+                type="button"
+                onClick={handlePlayAgain}
+                disabled={isSubmitting}
+                className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all disabled:opacity-50"
+              >
+                🎮 {isSubmitting ? 'Iniciando…' : 'Jugar de nuevo'}
+              </button>
+            )}
             <Link
               href="/inicio"
               className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all"
@@ -579,15 +631,30 @@ export default function ActividadRunnerPage({ params }: PageProps) {
           <h1 className="text-xl sm:text-2xl font-black text-amber-950">{activity.title}</h1>
         </div>
 
-        <button
-          type="button"
-          onClick={() => speakText(activity.title)}
-          className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
-          title="Escuchar título en inglés"
-        >
-          <span>🔊</span>
-          <span>Escuchar</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {activity.type === ActivityType.game && (
+            <button
+              type="button"
+              onClick={() => setSoundEnabled((prev) => !prev)}
+              className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+              title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
+              aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
+            >
+              <span>{soundEnabled ? '🔊' : '🔇'}</span>
+              <span>{soundEnabled ? 'Sonido sí' : 'Sonido no'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => speakText(activity.title)}
+            className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+            title="Escuchar título en inglés"
+          >
+            <span>🗣️</span>
+            <span>Escuchar</span>
+          </button>
+        </div>
       </div>
 
       {/* Runner Body by Activity Type */}
@@ -855,13 +922,31 @@ export default function ActividadRunnerPage({ params }: PageProps) {
           </div>
         )}
 
+        {/* Microgame Type (SPEC-06, ENG-080 to ENG-085) */}
+        {activity.type === ActivityType.game && (
+          <GameRenderer
+            config={activity.config as GamePublicConfig}
+            initialState={answers as GameAnswers}
+            onEvent={(event) => {
+              if ('itemId' in event && 'answer' in event) {
+                handleAnswerChange(event.itemId, event.answer);
+              }
+            }}
+            soundEnabled={soundEnabled}
+            theme={theme}
+            onComplete={(finalAnswers) => {
+              handleCompleteAttempt(finalAnswers as Record<string, unknown>);
+            }}
+          />
+        )}
+
         {/* Submit Button */}
         {!isFinished && (
           <div className="pt-4 border-t border-amber-200/60 flex justify-end">
             <button
               type="button"
               disabled={isSubmitting || isUploadingAudio}
-              onClick={handleCompleteAttempt}
+              onClick={() => handleCompleteAttempt()}
               className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-8 py-3.5 text-base shadow-md transition-all disabled:opacity-50 min-h-[48px]"
             >
               {isSubmitting ? 'Entregando actividad…' : 'Entregar actividad ✨'}

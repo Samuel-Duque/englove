@@ -1,6 +1,6 @@
 # Englove — Guía para agentes
 
-Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. El proyecto avanza por etapas bajo Spec-Driven Development (Etapas 0–5 implementadas; SPEC-01, SPEC-02, SPEC-03, SPEC-04 y SPEC-05 Verificadas; SPEC-06 redactada en En revisión; cierre global de Etapa 3/H1 y Etapa 5/H2 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales): no se escribe código de producción sin una spec aprobada en `specs/`.
+Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. El proyecto avanza por etapas bajo Spec-Driven Development (Etapas 0–6 implementadas; SPEC-01, SPEC-02, SPEC-03, SPEC-04, SPEC-05 y SPEC-06 Verificadas; cierre global de Etapa 3/H1, Etapa 5/H2 y Etapa 6 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales): no se escribe código de producción sin una spec aprobada en `specs/`.
 
 ## Dónde está cada cosa
 

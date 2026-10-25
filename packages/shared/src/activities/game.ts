@@ -141,6 +141,21 @@ export const GameConfigSchema = z.discriminatedUnion('mechanic', [
 
 export type GameConfig = z.infer<typeof GameConfigSchema>;
 
+export type MatchSettings = z.infer<typeof MatchSettingsSchema>;
+export type MatchSolution = z.infer<typeof MatchSolutionSchema>;
+
+export type OrderWordsSettings = z.infer<typeof OrderWordsSettingsSchema>;
+export type OrderWordsSolution = z.infer<typeof OrderWordsSolutionSchema>;
+
+export type DragDropSettings = z.infer<typeof DragDropSettingsSchema>;
+export type DragDropSolution = z.infer<typeof DragDropSolutionSchema>;
+
+export type MemorySettings = z.infer<typeof MemorySettingsSchema>;
+export type MemorySolution = z.infer<typeof MemorySolutionSchema>;
+
+export type TimedChoiceSettings = z.infer<typeof TimedChoiceSettingsSchema>;
+export type TimedChoiceSolution = z.infer<typeof TimedChoiceSolutionSchema>;
+
 export const GameAnswerKeySchema = z.object({
   solution: z.union([
     MatchSolutionSchema,
@@ -152,3 +167,58 @@ export const GameAnswerKeySchema = z.object({
 });
 
 export type GameAnswerKey = z.infer<typeof GameAnswerKeySchema>;
+
+export interface GamePublicConfig {
+  mechanic: GameMechanic;
+  instructions?: string;
+  settings: unknown;
+  answerKey: GameAnswerKey;
+}
+
+export interface GameAnswers {
+  pairs?: Record<string, string>;
+  tokenIds?: string[];
+  placements?: Record<string, string>;
+  selections?: Array<[string, string]>;
+  choices?: Record<string, string | null>;
+}
+
+export const GAME_MECHANIC_LABELS: Record<GameMechanic, string> = {
+  [GameMechanic.match]: 'Emparejar',
+  [GameMechanic.order_words]: 'Ordenar palabras',
+  [GameMechanic.drag_drop]: 'Arrastrar y soltar',
+  [GameMechanic.memory]: 'Memoria',
+  [GameMechanic.timed_choice]: 'Contra reloj',
+};
+
+/**
+ * Seeded pseudo-random number generator for deterministic shuffling (SPEC-06 §4 Rule 5).
+ */
+export function seededRandom(seedStr: string): () => number {
+  let h = 1779033703 ^ seedStr.length;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return function () {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Pure deterministic Fisher-Yates shuffle using a string seed (e.g. attemptId).
+ */
+export function deterministicShuffle<T>(array: T[], seedStr: string): T[] {
+  const result = [...array];
+  if (result.length <= 1) return result;
+  const rand = seededRandom(seedStr);
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const temp = result[i]!;
+    result[i] = result[j]!;
+    result[j] = temp;
+  }
+  return result;
+}

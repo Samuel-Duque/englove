@@ -33,6 +33,10 @@ import {
   FillBlankAnswerKey,
   ExamConfig,
   ExamAnswerKey,
+  GameConfig,
+  GameAnswerKey,
+  GamePublicConfig,
+  GameMechanic,
 } from '@englove/shared';
 
 interface AttemptTokenPayload {
@@ -47,6 +51,7 @@ interface ActivityEntityLike {
   title: string;
   type: ActivityType;
   level: import('@englove/shared').Level;
+  min_plausible_seconds?: number | null;
   fill_blank_detail?: { config: unknown } | null;
   open_question_detail?: { config: unknown } | null;
   speaking_detail?: {
@@ -54,6 +59,11 @@ interface ActivityEntityLike {
     example_url?: string | null;
     min_duration_seconds: number;
     max_duration_seconds: number;
+  } | null;
+  game_detail?: {
+    mechanic: string;
+    config?: unknown;
+    answer_key?: unknown;
   } | null;
   exam_detail?: { config: unknown } | null;
 }
@@ -205,21 +215,36 @@ export class AttemptsService {
 
     const latestAttempt = existingAttempts[0];
     if (latestAttempt) {
-      // Check for unconsumed retry authorization (RF-4, Decision 61, 74)
-      const hasUnconsumedRetry =
-        latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt;
+      if (assignment.activity.type === ActivityType.game) {
+        // Decision 104: For games, if latest is in_progress, prevent duplicate
+        if (latestAttempt.status === AttemptStatus.in_progress) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ATTEMPT_ALREADY_EXISTS',
+            message: 'Ya existe un intento en curso para este microjuego',
+          });
+        }
+        // Completed/abandoned game within open window: create new individual attempt (attempt_number + 1)
+        attemptNumber = latestAttempt.attempt_number + 1;
+        previousAttemptId = latestAttempt.id;
+        effectiveDueAt = assignment.due_at;
+      } else {
+        // Check for unconsumed retry authorization (RF-4, Decision 61, 74)
+        const hasUnconsumedRetry =
+          latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt;
 
-      if (!hasUnconsumedRetry) {
-        throw new ConflictException({
-          statusCode: 409,
-          code: 'ATTEMPT_ALREADY_EXISTS',
-          message: 'Ya existe un intento para esta asignación',
-        });
+        if (!hasUnconsumedRetry) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ATTEMPT_ALREADY_EXISTS',
+            message: 'Ya existe un intento para esta asignación',
+          });
+        }
+
+        attemptNumber = latestAttempt.attempt_number + 1;
+        previousAttemptId = latestAttempt.id;
+        effectiveDueAt = latestAttempt.retry_extend_until ?? assignment.due_at;
       }
-
-      attemptNumber = latestAttempt.attempt_number + 1;
-      previousAttemptId = latestAttempt.id;
-      effectiveDueAt = latestAttempt.retry_extend_until ?? assignment.due_at;
     }
 
     // Time window validation (RF-3, Decision 84)
@@ -239,7 +264,7 @@ export class AttemptsService {
       });
     }
 
-    // Atomically create Attempt (RF-3, RF-4, Decision 74)
+    // Atomically create Attempt (RF-3, RF-4, Decision 74, 104)
     let attempt;
     try {
       attempt = await this.prisma.attempt.create({
@@ -269,7 +294,32 @@ export class AttemptsService {
     const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
     const token = this.generateAttemptToken(attempt.id, studentId, organizationId, completeUntil);
 
-    return this.buildRuntimeView(attempt, assignment, effectiveDueAt, completeUntil, token);
+    let gamePublicConfig: GamePublicConfig | undefined;
+    if (assignment.activity.type === ActivityType.game) {
+      const gameDetailWithKey = await this.prisma.gameDetail.findFirst({
+        where: { organization_id: organizationId, activity_id: assignment.activity.id },
+        // guardrails-ignore G-C04: lectura controlada de answer_key para GamePublicConfig en RuntimeView de microjuegos (SPEC-06 §4)
+        select: { mechanic: true, config: true, answer_key: true },
+      });
+      if (gameDetailWithKey) {
+        const cfg = (gameDetailWithKey.config as Record<string, unknown>) || {};
+        gamePublicConfig = {
+          mechanic: gameDetailWithKey.mechanic as GameMechanic,
+          instructions: (cfg.instructions as string) || undefined,
+          settings: cfg.settings || {},
+          answerKey: (gameDetailWithKey.answer_key as GameAnswerKey) || { solution: {} },
+        };
+      }
+    }
+
+    return this.buildRuntimeView(
+      attempt,
+      assignment,
+      effectiveDueAt,
+      completeUntil,
+      token,
+      gamePublicConfig,
+    );
   }
 
   /**
@@ -323,7 +373,32 @@ export class AttemptsService {
       ? this.generateAttemptToken(attempt.id, studentId, organizationId, completeUntil)
       : null;
 
-    return this.buildRuntimeView(attempt, attempt.assignment, effectiveDueAt, completeUntil, token);
+    let gamePublicConfig: GamePublicConfig | undefined;
+    if (attempt.assignment.activity.type === ActivityType.game) {
+      const gameDetailWithKey = await this.prisma.gameDetail.findFirst({
+        where: { organization_id: organizationId, activity_id: attempt.assignment.activity.id },
+        // guardrails-ignore G-C04: lectura controlada de answer_key para GamePublicConfig en RuntimeView de microjuegos (SPEC-06 §4)
+        select: { mechanic: true, config: true, answer_key: true },
+      });
+      if (gameDetailWithKey) {
+        const cfg = (gameDetailWithKey.config as Record<string, unknown>) || {};
+        gamePublicConfig = {
+          mechanic: gameDetailWithKey.mechanic as GameMechanic,
+          instructions: (cfg.instructions as string) || undefined,
+          settings: cfg.settings || {},
+          answerKey: (gameDetailWithKey.answer_key as GameAnswerKey) || { solution: {} },
+        };
+      }
+    }
+
+    return this.buildRuntimeView(
+      attempt,
+      attempt.assignment,
+      effectiveDueAt,
+      completeUntil,
+      token,
+      gamePublicConfig,
+    );
   }
 
   /**
@@ -393,7 +468,15 @@ export class AttemptsService {
       acceptedEventIds.push(ev.clientEventId);
       if (!processedSet.has(ev.clientEventId)) {
         processedSet.add(ev.clientEventId);
-        if (typeof ev.answer === 'object' && ev.answer !== null && !Array.isArray(ev.answer)) {
+        const isGameMap = ['pairs', 'tokenIds', 'placements', 'selections', 'choices'].includes(
+          ev.itemId,
+        );
+        if (
+          !isGameMap &&
+          typeof ev.answer === 'object' &&
+          ev.answer !== null &&
+          !Array.isArray(ev.answer)
+        ) {
           const existing = (answers[ev.itemId] as Record<string, unknown>) || {};
           answers[ev.itemId] = { ...existing, ...(ev.answer as Record<string, unknown>) };
         } else {
@@ -439,6 +522,7 @@ export class AttemptsService {
                 fill_blank_detail: true,
                 open_question_detail: true,
                 speaking_detail: true,
+                game_detail: true,
                 exam_detail: true,
               },
             },
@@ -487,7 +571,8 @@ export class AttemptsService {
     const activity = attempt.assignment.activity;
     const now = new Date();
     const durationSeconds = Math.max(0, Math.round((now.getTime() - attempt.started_at.getTime()) / 1000));
-    const minPlausible = activity.min_plausible_seconds;
+    const minPlausible =
+      activity.min_plausible_seconds ?? (activity.type === ActivityType.game ? 15 : undefined);
 
     const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};
     const answers = payload.answers || {};
@@ -615,6 +700,60 @@ export class AttemptsService {
         attempt.id,
         scoreResult.score,
       );
+    } else if (activity.type === ActivityType.game) {
+      const gamesEnabled = await this.featureFlagsService.isFeatureEnabled(
+        organizationId,
+        'games',
+      );
+      if (!gamesEnabled) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'ACTIVITY_NOT_AVAILABLE',
+          message: 'Los microjuegos aún no están disponibles',
+        });
+      }
+
+      const detailWithKey = await this.prisma.gameDetail.findFirst({
+        where: { organization_id: organizationId, activity_id: activity.id },
+        // guardrails-ignore G-C04: lectura exclusiva de answer_key en el servidor para autocalificacion de intento
+        select: { mechanic: true, config: true, answer_key: true },
+      });
+
+      const config = (detailWithKey?.config as unknown as GameConfig) || {
+        mechanic: detailWithKey?.mechanic as GameMechanic,
+        settings: {},
+      };
+      const answerKey = (detailWithKey?.answer_key as unknown as GameAnswerKey) || {
+        solution: {},
+      };
+
+      const scoreResult = this.scoringService.calculateGame(
+        config,
+        answerKey,
+        answers,
+        durationSeconds,
+        minPlausible ?? 15,
+      );
+
+      correction = scoreResult.correction;
+
+      updatedAttempt = await this.prisma.attempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: AttemptStatus.graded,
+          score: new Prisma.Decimal(scoreResult.score),
+          graded_at: now,
+          finished_at: now,
+          flags: scoreResult.flags,
+        },
+      });
+
+      newBadges = await this.gamificationService.recordAttemptCompleted(
+        organizationId,
+        studentId,
+        attempt.id,
+        scoreResult.score,
+      );
     } else {
       // Default / fallback
       updatedAttempt = await this.prisma.attempt.update({
@@ -680,7 +819,13 @@ export class AttemptsService {
           },
         },
         include: {
-          activity: true,
+          activity: {
+            include: {
+              game_detail: {
+                select: { mechanic: true },
+              },
+            },
+          },
           attempts: {
             where: { student_id: studentId },
             orderBy: { attempt_number: 'desc' },
@@ -707,7 +852,9 @@ export class AttemptsService {
           canContinue = now <= completeUntil;
         } else {
           // Completed or abandoned attempt
-          if (latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt) {
+          if (a.activity.type === ActivityType.game && gamesEnabled) {
+            canStart = now >= a.opens_at && now <= effectiveDueAt;
+          } else if (latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt) {
             retryAvailable = true;
             canStart = now <= effectiveDueAt;
           }
@@ -723,6 +870,7 @@ export class AttemptsService {
               type: a.activity.type,
               level: a.activity.level,
               version: a.activity.version,
+              mechanic: (a.activity.game_detail?.mechanic as GameMechanic | undefined),
             },
             opensAt: a.opens_at.toISOString(),
             dueAt: a.due_at.toISOString(),
@@ -743,6 +891,8 @@ export class AttemptsService {
       return { items: paginated, total, offset, limit };
     } else {
       // Continuity scope: assignments with student attempts
+      const gamesEnabled = await this.featureFlagsService.isFeatureEnabled(organizationId, 'games');
+
       const attempts = await this.prisma.attempt.findMany({
         where: {
           student_id: studentId,
@@ -750,7 +900,15 @@ export class AttemptsService {
         },
         include: {
           assignment: {
-            include: { activity: true },
+            include: {
+              activity: {
+                include: {
+                  game_detail: {
+                    select: { mechanic: true },
+                  },
+                },
+              },
+            },
           },
           next_attempt: true,
         },
@@ -781,7 +939,11 @@ export class AttemptsService {
           latestAttempt.status === AttemptStatus.in_progress && now <= completeUntil;
         const retryAvailable =
           latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt;
-        const canStart = retryAvailable && now <= effectiveDueAt && a.cancelled_at === null;
+
+        const canStart =
+          a.activity.type === ActivityType.game && gamesEnabled
+            ? now >= a.opens_at && now <= effectiveDueAt && a.cancelled_at === null
+            : retryAvailable && now <= effectiveDueAt && a.cancelled_at === null;
 
         cards.push({
           id: a.id,
@@ -791,6 +953,7 @@ export class AttemptsService {
             type: a.activity.type,
             level: a.activity.level,
             version: a.activity.version,
+            mechanic: (a.activity.game_detail?.mechanic as GameMechanic | undefined),
           },
           opensAt: a.opens_at.toISOString(),
           dueAt: a.due_at.toISOString(),
@@ -947,6 +1110,7 @@ export class AttemptsService {
     effectiveDueAt: Date,
     completeUntil: Date,
     token: string | null,
+    gamePublicConfig?: GamePublicConfig,
   ): RuntimeView {
     const activity = assignment.activity;
     let config: unknown = {};
@@ -964,6 +1128,8 @@ export class AttemptsService {
       };
     } else if (activity.type === ActivityType.exam) {
       config = activity.exam_detail?.config || {};
+    } else if (activity.type === ActivityType.game) {
+      config = gamePublicConfig || activity.game_detail?.config || {};
     }
 
     const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};

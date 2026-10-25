@@ -9,14 +9,33 @@ interface StudentNavProps {
   studentName?: string;
   ageSegment?: 'kids' | 'teens';
   level?: string | null;
+  gamesEnabled?: boolean;
 }
 
-export function StudentNav({ studentName, ageSegment = 'kids', level }: StudentNavProps) {
+export function StudentNav({ studentName, ageSegment = 'kids', level, gamesEnabled }: StudentNavProps) {
   const pathname = usePathname();
   const [isLoggingOut, startLogout] = useTransition();
+  const [gamesOn, setGamesOn] = React.useState(gamesEnabled ?? false);
+
+  React.useEffect(() => {
+    if (gamesEnabled !== undefined) {
+      setGamesOn(gamesEnabled);
+      return;
+    }
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    fetch(`${apiUrl}/api/v1/feature-flags`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.flags?.games !== undefined) {
+          setGamesOn(Boolean(data.flags.games));
+        }
+      })
+      .catch(() => {});
+  }, [gamesEnabled]);
 
   const navItems = [
     { label: 'Inicio', href: '/inicio', icon: '🏠' },
+    ...(gamesOn ? [{ label: 'Juegos', href: '/juegos', icon: '🎮' }] : []),
     { label: 'Progreso', href: '/progreso', icon: '⭐' },
   ];
 

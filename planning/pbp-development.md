@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-23. SPEC-01, SPEC-02, SPEC-03, SPEC-04 y SPEC-05 figuran Verificadas (tareas ENG-050 a ENG-053 y ENG-060 a ENG-073 más ENG-039 en Hecho, con 326/326 tests en monorepo: 54 shared, 213 api, 59 web). El cierre global de Etapa 3/H1 y Etapa 5/H2 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-05](../specs/SPEC-05-portal-e-intentos.md) aprobada y verificada tras resolución de Q-01 a Q-04 (decisiones 100–103).
+> Última actualización: 2026-10-25. SPEC-01, SPEC-02, SPEC-03, SPEC-04, SPEC-05 y SPEC-06 figuran Verificadas (tareas ENG-080 a ENG-087 completadas con 354/354 tests en monorepo: 54 shared, 225 api, 75 web). El cierre global de Etapa 3/H1, Etapa 5/H2 y Etapa 6 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-06](../specs/SPEC-06-microjuegos.md) aprobada y verificada tras resolución de Q-01 a Q-03 (decisiones 104–106).
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -428,7 +428,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tareas.** ENG-080 a ENG-087, SPEC-08.
 
-**Estado actual (2026-10-24).** [SPEC-06 — Microjuegos](../specs/SPEC-06-microjuegos.md) en estado `En revisión` tras el cierre de las preguntas abiertas `Q-01` a `Q-03` mediante las Decisiones 104 a 106 de CONTEXT §14 (intentos individuales secuenciales y calificados por separado en microjuegos para seguimiento de evolución en el panel estadístico; interacción híbrida en `match` y `drag_drop`; reinicio desde la primera pregunta y del temporizador al recargar en `timed_choice`), lista para aprobación formal del líder antes de iniciar las tareas `ENG-080` a `ENG-087`.
+**Estado actual (2026-10-25).** Etapa 6 completada a nivel técnico y [SPEC-06 — Microjuegos](../specs/SPEC-06-microjuegos.md) en estado `Verificada` tras la aprobación formal del líder del proyecto y la implementación integral de las tareas ENG-080 a ENG-087 (354/354 tests en monorepo: 54 shared, 225 api, 75 web; scorers deterministas 0.0–5.0 en ScoringService para 5 mecánicas, generación de intentos individuales secuenciales según Decisión 104, flag implausible_duration, 5 componentes microjuegos desacoplados bajo ActivityRuntimeProps con interacción híbrida y a11y, GameRenderer con simulación in-memory en previewMode = true, efectos de sonido con Howler.js/Web Audio API, confeti temático, chunks diferidos kids/teens y zona /juegos; 0 errores de guardrails; builds y linters limpios). Prueba física con usuarios en tablets Android reales pendiente para el cierre operativo formal.
 
 ---
 

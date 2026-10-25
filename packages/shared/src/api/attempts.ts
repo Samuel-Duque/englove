@@ -1,4 +1,4 @@
-import { ActivityType, AttemptStatus, Level, Role, AgeSegment } from '../enums';
+import { ActivityType, AttemptStatus, Level, Role, AgeSegment, GameMechanic } from '../enums';
 
 export interface AttemptView {
   id: string;
@@ -58,6 +58,7 @@ export interface AssignmentCard {
     type: ActivityType;
     level: Level;
     version?: number;
+    mechanic?: GameMechanic;
   };
   opensAt: string;
   dueAt: string;

@@ -4,14 +4,32 @@ import {
   FillBlankAnswerKey,
   ExamConfig,
   ExamAnswerKey,
+  GameConfig,
+  GameAnswerKey,
+  GameMechanic,
+  MatchSettings,
+  MatchSolution,
+  OrderWordsSettings,
+  OrderWordsSolution,
+  DragDropSettings,
+  DragDropSolution,
+  MemorySettings,
+  MemorySolution,
+  TimedChoiceSettings,
+  TimedChoiceSolution,
   calculateExamScore,
+  calculateMatchScore,
+  calculateOrderWordsScore,
+  calculateDragDropScore,
+  calculateTimedChoiceScore,
+  reconstructMemoryPlays,
   scoreToStars,
 } from '@englove/shared';
 
 export interface ScoreCalculationResult {
   score: number;
   fraction: number;
-  correction: Record<string, Record<string, { correct: boolean }>>;
+  correction: Record<string, unknown>;
   flags: string[];
 }
 
@@ -113,6 +131,181 @@ export class ScoringService {
       durationSeconds < minPlausibleSeconds
     ) {
       // guardrails-ignore G-C06: flag de negocio implausible_duration segun SPEC-05 RF-10
+      flags.push('implausible_duration');
+    }
+
+    return { score, fraction, correction, flags };
+  }
+
+  /**
+   * Calculates score for game activity across all 5 mechanics (SPEC-06 §4, RF-7, RF-8).
+   * Generates fraction in [0.0, 1.0], converts to score in [0.0, 5.0],
+   * formats correction object, and checks duracion plausible (minPlausibleSeconds).
+   */
+  calculateGame(
+    config: GameConfig,
+    answerKey: GameAnswerKey,
+    userAnswers: Record<string, unknown> = {},
+    durationSeconds?: number,
+    minPlausibleSeconds?: number,
+  ): ScoreCalculationResult {
+    let fraction = 0;
+    let correction: Record<string, unknown> = {};
+    const flags: string[] = [];
+
+    const mechanic = config.mechanic;
+
+    switch (mechanic) {
+      case GameMechanic.match: {
+        const settings = config.settings as MatchSettings;
+        const solution = answerKey.solution as MatchSolution;
+        const userPairs =
+          userAnswers.pairs && typeof userAnswers.pairs === 'object'
+            ? (userAnswers.pairs as Record<string, string>)
+            : typeof userAnswers === 'object' && userAnswers !== null && !Array.isArray(userAnswers)
+              ? (userAnswers as Record<string, string>)
+              : {};
+        fraction = calculateMatchScore(solution?.pairs || {}, userPairs);
+
+        const usedRightIds = new Set<string>();
+        const matchCorrection: Record<string, unknown> = {};
+        for (const item of settings.left) {
+          const expected = solution.pairs[item.id];
+          const submitted = userPairs[item.id] || null;
+          const isCorrect =
+            submitted !== null && submitted === expected && !usedRightIds.has(submitted);
+          if (isCorrect && submitted) usedRightIds.add(submitted);
+          matchCorrection[item.id] = {
+            correct: isCorrect,
+            expected,
+            submitted,
+          };
+        }
+        correction = matchCorrection;
+        break;
+      }
+
+      case GameMechanic.order_words: {
+        const settings = config.settings as OrderWordsSettings;
+        const solution = answerKey.solution as OrderWordsSolution;
+        const userTokenIds = (
+          Array.isArray(userAnswers.tokenIds)
+            ? userAnswers.tokenIds
+            : Array.isArray(userAnswers)
+              ? (userAnswers as unknown as string[])
+              : []
+        ) as string[];
+        fraction = calculateOrderWordsScore(settings.tokens, solution.tokenIds, userTokenIds);
+
+        const tokenMap = new Map<string, string>();
+        for (const t of settings.tokens) tokenMap.set(t.id, t.text.trim());
+        const seenTokens = new Set<string>();
+        const orderCorrection: Record<string, unknown> = {};
+
+        for (let i = 0; i < solution.tokenIds.length; i++) {
+          const expId = solution.tokenIds[i]!;
+          const expectedText = tokenMap.get(expId) || '';
+          const userTokenId = userTokenIds[i];
+          let isCorrect = false;
+          let submittedText: string | null = null;
+          if (userTokenId && tokenMap.has(userTokenId) && !seenTokens.has(userTokenId)) {
+            seenTokens.add(userTokenId);
+            submittedText = tokenMap.get(userTokenId) || null;
+            if (submittedText === expectedText) isCorrect = true;
+          }
+          orderCorrection[`pos_${i}`] = {
+            correct: isCorrect,
+            expected: expectedText,
+            submitted: submittedText,
+          };
+        }
+        correction = orderCorrection;
+        break;
+      }
+
+      case GameMechanic.drag_drop: {
+        const settings = config.settings as DragDropSettings;
+        const solution = answerKey.solution as DragDropSolution;
+        const userPlacements =
+          userAnswers.placements && typeof userAnswers.placements === 'object'
+            ? (userAnswers.placements as Record<string, string>)
+            : typeof userAnswers === 'object' && userAnswers !== null && !Array.isArray(userAnswers)
+              ? (userAnswers as Record<string, string>)
+              : {};
+        fraction = calculateDragDropScore(solution?.placements || {}, userPlacements);
+
+        const dragCorrection: Record<string, unknown> = {};
+        for (const obj of settings.objects) {
+          const expected = solution.placements[obj.id];
+          const submitted = userPlacements[obj.id] || null;
+          dragCorrection[obj.id] = {
+            correct: submitted === expected,
+            expected,
+            submitted,
+          };
+        }
+        correction = dragCorrection;
+        break;
+      }
+
+      case GameMechanic.memory: {
+        const settings = config.settings as MemorySettings;
+        const solution = answerKey.solution as MemorySolution;
+        const rawSelections = userAnswers.selections || userAnswers;
+        const userSelections = Array.isArray(rawSelections)
+          ? (rawSelections as Array<[string, string]>)
+          : [];
+        const recon = reconstructMemoryPlays(
+          settings?.cards || [],
+          solution?.pairs || [],
+          userSelections,
+        );
+        fraction = recon.fraction;
+        correction = {
+          summary: {
+            foundPairs: recon.foundPairs,
+            totalPairs: recon.totalPairs,
+            failedSelections: recon.failedSelections,
+          },
+          pairs: recon.resolvedPairs,
+        };
+        break;
+      }
+
+      case GameMechanic.timed_choice: {
+        const settings = config.settings as TimedChoiceSettings;
+        const solution = answerKey.solution as TimedChoiceSolution;
+        const userChoices =
+          userAnswers.choices && typeof userAnswers.choices === 'object'
+            ? (userAnswers.choices as Record<string, string | null>)
+            : typeof userAnswers === 'object' && userAnswers !== null && !Array.isArray(userAnswers)
+              ? (userAnswers as Record<string, string | null>)
+              : {};
+        fraction = calculateTimedChoiceScore(solution?.choices || {}, userChoices);
+
+        const timedCorrection: Record<string, unknown> = {};
+        for (const q of settings.questions) {
+          const expected = solution.choices[q.id];
+          const submitted = userChoices[q.id] ?? null;
+          timedCorrection[q.id] = {
+            correct: submitted !== null && submitted === expected,
+            expected,
+            submitted,
+          };
+        }
+        correction = timedCorrection;
+        break;
+      }
+    }
+
+    const score = this.fractionToScore(fraction);
+
+    if (
+      durationSeconds !== undefined &&
+      minPlausibleSeconds !== undefined &&
+      durationSeconds < minPlausibleSeconds
+    ) {
+      // guardrails-ignore G-C06: flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
       flags.push('implausible_duration');
     }
 

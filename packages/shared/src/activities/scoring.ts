@@ -51,6 +51,7 @@ export function calculateExamScore(
 /**
  * Match:
  * Correct pairs / total left elements.
+ * Each leftId adds 1 if userPairs[leftId] === pairsSolution[leftId] without reusing an already assigned rightId (SPEC-06 §4 Rule 3).
  */
 export function calculateMatchScore(
   pairsSolution: Record<string, string>,
@@ -59,9 +60,13 @@ export function calculateMatchScore(
   const leftIds = Object.keys(pairsSolution);
   if (leftIds.length === 0) return 0;
 
+  const usedRightIds = new Set<string>();
   let correct = 0;
   for (const lId of leftIds) {
-    if (userPairs[lId] && userPairs[lId] === pairsSolution[lId]) {
+    const expectedRight = pairsSolution[lId];
+    const userRight = userPairs[lId];
+    if (userRight && userRight === expectedRight && !usedRightIds.has(userRight)) {
+      usedRightIds.add(userRight);
       correct++;
     }
   }
@@ -72,7 +77,7 @@ export function calculateMatchScore(
 /**
  * Order words:
  * Tokens whose text matches expected position / total tokens.
- * "intercambiar textos idénticos no penaliza" (SPEC-03 §4, RF-6).
+ * Position i adds 1 if userTokenId exists in tokens, was not repeated before, and matches expected text (SPEC-06 §4 Rule 3).
  */
 export function calculateOrderWordsScore(
   tokens: Array<{ id: string; text: string }>,
@@ -86,15 +91,20 @@ export function calculateOrderWordsScore(
     tokenMap.set(t.id, t.text.trim());
   }
 
+  const seenUserTokenIds = new Set<string>();
   let correct = 0;
   for (let i = 0; i < expectedTokenIds.length; i++) {
     const expId = expectedTokenIds[i];
     if (!expId) continue;
     const expectedText = tokenMap.get(expId);
     const userTokenId = userTokenIds[i];
-    const userText = userTokenId ? tokenMap.get(userTokenId) : undefined;
-    if (expectedText !== undefined && userText !== undefined && expectedText === userText) {
-      correct++;
+
+    if (userTokenId && tokenMap.has(userTokenId) && !seenUserTokenIds.has(userTokenId)) {
+      seenUserTokenIds.add(userTokenId);
+      const userText = tokenMap.get(userTokenId);
+      if (expectedText !== undefined && userText !== undefined && expectedText === userText) {
+        correct++;
+      }
     }
   }
 
@@ -136,6 +146,71 @@ export function calculateMemoryScore(
   if (denominator <= 0) return 0;
 
   return Math.min(1, Math.max(0, resolvedPairs / denominator));
+}
+
+export interface MemoryReconstructionResult {
+  foundPairs: number;
+  totalPairs: number;
+  failedSelections: number;
+  resolvedPairs: Array<[string, string]>;
+  fraction: number;
+}
+
+/**
+ * Pure sequential replay of memory card turns (SPEC-06 §4 Rule 3, RF-7).
+ * Capped at 200 tuples; ignores invalid tuples, cardA === cardB, alien IDs,
+ * and plays on already resolved cards.
+ */
+export function reconstructMemoryPlays(
+  cards: Array<{ id: string }>,
+  solutionPairs: Array<[string, string]>,
+  selections: Array<[string, string]> = [],
+): MemoryReconstructionResult {
+  const validCardIds = new Set(cards.map((c) => c.id));
+  const pairKey = (idA: string, idB: string) => (idA < idB ? `${idA}:${idB}` : `${idB}:${idA}`);
+
+  const expectedPairSet = new Set(solutionPairs.map(([a, b]) => pairKey(a, b)));
+  const resolvedPairSet = new Set<string>();
+  const resolvedCardIds = new Set<string>();
+  const resolvedPairs: Array<[string, string]> = [];
+  let failedSelections = 0;
+
+  const cappedSelections = selections.slice(0, 200);
+
+  for (const tuple of cappedSelections) {
+    if (!Array.isArray(tuple) || tuple.length !== 2) continue;
+    const [cardA, cardB] = tuple;
+    if (!cardA || !cardB || cardA === cardB) continue;
+    if (!validCardIds.has(cardA) || !validCardIds.has(cardB)) continue;
+
+    // Ignore plays on already resolved cards
+    if (resolvedCardIds.has(cardA) || resolvedCardIds.has(cardB)) continue;
+
+    const key = pairKey(cardA, cardB);
+    if (expectedPairSet.has(key)) {
+      resolvedPairSet.add(key);
+      resolvedCardIds.add(cardA);
+      resolvedCardIds.add(cardB);
+      resolvedPairs.push([cardA, cardB]);
+    } else {
+      failedSelections++;
+    }
+  }
+
+  const totalPairs = solutionPairs.length;
+  const foundPairs = resolvedPairSet.size;
+  let fraction = 0;
+  if (foundPairs > 0 && totalPairs + failedSelections > 0) {
+    fraction = Math.min(1, Math.max(0, foundPairs / (totalPairs + failedSelections)));
+  }
+
+  return {
+    foundPairs,
+    totalPairs,
+    failedSelections,
+    resolvedPairs,
+    fraction,
+  };
 }
 
 /**

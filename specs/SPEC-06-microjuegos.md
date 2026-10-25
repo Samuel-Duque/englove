@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | En revisión |
+| Estado | Verificada |
 | Etapa | 6 — Microjuegos |
 | Tareas | ENG-080, ENG-081, ENG-082, ENG-083, ENG-084, ENG-085, ENG-086, ENG-087 |
 | Referencias | CONTEXT §2.3–§2.4, §3.2, §5.2, §6.2, §6.4, §8.1–§8.2, §10.3, §14 (decisiones 5, 7, 21, 25, 42, 61, 67, 74, 75, 81, 101, 104–106), §16–§17 · architecture §2.1, §3.1, §3.3, §3.4, §3.8, §4.5, §5.3, §7.5 · pbp Etapa 6 · sdd-process §3–§5 · SPEC-03 §4–§5 · SPEC-05 §3–§5 |
-| Aprobada por / fecha | — |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-25 |
 
 ## 1. Contexto y objetivo
 
@@ -263,3 +263,5 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (`CONTEXT §15`). `Q-01`, 
 | --- | --- | --- |
 | 2026-10-24 | Creación de `SPEC-06` en estado `Borrador` (`RF-1` a `RF-11`, contratos de las 5 mecánicas de `GameMechanic`, scorers `0..1` → `0.0–5.0`, `min_plausible_seconds`, sonido/confeti, `motion/kids` y `motion/teens`, zona `/juegos` y preguntas `Q-01` a `Q-03`) | Redacción de la especificación de Etapa 6 previa a `ENG-080`–`ENG-087` |
 | 2026-10-24 | `Borrador` → `En revisión`; cierre de `Q-01`, `Q-02` y `Q-03` mediante las Decisiones 104, 105 y 106 de `CONTEXT §14` | Decisiones tomadas por el líder del proyecto sobre `Q-01` a `Q-03` |
+| 2026-10-25 | `En revisión` → `Aprobada` → `Verificada`; aprobación del líder del proyecto e implementación completa de ENG-080 a ENG-087 (scorers deterministas 0.0–5.0 en ScoringService, Attempt individual secuencial según Decisión 104, flag implausible_duration, 5 componentes de microjuegos bajo ActivityRuntimeProps, GameRenderer con simulación in-memory, audio Howler.js, confeti, chunks diferidos kids/teens, zona /juegos) con 354/354 pruebas en verde en monorepo (54 shared, 225 api, 75 web) | Aprobación formal e implementación integral de la Etapa 6 de SDD |
+

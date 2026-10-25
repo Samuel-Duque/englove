@@ -8,8 +8,10 @@ import {
   ActivityStatus,
   Level,
   ActivityEditor,
+  GamePublicConfig,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { GameRenderer } from '../../../components/activities/GameRenderer';
 
 interface ActivityEditorProps {
   initialActivity?: ActivityEditor;
@@ -1799,12 +1801,36 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                 </div>
               )}
 
-              {type === ActivityType.game && (
-                <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
-                  <p className="text-xs font-bold text-purple-700 uppercase">Mecánica: {gameMechanic}</p>
-                  <p className="text-sm text-zinc-700 mt-1">Interacción lúdica para el estudiante.</p>
-                </div>
-              )}
+              {type === ActivityType.game && (() => {
+                let previewConfig: GamePublicConfig | null;
+                try {
+                  const payload = buildPayload();
+                  previewConfig = payload.config as GamePublicConfig;
+                } catch {
+                  previewConfig = null;
+                }
+
+                if (!previewConfig) {
+                  return (
+                    <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
+                      <p className="text-xs font-bold text-amber-800 uppercase">Previsualización de {gameMechanic}</p>
+                      <p className="text-xs text-zinc-600 mt-1">
+                        Completa los campos requeridos de la mecánica para interactuar con la previsualización.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-4 bg-white rounded-2xl border border-amber-200">
+                    <GameRenderer
+                      config={previewConfig}
+                      previewMode={true}
+                      theme="kids"
+                    />
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex justify-end pt-2 border-t border-zinc-100">

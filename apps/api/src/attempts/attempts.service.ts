@@ -1156,15 +1156,31 @@ export class AttemptsService {
 
   private buildExistingCompletionView(
     attempt: AttemptEntityLike,
-    _activity?: ActivityEntityLike,
+    activity?: ActivityEntityLike,
   ): CompletionView {
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ?? attempt.assignment?.due_at ?? new Date();
     const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
 
+    let correction: Record<string, unknown> | null = null;
+    if (activity && attempt.status === AttemptStatus.graded) {
+      const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};
+      const answers = payload.answers || {};
+
+      if (activity.type === ActivityType.game && activity.game_detail?.answer_key) {
+        const cfg = (activity.game_detail.config as GameConfig) || {
+          mechanic: activity.game_detail.mechanic as GameMechanic,
+          settings: {},
+        };
+        const ak = activity.game_detail.answer_key as GameAnswerKey;
+        const res = this.scoringService.calculateGame(cfg, ak, answers);
+        correction = res.correction;
+      }
+    }
+
     return {
       attempt: this.mapAttemptView(attempt, effectiveDueAt, completeUntil),
-      correction: null,
+      correction,
       newBadges: [],
     };
   }

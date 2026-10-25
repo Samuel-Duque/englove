@@ -940,8 +940,8 @@ export default function ActividadRunnerPage({ params }: PageProps) {
           />
         )}
 
-        {/* Submit Button */}
-        {!isFinished && (
+        {/* Submit Button for standard activities (Microgames provide their own dedicated submit action) */}
+        {!isFinished && activity.type !== ActivityType.game && (
           <div className="pt-4 border-t border-amber-200/60 flex justify-end">
             <button
               type="button"

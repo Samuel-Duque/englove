@@ -242,6 +242,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
     initialActivity?.type ?? ActivityType.fill_blank,
   );
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewTheme, setPreviewTheme] = useState<'kids' | 'teens'>('kids');
   const [gameMechanic, setGameMechanic] = useState<GameMechanicType>(
     initialActivity?.type === ActivityType.game ? initialMechanic : 'order_words',
   );
@@ -1740,16 +1741,53 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPreviewOpen(false)}
-                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 font-bold"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200"
+                  role="group"
+                  aria-label="Selector de tema para previsualización"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTheme('kids')}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      previewTheme === 'kids'
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                  >
+                    🧒 Kids
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTheme('teens')}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      previewTheme === 'teens'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                  >
+                    🧑‍🎓 Teens
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            <div className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-4" data-theme="kids">
+            <div
+              className={`p-6 rounded-2xl border space-y-4 ${
+                previewTheme === 'kids'
+                  ? 'border-amber-200 bg-amber-50/40 text-amber-950'
+                  : 'border-zinc-700 bg-zinc-900 text-zinc-100'
+              }`}
+              data-theme={previewTheme}
+            >
               <div className="flex items-center justify-between">
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900">
                   Nivel {level}
@@ -1826,7 +1864,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                     <GameRenderer
                       config={previewConfig}
                       previewMode={true}
-                      theme="kids"
+                      theme={previewTheme}
                     />
                   </div>
                 );

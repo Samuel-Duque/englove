@@ -32,8 +32,27 @@ describe('SPEC-06: Microgames Components & Runtime Rules (ENG-080 to ENG-087)', 
       const items = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
       const shuffleA = deterministicShuffle(items, 'seed-a');
       const shuffleB = deterministicShuffle(items, 'seed-b');
-
       expect(shuffleA).not.toEqual(shuffleB);
+    });
+
+    it('garantiza permutación no paralela frente a la columna izquierda en match (RF-2)', () => {
+      const left = [{ id: 'l1', text: 'Cat' }, { id: 'l2', text: 'Dog' }];
+      const right = [{ id: 'r1', text: 'Gato' }, { id: 'r2', text: 'Perro' }];
+      const solution = { pairs: { l1: 'r1', l2: 'r2' } };
+
+      // Simulate a shuffle that happened to be in parallel order [r1, r2]
+      let shuffled = [...right];
+      const isParallel = left.every((l, idx) => solution.pairs[l.id as 'l1' | 'l2'] === shuffled[idx]?.id);
+      if (isParallel) {
+        shuffled = [...shuffled].reverse();
+      }
+
+      // Assert it is no longer parallel
+      const stillParallel = left.every((l, idx) => solution.pairs[l.id as 'l1' | 'l2'] === shuffled[idx]?.id);
+      expect(isParallel).toBe(true);
+      expect(stillParallel).toBe(false);
+      expect(shuffled[0]?.id).toBe('r2');
+      expect(shuffled[1]?.id).toBe('r1');
     });
   });
 

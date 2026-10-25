@@ -34,10 +34,19 @@ export function MatchGame({
   }, [leftItems, solution]);
 
   const shuffledRight = useMemo(() => {
-    const shuffled = deterministicShuffle(rightOriginal, seed);
-    // Ensure not identical to original left sequence if possible
+    let shuffled = deterministicShuffle(rightOriginal, seed);
+    // Guarantee non-parallel permutation to left items if possible (SPEC-06 RF-2)
+    if (solution?.pairs && shuffled.length >= 2 && leftItems.length === shuffled.length) {
+      const isParallel = leftItems.every(
+        (left, idx) => solution.pairs[left.id] === shuffled[idx]?.id,
+      );
+      if (isParallel) {
+        // Reverse so it is never identical/parallel to left items
+        shuffled = [...shuffled].reverse();
+      }
+    }
     return shuffled;
-  }, [rightOriginal, seed]);
+  }, [rightOriginal, seed, solution, leftItems]);
 
   // Pairs state: leftId -> rightId
   const [pairs, setPairs] = useState<Record<string, string>>(() => {

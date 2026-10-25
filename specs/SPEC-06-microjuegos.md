@@ -126,11 +126,11 @@ Al cerrar un intento `game`, el servidor calcula `durationSeconds = Math.max(0, 
 - **Dado** una actividad `game` con `min_plausible_seconds = 15`, **Cuando** un intento se completa en `6` segundos según el reloj del servidor, **Entonces** `Attempt.flags` incluye `'implausible_duration'` y conserva su `score` en `[0.0, 5.0]`.
 - **Dado** un intento `in_progress` donde se actualiza o reinicia el mapa en `{ itemId: 'placements' | 'choices', answer: { ... } }`, **Cuando** `submitEvents` procesa el nuevo `clientEventId`, **Entonces** `attempt.payload.answers[itemId]` refleja exactamente el mapa enviado sin conservar claves eliminadas.
 
-### RF-9 — Efectos de sonido (`Howler.js`) y confeti (`canvas-confetti`) por segmento
+### RF-9 — Efectos de sonido con Web Audio API nativo y confeti (`canvas-confetti`) por segmento (Decisión 107)
 
 Tarea: `ENG-086`. Referencias: `CONTEXT §3.2`, `architecture §2.1`, `§3.3`.
 
-El runner incorpora `Howler.js` para tres eventos cortos (`hit`, `miss`, `complete`) y botón de silencio en cabecera. `soundEnabled` inicia en `true` para `kids` y en `false` para `teens`. Al completar una actividad autocalificada con `score >= 3.0` o desbloquear insignia, dispara `canvas-confetti` acorde al tema activo.
+El runner incorpora síntesis procedural nativa mediante Web Audio API para tres eventos cortos (`hit`, `miss`, `complete`) y botón de silencio en cabecera (Decisión 107). `soundEnabled` inicia en `true` para `kids` y en `false` para `teens`. Al completar una actividad autocalificada con `score >= 3.0` o desbloquear insignia, dispara `canvas-confetti` acorde al tema activo.
 
 **Criterios de aceptación**:
 
@@ -263,5 +263,5 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (`CONTEXT §15`). `Q-01`, 
 | --- | --- | --- |
 | 2026-10-24 | Creación de `SPEC-06` en estado `Borrador` (`RF-1` a `RF-11`, contratos de las 5 mecánicas de `GameMechanic`, scorers `0..1` → `0.0–5.0`, `min_plausible_seconds`, sonido/confeti, `motion/kids` y `motion/teens`, zona `/juegos` y preguntas `Q-01` a `Q-03`) | Redacción de la especificación de Etapa 6 previa a `ENG-080`–`ENG-087` |
 | 2026-10-24 | `Borrador` → `En revisión`; cierre de `Q-01`, `Q-02` y `Q-03` mediante las Decisiones 104, 105 y 106 de `CONTEXT §14` | Decisiones tomadas por el líder del proyecto sobre `Q-01` a `Q-03` |
-| 2026-10-25 | `En revisión` → `Aprobada` → `Verificada`; aprobación del líder del proyecto e implementación completa de ENG-080 a ENG-087 (scorers deterministas 0.0–5.0 en ScoringService, Attempt individual secuencial según Decisión 104, flag implausible_duration, 5 componentes de microjuegos bajo ActivityRuntimeProps, GameRenderer con simulación in-memory, audio Howler.js, confeti, chunks diferidos kids/teens, zona /juegos) con 365/365 pruebas en verde en monorepo (54 shared, 235 api, 76 web) | Aprobación formal e implementación integral de la Etapa 6 de SDD |
+| 2026-10-25 | `En revisión` → `Aprobada` → `Verificada`; aprobación del líder del proyecto e implementación completa de ENG-080 a ENG-087 (scorers deterministas 0.0–5.0 en ScoringService, Attempt individual secuencial según Decisión 104, flag implausible_duration, 5 componentes de microjuegos bajo ActivityRuntimeProps, GameRenderer con simulación in-memory, audio Howler.js, confeti, chunks diferidos kids/teens, zona /juegos) con 370/370 pruebas en verde en monorepo (58 shared, 236 api, 76 web) | Aprobación formal e implementación integral de la Etapa 6 de SDD |
 

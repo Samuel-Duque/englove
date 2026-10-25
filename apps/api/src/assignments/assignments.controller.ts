@@ -12,8 +12,11 @@ import {
   BadRequestException,
   Optional,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { AssignmentsService } from './assignments.service';
+import { AttemptsService } from '../attempts/attempts.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
@@ -41,7 +44,9 @@ const uuidPipe = new ParseUUIDPipe({
 export class AssignmentsController {
   constructor(
     private readonly assignmentsService: AssignmentsService,
-    @Optional() private readonly attemptsService?: import('../attempts/attempts.service').AttemptsService,
+    @Optional()
+    @Inject(forwardRef(() => AttemptsService))
+    private readonly attemptsService?: AttemptsService,
   ) {}
 
   @Post(':id/attempts')

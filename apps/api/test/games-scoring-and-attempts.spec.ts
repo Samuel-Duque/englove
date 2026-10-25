@@ -247,6 +247,44 @@ describe('SPEC-06 Microjuegos — ScoringService y AttemptsService (RF-7, RF-8, 
       expect((res.correction['q2'] as ItemCorrection).correct).toBe(false);
     });
 
+    it('maneja configuraciones y soluciones vacías o parciales de forma defensiva sin fallar con TypeError', () => {
+      // Empty match
+      const resMatch = scoringService.calculateGame(
+        { mechanic: GameMechanic.match, settings: { left: [], right: [] } },
+        { solution: { pairs: {} } },
+        {},
+      );
+      expect(resMatch.score).toBe(0.0);
+      expect(resMatch.fraction).toBe(0.0);
+
+      // Empty order_words
+      const resOrder = scoringService.calculateGame(
+        { mechanic: GameMechanic.order_words, settings: { tokens: [] } },
+        { solution: { tokenIds: [] } },
+        {},
+      );
+      expect(resOrder.score).toBe(0.0);
+      expect(resOrder.fraction).toBe(0.0);
+
+      // Empty drag_drop
+      const resDrag = scoringService.calculateGame(
+        { mechanic: GameMechanic.drag_drop, settings: { objects: [], targets: [] } },
+        { solution: { placements: {} } },
+        {},
+      );
+      expect(resDrag.score).toBe(0.0);
+      expect(resDrag.fraction).toBe(0.0);
+
+      // Empty timed_choice
+      const resTimed = scoringService.calculateGame(
+        { mechanic: GameMechanic.timed_choice, settings: { timeLimitSeconds: 10, questions: [] } },
+        { solution: { choices: {} } },
+        {},
+      );
+      expect(resTimed.score).toBe(0.0);
+      expect(resTimed.fraction).toBe(0.0);
+    });
+
     it('RF-8: durationSeconds < minPlausibleSeconds marca flag implausible_duration conservando score', () => {
       const config: GameConfig = {
         mechanic: GameMechanic.timed_choice,

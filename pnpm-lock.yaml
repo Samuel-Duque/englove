@@ -171,9 +171,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      howler:
-        specifier: ^2.2.4
-        version: 2.2.4
       lucide-react:
         specifier: ^1.16.0
         version: 1.59.0(@types/react@19.0.10)(react@19.3.1)
@@ -208,9 +205,6 @@ importers:
       '@types/canvas-confetti':
         specifier: ^1.9.0
         version: 1.9.0
-      '@types/howler':
-        specifier: ^2.2.13
-        version: 2.2.13
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
@@ -1654,9 +1648,6 @@ packages:
   '@types/geojson@7946.0.16':
     resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
 
-  '@types/howler@2.2.13':
-    resolution: {integrity: sha512-40+EBjqIHHrC4VShlz/7i0lBUsE3QkgzZinQQji74Hd8sBkJZUBaT7LWFLK6rcabsDOOQpoMbEJvtaFQwxOu/g==}
-
   '@types/http-errors@2.0.5':
     resolution: {integrity: sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==}
 
@@ -2567,9 +2558,6 @@ packages:
   hex-rgb@4.3.0:
     resolution: {integrity: sha512-Ox1pJVrDCyGHMG9CFg1tmrRUMRPRsAWYc/PinY0XzJU4K7y7vjNoLKIQ7BR5UJMCxNN8EM1MNDmHWA/B3aZUuw==}
     engines: {node: '>=6'}
-
-  howler@2.2.4:
-    resolution: {integrity: sha512-iARIBPgcQrwtEr+tALF+rapJ8qSc+Set2GJQl7xT1MQzWaVkFebdJhR3alVlSiUf5U7nAANKuj3aWpwerocD5w==}
 
   html-to-text@9.0.5:
     resolution: {integrity: sha512-qY60FjREgVZL03vJU6IfMV4GDjGBIoOyvuFdpBDIX9yTlDw0TjxVBQp+P8NvpdIXNJvfWBTNul7fsAQJq2FNpg==}
@@ -4896,8 +4884,6 @@ snapshots:
 
   '@types/geojson@7946.0.16': {}
 
-  '@types/howler@2.2.13': {}
-
   '@types/http-errors@2.0.5': {}
 
   '@types/json-schema@7.0.15': {}
@@ -5920,8 +5906,6 @@ snapshots:
   helmet@8.3.0: {}
 
   hex-rgb@4.3.0: {}
-
-  howler@2.2.4: {}
 
   html-to-text@9.0.5:
     dependencies:

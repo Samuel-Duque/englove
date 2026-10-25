@@ -391,6 +391,34 @@ describe('ENG-030 / SPEC-03: Activity schemas, scoring, weights and durations', 
     it('memory: two pairs found and one failed selection gives 2/3 (SPEC-03 §4)', () => {
       expect(calculateMemoryScore(2, 2, 1)).toBeCloseTo(2 / 3);
     });
+
+    it('match: calculates fraction and prevents right reuse', () => {
+      const sol = { l1: 'r1', l2: 'r2', l3: 'r3' };
+      expect(calculateMatchScore(sol, { l1: 'r1', l2: 'r2', l3: 'r3' })).toBe(1.0);
+      expect(calculateMatchScore(sol, { l1: 'r1', l2: 'r1', l3: 'r3' })).toBeCloseTo(2 / 3);
+      expect(calculateMatchScore(sol, {})).toBe(0.0);
+      expect(calculateMatchScore({} as Record<string, string>, {})).toBe(0.0);
+    });
+
+    it('drag_drop: calculates fraction across targets', () => {
+      const sol = { o1: 't1', o2: 't1', o3: 't2' };
+      expect(calculateDragDropScore(sol, { o1: 't1', o2: 't1', o3: 't2' })).toBe(1.0);
+      expect(calculateDragDropScore(sol, { o1: 't1', o2: 't2', o3: 't2' })).toBeCloseTo(2 / 3);
+      expect(calculateDragDropScore(sol, {})).toBe(0.0);
+      expect(calculateDragDropScore({} as Record<string, string>, {})).toBe(0.0);
+    });
+
+    it('timed_choice: calculates fraction across questions', () => {
+      const sol = { q1: 'opt1', q2: 'opt2' };
+      expect(calculateTimedChoiceScore(sol, { q1: 'opt1', q2: 'opt2' })).toBe(1.0);
+      expect(calculateTimedChoiceScore(sol, { q1: 'opt1', q2: null })).toBe(0.5);
+      expect(calculateTimedChoiceScore(sol, {})).toBe(0.0);
+      expect(calculateTimedChoiceScore({} as Record<string, string>, {})).toBe(0.0);
+    });
+
+    it('order_words: handles empty or missing expected tokens gracefully', () => {
+      expect(calculateOrderWordsScore([], [], [])).toBe(0.0);
+    });
   });
 
   describe('Activity durations and public projection', () => {

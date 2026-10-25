@@ -57,7 +57,7 @@ export function calculateMatchScore(
   pairsSolution: Record<string, string>,
   userPairs: Record<string, string> = {},
 ): number {
-  const leftIds = Object.keys(pairsSolution);
+  const leftIds = Object.keys(pairsSolution || {});
   if (leftIds.length === 0) return 0;
 
   const usedRightIds = new Set<string>();
@@ -84,10 +84,10 @@ export function calculateOrderWordsScore(
   expectedTokenIds: string[],
   userTokenIds: string[] = [],
 ): number {
-  if (expectedTokenIds.length === 0) return 0;
+  if (!expectedTokenIds || expectedTokenIds.length === 0) return 0;
 
   const tokenMap = new Map<string, string>();
-  for (const t of tokens) {
+  for (const t of tokens || []) {
     tokenMap.set(t.id, t.text.trim());
   }
 
@@ -119,7 +119,7 @@ export function calculateDragDropScore(
   placementsSolution: Record<string, string>,
   userPlacements: Record<string, string> = {},
 ): number {
-  const objectIds = Object.keys(placementsSolution);
+  const objectIds = Object.keys(placementsSolution || {});
   if (objectIds.length === 0) return 0;
 
   let correct = 0;
@@ -221,7 +221,7 @@ export function calculateTimedChoiceScore(
   choicesSolution: Record<string, string>,
   userChoices: Record<string, string | null | undefined> = {},
 ): number {
-  const questionIds = Object.keys(choicesSolution);
+  const questionIds = Object.keys(choicesSolution || {});
   if (questionIds.length === 0) return 0;
 
   let correct = 0;

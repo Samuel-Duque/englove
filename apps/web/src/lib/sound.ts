@@ -1,6 +1,6 @@
 /**
- * Sound effects engine for microgames using Howler.js and Web Audio API fallback (SPEC-06 RF-9, ENG-086).
- * Safely plays short effects for 'hit', 'miss', 'complete'.
+ * Sound effects engine for microgames using native Web Audio API synthesis (SPEC-06 RF-9, ENG-086, Decisión 107).
+ * Synthesizes procedural effects for 'hit', 'miss', and 'complete' with zero external assets or network latency.
  * Degrades gracefully without errors if browser blocks autoplay or audio context is unavailable.
  */
 

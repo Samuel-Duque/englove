@@ -861,6 +861,49 @@ describe('SPEC-04: Asignación — AssignmentsService (ENG-050)', () => {
       await controller.cancelAssignment(teacherUser, assignmentId1);
       expect(mockService.cancelAssignment).toHaveBeenCalledWith(orgId, assignmentId1);
     });
+
+    it('startAttempt lanza 400 si falta studentId en usuario autenticado', async () => {
+      await expect(
+        controller.startAttempt(teacherUser as any, assignmentId1),
+      ).rejects.toThrow();
+    });
+
+    it('startAttempt lanza 404 si attemptsService no esta configurado', async () => {
+      const studentUser = {
+        id: 'user-2',
+        sessionId: 'session-2',
+        organizationId: orgId,
+        email: 'student@test.com',
+        role: Role.student,
+        studentId: 'student-uuid-1',
+      };
+      await expect(
+        controller.startAttempt(studentUser as any, assignmentId1),
+      ).rejects.toThrow();
+    });
+
+    it('startAttempt delega a attemptsService cuando esta presente', async () => {
+      const mockAttemptsService = {
+        startAttempt: vi.fn().mockResolvedValue({
+          attempt: { id: 'attempt-1', attemptNumber: 1 },
+        }),
+      };
+      const ctrlWithAttempts = new AssignmentsController(
+        mockService as unknown as AssignmentsService,
+        mockAttemptsService as any,
+      );
+      const studentUser = {
+        id: 'user-2',
+        sessionId: 'session-2',
+        organizationId: orgId,
+        email: 'student@test.com',
+        role: Role.student,
+        studentId: 'student-uuid-1',
+      };
+      const res = await ctrlWithAttempts.startAttempt(studentUser as any, assignmentId1);
+      expect(mockAttemptsService.startAttempt).toHaveBeenCalledWith(orgId, 'student-uuid-1', assignmentId1);
+      expect((res as any).attempt.id).toBe('attempt-1');
+    });
   });
 });
 

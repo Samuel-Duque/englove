@@ -167,17 +167,18 @@ export class ScoringService {
               : {};
         fraction = calculateMatchScore(solution?.pairs || {}, userPairs);
 
+        const leftItems = settings?.left || [];
         const usedRightIds = new Set<string>();
         const matchCorrection: Record<string, unknown> = {};
-        for (const item of settings.left) {
-          const expected = solution.pairs[item.id];
+        for (const item of leftItems) {
+          const expected = solution?.pairs ? solution.pairs[item.id] : undefined;
           const submitted = userPairs[item.id] || null;
           const isCorrect =
-            submitted !== null && submitted === expected && !usedRightIds.has(submitted);
+            submitted !== null && expected !== undefined && submitted === expected && !usedRightIds.has(submitted);
           if (isCorrect && submitted) usedRightIds.add(submitted);
           matchCorrection[item.id] = {
             correct: isCorrect,
-            expected,
+            expected: expected ?? null,
             submitted,
           };
         }
@@ -195,15 +196,21 @@ export class ScoringService {
               ? (userAnswers as unknown as string[])
               : []
         ) as string[];
-        fraction = calculateOrderWordsScore(settings.tokens, solution.tokenIds, userTokenIds);
+        fraction = calculateOrderWordsScore(
+          settings?.tokens || [],
+          solution?.tokenIds || [],
+          userTokenIds,
+        );
 
+        const tokens = settings?.tokens || [];
+        const expectedIds = solution?.tokenIds || [];
         const tokenMap = new Map<string, string>();
-        for (const t of settings.tokens) tokenMap.set(t.id, t.text.trim());
+        for (const t of tokens) tokenMap.set(t.id, t.text.trim());
         const seenTokens = new Set<string>();
         const orderCorrection: Record<string, unknown> = {};
 
-        for (let i = 0; i < solution.tokenIds.length; i++) {
-          const expId = solution.tokenIds[i]!;
+        for (let i = 0; i < expectedIds.length; i++) {
+          const expId = expectedIds[i]!;
           const expectedText = tokenMap.get(expId) || '';
           const userTokenId = userTokenIds[i];
           let isCorrect = false;
@@ -234,13 +241,14 @@ export class ScoringService {
               : {};
         fraction = calculateDragDropScore(solution?.placements || {}, userPlacements);
 
+        const objects = settings?.objects || [];
         const dragCorrection: Record<string, unknown> = {};
-        for (const obj of settings.objects) {
-          const expected = solution.placements[obj.id];
+        for (const obj of objects) {
+          const expected = solution?.placements ? solution.placements[obj.id] : undefined;
           const submitted = userPlacements[obj.id] || null;
           dragCorrection[obj.id] = {
-            correct: submitted === expected,
-            expected,
+            correct: expected !== undefined && submitted === expected,
+            expected: expected ?? null,
             submitted,
           };
         }
@@ -283,13 +291,14 @@ export class ScoringService {
               : {};
         fraction = calculateTimedChoiceScore(solution?.choices || {}, userChoices);
 
+        const questions = settings?.questions || [];
         const timedCorrection: Record<string, unknown> = {};
-        for (const q of settings.questions) {
-          const expected = solution.choices[q.id];
+        for (const q of questions) {
+          const expected = solution?.choices ? solution.choices[q.id] : undefined;
           const submitted = userChoices[q.id] ?? null;
           timedCorrection[q.id] = {
-            correct: submitted !== null && submitted === expected,
-            expected,
+            correct: expected !== undefined && submitted !== null && submitted === expected,
+            expected: expected ?? null,
             submitted,
           };
         }

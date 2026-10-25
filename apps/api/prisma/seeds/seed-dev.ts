@@ -18,6 +18,27 @@ export async function seedDev() {
   const prisma = getPrisma();
   const { org, teacher } = await seedMinimal();
 
+  await prisma.featureFlag.upsert({
+    where: {
+      organization_id_key: {
+        organization_id: org.id,
+        key: 'games',
+      },
+    },
+    update: { enabled: true },
+    create: {
+      organization_id: org.id,
+      key: 'games',
+      enabled: true,
+      config: {
+        passing_score: 3.0,
+        retention_days: 30,
+        pending_upload_ttl_days: 7,
+        ungraded_reminder_days: 3,
+      },
+    },
+  });
+
   const studentHash = await argon2.hash('Estudiante2026!', {
     type: argon2.argon2id,
   });
@@ -291,38 +312,176 @@ export async function seedDev() {
     },
   });
 
-  // 4. game (5 mechanics)
-  const mechanics = [
-    GameMechanic.match,
-    GameMechanic.order_words,
-    GameMechanic.drag_drop,
-    GameMechanic.memory,
-    GameMechanic.timed_choice,
+  // 4. game (5 mechanics with full schemas)
+  const gameDefinitions = [
+    {
+      mech: GameMechanic.match,
+      title: 'Vocabulary Match: Animals & Objects',
+      actId: '20000000-0000-4000-8000-000000000011',
+      config: {
+        mechanic: GameMechanic.match,
+        instructions: 'Match each English word to its Spanish translation',
+        settings: {
+          left: [
+            { id: '11111111-1111-4111-8111-111111111101', text: 'Apple' },
+            { id: '11111111-1111-4111-8111-111111111102', text: 'Dog' },
+          ],
+          right: [
+            { id: '22222222-2222-4222-8222-222222222201', text: 'Manzana' },
+            { id: '22222222-2222-4222-8222-222222222202', text: 'Perro' },
+          ],
+        },
+      },
+      answerKey: {
+        solution: {
+          pairs: {
+            '11111111-1111-4111-8111-111111111101': '22222222-2222-4222-8222-222222222201',
+            '11111111-1111-4111-8111-111111111102': '22222222-2222-4222-8222-222222222202',
+          },
+        },
+      },
+    },
+    {
+      mech: GameMechanic.order_words,
+      title: 'Sentence Builder: Likes Learning',
+      actId: '20000000-0000-4000-8000-000000000012',
+      config: {
+        mechanic: GameMechanic.order_words,
+        instructions: 'Order the words to form a correct English sentence',
+        settings: {
+          tokens: [
+            { id: '11111111-1111-4111-8111-111111111201', text: 'I' },
+            { id: '11111111-1111-4111-8111-111111111202', text: 'like' },
+            { id: '11111111-1111-4111-8111-111111111203', text: 'learning' },
+            { id: '11111111-1111-4111-8111-111111111204', text: 'English' },
+          ],
+        },
+      },
+      answerKey: {
+        solution: {
+          tokenIds: [
+            '11111111-1111-4111-8111-111111111201',
+            '11111111-1111-4111-8111-111111111202',
+            '11111111-1111-4111-8111-111111111203',
+            '11111111-1111-4111-8111-111111111204',
+          ],
+        },
+      },
+    },
+    {
+      mech: GameMechanic.drag_drop,
+      title: 'Category Sorting: Fruits & Animals',
+      actId: '20000000-0000-4000-8000-000000000013',
+      config: {
+        mechanic: GameMechanic.drag_drop,
+        instructions: 'Drag each item into its correct category',
+        settings: {
+          targets: [
+            { id: '22222222-2222-4222-8222-222222222301', label: 'Fruits' },
+            { id: '22222222-2222-4222-8222-222222222302', label: 'Animals' },
+          ],
+          objects: [
+            { id: '11111111-1111-4111-8111-111111111301', text: 'Apple' },
+            { id: '11111111-1111-4111-8111-111111111302', text: 'Dog' },
+          ],
+        },
+      },
+      answerKey: {
+        solution: {
+          placements: {
+            '11111111-1111-4111-8111-111111111301': '22222222-2222-4222-8222-222222222301',
+            '11111111-1111-4111-8111-111111111302': '22222222-2222-4222-8222-222222222302',
+          },
+        },
+      },
+    },
+    {
+      mech: GameMechanic.memory,
+      title: 'Memory Cards: Animals & Nature',
+      actId: '20000000-0000-4000-8000-000000000014',
+      config: {
+        mechanic: GameMechanic.memory,
+        instructions: 'Find all matching pairs of cards',
+        settings: {
+          cards: [
+            { id: '11111111-1111-4111-8111-111111111401', text: 'Cat' },
+            { id: '11111111-1111-4111-8111-111111111402', text: 'Gato' },
+            { id: '11111111-1111-4111-8111-111111111403', text: 'Sun' },
+            { id: '11111111-1111-4111-8111-111111111404', text: 'Sol' },
+          ],
+        },
+      },
+      answerKey: {
+        solution: {
+          pairs: [
+            ['11111111-1111-4111-8111-111111111401', '11111111-1111-4111-8111-111111111402'],
+            ['11111111-1111-4111-8111-111111111403', '11111111-1111-4111-8111-111111111404'],
+          ],
+        },
+      },
+    },
+    {
+      mech: GameMechanic.timed_choice,
+      title: 'Speed Quiz: Colors',
+      actId: '20000000-0000-4000-8000-000000000015',
+      config: {
+        mechanic: GameMechanic.timed_choice,
+        instructions: 'Choose the correct answer before time runs out',
+        settings: {
+          timeLimitSeconds: 20,
+          questions: [
+            {
+              id: '11111111-1111-4111-8111-111111111501',
+              prompt: 'What color is the sun?',
+              options: [
+                { id: '22222222-2222-4222-8222-222222222501', text: 'Yellow' },
+                { id: '22222222-2222-4222-8222-222222222502', text: 'Blue' },
+              ],
+            },
+          ],
+        },
+      },
+      answerKey: {
+        solution: {
+          choices: {
+            '11111111-1111-4111-8111-111111111501': '22222222-2222-4222-8222-222222222501',
+          },
+        },
+      },
+    },
   ];
 
-  for (let idx = 0; idx < mechanics.length; idx++) {
-    const mech = mechanics[idx]!;
-    const actId = `20000000-0000-4000-8000-00000000001${idx + 1}`;
+  for (const def of gameDefinitions) {
     await prisma.activity.upsert({
-      where: { id: actId },
-      update: {},
+      where: { id: def.actId },
+      update: {
+        title: def.title,
+      },
       create: {
-        id: actId,
+        id: def.actId,
         organization_id: org.id,
-        title: `Game: ${mech}`,
+        title: def.title,
         type: ActivityType.game,
         level: Level.A1,
         status: ActivityStatus.published,
         created_by: teacher.id,
         expected_duration_seconds: 180,
-        game_detail: {
-          create: {
-            organization_id: org.id,
-            mechanic: mech,
-            config: { mechanic: mech, instructions: `Play ${mech}` },
-            answer_key: { solution: { [mech]: true } },
-          },
-        },
+      },
+    });
+
+    await prisma.gameDetail.upsert({
+      where: { activity_id: def.actId },
+      update: {
+        mechanic: def.mech,
+        config: def.config,
+        answer_key: def.answerKey,
+      },
+      create: {
+        organization_id: org.id,
+        activity_id: def.actId,
+        mechanic: def.mech,
+        config: def.config,
+        answer_key: def.answerKey,
       },
     });
   }
@@ -407,6 +566,27 @@ export async function seedDev() {
       due_at: new Date(futureOpens.getTime() + 7 * 24 * 3600 * 1000),
     },
   });
+
+  // Open microgame assignments for groupKids
+  for (let idx = 0; idx < gameDefinitions.length; idx++) {
+    const def = gameDefinitions[idx]!;
+    const assignId = `30000000-0000-4000-8000-00000000001${idx + 1}`;
+    await prisma.assignment.upsert({
+      where: { id: assignId },
+      update: {
+        opens_at: pastOpens,
+        due_at: futureDue,
+      },
+      create: {
+        id: assignId,
+        organization_id: org.id,
+        activity_id: def.actId,
+        group_id: groupKids.id,
+        opens_at: pastOpens,
+        due_at: futureDue,
+      },
+    });
+  }
 
   const firstStudent = students[0]!;
   const secondStudent = students[1]!;

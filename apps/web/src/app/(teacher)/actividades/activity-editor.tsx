@@ -9,6 +9,7 @@ import {
   Level,
   ActivityEditor,
   GamePublicConfig,
+  GameAnswerKey,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { GameRenderer } from '../../../components/activities/GameRenderer';
@@ -1843,7 +1844,10 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                 let previewConfig: GamePublicConfig | null;
                 try {
                   const payload = buildPayload();
-                  previewConfig = payload.config as GamePublicConfig;
+                  previewConfig = {
+                    ...(payload.config as GamePublicConfig),
+                    answerKey: (payload.answerKey as GameAnswerKey) || undefined,
+                  };
                 } catch {
                   previewConfig = null;
                 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchSharedSession } from '../../lib/auth-session';
+
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -29,18 +31,12 @@ export default function InicioPage() {
 
     async function loadData() {
       try {
-        const sessionRes = await fetch(`${apiUrl}/api/v1/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
+        const sessionData = await fetchSharedSession();
 
-        if (!sessionRes.ok) {
+        if (!sessionData) {
           if (isMounted) router.replace('/login');
           return;
         }
-
-        const sessionData: SessionView = await sessionRes.json();
         if (isMounted) setSession(sessionData);
 
         // If teacher, fetch reminders from PendingSummaryService (RF-17)

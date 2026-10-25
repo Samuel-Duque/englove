@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -9,6 +9,7 @@ import {
   OrderWordsSolution,
   deterministicShuffle,
 } from '@englove/shared';
+import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { soundManager } from '../../../lib/sound';
 
 export function OrderWordsGame({
@@ -80,6 +81,14 @@ export function OrderWordsGame({
     onEvent?.({ itemId: 'tokenIds', answer: next });
   };
 
+  const handleInsertBankToken = (tokenId: string, atIndex: number) => {
+    if (tokenIds.includes(tokenId)) return;
+    const next = [...tokenIds];
+    next.splice(atIndex, 0, tokenId);
+    setTokenIds(next);
+    onEvent?.({ itemId: 'tokenIds', answer: next });
+  };
+
   const handleRemoveToken = (tokenId: string) => {
     const next = tokenIds.filter((id) => id !== tokenId);
     setTokenIds(next);
@@ -87,7 +96,15 @@ export function OrderWordsGame({
   };
 
   const handleMoveToken = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= tokenIds.length ||
+      toIndex >= tokenIds.length
+    ) {
+      return;
+    }
     const next = [...tokenIds];
     const [moved] = next.splice(fromIndex, 1);
     if (moved) {
@@ -101,6 +118,50 @@ export function OrderWordsGame({
     soundManager.play('complete', soundEnabled);
     onComplete?.({ tokenIds });
   };
+
+  // Sentence Line drop target
+  const sentenceLineRef = useRef<HTMLDivElement>(null);
+  const [isOverLine, setIsOverLine] = useState(false);
+
+  useEffect(() => {
+    const el = sentenceLineRef.current;
+    if (!el) return;
+
+    return dropTargetForElements({
+      element: el,
+      onDragEnter: () => setIsOverLine(true),
+      onDragLeave: () => setIsOverLine(false),
+      onDrop: ({ source }) => {
+        setIsOverLine(false);
+        const data = source.data;
+        if (data?.type === 'bank-token' && typeof data.tokenId === 'string') {
+          handleAddToken(data.tokenId);
+        }
+      },
+    });
+  }, [tokenIds]);
+
+  // Bank drop target (for dragging placed tokens back)
+  const bankRef = useRef<HTMLDivElement>(null);
+  const [isOverBank, setIsOverBank] = useState(false);
+
+  useEffect(() => {
+    const el = bankRef.current;
+    if (!el) return;
+
+    return dropTargetForElements({
+      element: el,
+      onDragEnter: () => setIsOverBank(true),
+      onDragLeave: () => setIsOverBank(false),
+      onDrop: ({ source }) => {
+        setIsOverBank(false);
+        const data = source.data;
+        if (data?.type === 'placed-token' && typeof data.tokenId === 'string') {
+          handleRemoveToken(data.tokenId);
+        }
+      },
+    });
+  }, [tokenIds]);
 
   const isKids = theme === 'kids';
 
@@ -142,21 +203,26 @@ export function OrderWordsGame({
         </div>
 
         <div
+          ref={sentenceLineRef}
           className={`min-h-24 p-4 rounded-2xl border-2 border-dashed flex flex-wrap items-center gap-2.5 transition-colors ${
-            tokenIds.length === 0
-              ? isKids
-                ? 'border-amber-300 bg-amber-50/40 justify-center'
-                : 'border-zinc-700 bg-zinc-800/40 justify-center'
-              : isKids
-                ? 'border-amber-400 bg-white shadow-inner'
-                : 'border-zinc-700 bg-zinc-800 shadow-inner'
+            isOverLine
+              ? 'border-indigo-500 ring-4 ring-indigo-200 bg-indigo-50/60 shadow-md'
+              : tokenIds.length === 0
+                ? isKids
+                  ? 'border-amber-300 bg-amber-50/40 justify-center'
+                  : 'border-zinc-700 bg-zinc-800/40 justify-center'
+                : isKids
+                  ? 'border-amber-400 bg-white shadow-inner'
+                  : 'border-zinc-700 bg-zinc-800 shadow-inner'
           }`}
         >
           {tokenIds.length === 0 ? (
-            <p className={`text-xs sm:text-sm font-semibold text-center select-none ${
-              isKids ? 'text-amber-900/60' : 'text-zinc-400'
-            }`}>
-              Toca palabras del banco hacia aquí para construir la frase.
+            <p
+              className={`text-xs sm:text-sm font-semibold text-center select-none ${
+                isKids ? 'text-amber-900/60' : 'text-zinc-400'
+              }`}
+            >
+              Arrastra o toca palabras del banco hacia aquí para construir la frase.
             </p>
           ) : (
             tokenIds.map((id, index) => {
@@ -164,62 +230,17 @@ export function OrderWordsGame({
               if (!token) return null;
 
               return (
-                <div
+                <DraggablePlacedToken
                   key={id}
-                  className={`group inline-flex items-center gap-1 rounded-xl border px-3 py-2 shadow-xs transition-transform active:scale-95 ${
-                    isKids
-                      ? 'bg-amber-100 border-amber-300'
-                      : 'bg-zinc-700 border-zinc-600'
-                  }`}
-                >
-                  <span className={`text-xs font-mono font-bold mr-1 select-none ${
-                    isKids ? 'text-amber-700' : 'text-zinc-300'
-                  }`}>
-                    #{index + 1}
-                  </span>
-                  <span className={`text-sm sm:text-base font-extrabold ${
-                    isKids ? 'text-amber-950' : 'text-zinc-100'
-                  }`}>
-                    {token.text}
-                  </span>
-
-                  {/* Reorder Left */}
-                  {index > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handleMoveToken(index, index - 1)}
-                      className="text-xs text-amber-700 hover:text-amber-900 px-1 font-bold"
-                      title="Mover a la izquierda"
-                      aria-label="Mover a la izquierda"
-                    >
-                      ←
-                    </button>
-                  )}
-
-                  {/* Reorder Right */}
-                  {index < tokenIds.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleMoveToken(index, index + 1)}
-                      className="text-xs text-amber-700 hover:text-amber-900 px-1 font-bold"
-                      title="Mover a la derecha"
-                      aria-label="Mover a la derecha"
-                    >
-                      →
-                    </button>
-                  )}
-
-                  {/* Remove */}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveToken(id)}
-                    className="text-xs text-rose-600 hover:text-rose-800 font-black px-1.5 py-0.5 rounded-md ml-1"
-                    title="Devolver al banco"
-                    aria-label={`Devolver ${token.text} al banco`}
-                  >
-                    ✕
-                  </button>
-                </div>
+                  id={id}
+                  index={index}
+                  text={token.text}
+                  totalCount={tokenIds.length}
+                  isKids={isKids}
+                  onMoveToken={handleMoveToken}
+                  onInsertBankToken={handleInsertBankToken}
+                  onRemoveToken={handleRemoveToken}
+                />
               );
             })
           )}
@@ -236,25 +257,27 @@ export function OrderWordsGame({
           Banco de palabras:
         </h4>
 
-        <div className="flex flex-wrap gap-2.5 p-4 rounded-2xl bg-white/70 border border-amber-200/80 min-h-16 items-center">
+        <div
+          ref={bankRef}
+          className={`flex flex-wrap gap-2.5 p-4 rounded-2xl border min-h-16 items-center transition-colors ${
+            isOverBank
+              ? 'border-rose-400 ring-4 ring-rose-200 bg-rose-50/60'
+              : 'bg-white/70 border-amber-200/80'
+          }`}
+        >
           {bankTokens.length === 0 ? (
             <p className="text-xs font-medium text-zinc-400 italic">
               Todas las palabras han sido colocadas en la oración.
             </p>
           ) : (
             bankTokens.map((token) => (
-              <button
+              <DraggableBankToken
                 key={token.id}
-                type="button"
-                onClick={() => handleAddToken(token.id)}
-                className={`min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all active:scale-95 touch-manipulation cursor-pointer ${
-                  isKids
-                    ? 'border-amber-300 bg-amber-200/90 text-amber-950 hover:bg-amber-300 hover:border-amber-400'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
-                }`}
-              >
-                + {token.text}
-              </button>
+                id={token.id}
+                text={token.text}
+                isKids={isKids}
+                onAddToken={handleAddToken}
+              />
             ))
           )}
         </div>
@@ -269,7 +292,7 @@ export function OrderWordsGame({
             onEvent?.({ itemId: 'tokenIds', answer: [] });
           }}
           disabled={tokenIds.length === 0}
-          className="text-xs font-bold text-zinc-500 hover:text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="text-xs font-bold text-zinc-500 hover:text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
         >
           Reiniciar orden
         </button>
@@ -277,7 +300,7 @@ export function OrderWordsGame({
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
+          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
             isKids
               ? 'bg-amber-500 hover:bg-amber-600 text-white'
               : 'bg-indigo-600 hover:bg-indigo-700 text-white'
@@ -286,6 +309,174 @@ export function OrderWordsGame({
           Comprobar y finalizar ✨
         </button>
       </div>
+    </div>
+  );
+}
+
+function DraggableBankToken({
+  id,
+  text,
+  isKids,
+  onAddToken,
+}: {
+  id: string;
+  text: string;
+  isKids: boolean;
+  onAddToken: (id: string) => void;
+}) {
+  const elRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+
+    return draggable({
+      element: el,
+      getInitialData: () => ({ type: 'bank-token', tokenId: id }),
+    });
+  }, [id]);
+
+  return (
+    <button
+      ref={elRef}
+      type="button"
+      onClick={() => onAddToken(id)}
+      className={`min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all active:scale-95 touch-manipulation cursor-grab ${
+        isKids
+          ? 'border-amber-300 bg-amber-200/90 text-amber-950 hover:bg-amber-300 hover:border-amber-400'
+          : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+      }`}
+    >
+      + {text}
+    </button>
+  );
+}
+
+function DraggablePlacedToken({
+  id,
+  index,
+  text,
+  totalCount,
+  isKids,
+  onMoveToken,
+  onInsertBankToken,
+  onRemoveToken,
+}: {
+  id: string;
+  index: number;
+  text: string;
+  totalCount: number;
+  isKids: boolean;
+  onMoveToken: (fromIndex: number, toIndex: number) => void;
+  onInsertBankToken: (tokenId: string, atIndex: number) => void;
+  onRemoveToken: (tokenId: string) => void;
+}) {
+  const elRef = useRef<HTMLDivElement>(null);
+  const [isOver, setIsOver] = useState(false);
+
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+
+    const cleanupDraggable = draggable({
+      element: el,
+      getInitialData: () => ({ type: 'placed-token', index, tokenId: id }),
+    });
+
+    const cleanupDropTarget = dropTargetForElements({
+      element: el,
+      onDragEnter: () => setIsOver(true),
+      onDragLeave: () => setIsOver(false),
+      onDrop: ({ source }) => {
+        setIsOver(false);
+        const data = source.data;
+        if (data?.type === 'placed-token' && typeof data.index === 'number') {
+          onMoveToken(data.index, index);
+        } else if (data?.type === 'bank-token' && typeof data.tokenId === 'string') {
+          onInsertBankToken(data.tokenId, index);
+        }
+      },
+    });
+
+    return () => {
+      cleanupDraggable();
+      cleanupDropTarget();
+    };
+  }, [id, index, onMoveToken, onInsertBankToken]);
+
+  return (
+    <div
+      ref={elRef}
+      className={`group inline-flex items-center gap-1 rounded-xl border px-3 py-2 shadow-xs transition-all cursor-grab active:scale-95 ${
+        isOver
+          ? 'ring-2 ring-indigo-500 scale-105'
+          : ''
+      } ${
+        isKids
+          ? 'bg-amber-100 border-amber-300'
+          : 'bg-zinc-700 border-zinc-600'
+      }`}
+    >
+      <span
+        className={`text-xs font-mono font-bold mr-1 select-none ${
+          isKids ? 'text-amber-700' : 'text-zinc-300'
+        }`}
+      >
+        #{index + 1}
+      </span>
+      <span
+        className={`text-sm sm:text-base font-extrabold ${
+          isKids ? 'text-amber-950' : 'text-zinc-100'
+        }`}
+      >
+        {text}
+      </span>
+
+      {/* Reorder Left */}
+      {index > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveToken(index, index - 1);
+          }}
+          className="text-xs text-amber-700 hover:text-amber-900 px-1 font-bold cursor-pointer"
+          title="Mover a la izquierda"
+          aria-label="Mover a la izquierda"
+        >
+          ←
+        </button>
+      )}
+
+      {/* Reorder Right */}
+      {index < totalCount - 1 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveToken(index, index + 1);
+          }}
+          className="text-xs text-amber-700 hover:text-amber-900 px-1 font-bold cursor-pointer"
+          title="Mover a la derecha"
+          aria-label="Mover a la derecha"
+        >
+          →
+        </button>
+      )}
+
+      {/* Remove */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemoveToken(id);
+        }}
+        className="text-xs text-rose-600 hover:text-rose-800 font-black px-1.5 py-0.5 rounded-md ml-1 cursor-pointer"
+        title="Devolver al banco"
+        aria-label={`Devolver ${text} al banco`}
+      >
+        ✕
+      </button>
     </div>
   );
 }

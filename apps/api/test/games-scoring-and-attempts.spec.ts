@@ -10,12 +10,12 @@ import {
   Level,
 } from '@englove/shared';
 import { ConflictException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { GamificationService } from '../gamification/gamification.service';
-import { MediaService } from '../media/media.service';
-import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
+import { GamificationService } from '../src/gamification/gamification.service';
+import { MediaService } from '../src/media/media.service';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 
 interface ItemCorrection {
   correct: boolean;

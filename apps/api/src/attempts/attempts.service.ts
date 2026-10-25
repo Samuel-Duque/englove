@@ -942,7 +942,10 @@ export class AttemptsService {
 
         const canStart =
           a.activity.type === ActivityType.game && gamesEnabled
-            ? now >= a.opens_at && now <= effectiveDueAt && a.cancelled_at === null
+            ? latestAttempt.status !== AttemptStatus.in_progress &&
+              now >= a.opens_at &&
+              now <= effectiveDueAt &&
+              a.cancelled_at === null
             : retryAvailable && now <= effectiveDueAt && a.cancelled_at === null;
 
         cards.push({

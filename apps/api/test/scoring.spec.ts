@@ -95,8 +95,9 @@ describe('SPEC-05: ScoringService & Algoritmos de Calificación', () => {
       expect(result.score).toBe(5.0);
       expect(result.fraction).toBe(1);
       expect(result.flags).toHaveLength(0);
-      expect(result.correction['11111111-1111-4111-8111-111111111111']?.['22222222-2222-4222-8222-222222222222']?.correct).toBe(true);
-      expect(result.correction['55555555-5555-4555-8555-555555555555']?.['66666666-6666-4666-8666-666666666666']?.correct).toBe(true);
+      const corr1 = result.correction as Record<string, Record<string, { correct: boolean }>>;
+      expect(corr1['11111111-1111-4111-8111-111111111111']?.['22222222-2222-4222-8222-222222222222']?.correct).toBe(true);
+      expect(corr1['55555555-5555-4555-8555-555555555555']?.['66666666-6666-4666-8666-666666666666']?.correct).toBe(true);
     });
 
     it('califica 2.5 con la mitad de respuestas correctas', () => {
@@ -113,7 +114,8 @@ describe('SPEC-05: ScoringService & Algoritmos de Calificación', () => {
 
       expect(result.score).toBe(2.5);
       expect(result.fraction).toBe(0.5);
-      expect(result.correction['55555555-5555-4555-8555-555555555555']?.['66666666-6666-4666-8666-666666666666']?.correct).toBe(false);
+      const corr2 = result.correction as Record<string, Record<string, { correct: boolean }>>;
+      expect(corr2['55555555-5555-4555-8555-555555555555']?.['66666666-6666-4666-8666-666666666666']?.correct).toBe(false);
     });
 
     it('califica correctamente con respuestas anidadas por itemId', () => {
@@ -134,8 +136,9 @@ describe('SPEC-05: ScoringService & Algoritmos de Calificación', () => {
 
       expect(result.score).toBe(5.0);
       expect(result.fraction).toBe(1);
-      expect(result.correction['11111111-1111-4111-8111-111111111111']?.['22222222-2222-4222-8222-222222222222']?.correct).toBe(true);
-      expect(result.correction['55555555-5555-4555-8555-555555555555']?.['66666666-6666-4666-8666-666666666666']?.correct).toBe(true);
+      const corr3 = result.correction as Record<string, Record<string, { correct: boolean }>>;
+      expect(corr3['11111111-1111-4111-8111-111111111111']?.['22222222-2222-4222-8222-222222222222']?.correct).toBe(true);
+      expect(corr3['55555555-5555-4555-8555-555555555555']?.['66666666-6666-4666-8666-666666666666']?.correct).toBe(true);
     });
 
     // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10

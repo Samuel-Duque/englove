@@ -132,7 +132,7 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 - **Regla:** los microjuegos de arrastre usan `@atlaskit/pragmatic-drag-and-drop`. Prohibido `@dnd-kit` (y otras librerías de arrastre sin decisión: `react-dnd`, `react-beautiful-dnd`).
 - **Fuente:** decisión 81; architecture §3.8; CONTEXT §6 y §16.
 - **Verificación:** Automática.
-- **Excepciones:** ninguna sin decisión nueva (SPEC-06 evalúa una alternativa sin arrastre, no otra librería).
+- **Excepciones:** ninguna sin decisión nueva (según la decisión 105, `match` y `drag_drop` combinan de serie `@atlaskit/pragmatic-drag-and-drop` con selección por toque/clic en dos pasos y teclado).
 
 ### G-B06 — Worker de Cloudflare bien configurado y dentro del límite
 

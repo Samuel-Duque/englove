@@ -422,11 +422,13 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Dependencias.** SPEC-06 Aprobada. Etapa 5 (runtime del contrato). Puede solaparse con la Etapa 7 si hay dos personas.
 
-**Riesgos.** Arrastrar y soltar en pantallas táctiles pequeñas; mitigación: `@atlaskit/pragmatic-drag-and-drop` usa el arrastre nativo del navegador, con limitaciones conocidas en iOS, iPadOS y Android (la vista previa del arrastre queda centrada bajo el dedo y el arrastre exige una pulsación sostenida); objetivos de al menos 48 px, prueba en tablet real desde el primer día y SPEC-06 evalúa si hace falta una alternativa sin arrastre (accesibilidad o fallo del arrastre nativo en gama baja); si implica alcance nuevo, se propone en CONTEXT §14 antes de construirla.
+**Riesgos.** Arrastrar y soltar en pantallas táctiles pequeñas; mitigación: `@atlaskit/pragmatic-drag-and-drop` usa el arrastre nativo del navegador, con limitaciones conocidas en iOS, iPadOS y Android (la vista previa del arrastre queda centrada bajo el dedo y el arrastre exige una pulsación sostenida); objetivos de al menos 48 px, prueba en tablet real desde el primer día e interacción híbrida integrada de serie en `match` y `drag_drop` (arrastre + toque/clic en dos pasos origen → destino + teclado, decisión 105).
 
 **Tamaño.** L, 2–3 semanas.
 
 **Tareas.** ENG-080 a ENG-087, SPEC-08.
+
+**Estado actual (2026-10-24).** [SPEC-06 — Microjuegos](../specs/SPEC-06-microjuegos.md) en estado `En revisión` tras el cierre de las preguntas abiertas `Q-01` a `Q-03` mediante las Decisiones 104 a 106 de CONTEXT §14 (intentos individuales secuenciales y calificados por separado en microjuegos para seguimiento de evolución en el panel estadístico; interacción híbrida en `match` y `drag_drop`; reinicio desde la primera pregunta y del temporizador al recargar en `timed_choice`), lista para aprobación formal del líder antes de iniciar las tareas `ENG-080` a `ENG-087`.
 
 ---
 

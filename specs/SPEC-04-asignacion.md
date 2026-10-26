@@ -25,7 +25,7 @@ Entrega gestión docente, no ejecución del alumno; el cierre limita el inicio. 
 
 **RF-1 — Selección de destinatarios y contenido.** ENG-051; CONTEXT §5.1, architecture §6.4.
 
-- **Dado** una profesora **Cuando** abre «Nueva asignación» **Entonces** puede seleccionar una actividad de `GET /api/v1/activities?status=published` y uno o varios grupos de `GET /api/v1/groups?archived=false`, recorriendo sus páginas. Ve título, tipo, nivel y versión de la actividad y nombre de cada grupo; no selecciona alumnos individualmente.
+- **Dado** una profesora **Cuando** abre «Nueva asignación» **Entonces** puede seleccionar una actividad asignable (`fill_blank`, `open_question`, `speaking` o `exam`; los microjuegos `game` nunca son una asignación y viven abiertos 24/7 en `/juegos`, decisión 111) de `GET /api/v1/activities?status=published` y uno o varios grupos de `GET /api/v1/groups?archived=false`, recorriendo sus páginas. Ve título, tipo, nivel y versión de la actividad y nombre de cada grupo; no selecciona alumnos individualmente.
 - **Dado** un grupo activo sin alumnos **Cuando** lo selecciona **Entonces** puede asignarle contenido; no se inventa un nivel de grupo ni se excluyen destinatarios por su nivel individual. El nivel pertenece a la actividad y sirve para filtrar el catálogo.
 
 **RF-2 — Creación multigrupo atómica.** ENG-050; pbp Etapa 4.
@@ -35,7 +35,7 @@ Entrega gestión docente, no ejecución del alumno; el cierre limita el inicio. 
 
 **RF-3 — Referencias asignables verificadas en servidor.** ENG-050; decisiones 79, 89 y 95.
 
-- **Dado** una actividad `draft`/`archived` o un grupo archivado **Cuando** intenta asignarlos directamente por API **Entonces** recibe respectivamente `409 ACTIVITY_NOT_ASSIGNABLE` o `409 GROUP_ARCHIVED`, sin escrituras. IDs inexistentes o de otra organización, incluso dentro de un lote, producen `404 NOT_FOUND`.
+- **Dado** una actividad `draft`/`archived`, de tipo `game` (decisión 111) o un grupo archivado **Cuando** intenta asignarlos directamente por API **Entonces** recibe respectivamente `409 ACTIVITY_NOT_ASSIGNABLE` o `409 GROUP_ARCHIVED`, sin escrituras. IDs inexistentes o de otra organización, incluso dentro de un lote, producen `404 NOT_FOUND`.
 - **Dado** un archivo/borrado de actividad o grupo concurrente **Cuando** compite con la creación **Entonces** las operaciones quedan serializadas: la asignación solo se confirma si sus referencias eran propias y asignables en ese orden; nunca queda huérfana ni se omite la validación por una lectura previa.
 
 **RF-4 — Ventana coherente.** ENG-050; pbp Etapa 4, architecture §6.2.

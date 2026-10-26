@@ -28,7 +28,7 @@ Depende de [SPEC-01](./SPEC-01-scaffold.md), [SPEC-02](./SPEC-02-identidad-y-ses
 
 **RF-2 — Home y continuidad.** ENG-061; decisiones 60, 61, 90 y 98.
 
-- **Dado** asignaciones propias **Cuando** carga inicio **Entonces** ve abiertas del grupo vigente por `due_at`, cierre efectivo/aviso y habilitación con plazo. Continuidad conserva intentos propios anteriores/cancelados; «Continuar» solo en plazo. Sin runtime disponible no ofrece empezar; inicio directo: `409 ACTIVITY_NOT_AVAILABLE`, sin intento. `game` espera SPEC-06 y su flag.
+- **Dado** asignaciones propias **Cuando** carga inicio **Entonces** ve abiertas del grupo vigente por `due_at`, cierre efectivo/aviso y habilitación con plazo. Continuidad conserva intentos propios anteriores/cancelados; «Continuar» solo en plazo. Sin runtime disponible no ofrece empezar; inicio directo: `409 ACTIVITY_NOT_AVAILABLE`, sin intento. `game` vive abierto 24/7 en `/juegos` para práctica autónoma sin `Assignment` (SPEC-06 y decisión 111).
 
 **RF-3 — Inicio único y oportuno.** ENG-062; decisiones 25, 73, 74 y 84.
 

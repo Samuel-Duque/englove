@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-26. SPEC-01, SPEC-02, SPEC-03, SPEC-04, SPEC-05 y SPEC-06 figuran Verificadas (tareas ENG-080 a ENG-087 completadas con 370/370 tests en monorepo: 58 shared, 236 api, 76 web), y [SPEC-07](../specs/SPEC-07-revision-y-feedback.md) figura en estado `Aprobada` (aprobada el 2026-10-26 por el líder del proyecto tras cerrar `Q-01` a `Q-04` con las decisiones 108 a 111 de CONTEXT §14: paquete acotado de 6 stickers, inmutabilidad de `score` tras pasar a `graded` y notificación de calificación solo en la primera revisión, recordatorio de pendientes medido desde el cierre efectivo `effectiveDueAt`, y microjuegos `game` como espacio autónomo de estudio 24/7 sin `Assignment` ni límite de intentos). El cierre global de Etapa 3/H1, Etapa 5/H2 y Etapa 6 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-06](../specs/SPEC-06-microjuegos.md) aprobada y verificada tras resolución de Q-01 a Q-04 (decisiones 104–107).
+> Última actualización: 2026-10-26. SPEC-01 a SPEC-07 figuran Verificadas (tareas ENG-090 a ENG-096 completadas con 407/407 tests en monorepo: 58 shared, 265 api, 84 web, suite E2E en PostgreSQL real y job nocturno de retención de audios en R2; decisiones 108 a 111 de CONTEXT §14 formalizadas y cubiertas: paquete acotado de 6 stickers, inmutabilidad de `score` tras pasar a `graded` y notificación de calificación solo en la primera revisión, recordatorio de pendientes medido desde el cierre efectivo `effectiveDueAt`, y microjuegos `game` como espacio autónomo de estudio 24/7 sin `Assignment` ni límite de intentos). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-07](../specs/SPEC-07-revision-y-feedback.md) en estado `Verificada`.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -461,13 +461,13 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - El job de retención borra raw y `_converted.mp4` de R2 y conserva `Review` y `Attempt.score` (test de integración con reloj simulado).
 - El E2E del flujo 3 pasa en CI.
 
-**Dependencias.** SPEC-07 Aprobada (P-2 cerrado, decisión 84; `Q-01` a `Q-04` cerradas con las decisiones 108 a 111 el 2026-10-26). Etapa 5. Independiente de la Etapa 6.
+**Dependencias.** SPEC-07 Verificada (P-2 cerrado, decisión 84; `Q-01` a `Q-04` cerradas con las decisiones 108 a 111 el 2026-10-26). Etapa 5. Independiente de la Etapa 6.
 
 **Riesgos.** Confusión entre "comentar un intento automático" y "habilitar nuevo intento"; mitigación: el campo de habilitación es un interruptor explícito con texto de confirmación. Habilitar un nuevo intento sobre una asignación cerrada sin fijar plazo, que el alumno no podrá iniciar; mitigación: el formulario lo advierte y muestra el límite efectivo. Correos de calificación que terminan en spam; mitigación: dominio verificado (SPF, DKIM) y asunto estable. La reproducción de WebM/Opus en Safari dejó de ser riesgo con la transcodificación de la Etapa 5 (decisión 34 §22).
 
 **Tamaño.** M, 1.5–2 semanas.
 
-**Tareas.** ENG-090 a ENG-096 (incluye las antiguas ENG-133 y ENG-134, renumeradas). **Estado actual (2026-10-26):** [SPEC-07](../specs/SPEC-07-revision-y-feedback.md) figura en estado `Aprobada` tras cerrar `Q-01` a `Q-04` con las decisiones 108 a 111; `ENG-090` queda desbloqueada en `Por hacer` lista para iniciar la Etapa 7.
+**Tareas.** ENG-090 a ENG-096 (incluye las antiguas ENG-133 y ENG-134, renumeradas). **Estado actual (2026-10-26):** [SPEC-07](../specs/SPEC-07-revision-y-feedback.md) figura en estado `Verificada` tras la implementación integral de ENG-090 a ENG-096 con 407/407 tests en verde en el monorepo (265 API, 84 web, 58 shared), suite E2E de revisión y nuevo intento en PostgreSQL real con Docker y job nocturno de retención de audios en R2; acreditación operativa del Hito H3 pendiente de pruebas con usuarios y grabaciones reales en staging.
 
 ---
 

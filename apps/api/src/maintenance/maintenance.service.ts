@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { MediaService } from '../media/media.service';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import {
   JobRunStatus,
   AttemptStatus,
@@ -19,6 +20,7 @@ export class MaintenanceService {
     private readonly prisma: PrismaService,
     @Optional() private readonly gamificationService?: GamificationService,
     @Optional() private readonly mediaService?: MediaService,
+    @Optional() private readonly featureFlagsService?: FeatureFlagsService,
   ) {}
 
   @Cron('0 0 0 * * *', { timeZone: 'America/Bogota' })
@@ -406,6 +408,159 @@ export class MaintenanceService {
           where: {
             organization_id: org.id,
             job_key: 'student_age_review',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.failed, finished_at: new Date() },
+        });
+      }
+    }
+  }
+
+  @Cron('0 0 2 * * *', { timeZone: 'America/Bogota' })
+  async handleAudioRetention(): Promise<void> {
+    const periodKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    await this.runAudioRetention(periodKey);
+  }
+
+  /**
+   * RF-11 (ENG-095): Purges expired and orphaned audio assets from R2
+   */
+  async runAudioRetention(periodKey: string, asOfDate?: Date): Promise<void> {
+    const orgs = await this.prisma.organization.findMany();
+    const now = asOfDate || new Date();
+
+    for (const org of orgs) {
+      let pendingUploadTtlDays = 7;
+      if (this.featureFlagsService) {
+        try {
+          const config = await this.featureFlagsService.getConfiguration(org.id);
+          if (config?.config?.pending_upload_ttl_days) {
+            pendingUploadTtlDays = config.config.pending_upload_ttl_days;
+          }
+        } catch {
+          pendingUploadTtlDays = 7;
+        }
+      }
+      const pendingUploadCutoff = new Date(
+        now.getTime() - pendingUploadTtlDays * 24 * 60 * 60 * 1000,
+      );
+
+      const existingJob = await this.prisma.scheduledJobRun.findFirst({
+        where: {
+          organization_id: org.id,
+          job_key: 'audio_retention',
+          period_key: periodKey,
+        },
+      });
+
+      if (existingJob) {
+        if (existingJob.status === JobRunStatus.done) {
+          continue;
+        }
+
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        if (existingJob.status === JobRunStatus.running && existingJob.started_at > oneHourAgo) {
+          continue;
+        }
+
+        await this.prisma.scheduledJobRun.update({
+          where: { id: existingJob.id },
+          data: { status: JobRunStatus.running, started_at: now },
+        });
+      } else {
+        try {
+          await this.prisma.scheduledJobRun.create({
+            data: {
+              organization_id: org.id,
+              job_key: 'audio_retention',
+              period_key: periodKey,
+              status: JobRunStatus.running,
+              started_at: now,
+            },
+          });
+        } catch (createErr: unknown) {
+          if ((createErr as { code?: string })?.code === 'P2002') {
+            continue;
+          }
+          throw createErr;
+        }
+      }
+
+      try {
+        if (this.prisma.mediaAsset) {
+          const mediaToPurge = await this.prisma.mediaAsset.findMany({
+            where: {
+              organization_id: org.id,
+              OR: [
+                {
+                  status: MediaAssetStatus.ready,
+                  retention_until: { lt: now },
+                },
+                {
+                  status: MediaAssetStatus.pending_upload,
+                  created_at: { lt: pendingUploadCutoff },
+                },
+                {
+                  status: MediaAssetStatus.pending_delete,
+                },
+              ],
+            },
+          });
+
+          for (const media of mediaToPurge) {
+            try {
+              if (this.mediaService) {
+                await this.mediaService.deleteFile(media.key);
+                if (media.converted_key) {
+                  await this.mediaService.deleteFile(media.converted_key);
+                }
+              }
+
+              await this.prisma.mediaAsset.update({
+                where: { id: media.id },
+                data: {
+                  status: MediaAssetStatus.deleted,
+                  deleted_at: now,
+                },
+              });
+            } catch (err: unknown) {
+              this.logger.error(
+                `[MaintenanceService:audio_retention] Fallo al borrar asset ${media.id} de R2: ${(err as Error)?.message || String(err)}`,
+              );
+              try {
+                await this.prisma.mediaAsset.update({
+                  where: { id: media.id },
+                  data: { status: MediaAssetStatus.pending_delete },
+                });
+              } catch {
+                // Ignore secondary failure updating to pending_delete
+              }
+            }
+          }
+        }
+
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'audio_retention',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.done, finished_at: new Date() },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `[MaintenanceService:audio_retention] Error en retención de audios para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+        );
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'audio_retention',
             period_key: periodKey,
           },
           data: { status: JobRunStatus.failed, finished_at: new Date() },

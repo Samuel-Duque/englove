@@ -162,6 +162,9 @@ export interface MediaUploadUrlResponse {
 export interface MediaPlaybackUrlResponse {
   url: string;
   expiresAt: string;
+  expiresIn?: number;
+  isConverted?: boolean;
+  durationSeconds?: number | null;
   format: 'converted' | 'raw';
   compatibilityWarning: boolean;
 }

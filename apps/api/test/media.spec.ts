@@ -201,10 +201,14 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
         status: MediaAssetStatus.ready,
         converted_key: 'converted/audio.mp4',
         key: 'raw/audio.webm',
+        duration_seconds: 45,
       });
 
-      const url = await service.getPlaybackUrl(orgId, mediaId);
-      expect(url).toBeDefined();
+      const response = await service.getPlaybackUrl(orgId, mediaId);
+      expect(response).toBeDefined();
+      expect(response.expiresIn).toBe(300);
+      expect(response.isConverted).toBe(true);
+      expect(response.durationSeconds).toBe(45);
     });
 
     it('lanza NotFoundException si el asset no existe', async () => {

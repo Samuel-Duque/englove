@@ -331,6 +331,9 @@ export class MediaService implements OnModuleInit {
     return {
       url,
       expiresAt: new Date(Date.now() + expiresSeconds * 1000).toISOString(),
+      expiresIn: expiresSeconds,
+      isConverted: Boolean(asset.converted_key),
+      durationSeconds: asset.duration_seconds ?? null,
       format,
       compatibilityWarning,
     };
@@ -376,6 +379,9 @@ export class MediaService implements OnModuleInit {
     return {
       url,
       expiresAt: new Date(Date.now() + expiresSeconds * 1000).toISOString(),
+      expiresIn: expiresSeconds,
+      isConverted: Boolean(asset.converted_key),
+      durationSeconds: asset.duration_seconds ?? null,
       format,
       compatibilityWarning,
     };

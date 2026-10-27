@@ -175,17 +175,37 @@ export default function InicioPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-zinc-200 bg-white p-5 text-zinc-800">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl" aria-hidden="true">
-                    📋
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold">Entregas sin Calificar</h2>
-                    <p className="text-sm text-zinc-600">
-                      Recordatorio configurado para alertar tras {reminderDays} días sin calificación docente.
-                    </p>
+              <div
+                className={`rounded-xl border p-5 transition-all ${
+                  (reminders?.overdueReviews ?? 0) > 0
+                    ? 'border-amber-300 bg-amber-50/70 text-amber-900'
+                    : 'border-zinc-200 bg-white text-zinc-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl" aria-hidden="true">
+                      📋
+                    </span>
+                    <div>
+                      <h2 className="text-base font-semibold">Entregas sin Calificar</h2>
+                      <p className="text-sm opacity-90">
+                        {(reminders?.overdueReviews ?? 0) === 0
+                          ? `No hay entregas pendientes con más de ${reminderDays} días desde su cierre.`
+                          : (reminders?.overdueReviews ?? 0) === 1
+                            ? `Hay 1 entrega pendiente de calificar hace más de ${reminderDays} días.`
+                            : `Hay ${reminders?.overdueReviews} entregas pendientes de calificar hace más de ${reminderDays} días.`}
+                      </p>
+                    </div>
                   </div>
+                  {(reminders?.overdueReviews ?? 0) > 0 && (
+                    <Link
+                      href="/revision"
+                      className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                    >
+                      Revisar
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
@@ -251,6 +271,21 @@ export default function InicioPage() {
                 Consulta fichas, aprueba solicitudes y desbloquea accesos.
               </p>
             </Link>
+
+            <Link
+              href="/revision"
+              className="group rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:border-amber-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700 mb-4 font-bold text-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                ✍️
+              </div>
+              <h3 className="text-base font-semibold text-zinc-900 group-hover:text-amber-600 transition-colors">
+                Revisión y Calificación
+              </h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Califica entregas de speaking y respuestas, envía stickers y concede nuevos intentos.
+              </p>
+            </Link>
           </div>
         </main>
       </div>
@@ -299,8 +334,13 @@ export default function InicioPage() {
               Aquí tienes tus misiones y actividades de inglés asignadas por tu profesora.
             </p>
           </div>
-
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/feedback"
+              className="rounded-2xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-4 py-2.5 text-xs font-black text-indigo-900 transition-colors shadow-xs"
+            >
+              💬 Ver mi feedback
+            </Link>
             <Link
               href="/progreso"
               className="rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-4 py-2.5 text-xs font-black text-amber-900 transition-colors shadow-xs"
@@ -419,7 +459,7 @@ export default function InicioPage() {
                       </h3>
                       <p className="text-xs text-zinc-500 mt-1">
                         Límite:{' '}
-                        {new Date(card.dueAt).toLocaleDateString('es-CO', {
+                        {new Date(card.effectiveDueAt ?? card.dueAt).toLocaleDateString('es-CO', {
                           day: 'numeric',
                           month: 'short',
                           hour: '2-digit',
@@ -431,7 +471,21 @@ export default function InicioPage() {
                     {card.retryAvailable && (
                       <div className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[11px] font-bold text-indigo-900">
                         <span>🔄</span>
-                        <span>Tu profesora te habilitó un nuevo intento</span>
+                        <span>
+                          Tu profesora te habilitó un nuevo intento
+                          {card.effectiveDueAt && (
+                            <span className="font-normal text-indigo-700 ml-1">
+                              (hasta el{' '}
+                              {new Date(card.effectiveDueAt).toLocaleDateString('es-CO', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                              )
+                            </span>
+                          )}
+                        </span>
                       </div>
                     )}
 
@@ -461,7 +515,7 @@ export default function InicioPage() {
                     {card.latestAttempt && card.latestAttempt.status === 'graded' && (
                       <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-50/70 border border-amber-200">
                         <span className="text-xs font-bold text-amber-900">
-                          Nota: {Number(card.latestAttempt.score).toFixed(1)} / 5.0
+                          Nota: {Number(card.latestAttempt.score).toFixed(1).replace('.', ',')} / 5,0
                         </span>
                         <span className="text-amber-400 font-bold text-sm tracking-widest">
                           {'★'.repeat(stars) + '☆'.repeat(3 - stars)}

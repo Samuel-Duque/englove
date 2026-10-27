@@ -37,6 +37,7 @@ export function StudentNav({ studentName, ageSegment = 'kids', level, gamesEnabl
     { label: 'Inicio', href: '/inicio', icon: '🏠' },
     ...(gamesOn ? [{ label: 'Juegos', href: '/juegos', icon: '🎮' }] : []),
     { label: 'Progreso', href: '/progreso', icon: '⭐' },
+    { label: 'Feedback', href: '/feedback', icon: '💬' },
   ];
 
   const handleLogout = () => {

@@ -17,6 +17,7 @@ export function TeacherNav({ teacherName }: TeacherNavProps) {
     { label: 'Inicio', href: '/inicio' },
     { label: 'Actividades', href: '/actividades' },
     { label: 'Asignaciones', href: '/asignaciones' },
+    { label: 'Revisión', href: '/revision' },
     { label: 'Grupos', href: '/grupos' },
     { label: 'Alumnos', href: '/alumnos' },
   ];

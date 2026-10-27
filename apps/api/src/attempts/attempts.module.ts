@@ -8,6 +8,7 @@ import { ScoringModule } from '../scoring/scoring.module';
 import { GamificationModule } from '../gamification/gamification.module';
 import { MediaModule } from '../media/media.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
     GamificationModule,
     MediaModule,
     FeatureFlagsModule,
+    ReviewsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

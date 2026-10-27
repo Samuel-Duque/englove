@@ -5,3 +5,4 @@ export * from './activities';
 export * from './groups';
 export * from './dashboard';
 export * from './assignments';
+export * from './reviews';

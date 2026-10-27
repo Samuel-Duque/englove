@@ -2,11 +2,12 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Aprobada |
+| Estado | Verificada |
 | Etapa | 7 — Calificación, feedback y nuevo intento |
 | Tareas | ENG-090, ENG-091, ENG-092, ENG-093, ENG-094, ENG-095, ENG-096 |
 | Referencias | `.agents/CONTEXT.md` §2.4, §5.1–§5.3, §5.5, §7, §8, §10, §11.2, §14 (decisiones 9, 25, 29, 34 §5–§6, 39, 44, 55, 61, 65, 72, 76, 79, 82–84, 86, 87, 98, 100, 101, 104, 108–111), §15–§17 · `planning/architecture-overview.md` §3.1, §3.5, §3.6, §4.2, §4.5, §6, §7.5–§7.7, §8.3, §8.4, §9.1, §13, §14 · `planning/pbp-development.md` §4 (Etapa 7, H3) · `planning/sdd-process.md` §3–§7 · `specs/SPEC-01-scaffold.md` a `specs/SPEC-06-microjuegos.md` |
 | Aprobada por / fecha | Líder del proyecto / 2026-10-26 |
+| Verificada por / fecha | Líder del proyecto / 2026-10-26 |
 
 ## 1. Contexto y objetivo
 
@@ -207,7 +208,7 @@ Para las capacidades de `SPEC-07` sobre actividades asignadas se utilizan las ta
 
 ## 9. Pruebas
 
-- **Unitarias e integración en `apps/api` (Jest):**
+- **Unitarias e integración en `apps/api` (Vitest):**
   - **RF-1:** `GET /api/v1/reviews/queue` y `GET /api/v1/reviews/graded` filtran por `organization_id`, `status`, `groupId`, `type`, `from`, `to` y paginan con `offset`/`limit`.
   - **RF-2:** `PendingSummaryService` calcula `overdueReviews` contando intentos `pending_review` de asignaciones activas (`cancelled_at IS NULL`) cuyo `effectiveDueAt` (`previous_attempt.retry_extend_until ?? assignment.due_at`) venció hace más de `ungraded_reminder_days` (3 días, Decisión 110).
   - **RF-3:** `GET /api/v1/attempts/:id/review-detail` devuelve ítems, respuestas, historial y `mediaAsset`; `/media/:id/url` y `/download-url` priorizan `converted_key`, hacen fallback a `key` (`isConverted: false`) y manejan `deleted`.
@@ -250,3 +251,4 @@ No quedan preguntas abiertas. Las cuatro decisiones operativas de esta especific
 |---|---|---|
 | 2026-10-25 | Agente SDD | Redacción inicial de `SPEC-07` en estado `Borrador` cubriendo `ENG-090` a `ENG-096` y propuestas `Q-01` a `Q-04`. |
 | 2026-10-26 | Líder del proyecto / Agente SDD | Cierre de `Q-01` a `Q-04` mediante las Decisiones 108 a 111 de `CONTEXT.md` §14. `SPEC-07` pasa a estado `Aprobada`. |
+| 2026-10-26 | Agente SDD / Verificación | Implementación integral de ENG-090 a ENG-096 y verificación automatizada (407 tests en monorepo: 265 api, 84 web, 58 shared; suite E2E de revisión, feedback, correo único y nuevo intento en PostgreSQL real con Docker; job nocturno de retención de audios a 30 días en R2 con reloj simulado; guardrails y linter limpios). Estado pasa a Verificada. |

@@ -5,11 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { MediaService } from '../media/media.service';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
+import { PendingSummaryService } from '../dashboard/pending-summary.service';
+import { MailService } from '../mail/mail.service';
 import {
   JobRunStatus,
   AttemptStatus,
   MediaAssetStatus,
   ProgressEventType,
+  Role,
 } from '@englove/shared';
 
 @Injectable()
@@ -21,6 +24,8 @@ export class MaintenanceService {
     @Optional() private readonly gamificationService?: GamificationService,
     @Optional() private readonly mediaService?: MediaService,
     @Optional() private readonly featureFlagsService?: FeatureFlagsService,
+    @Optional() private readonly pendingSummaryService?: PendingSummaryService,
+    @Optional() private readonly mailService?: MailService,
   ) {}
 
   @Cron('0 0 0 * * *', { timeZone: 'America/Bogota' })
@@ -561,6 +566,155 @@ export class MaintenanceService {
           where: {
             organization_id: org.id,
             job_key: 'audio_retention',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.failed, finished_at: new Date() },
+        });
+      }
+    }
+  }
+
+  @Cron('0 0 8 * * *', { timeZone: 'America/Bogota' })
+  async handleTeacherPendingSummary(): Promise<void> {
+    const periodKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    await this.runTeacherPendingSummary(periodKey);
+  }
+
+  /**
+   * ENG-104 (RF-12, Decisiones 34 §18, 76, 110, 114):
+   * Daily job running at 08:00 Bogota that verifies 3-day interval since last execution,
+   * querying PendingSummaryService and sending 'teacher-pending-summary' template only when pendings > 0.
+   */
+  async runTeacherPendingSummary(periodKey: string, asOfDate?: Date): Promise<void> {
+    const orgs = await this.prisma.organization.findMany();
+    const now = asOfDate || new Date();
+
+    const nowBogotaDay = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+
+    for (const org of orgs) {
+      // 1. Verify 3-day block rule (Decision 114)
+      const lastDoneJob = await this.prisma.scheduledJobRun.findFirst({
+        where: {
+          organization_id: org.id,
+          job_key: 'teacher_pending_summary',
+          status: JobRunStatus.done,
+        },
+        orderBy: { finished_at: 'desc' },
+      });
+
+      if (lastDoneJob && lastDoneJob.finished_at) {
+        const lastBogotaDay = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Bogota',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(lastDoneJob.finished_at);
+
+        const diffMs = new Date(nowBogotaDay).getTime() - new Date(lastBogotaDay).getTime();
+        const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+        if (diffDays < 3) {
+          continue; // Less than 3 calendar days since last done execution
+        }
+      }
+
+      // 2. Check existing job run for periodKey (idempotency)
+      const existingJob = await this.prisma.scheduledJobRun.findFirst({
+        where: {
+          organization_id: org.id,
+          job_key: 'teacher_pending_summary',
+          period_key: periodKey,
+        },
+      });
+
+      if (existingJob) {
+        if (existingJob.status === JobRunStatus.done) {
+          continue;
+        }
+
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        if (existingJob.status === JobRunStatus.running && existingJob.started_at > oneHourAgo) {
+          continue;
+        }
+
+        await this.prisma.scheduledJobRun.update({
+          where: { id: existingJob.id },
+          data: { status: JobRunStatus.running, started_at: now },
+        });
+      } else {
+        try {
+          await this.prisma.scheduledJobRun.create({
+            data: {
+              organization_id: org.id,
+              job_key: 'teacher_pending_summary',
+              period_key: periodKey,
+              status: JobRunStatus.running,
+              started_at: now,
+            },
+          });
+        } catch (createErr: unknown) {
+          if ((createErr as { code?: string })?.code === 'P2002') {
+            continue;
+          }
+          throw createErr;
+        }
+      }
+
+      // 3. Query pending reminders and send email if pendings > 0
+      try {
+        if (this.pendingSummaryService && this.mailService) {
+          const reminders = await this.pendingSummaryService.getReminders(org.id);
+          const pendingApprovals = reminders.pendingApprovals ?? reminders.pendingRegistrations ?? 0;
+          const overdueReviews = reminders.overdueReviews ?? 0;
+
+          if (pendingApprovals > 0 || overdueReviews > 0) {
+            const teachers = await this.prisma.user.findMany({
+              where: {
+                organization_id: org.id,
+                role: Role.teacher,
+              },
+            });
+
+            for (const teacher of teachers) {
+              await this.mailService.sendMail({
+                template: 'teacher-pending-summary',
+                to: teacher.email,
+                variables: {
+                  pendingRequests: pendingApprovals,
+                  ungradedActivities: overdueReviews,
+                },
+                idempotencyKey: `teacher-pending-summary-${org.id}-${teacher.id}-${periodKey}`,
+              });
+            }
+          }
+        }
+
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'teacher_pending_summary',
+            period_key: periodKey,
+          },
+          data: { status: JobRunStatus.done, finished_at: new Date() },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `[MaintenanceService:teacher_pending_summary] Error en resumen de pendientes para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+        );
+        await this.prisma.scheduledJobRun.updateMany({
+          where: {
+            organization_id: org.id,
+            job_key: 'teacher_pending_summary',
             period_key: periodKey,
           },
           data: { status: JobRunStatus.failed, finished_at: new Date() },

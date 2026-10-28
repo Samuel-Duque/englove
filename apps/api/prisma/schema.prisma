@@ -429,6 +429,8 @@ model Attempt {
   @@unique([assignment_id, student_id, attempt_number])
   @@index([student_id, finished_at])
   @@index([previous_attempt_id])
+  @@index([organization_id, status, graded_at])
+  @@index([organization_id, status, finished_at])
   @@map("attempts")
 }
 
@@ -468,6 +470,7 @@ model ProgressEvent {
 
   @@index([student_id, occurred_at])
   @@index([attempt_id])
+  @@index([organization_id, type, occurred_at])
   @@map("progress_events")
 }
 

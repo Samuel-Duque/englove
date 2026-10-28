@@ -2,11 +2,12 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Aprobada |
+| Estado | Verificada |
 | Etapa | 8 — Estadísticas y leaderboard |
 | Tareas | ENG-100, ENG-101, ENG-102, ENG-103, ENG-104 |
 | Referencias | `.agents/CONTEXT.md` §5.1, §5.3, §5.4, §12.8, §14 (Decisiones 20, 23, 25, 34, 41, 61, 66, 71, 73, 74, 76, 79, 98, 100, 104, 110–115); `planning/architecture-overview.md` §6, §7.8, §9.3, §9.4; `planning/pbp-development.md` (Etapa 8); `specs/SPEC-01-scaffold.md` a `specs/SPEC-07-revision-y-feedback.md` |
 | Aprobada por / fecha | Líder del proyecto / 2026-10-27 |
+| Verificada por / fecha | Líder del proyecto / 2026-10-28 |
 
 ## 1. Contexto y objetivo
 
@@ -439,3 +440,4 @@ No quedan preguntas abiertas bloqueantes. Las cuatro preguntas iniciales (`Q-01`
 |---|---|---|
 | 2026-10-27 | Agente IA | Redacción inicial de `SPEC-08` en estado `Borrador` cubriendo `ENG-100` a `ENG-104` y documentando `Q-01` a `Q-04`. |
 | 2026-10-27 | Líder del proyecto / Agente IA | Cierre de `Q-01` a `Q-04` (Decisiones 112 a 115 de `CONTEXT.md` §14: tendencia a 30 días y semanal en grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtro por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado) y aprobación de `SPEC-08` (`Estado: Aprobada`). |
+| 2026-10-28 | Líder del proyecto / Agente IA | Verificación exhaustiva de la implementación de `SPEC-08` (`ENG-100` a `ENG-104`). Contratos compartidos (`@englove/shared`), índices en `Attempt` y `ProgressEvent`, `StatsService` y `StatsController`, cron cada 3 días de pendientes (`teacher_pending_summary`), vistas en Next.js (`/estadisticas` y `/estadisticas/estudiantes/[id]`), suites de pruebas completas (34 pruebas en API + 11 en web + presupuesto `< 500 ms`) y guardrails validados con 0 errores (`Estado: Verificada`). |

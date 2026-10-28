@@ -19,6 +19,7 @@ import { MediaModule } from './media/media.module';
 import { GamificationModule } from './gamification/gamification.module';
 import { AttemptsModule } from './attempts/attempts.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { StatsModule } from './stats/stats.module';
 import { OriginGuard } from './common/guards/origin.guard';
 import { RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -66,6 +67,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     GamificationModule,
     AttemptsModule,
     ReviewsModule,
+    StatsModule,
   ],
   providers: [
     {

@@ -6,3 +6,4 @@ export * from './groups';
 export * from './dashboard';
 export * from './assignments';
 export * from './reviews';
+export * from './stats';

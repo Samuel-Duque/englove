@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-10-26. SPEC-01 a SPEC-07 figuran Verificadas (tareas ENG-090 a ENG-096 completadas con 407/407 tests en monorepo: 58 shared, 265 api, 84 web, suite E2E en PostgreSQL real y job nocturno de retención de audios en R2; decisiones 108 a 111 de CONTEXT §14 formalizadas y cubiertas: paquete acotado de 6 stickers, inmutabilidad de `score` tras pasar a `graded` y notificación de calificación solo en la primera revisión, recordatorio de pendientes medido desde el cierre efectivo `effectiveDueAt`, y microjuegos `game` como espacio autónomo de estudio 24/7 sin `Assignment` ni límite de intentos). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-07](../specs/SPEC-07-revision-y-feedback.md) en estado `Verificada`.
+> Última actualización: 2026-10-27. SPEC-01 a SPEC-07 figuran Verificadas (tareas ENG-090 a ENG-096 completadas con 407/407 tests en monorepo: 58 shared, 265 api, 84 web, suite E2E en PostgreSQL real y job nocturno de retención de audios en R2; decisiones 108 a 111 de CONTEXT §14 formalizadas y cubiertas: paquete acotado de 6 stickers, inmutabilidad de `score` tras pasar a `graded` y notificación de calificación solo en la primera revisión, recordatorio de pendientes medido desde el cierre efectivo `effectiveDueAt`, y microjuegos `game` como espacio autónomo de estudio 24/7 sin `Assignment` ni límite de intentos). [SPEC-08](../specs/SPEC-08-estadisticas.md) redactada en estado `Borrador` (cubriendo ENG-100 a ENG-104 con las preguntas abiertas Q-01 a Q-04 propuestas para revisión y aprobación del líder del proyecto). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-07](../specs/SPEC-07-revision-y-feedback.md) en estado `Verificada`.
 >
 > Ronda 4: 2026-09-28. Incorpora la decisión 57 de CONTEXT §14 (aplicación de `decisiones-para-correccion-de-planeacion.md`): Etapas 0 → 1 → 2 en secuencia según la aprobación de SPEC-01 y SPEC-02 y calendario corregido (§2), cookies con `Domain=.<dominio>` y correo globalmente único (Etapa 2), cambio administrativo del correo con auditoría (Etapa 3), tolerancia de 24 h y recuperación de transcodificaciones con una sola instancia (Etapa 5), `retry_extend_until` (Etapa 7) y terminología de tipos de actividad y mecánicas de juego. Las decisiones menores pendientes (CONTEXT §15, P-1 a P-5) se asignan a la etapa cuya spec debe cerrarlas.
 >
@@ -501,7 +501,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tamaño.** M, 1–1.5 semanas.
 
-**Tareas.** ENG-100 a ENG-104, SPEC-09. (ENG-104 es nueva: correo de pendientes.)
+**Tareas.** ENG-100 a ENG-104, SPEC-09. (ENG-104 es nueva: correo de pendientes.) **Estado actual (2026-10-27):** [SPEC-08](../specs/SPEC-08-estadisticas.md) figura redactada en estado `Borrador` con las preguntas abiertas `Q-01` a `Q-04` propuestas para revisión y aprobación del líder del proyecto antes de iniciar las tareas `ENG-100` a `ENG-104`.
 
 ---
 

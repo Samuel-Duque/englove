@@ -109,6 +109,7 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
       );
 
       // Clean prior fixtures in reverse dependency order
+      await prisma.scheduledJobRun.deleteMany({ where: { organization_id: orgId } });
       await prisma.badgeAward.deleteMany({ where: { organization_id: orgId } });
       await prisma.badgeRule.deleteMany({ where: { organization_id: orgId } });
       await prisma.progressEvent.deleteMany({ where: { organization_id: orgId } });
@@ -233,6 +234,7 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   afterAll(async () => {
     if (prisma && isPostgresAvailable) {
       try {
+        await prisma.scheduledJobRun.deleteMany({ where: { organization_id: orgId } });
         await prisma.badgeAward.deleteMany({ where: { organization_id: orgId } });
         await prisma.badgeRule.deleteMany({ where: { organization_id: orgId } });
         await prisma.progressEvent.deleteMany({ where: { organization_id: orgId } });
@@ -244,6 +246,7 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
         await prisma.group.deleteMany({ where: { organization_id: orgId } });
         await prisma.student.deleteMany({ where: { organization_id: orgId } });
         await prisma.user.deleteMany({ where: { organization_id: orgId } });
+        await prisma.scheduledJobRun.deleteMany({ where: { organization_id: orgId } });
         await prisma.organization.deleteMany({ where: { id: orgId } });
       } catch (err) {
         console.warn('Error en limpieza post-E2E:', err);

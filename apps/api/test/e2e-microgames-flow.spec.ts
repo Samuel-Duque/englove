@@ -133,6 +133,7 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
       await prisma.student.deleteMany({ where: { organization_id: orgId } });
       await prisma.user.deleteMany({ where: { organization_id: orgId } });
       await prisma.featureFlag.deleteMany({ where: { organization_id: orgId } });
+      await prisma.scheduledJobRun.deleteMany({ where: { organization_id: orgId } });
       await prisma.organization.deleteMany({ where: { id: orgId } });
 
       // Seed organization

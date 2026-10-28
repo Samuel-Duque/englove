@@ -376,6 +376,35 @@ describe('SPEC-08: StatsService — Estadísticas de rendimiento y constancia (E
       expect(leaderboard.entries[1]!.studentId).toBe(student1Id);
       expect(leaderboard.entries[1]!.rank).toBe(2);
     });
+
+    it('filtra correctamente por groupId usando la relacion memberships de Student', async () => {
+      mockPrisma.student.findMany.mockResolvedValue([]);
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+      mockPrisma.progressEvent.findMany.mockResolvedValue([]);
+
+      await service.getLeaderboard(orgId, { groupId });
+
+      expect(mockPrisma.student.findMany).toHaveBeenCalledWith({
+        where: {
+          organization_id: orgId,
+          approval_status: ApprovalStatus.approved,
+          memberships: {
+            some: {
+              group_id: groupId,
+              left_at: null,
+            },
+          },
+        },
+        include: expect.objectContaining({
+          user: true,
+          memberships: {
+            where: { left_at: null },
+            include: { group: true },
+          },
+          badge_awards: true,
+        }),
+      });
+    });
   });
 
   describe('RF-9 y RF-10: Ficha de estudiante individual', () => {

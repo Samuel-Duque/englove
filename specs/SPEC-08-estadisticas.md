@@ -412,9 +412,16 @@ Bajo `apps/web/src/app/(teacher)/estadisticas/`:
   - `students/:id` con desgloses por `ActivityType`, `GameMechanic` y `Level`, umbral `3.0`, calendario semanal, `bestStreakWeeks` y tiempo diario/semanal/mensual (`RF-9`, `RF-10`).
 - **Seguridad y validaciones (`apps/api/src/stats/stats.controller.spec.ts`):**
   - Rol `student` recibe `403 FORBIDDEN` en `/leaderboard` y demás rutas de `/stats/*` (`RF-8`); `groupId` o `studentId` ajeno devuelve `404 NOT_FOUND` y `from > to` devuelve `400 VALIDATION_ERROR` (`RF-11`).
-- **Benchmark de volumen (`apps/api/src/stats/stats.performance.spec.ts`):**
+- **Suite integral E2E en PostgreSQL real con Docker (`apps/api/test/e2e-stats-flow.spec.ts`):**
+  - Paso 1: `GET /stats/overview` con regla del último intento calificado, alertas de inactividad de 14 días y exclusión de microjuegos y asignaciones canceladas de la tasa de finalización (`RF-1`, `RF-2`, `RF-5`).
+  - Paso 2: `GET /stats/groups/:id` con cálculo simultáneo de tendencia cada 30 días (`trend30d`) y semanal (`trend7d`), además de ordenamiento (`RF-6`).
+  - Paso 3: `GET /stats/leaderboard` con ordenamiento determinista y filtrado relacional en PostgreSQL por `groupId` y por niveles MCER (`RF-8`).
+  - Paso 4: `GET /stats/students/:id` con serie histórica completa (1..N en juegos, último en asignaciones), banderas de plazo extendido y duración implausible, y calendario ISO de 12 semanas (`RF-9`, `RF-10`).
+  - Paso 5: Verificación directa de latencia en PostgreSQL real con volumen de 3 meses respondiendo los 4 endpoints en < 500 ms (`RF-4`).
+  - Paso 6: Ejecución del job `teacher_pending_summary` con persistencia en `ScheduledJobRun` y ventana Bogotá de 3 días (`RF-12`).
+- **Benchmark de volumen (`apps/api/test/stats.performance.spec.ts`):**
   - Sobre `seedVolume()`, verifica que los 4 endpoints responden en `< 500 ms` (`RF-4`).
-- **Job cada 3 días (`apps/api/src/maintenance/maintenance.service.spec.ts`):**
+- **Job cada 3 días (`apps/api/test/maintenance-teacher-summary.spec.ts`):**
   - Verifica envío de `'teacher-pending-summary'` solo cuando hay pendientes, omisión cuando ambos son `0`, e idempotencia por ventana de 3 días en `ScheduledJobRun` (`RF-12`).
 - **Frontend y validación docente (`apps/web`):**
   - Pruebas de componentes verificando polling de 30 s (`RF-7`), conmutación de tendencia 30 días / semanal (`RF-6`), filtros por grupos `A1`–`B2` en leaderboard (`RF-8`), vistas general e individual (`RF-5`, `RF-9`, `RF-10`) y sesión con la profesora en staging (`ENG-103`).
@@ -440,4 +447,4 @@ No quedan preguntas abiertas bloqueantes. Las cuatro preguntas iniciales (`Q-01`
 |---|---|---|
 | 2026-10-27 | Agente IA | Redacción inicial de `SPEC-08` en estado `Borrador` cubriendo `ENG-100` a `ENG-104` y documentando `Q-01` a `Q-04`. |
 | 2026-10-27 | Líder del proyecto / Agente IA | Cierre de `Q-01` a `Q-04` (Decisiones 112 a 115 de `CONTEXT.md` §14: tendencia a 30 días y semanal en grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtro por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado) y aprobación de `SPEC-08` (`Estado: Aprobada`). |
-| 2026-10-28 | Líder del proyecto / Agente IA | Verificación exhaustiva de la implementación de `SPEC-08` (`ENG-100` a `ENG-104`). Contratos compartidos (`@englove/shared`), índices en `Attempt` y `ProgressEvent`, `StatsService` y `StatsController`, cron cada 3 días de pendientes (`teacher_pending_summary`), vistas en Next.js (`/estadisticas` y `/estadisticas/estudiantes/[id]`), suites de pruebas completas (34 pruebas en API + 11 en web + presupuesto `< 500 ms`) y guardrails validados con 0 errores (`Estado: Verificada`). |
+| 2026-10-28 | Líder del proyecto / Agente IA | Verificación exhaustiva de la implementación de `SPEC-08` (`ENG-100` a `ENG-104`). Contratos compartidos (`@englove/shared`), índices en `Attempt` y `ProgressEvent`, `StatsService` y `StatsController`, cron cada 3 días de pendientes (`teacher_pending_summary`), vistas en Next.js (`/estadisticas` y `/estadisticas/estudiantes/[id]`), suites de pruebas completas (30 pruebas estadísticas en API + suite E2E de 6 pasos en PostgreSQL real Docker + 11 en web + presupuesto `< 500 ms`, 448/448 tests en monorepo) y guardrails validados con 0 errores (`Estado: Verificada`). |

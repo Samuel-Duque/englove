@@ -549,10 +549,19 @@ export class StatsService {
     });
 
     // Helper to get latest graded score per (student, assignment) in a window
-    const getStudentAvgInWindow = (studentId: string, wFrom: Date, wTo: Date): number | null => {
-      const windowAttempts = allGradedAttempts.filter(
-        (a) => a.student_id === studentId && a.graded_at && a.graded_at >= wFrom && a.graded_at <= wTo,
-      );
+    const getStudentAvgInWindow = (
+      studentId: string,
+      wFrom: Date,
+      wTo: Date,
+      exclusiveTo = false,
+    ): number | null => {
+      const windowAttempts = allGradedAttempts.filter((a) => {
+        if (a.student_id !== studentId || !a.graded_at) return false;
+        const gTime = a.graded_at.getTime();
+        const fromOk = gTime >= wFrom.getTime();
+        const toOk = exclusiveTo ? gTime < wTo.getTime() : gTime <= wTo.getTime();
+        return fromOk && toOk;
+      });
       const latestMap = new Map<string, number>();
       for (const a of windowAttempts) {
         if (!latestMap.has(a.assignment_id) && a.score !== null) {
@@ -630,12 +639,12 @@ export class StatsService {
       const avgPeriod = getStudentAvgInWindow(studentId, from, to);
 
       // Trends
-      const t30Curr = getStudentAvgInWindow(studentId, t30CurrentFrom, to);
-      const t30Prev = getStudentAvgInWindow(studentId, t30PrevFrom, t30PrevTo);
+      const t30Curr = getStudentAvgInWindow(studentId, t30CurrentFrom, to, false);
+      const t30Prev = getStudentAvgInWindow(studentId, t30PrevFrom, t30PrevTo, true);
       const trend30d = this.computeTrendComparison(t30Curr, t30Prev);
 
-      const t7Curr = getStudentAvgInWindow(studentId, t7CurrentFrom, to);
-      const t7Prev = getStudentAvgInWindow(studentId, t7PrevFrom, t7PrevTo);
+      const t7Curr = getStudentAvgInWindow(studentId, t7CurrentFrom, to, false);
+      const t7Prev = getStudentAvgInWindow(studentId, t7PrevFrom, t7PrevTo, true);
       const trend7d = this.computeTrendComparison(t7Curr, t7Prev);
 
       const activeTrend = trendMode === '7d' ? trend7d : trend30d;
@@ -800,7 +809,7 @@ export class StatsService {
         ...(query.level ? { level: query.level } : {}),
         ...(query.groupId
           ? {
-              group_memberships: {
+              memberships: {
                 some: {
                   group_id: query.groupId,
                   left_at: null,
@@ -872,7 +881,11 @@ export class StatsService {
       const completedCount = completedCountMap.get(student.id) ?? 0;
       const streak = await this.gamificationService.calculateStreak(organizationId, student.id, to);
       const badgesCount = student.badge_awards?.length ?? 0;
-      const activeGroup = (student.memberships ?? [])[0]?.group ?? null;
+      const activeGroup = query.groupId
+        ? (student.memberships ?? []).find((m) => m.group_id === query.groupId)?.group ??
+          (student.memberships ?? [])[0]?.group ??
+          null
+        : (student.memberships ?? [])[0]?.group ?? null;
 
       entries.push({
         rank: 0, // Will be set after sorting

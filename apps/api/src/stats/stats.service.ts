@@ -144,6 +144,26 @@ export class StatsService {
   }
 
   /**
+   * Returns the Monday (start date, YYYY-MM-DD) of the ISO week containing the given date in America/Bogota timezone.
+   */
+  private getBogotaIsoWeekMonday(date: Date): string {
+    const bogotaDateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+
+    const [yearStr, monthStr, dayStr] = bogotaDateStr.split('-');
+    const bogotaDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));
+
+    const day = bogotaDate.getUTCDay() || 7;
+    bogotaDate.setUTCDate(bogotaDate.getUTCDate() - (day - 1));
+
+    return bogotaDate.toISOString().substring(0, 10);
+  }
+
+  /**
    * ENG-101: GET /api/v1/stats/overview (RF-5)
    */
   async getOverview(
@@ -277,14 +297,15 @@ export class StatsService {
         return joinedOk && leftOk;
       });
 
+      const obligatedStudentIds = new Set(obligatedMembers.map((m) => m.student_id));
+
       // Frozen denominator if closed and historical_student_count is recorded
       const isClosed = asg.due_at < now;
       const denominator =
         isClosed && asg.historical_student_count !== null
           ? asg.historical_student_count
-          : obligatedMembers.length;
+          : obligatedStudentIds.size;
 
-      const obligatedStudentIds = new Set(obligatedMembers.map((m) => m.student_id));
       const submitters = new Set(
         asg.attempts.filter((att) => obligatedStudentIds.has(att.student_id)).map((att) => att.student_id),
       );
@@ -380,13 +401,13 @@ export class StatsService {
           if (!levelStudentIds.has(m.student_id)) return false;
           return m.joined_at <= asg.due_at && (m.left_at === null || m.left_at >= asg.opens_at);
         });
+        const obligatedIds = new Set(obligatedMembers.map((m) => m.student_id));
         const isClosed = asg.due_at < now;
         const denominator =
           isClosed && asg.historical_student_count !== null
-            ? Math.min(asg.historical_student_count, obligatedMembers.length)
-            : obligatedMembers.length;
+            ? Math.min(asg.historical_student_count, obligatedIds.size)
+            : obligatedIds.size;
 
-        const obligatedIds = new Set(obligatedMembers.map((m) => m.student_id));
         const submitters = new Set(
           asg.attempts.filter((att) => obligatedIds.has(att.student_id)).map((att) => att.student_id),
         );
@@ -443,13 +464,13 @@ export class StatsService {
         const obligatedMembers = asg.group.memberships.filter(
           (m) => m.joined_at <= asg.due_at && (m.left_at === null || m.left_at >= asg.opens_at),
         );
+        const obligatedIds = new Set(obligatedMembers.map((m) => m.student_id));
         const isClosed = asg.due_at < now;
         const denominator =
           isClosed && asg.historical_student_count !== null
             ? asg.historical_student_count
-            : obligatedMembers.length;
+            : obligatedIds.size;
 
-        const obligatedIds = new Set(obligatedMembers.map((m) => m.student_id));
         const submitters = new Set(
           asg.attempts.filter((att) => obligatedIds.has(att.student_id)).map((att) => att.student_id),
         );
@@ -522,7 +543,15 @@ export class StatsService {
     }
 
     const members = group.memberships.filter((m) => m.student.approval_status === ApprovalStatus.approved);
-    const memberStudentIds = members.map((m) => m.student_id);
+
+    // Group memberships by student_id to prevent duplicate rows for re-enrolled students
+    const studentMembershipsMap = new Map<string, typeof members>();
+    for (const m of members) {
+      const list = studentMembershipsMap.get(m.student_id) ?? [];
+      list.push(m);
+      studentMembershipsMap.set(m.student_id, list);
+    }
+    const memberStudentIds = Array.from(studentMembershipsMap.keys());
 
     // Trend Windows based on `to`:
     // trend30d: [to - 30d, to] vs [to - 60d, to - 30d)
@@ -631,9 +660,9 @@ export class StatsService {
     const now = new Date();
     const studentRows: GroupStudentStatsRow[] = [];
 
-    for (const m of members) {
-      const student = m.student;
-      const studentId = student.id;
+    for (const [studentId, mList] of studentMembershipsMap.entries()) {
+      const student = mList[0]!.student;
+      const isCurrentMember = mList.some((m) => m.left_at === null);
 
       // Period average score
       const avgPeriod = getStudentAvgInWindow(studentId, from, to);
@@ -667,11 +696,13 @@ export class StatsService {
         }
       }
 
-      // Compliance
+      // Compliance across all memberships in this group
       let assignedCount = 0;
       let completedAssignedCount = 0;
       for (const asg of groupAssignments) {
-        const isObligated = m.joined_at <= asg.due_at && (m.left_at === null || m.left_at >= asg.opens_at);
+        const isObligated = mList.some(
+          (m) => m.joined_at <= asg.due_at && (m.left_at === null || m.left_at >= asg.opens_at),
+        );
         if (isObligated) {
           assignedCount += 1;
           const completed = asg.attempts.some((a) => a.student_id === studentId);
@@ -689,7 +720,7 @@ export class StatsService {
         studentName: student.user.name,
         level: student.level ?? Level.A1,
         ageSegment: student.age_segment,
-        isCurrentMember: m.left_at === null,
+        isCurrentMember,
         averageScore: avgPeriod,
         previousAverageScore: activeTrend.previousAverageScore,
         scoreTrendDelta: activeTrend.delta,
@@ -746,15 +777,18 @@ export class StatsService {
     let groupTotalAssigned = 0;
     let groupTotalCompleted = 0;
     for (const asg of groupAssignments) {
-      const obligated = members.filter(
-        (m) => m.joined_at <= asg.due_at && (m.left_at === null || m.left_at >= asg.opens_at),
-      );
+      const obligatedIds = new Set<string>();
+      for (const [studentId, mList] of studentMembershipsMap.entries()) {
+        const isObligated = mList.some(
+          (m) => m.joined_at <= asg.due_at && (m.left_at === null || m.left_at >= asg.opens_at),
+        );
+        if (isObligated) obligatedIds.add(studentId);
+      }
       const isClosed = asg.due_at < now;
       const den =
         isClosed && asg.historical_student_count !== null
           ? asg.historical_student_count
-          : obligated.length;
-      const obligatedIds = new Set(obligated.map((m) => m.student_id));
+          : obligatedIds.size;
       const submitters = new Set(
         asg.attempts.filter((a) => obligatedIds.has(a.student_id)).map((a) => a.student_id),
       );
@@ -765,7 +799,7 @@ export class StatsService {
     const summary: GroupStatsSummary = {
       groupId: group.id,
       groupName: group.name,
-      studentCount: members.length,
+      studentCount: studentMembershipsMap.size,
       activeStudentCount: activeCount,
       averageScore: avgScore,
       assignedCount: groupTotalAssigned,
@@ -962,8 +996,8 @@ export class StatsService {
       include: {
         user: true,
         memberships: {
-          where: { left_at: null },
           include: { group: true },
+          orderBy: { joined_at: 'desc' },
         },
       },
     });
@@ -976,7 +1010,8 @@ export class StatsService {
       });
     }
 
-    const activeGroup = (student.memberships ?? [])[0]?.group ?? null;
+    const activeMembership = (student.memberships ?? []).find((m) => m.left_at === null);
+    const activeGroup = activeMembership?.group ?? (student.memberships ?? [])[0]?.group ?? null;
 
     // Optional query filters
     const typeFilter = query.type;
@@ -1186,11 +1221,15 @@ export class StatsService {
       to,
     );
 
-    // Compute historical best streak by evaluating streak progression through all active weeks
+    // Compute historical best streak by evaluating streak progression through unique active ISO weeks
     let bestStreakWeeks = currentStreakState.weeks;
     if (allStudentEvents.length > 0) {
-      // Evaluate streak on every event date to find the historical maximum
+      const evaluatedWeeks = new Set<string>();
       for (const ev of allStudentEvents) {
+        const wk = this.gamificationService.getBogotaIsoWeekKey(ev.occurred_at);
+        if (evaluatedWeeks.has(wk)) continue;
+        evaluatedWeeks.add(wk);
+
         const histStreak = await this.gamificationService.calculateStreak(
           organizationId,
           studentId,
@@ -1312,20 +1351,22 @@ export class StatsService {
 
       weeklyCalendar.push({
         weekKey: wKey,
-        weekStart: this.formatBogotaDay(weekDate),
+        weekStart: this.getBogotaIsoWeekMonday(weekDate),
         status,
         completedCount,
       });
     }
 
-    // Student assignment compliance
+    // Student assignment compliance across all groups student was enrolled in
     let assignedCount = 0;
     let completedAssignedCount = 0;
 
-    if (activeGroup) {
-      const groupAssignments = await this.prisma.assignment.findMany({
+    const studentGroupIds = Array.from(new Set((student.memberships ?? []).map((m) => m.group_id)));
+
+    if (studentGroupIds.length > 0) {
+      const relevantAssignments = await this.prisma.assignment.findMany({
         where: {
-          group_id: activeGroup.id,
+          group_id: { in: studentGroupIds },
           organization_id: organizationId,
           cancelled_at: null,
           activity: { type: { not: ActivityType.game } },
@@ -1342,17 +1383,18 @@ export class StatsService {
         },
       });
 
-      const membership = (student.memberships ?? [])[0];
-      if (membership) {
-        for (const asg of groupAssignments) {
-          const isObligated =
-            membership.joined_at <= asg.due_at &&
-            (membership.left_at === null || membership.left_at >= asg.opens_at);
-          if (isObligated) {
-            assignedCount += 1;
-            if (asg.attempts.length > 0) {
-              completedAssignedCount += 1;
-            }
+      for (const asg of relevantAssignments) {
+        // Is the student obligated for this assignment in its group?
+        const isObligated = (student.memberships ?? []).some(
+          (m) =>
+            m.group_id === asg.group_id &&
+            m.joined_at <= asg.due_at &&
+            (m.left_at === null || m.left_at >= asg.opens_at),
+        );
+        if (isObligated) {
+          assignedCount += 1;
+          if (asg.attempts.length > 0) {
+            completedAssignedCount += 1;
           }
         }
       }

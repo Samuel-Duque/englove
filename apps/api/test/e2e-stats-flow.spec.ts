@@ -629,7 +629,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     if (!isPostgresAvailable || !prisma) return;
 
     const periodKey = '2026-10-28';
-    await maintenanceService.runTeacherPendingSummary(periodKey);
+    await maintenanceService.runTeacherPendingSummary(periodKey, undefined, orgId);
 
     const job = await prisma.scheduledJobRun.findFirst({
       where: {
@@ -642,17 +642,63 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     expect(job).toBeDefined();
     expect(job?.status).toBe('done');
 
-    // Executing again on the same day should skip due to 3-day block rule (diffDays < 3)
+    // Executing again on the same day or next day should skip due to 3-day block rule (diffDays < 3)
     const countBefore = await prisma.scheduledJobRun.count({
       where: { organization_id: orgId, job_key: 'teacher_pending_summary' },
     });
 
-    await maintenanceService.runTeacherPendingSummary('2026-10-29');
+    await maintenanceService.runTeacherPendingSummary('2026-10-29', undefined, orgId);
 
     const countAfter = await prisma.scheduledJobRun.count({
       where: { organization_id: orgId, job_key: 'teacher_pending_summary' },
     });
 
     expect(countAfter).toBe(countBefore); // Skipped because 1 day < 3 days!
+  });
+
+  it('Paso 7: Traslado de grupo y reincorporación en PostgreSQL real no produce duplicados y consolida cumplimiento', async () => {
+    if (!isPostgresAvailable || !prisma) return;
+
+    // Simulate Student 2 transferring from Group 1 to Group 2, then re-enrolling in Group 1
+    // 1. Set left_at on current Group 1 membership
+    const m2 = await prisma.groupMembership.findFirst({
+      where: { organization_id: orgId, student_id: student2Id, group_id: group1Id },
+    });
+    expect(m2).toBeDefined();
+
+    const transferDate = new Date();
+    await prisma.groupMembership.update({
+      where: { id: m2!.id },
+      data: { left_at: transferDate },
+    });
+
+    // 2. Create new membership in Group 1 (re-enrolled!)
+    await prisma.groupMembership.create({
+      data: {
+        id: 'e2e80008-8888-4888-8888-888888888889',
+        organization_id: orgId,
+        group_id: group1Id,
+        student_id: student2Id,
+        joined_at: transferDate,
+        left_at: null,
+      },
+    });
+
+    // Query group stats for Group 1 in PostgreSQL
+    const groupStats = await statsService.getGroupStats(orgId, group1Id, {});
+
+    // Student 2 must appear EXACTLY ONCE in students
+    const betoRows = groupStats.students.filter((s) => s.studentId === student2Id);
+    expect(betoRows.length).toBe(1);
+    expect(betoRows[0]!.isCurrentMember).toBe(true);
+
+    // Group studentCount must remain 2 (Ana Gomez, Beto Lopez)
+    expect(groupStats.summary.studentCount).toBe(2);
+
+    // WeekStart check: ISO 8601 Monday
+    const stStats = await statsService.getStudentStats(orgId, student2Id, {});
+    const firstWk = stStats.consistency.weeklyCalendar[0]!;
+    const monday = new Date(`${firstWk.weekStart}T12:00:00Z`);
+    expect(monday.getUTCDay()).toBe(1);
   });
 });

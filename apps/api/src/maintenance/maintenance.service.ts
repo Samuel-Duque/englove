@@ -591,8 +591,14 @@ export class MaintenanceService {
    * Daily job running at 08:00 Bogota that verifies 3-day interval since last execution,
    * querying PendingSummaryService and sending 'teacher-pending-summary' template only when pendings > 0.
    */
-  async runTeacherPendingSummary(periodKey: string, asOfDate?: Date): Promise<void> {
-    const orgs = await this.prisma.organization.findMany();
+  async runTeacherPendingSummary(
+    periodKey: string,
+    asOfDate?: Date,
+    organizationId?: string,
+  ): Promise<void> {
+    const orgs = await this.prisma.organization.findMany({
+      where: organizationId ? { id: organizationId } : undefined,
+    });
     const now = asOfDate || new Date();
 
     const nowBogotaDay = new Intl.DateTimeFormat('en-CA', {
@@ -603,75 +609,76 @@ export class MaintenanceService {
     }).format(now);
 
     for (const org of orgs) {
-      // 1. Verify 3-day block rule (Decision 114)
-      const lastDoneJob = await this.prisma.scheduledJobRun.findFirst({
-        where: {
-          organization_id: org.id,
-          job_key: 'teacher_pending_summary',
-          status: JobRunStatus.done,
-        },
-        orderBy: { finished_at: 'desc' },
-      });
-
-      if (lastDoneJob && lastDoneJob.finished_at) {
-        const lastBogotaDay = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'America/Bogota',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(lastDoneJob.finished_at);
-
-        const diffMs = new Date(nowBogotaDay).getTime() - new Date(lastBogotaDay).getTime();
-        const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
-        if (diffDays < 3) {
-          continue; // Less than 3 calendar days since last done execution
-        }
-      }
-
-      // 2. Check existing job run for periodKey (idempotency)
-      const existingJob = await this.prisma.scheduledJobRun.findFirst({
-        where: {
-          organization_id: org.id,
-          job_key: 'teacher_pending_summary',
-          period_key: periodKey,
-        },
-      });
-
-      if (existingJob) {
-        if (existingJob.status === JobRunStatus.done) {
-          continue;
-        }
-
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        if (existingJob.status === JobRunStatus.running && existingJob.started_at > oneHourAgo) {
-          continue;
-        }
-
-        await this.prisma.scheduledJobRun.update({
-          where: { id: existingJob.id },
-          data: { status: JobRunStatus.running, started_at: now },
+      try {
+        // 1. Verify 3-day block rule (Decision 114)
+        const lastDoneJob = await this.prisma.scheduledJobRun.findFirst({
+          where: {
+            organization_id: org.id,
+            job_key: 'teacher_pending_summary',
+            status: JobRunStatus.done,
+          },
+          orderBy: { finished_at: 'desc' },
         });
-      } else {
-        try {
-          await this.prisma.scheduledJobRun.create({
-            data: {
-              organization_id: org.id,
-              job_key: 'teacher_pending_summary',
-              period_key: periodKey,
-              status: JobRunStatus.running,
-              started_at: now,
-            },
-          });
-        } catch (createErr: unknown) {
-          if ((createErr as { code?: string })?.code === 'P2002') {
+
+        if (lastDoneJob && lastDoneJob.finished_at) {
+          const lastBogotaDay = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Bogota',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(lastDoneJob.finished_at);
+
+          const diffMs = new Date(nowBogotaDay).getTime() - new Date(lastBogotaDay).getTime();
+          const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+          if (diffDays < 3) {
+            continue; // Less than 3 calendar days since last done execution
+          }
+        }
+
+        // 2. Check existing job run for periodKey (idempotency)
+        const existingJob = await this.prisma.scheduledJobRun.findFirst({
+          where: {
+            organization_id: org.id,
+            job_key: 'teacher_pending_summary',
+            period_key: periodKey,
+          },
+        });
+
+        if (existingJob) {
+          if (existingJob.status === JobRunStatus.done) {
             continue;
           }
-          throw createErr;
-        }
-      }
 
-      // 3. Query pending reminders and send email if pendings > 0
-      try {
+          const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+          if (existingJob.status === JobRunStatus.running && existingJob.started_at > oneHourAgo) {
+            continue;
+          }
+
+          await this.prisma.scheduledJobRun.update({
+            where: { id: existingJob.id },
+            data: { status: JobRunStatus.running, started_at: now },
+          });
+        } else {
+          try {
+            await this.prisma.scheduledJobRun.create({
+              data: {
+                organization_id: org.id,
+                job_key: 'teacher_pending_summary',
+                period_key: periodKey,
+                status: JobRunStatus.running,
+                started_at: now,
+              },
+            });
+          } catch (createErr: unknown) {
+            const code = (createErr as { code?: string })?.code;
+            if (code === 'P2002' || code === 'P2003') {
+              continue;
+            }
+            throw createErr;
+          }
+        }
+
+        // 3. Query pending reminders and send email if pendings > 0
         if (this.pendingSummaryService && this.mailService) {
           const reminders = await this.pendingSummaryService.getReminders(org.id);
           const pendingApprovals = reminders.pendingApprovals ?? reminders.pendingRegistrations ?? 0;
@@ -708,17 +715,25 @@ export class MaintenanceService {
           data: { status: JobRunStatus.done, finished_at: new Date() },
         });
       } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === 'P2003') {
+          continue; // Organization deleted concurrently
+        }
         this.logger.error(
           `[MaintenanceService:teacher_pending_summary] Error en resumen de pendientes para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
         );
-        await this.prisma.scheduledJobRun.updateMany({
-          where: {
-            organization_id: org.id,
-            job_key: 'teacher_pending_summary',
-            period_key: periodKey,
-          },
-          data: { status: JobRunStatus.failed, finished_at: new Date() },
-        });
+        try {
+          await this.prisma.scheduledJobRun.updateMany({
+            where: {
+              organization_id: org.id,
+              job_key: 'teacher_pending_summary',
+              period_key: periodKey,
+            },
+            data: { status: JobRunStatus.failed, finished_at: new Date() },
+          });
+        } catch {
+          // Ignore failure update if org/table row deleted
+        }
       }
     }
   }

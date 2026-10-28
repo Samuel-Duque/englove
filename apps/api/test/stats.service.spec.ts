@@ -527,6 +527,130 @@ describe('SPEC-08: StatsService — Estadísticas de rendimiento y constancia (E
 
       // Calendar of 12 weeks
       expect(stats.consistency.weeklyCalendar.length).toBeGreaterThanOrEqual(1);
+      // WeekStart is Monday (ISO 8601)
+      const firstWeek = stats.consistency.weeklyCalendar[0]!;
+      const mondayDate = new Date(`${firstWeek.weekStart}T12:00:00Z`);
+      expect(mondayDate.getUTCDay()).toBe(1); // 1 is Monday
+    });
+
+    it('RF-10 & RF-2: Alumno trasladado de grupo consolida cumplimiento de asignaciones de todos sus grupos solapados', async () => {
+      const mockStudent = {
+        id: student1Id,
+        level: Level.A1,
+        age_segment: AgeSegment.kids,
+        approval_status: ApprovalStatus.approved,
+        created_at: new Date('2026-01-01T00:00:00Z'),
+        user: { name: 'Alumno Trasladado' },
+        memberships: [
+          // Active in Group 2
+          {
+            group_id: 'group-2',
+            group: { id: 'group-2', name: 'Grupo 2' },
+            joined_at: new Date('2026-10-15T00:00:00Z'),
+            left_at: null,
+          },
+          // Past in Group 1
+          {
+            group_id: groupId,
+            group: { id: groupId, name: 'Grupo 1' },
+            joined_at: new Date('2026-09-01T00:00:00Z'),
+            left_at: new Date('2026-10-15T00:00:00Z'),
+          },
+        ],
+      };
+
+      mockPrisma.student.findFirst.mockResolvedValue(mockStudent);
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+      mockPrisma.progressEvent.findMany.mockResolvedValue([]);
+
+      // Two assignments: one in Group 1 (due Oct 10), one in Group 2 (due Oct 25)
+      mockPrisma.assignment.findMany.mockResolvedValue([
+        {
+          id: 'asg-grp-1',
+          group_id: groupId,
+          opens_at: new Date('2026-10-01T00:00:00Z'),
+          due_at: new Date('2026-10-10T00:00:00Z'),
+          attempts: [{ student_id: student1Id }],
+        },
+        {
+          id: 'asg-grp-2',
+          group_id: 'group-2',
+          opens_at: new Date('2026-10-16T00:00:00Z'),
+          due_at: new Date('2026-10-25T00:00:00Z'),
+          attempts: [{ student_id: student1Id }],
+        },
+      ]);
+
+      const stats = await service.getStudentStats(orgId, student1Id, {
+        from: '2026-10-01T00:00:00Z',
+        to: '2026-10-28T00:00:00Z',
+      });
+
+      // Both assignments from both groups were obligated and completed
+      expect(stats.consistency.assignedCount).toBe(2);
+      expect(stats.consistency.completedAssignedCount).toBe(2);
+      expect(stats.consistency.completionRatePercent).toBe(100);
+    });
+  });
+
+  describe('RF-6 & RF-2: Alumno con múltiples membresías en el mismo grupo (reincorporación)', () => {
+    it('no produce filas duplicadas ni infla conteos en la vista de grupo', async () => {
+      const mockStudent = {
+        id: student1Id,
+        level: Level.A1,
+        age_segment: AgeSegment.kids,
+        approval_status: ApprovalStatus.approved,
+        user: { name: 'Juan Reincorporado' },
+      };
+
+      // Student has TWO memberships in the same group (e.g. joined, left, rejoined)
+      mockPrisma.group.findFirst.mockResolvedValue({
+        id: groupId,
+        name: 'Grupo A1',
+        memberships: [
+          {
+            student_id: student1Id,
+            student: mockStudent,
+            joined_at: new Date('2026-08-01T00:00:00Z'),
+            left_at: new Date('2026-09-01T00:00:00Z'),
+          },
+          {
+            student_id: student1Id,
+            student: mockStudent,
+            joined_at: new Date('2026-10-01T00:00:00Z'),
+            left_at: null, // Currently active
+          },
+        ],
+      });
+
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+      mockPrisma.progressEvent.findMany.mockResolvedValue([]);
+
+      // Assignment in October
+      mockPrisma.assignment.findMany.mockResolvedValue([
+        {
+          id: assignment1Id,
+          group_id: groupId,
+          historical_student_count: null,
+          opens_at: new Date('2026-10-05T00:00:00Z'),
+          due_at: new Date('2026-10-15T00:00:00Z'),
+          attempts: [{ student_id: student1Id }],
+        },
+      ]);
+
+      const groupStats = await service.getGroupStats(orgId, groupId, {
+        from: '2026-10-01T00:00:00Z',
+        to: '2026-10-28T00:00:00Z',
+      });
+
+      // Exactly 1 row for this student in students list
+      expect(groupStats.students.length).toBe(1);
+      expect(groupStats.students[0]!.studentId).toBe(student1Id);
+      expect(groupStats.students[0]!.isCurrentMember).toBe(true);
+
+      // summary.studentCount is 1 (distinct students, not 2 memberships)
+      expect(groupStats.summary.studentCount).toBe(1);
+      expect(groupStats.summary.assignedCount).toBe(1);
     });
   });
 });

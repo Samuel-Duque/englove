@@ -21,7 +21,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Lo último que este script conoce de la planeación. Si CONTEXT avanza, el script avisa.
-const KNOWN_MAX_DECISION = 111;
+const KNOWN_MAX_DECISION = 115;
 const KNOWN_OUT_OF_SCOPE_ROWS = 9; // filas de la tabla de CONTEXT §2.4
 const MAX_FILE_BYTES = 1024 * 1024;
 

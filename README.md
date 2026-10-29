@@ -1,6 +1,7 @@
 # Englove
 
 Plataforma web educativa, interactiva y gamificada para la enseñanza de inglés a niños y adolescentes de **7 a 14 años**. Diseñada para potenciar la labor pedagógica de una profesora particular y concebida con arquitectura SaaS multi-tenant escalable para academias de idiomas.
+
 ---
 
 ## Tabla de contenidos
@@ -46,12 +47,7 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 
 ### 1. Gestor de contenidos y actividades interactivas
 
-- **5 tipos de actividad base:**
-  1. `fill_blank`: Completar textos y oraciones con opciones dinámicas.
-  2. `multiple_choice`: Preguntas de selección múltiple con opciones contextuales.
-  3. `matching`: Emparejamiento conceptual mediante arrastrar y soltar (_drag & drop_).
-  4. `audio_recording`: Grabación de pronunciación oral con subida directa y segura a Cloudflare R2 mediante URLs prefirmadas.
-  5. `game`: Microjuegos formativos.
+- **5 tipos de actividad base:** 1.`fill_blank`: Completar textos y oraciones con opciones dinámicas. 2. `multiple_choice`: Preguntas de selección múltiple con opciones contextuales. 3. `matching`: Emparejamiento conceptual mediante arrastrar y soltar (_drag & drop_). 4. `audio_recording`: Grabación de pronunciación oral con subida directa y segura a Cloudflare R2 mediante URLs prefirmadas. 5. `game`: Microjuegos formativos.
 - **5 mecánicas de minijuegos educativos:**
   - `word_scramble`: Ordenamiento de letras para armar palabras en inglés.
   - `drag_letters`: Formación de vocabulario arrastrando letras sueltas.

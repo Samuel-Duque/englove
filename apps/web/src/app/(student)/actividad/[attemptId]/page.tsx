@@ -16,6 +16,7 @@ import {
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { GameRenderer } from '../../../../components/activities/GameRenderer';
 import { fireCelebrationConfetti } from '../../../../lib/confetti';
+import { uploadAudioBlob } from '../../../../lib/audio-upload';
 
 interface PageProps {
   params: Promise<{ attemptId: string }>;
@@ -341,50 +342,18 @@ export default function ActividadRunnerPage({ params }: PageProps) {
     setUploadError(null);
     setUploadProgress('Obteniendo enlace de subida seguro…');
     try {
-      const mimeType = recordedAudioBlob.type || 'audio/webm';
-      const sizeBytes = recordedAudioBlob.size;
-
-      // 1. Get Presigned Upload URL
-      const presignedRes = await fetch(`${apiUrl}/api/v1/media/upload-url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          attemptId,
-          mimeType,
-          sizeBytes,
-        }),
+      // URL firmada + PUT a R2; devuelve el mediaId del contrato (ENG-074)
+      const uploadedMediaId = await uploadAudioBlob({
+        apiUrl,
+        origin: window.location.origin,
+        attemptId,
+        blob: recordedAudioBlob,
       });
 
-      if (!presignedRes.ok) {
-        const err = await presignedRes.json().catch(() => ({}));
-        throw new Error(err.message || 'Error al autorizar subida');
-      }
-
-      const presignedData = await presignedRes.json();
-      const { uploadUrl, assetId } = presignedData;
-
-      // 2. Upload to Cloudflare R2 via PUT
-      setUploadProgress('Subiendo audio a la nube…');
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-        },
-        body: recordedAudioBlob,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error('Error al transferir archivo a almacenamiento');
-      }
-
-      setMediaId(assetId);
+      setMediaId(uploadedMediaId);
       setUploadProgress(null);
       setUploadError(null);
-      return assetId;
+      return uploadedMediaId;
     } catch {
       setUploadProgress(null);
       setUploadError('No pudimos enviar tu grabación. Sigue guardada en este dispositivo');

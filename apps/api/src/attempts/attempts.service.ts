@@ -454,48 +454,66 @@ export class AttemptsService {
       });
     }
 
-    // Merge payload safely
-    const currentPayload = (attempt.payload as {
-      answers?: Record<string, unknown>;
-      processedEventIds?: string[];
-    }) || {};
+    // Merge payload atomically: lock the attempt row so concurrent batches never
+    // overwrite each other (SPEC-05 RF-7, architecture A70, ENG-074).
+    return await this.prisma.$transaction(async (tx) => {
+      const lockedRows = await tx.$queryRaw<Array<{ status: string; payload: unknown }>>`
+        SELECT status, payload
+        FROM attempts
+        WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+        FOR UPDATE
+      `;
+      const locked = lockedRows[0];
+      if (!locked || locked.status !== AttemptStatus.in_progress) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'ATTEMPT_NOT_IN_PROGRESS',
+          message: 'El intento ya no admite cambios',
+        });
+      }
 
-    const answers = { ...(currentPayload.answers || {}) };
-    const processedSet = new Set<string>(currentPayload.processedEventIds || []);
-    const acceptedEventIds: string[] = [];
+      const currentPayload = (locked.payload as {
+        answers?: Record<string, unknown>;
+        processedEventIds?: string[];
+      } | null) || {};
 
-    for (const ev of dto.events) {
-      acceptedEventIds.push(ev.clientEventId);
-      if (!processedSet.has(ev.clientEventId)) {
-        processedSet.add(ev.clientEventId);
-        const isGameMap = ['pairs', 'tokenIds', 'placements', 'selections', 'choices'].includes(
-          ev.itemId,
-        );
-        if (
-          !isGameMap &&
-          typeof ev.answer === 'object' &&
-          ev.answer !== null &&
-          !Array.isArray(ev.answer)
-        ) {
-          const existing = (answers[ev.itemId] as Record<string, unknown>) || {};
-          answers[ev.itemId] = { ...existing, ...(ev.answer as Record<string, unknown>) };
-        } else {
-          answers[ev.itemId] = ev.answer;
+      const answers = { ...(currentPayload.answers || {}) };
+      const processedSet = new Set<string>(currentPayload.processedEventIds || []);
+      const acceptedEventIds: string[] = [];
+
+      for (const ev of dto.events) {
+        acceptedEventIds.push(ev.clientEventId);
+        if (!processedSet.has(ev.clientEventId)) {
+          processedSet.add(ev.clientEventId);
+          const isGameMap = ['pairs', 'tokenIds', 'placements', 'selections', 'choices'].includes(
+            ev.itemId,
+          );
+          if (
+            !isGameMap &&
+            typeof ev.answer === 'object' &&
+            ev.answer !== null &&
+            !Array.isArray(ev.answer)
+          ) {
+            const existing = (answers[ev.itemId] as Record<string, unknown>) || {};
+            answers[ev.itemId] = { ...existing, ...(ev.answer as Record<string, unknown>) };
+          } else {
+            answers[ev.itemId] = ev.answer;
+          }
         }
       }
-    }
 
-    await this.prisma.attempt.update({
-      where: { id: attempt.id },
-      data: {
-        payload: {
-          answers,
-          processedEventIds: Array.from(processedSet),
-        } as unknown as Prisma.InputJsonObject,
-      },
+      await tx.attempt.update({
+        where: { id: attempt.id },
+        data: {
+          payload: {
+            answers,
+            processedEventIds: Array.from(processedSet),
+          } as unknown as Prisma.InputJsonObject,
+        },
+      });
+
+      return { acceptedEventIds };
     });
-
-    return { acceptedEventIds };
   }
 
   /**

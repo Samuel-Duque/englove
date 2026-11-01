@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ActivityType,
   STICKERS,
@@ -14,17 +15,13 @@ import {
   MediaPlaybackUrlResponse,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
 
 function RevisionContent() {
   const [activeTab, setActiveTab] = useState<'pending' | 'graded'>('pending');
-  const [pendingItems, setPendingItems] = useState<ReviewListItemView[]>([]);
-  const [gradedItems, setGradedItems] = useState<ReviewListItemView[]>([]);
-  const [pendingTotal, setPendingTotal] = useState(0);
-  const [gradedTotal, setGradedTotal] = useState(0);
 
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AttemptReviewDetailView | null>(null);
-  const [groups, setGroups] = useState<GroupView[]>([]);
 
   // Filter states
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
@@ -45,56 +42,61 @@ function RevisionContent() {
   const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
 
   // Status & notifications
-  const [isLoadingList, setIsLoadingList] = useState<boolean>(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Load groups for filter dropdown
+  const groupsQuery = useQuery({
+    queryKey: ['groups', 'active'],
+    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+  });
+  const groups: GroupView[] = groupsQuery.data?.items ?? [];
+
+  // Listas con TanStack Query y polling de 30 s (SPEC-07, A2)
+  const listParams = new URLSearchParams();
+  if (selectedGroupId) listParams.set('groupId', selectedGroupId);
+  if (selectedType) listParams.set('type', selectedType);
+  if (fromDate) listParams.set('from', fromDate);
+  if (toDate) listParams.set('to', toDate);
+  const listQueryString = listParams.toString();
+
+  const pendingQuery = useQuery({
+    queryKey: ['reviews', 'queue', listQueryString],
+    queryFn: () => apiFetch<ReviewListResponse>(`/api/v1/reviews/queue?${listQueryString}`),
+    refetchInterval: POLLING_INTERVAL_MS,
+  });
+  const gradedQuery = useQuery({
+    queryKey: ['reviews', 'graded', listQueryString],
+    queryFn: () => apiFetch<ReviewListResponse>(`/api/v1/reviews/graded?${listQueryString}`),
+    refetchInterval: POLLING_INTERVAL_MS,
+  });
+
+  const pendingItems: ReviewListItemView[] = pendingQuery.data?.items ?? [];
+  const gradedItems: ReviewListItemView[] = gradedQuery.data?.items ?? [];
+  const pendingTotal = pendingQuery.data?.total ?? 0;
+  const gradedTotal = gradedQuery.data?.total ?? 0;
+  const isLoadingList = pendingQuery.isFetching || gradedQuery.isFetching;
+  const listError = pendingQuery.error ?? gradedQuery.error;
+  const listErrorMessage = listError
+    ? listError instanceof ApiError
+      ? listError.message
+      : 'Error al cargar las entregas para revisión'
+    : null;
+  const shownErrorMessage = errorMessage ?? listErrorMessage;
+  const fetchList = () => {
+    void pendingQuery.refetch();
+    void gradedQuery.refetch();
+  };
+
+  // Auto-select first pending if none selected
+  const firstPendingId = pendingItems[0]?.attempt.attemptId ?? null;
   useEffect(() => {
-    apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100')
-      .then((res) => setGroups(res.items))
-      .catch(() => {});
-  }, []);
-
-  // Fetch list data
-  const fetchList = useCallback(async () => {
-    setIsLoadingList(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedGroupId) params.set('groupId', selectedGroupId);
-      if (selectedType) params.set('type', selectedType);
-      if (fromDate) params.set('from', fromDate);
-      if (toDate) params.set('to', toDate);
-
-      const [pendingRes, gradedRes] = await Promise.all([
-        apiFetch<ReviewListResponse>(`/api/v1/reviews/queue?${params.toString()}`),
-        apiFetch<ReviewListResponse>(`/api/v1/reviews/graded?${params.toString()}`),
-      ]);
-
-      setPendingItems(pendingRes.items);
-      setPendingTotal(pendingRes.total);
-      setGradedItems(gradedRes.items);
-      setGradedTotal(gradedRes.total);
-
-      // Auto-select first pending if none selected
-      if (!selectedAttemptId && pendingRes.items.length > 0 && activeTab === 'pending') {
-        setSelectedAttemptId(pendingRes.items[0]?.attempt.attemptId ?? null);
-      }
-    } catch (err) {
-      setErrorMessage((err as ApiError)?.message || 'Error al cargar las entregas para revisión');
-    } finally {
-      setIsLoadingList(false);
+    if (!selectedAttemptId && firstPendingId && activeTab === 'pending') {
+      setSelectedAttemptId(firstPendingId);
     }
-  }, [selectedGroupId, selectedType, fromDate, toDate, selectedAttemptId, activeTab]);
-
-  useEffect(() => {
-    fetchList();
-    // 30s polling
-    const interval = setInterval(fetchList, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchList]);
+  }, [selectedAttemptId, firstPendingId, activeTab]);
 
   // Load attempt detail
   const loadDetail = useCallback(async (attemptId: string) => {
@@ -355,9 +357,9 @@ function RevisionContent() {
         </div>
       )}
 
-      {errorMessage && (
+      {shownErrorMessage && (
         <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-semibold flex items-center justify-between">
-          <span>⚠️ {errorMessage}</span>
+          <span>⚠️ {shownErrorMessage}</span>
           <button
             type="button"
             onClick={() => setErrorMessage(null)}

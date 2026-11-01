@@ -1,8 +1,17 @@
+import type { QueryClient } from '@tanstack/react-query';
+import { getQueryClient } from './query-client';
+
 /**
  * Performs client-side hygiene on logout or session expiration (Rule G-C13, RF-18).
  * Clears TanStack Query cache and IndexedDB pending queues on shared tablets.
  */
-export async function clearSharedDeviceSession(): Promise<void> {
+export async function clearSharedDeviceSession(
+  queryClient: QueryClient = getQueryClient(),
+): Promise<void> {
+  // Cancel in-flight queries and drop every cached response of the previous account
+  await queryClient.cancelQueries();
+  queryClient.clear();
+
   // Clear IndexedDB pending queues if running in browser
   if (typeof window !== 'undefined' && 'indexedDB' in window) {
     try {

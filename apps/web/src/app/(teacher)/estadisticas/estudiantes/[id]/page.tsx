@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, use, Suspense } from 'react';
+import React, { useState, use, Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   StudentStatsResponse,
   WeekCalendarStatus,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../../lib/api';
+import { POLLING_INTERVAL_MS } from '../../../../../lib/query-client';
 
 function formatScore(score: number | null | undefined): string {
   if (score === null || score === undefined) return '—';
@@ -62,51 +64,30 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
   // Time bucket view tab
   const [timeBucketMode, setTimeBucketMode] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
 
-  // Data & State
-  const [data, setData] = useState<StudentStatsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Data & State: TanStack Query con polling de 30 s (SPEC-08 RF-7, A2)
+  const params = new URLSearchParams();
+  if (fromDate) params.set('from', new Date(fromDate).toISOString());
+  if (toDate) params.set('to', new Date(toDate).toISOString());
+  if (selectedType) params.set('type', selectedType);
+  if (selectedLevel) params.set('level', selectedLevel);
+  const queryString = params.toString();
 
-  const fetchStudentStats = useCallback(
-    async (showLoading = true) => {
-      if (showLoading) setIsLoading(true);
-      setErrorMessage(null);
-
-      const params = new URLSearchParams();
-      if (fromDate) params.set('from', new Date(fromDate).toISOString());
-      if (toDate) params.set('to', new Date(toDate).toISOString());
-      if (selectedType) params.set('type', selectedType);
-      if (selectedLevel) params.set('level', selectedLevel);
-
-      try {
-        const res = await apiFetch<StudentStatsResponse>(
-          `/api/v1/stats/students/${studentId}?${params.toString()}`,
-        );
-        setData(res);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setErrorMessage(err.message);
-        } else {
-          setErrorMessage('Error al cargar la información del estudiante');
-        }
-      } finally {
-        if (showLoading) setIsLoading(false);
-      }
-    },
-    [studentId, fromDate, toDate, selectedType, selectedLevel],
-  );
-
-  useEffect(() => {
-    fetchStudentStats(true);
-  }, [fetchStudentStats]);
-
-  // 30s Polling (RF-7)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchStudentStats(false);
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchStudentStats]);
+  const studentStatsQuery = useQuery({
+    queryKey: ['stats', 'student', studentId, queryString],
+    queryFn: () =>
+      apiFetch<StudentStatsResponse>(`/api/v1/stats/students/${studentId}?${queryString}`),
+    refetchInterval: POLLING_INTERVAL_MS,
+  });
+  const data = studentStatsQuery.data ?? null;
+  const isLoading = studentStatsQuery.isPending;
+  const errorMessage = studentStatsQuery.error
+    ? studentStatsQuery.error instanceof ApiError
+      ? studentStatsQuery.error.message
+      : 'Error al cargar la información del estudiante'
+    : null;
+  const fetchStudentStats = (_showLoading?: boolean) => {
+    void studentStatsQuery.refetch();
+  };
 
   return (
     <div className="space-y-6">

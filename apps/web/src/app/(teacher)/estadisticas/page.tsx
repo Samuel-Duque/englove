@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useCallback, Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -13,6 +14,7 @@ import {
   ScoreTrendDirection,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
 
 type TabType = 'overview' | 'groups' | 'leaderboard';
 type PeriodPreset = '7d' | '30d' | '90d' | 'custom';
@@ -76,7 +78,6 @@ function EstadisticasContent() {
   const [customTo, setCustomTo] = useState('');
 
   // Groups list for dropdown
-  const [groups, setGroups] = useState<GroupView[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
 
   // Group tab options
@@ -88,15 +89,6 @@ function EstadisticasContent() {
   const [leaderboardLevel, setLeaderboardLevel] = useState<string>('');
   const [leaderboardGroupId, setLeaderboardGroupId] = useState<string>('');
 
-  // Data states
-  const [overviewData, setOverviewData] = useState<StatsOverviewResponse | null>(null);
-  const [groupData, setGroupData] = useState<GroupStatsResponse | null>(null);
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardResponse | null>(null);
-
-  // UI state
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
 
   // Compute current from/to based on preset
   const getDateRange = useCallback((): { from?: string; to?: string } => {
@@ -115,98 +107,82 @@ function EstadisticasContent() {
   }, [periodPreset, customFrom, customTo]);
 
   // Load active groups for dropdowns
-  useEffect(() => {
-    apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100')
-      .then((res) => {
-        setGroups(res.items);
-        if (res.items.length > 0 && !selectedGroupId) {
-          setSelectedGroupId(res.items[0]?.id ?? '');
-        }
-      })
-      .catch(() => {});
-  }, [selectedGroupId]);
+  const groupsQuery = useQuery({
+    queryKey: ['groups', 'active'],
+    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+  });
+  const groups: GroupView[] = groupsQuery.data?.items ?? [];
+  const effectiveGroupId = selectedGroupId || groups[0]?.id || '';
 
   // Sync tab with URL
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    setErrorMessage(null);
     const params = new URLSearchParams(window.location.search);
     params.set('tab', tab);
     router.replace(`/estadisticas?${params.toString()}`);
   };
 
-  // Main data fetch function
-  const fetchData = useCallback(
-    async (showLoadingSpinner = true) => {
-      if (showLoadingSpinner) setIsLoading(true);
-      setErrorMessage(null);
+  // Datos con TanStack Query y polling de 30 s (SPEC-08 RF-7, A2). La clave usa el
+  // preset (no el instante calculado) para que el polling no cree consultas nuevas.
+  const buildParams = (): URLSearchParams => {
+    const { from, to } = getDateRange();
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return params;
+  };
+  const periodKey = [periodPreset, customFrom, customTo];
 
-      const { from, to } = getDateRange();
-      const params = new URLSearchParams();
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
+  const overviewQuery = useQuery({
+    queryKey: ['stats', 'overview', ...periodKey],
+    queryFn: () =>
+      apiFetch<StatsOverviewResponse>(`/api/v1/stats/overview?${buildParams().toString()}`),
+    enabled: activeTab === 'overview',
+    refetchInterval: POLLING_INTERVAL_MS,
+  });
 
-      try {
-        if (activeTab === 'overview') {
-          const res = await apiFetch<StatsOverviewResponse>(
-            `/api/v1/stats/overview?${params.toString()}`,
-          );
-          setOverviewData(res);
-        } else if (activeTab === 'groups') {
-          if (!selectedGroupId) {
-            setIsLoading(false);
-            return;
-          }
-          params.set('trendMode', trendMode);
-          params.set('sortBy', groupSortBy);
-          params.set('sortOrder', groupSortOrder);
-          const res = await apiFetch<GroupStatsResponse>(
-            `/api/v1/stats/groups/${selectedGroupId}?${params.toString()}`,
-          );
-          setGroupData(res);
-        } else if (activeTab === 'leaderboard') {
-          if (leaderboardLevel) params.set('level', leaderboardLevel);
-          if (leaderboardGroupId) params.set('groupId', leaderboardGroupId);
-          const res = await apiFetch<LeaderboardResponse>(
-            `/api/v1/stats/leaderboard?${params.toString()}`,
-          );
-          setLeaderboardData(res);
-        }
-        setLastRefreshedAt(new Date());
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setErrorMessage(err.message);
-        } else {
-          setErrorMessage('Error al cargar la información estadística');
-        }
-      } finally {
-        if (showLoadingSpinner) setIsLoading(false);
-      }
+  const groupQuery = useQuery({
+    queryKey: ['stats', 'group', effectiveGroupId, trendMode, groupSortBy, groupSortOrder, ...periodKey],
+    queryFn: () => {
+      const params = buildParams();
+      params.set('trendMode', trendMode);
+      params.set('sortBy', groupSortBy);
+      params.set('sortOrder', groupSortOrder);
+      return apiFetch<GroupStatsResponse>(
+        `/api/v1/stats/groups/${effectiveGroupId}?${params.toString()}`,
+      );
     },
-    [
-      activeTab,
-      getDateRange,
-      selectedGroupId,
-      trendMode,
-      groupSortBy,
-      groupSortOrder,
-      leaderboardLevel,
-      leaderboardGroupId,
-    ],
-  );
+    enabled: activeTab === 'groups' && effectiveGroupId !== '',
+    refetchInterval: POLLING_INTERVAL_MS,
+  });
 
-  // Initial and reactive fetch
-  useEffect(() => {
-    fetchData(true);
-  }, [fetchData]);
+  const leaderboardQuery = useQuery({
+    queryKey: ['stats', 'leaderboard', leaderboardLevel, leaderboardGroupId, ...periodKey],
+    queryFn: () => {
+      const params = buildParams();
+      if (leaderboardLevel) params.set('level', leaderboardLevel);
+      if (leaderboardGroupId) params.set('groupId', leaderboardGroupId);
+      return apiFetch<LeaderboardResponse>(`/api/v1/stats/leaderboard?${params.toString()}`);
+    },
+    enabled: activeTab === 'leaderboard',
+    refetchInterval: POLLING_INTERVAL_MS,
+  });
 
-  // 30s Polling (RF-7)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchData(false);
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  const activeQuery =
+    activeTab === 'overview' ? overviewQuery : activeTab === 'groups' ? groupQuery : leaderboardQuery;
+  const overviewData = overviewQuery.data ?? null;
+  const groupData = groupQuery.data ?? null;
+  const leaderboardData = leaderboardQuery.data ?? null;
+  const isLoading = activeQuery.isPending && activeQuery.fetchStatus !== 'idle';
+  const errorMessage = activeQuery.error
+    ? activeQuery.error instanceof ApiError
+      ? activeQuery.error.message
+      : 'Error al cargar la información estadística'
+    : null;
+  const lastRefreshedAt = new Date(activeQuery.dataUpdatedAt || Date.now());
+  const fetchData = (_showLoadingSpinner?: boolean) => {
+    void activeQuery.refetch();
+  };
 
   return (
     <div className="space-y-6">
@@ -572,7 +548,7 @@ function EstadisticasContent() {
             <div className="flex items-center gap-3">
               <label className="text-xs font-semibold text-zinc-700">Seleccionar grupo:</label>
               <select
-                value={selectedGroupId}
+                value={effectiveGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
                 className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs text-zinc-800 bg-white"
               >

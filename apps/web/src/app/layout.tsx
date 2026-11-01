@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Englove — Plataforma en preparación',
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased min-h-screen bg-white text-zinc-900">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:e2e": "pnpm --filter @englove/web test:e2e",
     "seed": "pnpm --filter @englove/api seed",
     "seed:dev": "pnpm --filter @englove/api seed:dev",
     "seed:volume": "pnpm --filter @englove/api seed:volume",

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "nest start --watch -p tsconfig.build.json",
     "start": "node dist/src/main.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
@@ -49,6 +49,7 @@
     "@englove/eslint-config": "workspace:*",
     "@englove/prettier-config": "workspace:*",
     "@englove/tsconfig": "workspace:*",
+    "@nestjs/cli": "^12.0.11",
     "@prisma/config": "^7.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",

@@ -165,8 +165,9 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     expect(dbActivity?.status).toBe(ActivityStatus.draft);
 
     // 2. Intento de asignar en borrador es rechazado con 409 ACTIVITY_NOT_ASSIGNABLE (RF-3)
-    const opensAt = '2026-11-01T10:00:00.000Z';
-    const dueAt = '2026-11-05T18:00:00.000Z';
+    const now = Date.now();
+    const opensAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+    const dueAt = new Date(now + 5 * 24 * 60 * 60 * 1000).toISOString();
 
     await expect(
       assignmentsService.createAssignments(orgId, {
@@ -237,8 +238,8 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
       assignmentsService.createAssignments(orgId, {
         activityId: createdActivity.id,
         groupIds: [groupId],
-        opensAt: '2026-11-10T10:00:00.000Z',
-        dueAt: '2026-11-15T18:00:00.000Z',
+        opensAt: new Date(now + 10 * 24 * 60 * 60 * 1000).toISOString(),
+        dueAt: new Date(now + 15 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     ).rejects.toThrow(HttpException);
 
@@ -255,8 +256,8 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     const newAssignResult = await assignmentsService.createAssignments(orgId, {
       activityId: createdActivity.id,
       groupIds: [groupId],
-      opensAt: '2026-11-10T10:00:00.000Z',
-      dueAt: '2026-11-15T18:00:00.000Z',
+      opensAt: new Date(now + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      dueAt: new Date(now + 15 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
     expect(newAssignResult.items).toHaveLength(1);

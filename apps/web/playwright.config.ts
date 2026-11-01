@@ -14,6 +14,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
+    launchOptions: {
+      slowMo: process.env.SLOWMO ? parseInt(process.env.SLOWMO, 10) : 800,
+    },
   },
   projects: [
     {

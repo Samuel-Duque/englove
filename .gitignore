@@ -54,3 +54,6 @@ scratch/
 test-evidence/
  
 HU/
+.playwright-mcp/
+test-results/
+playwright-report/

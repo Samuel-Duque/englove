@@ -444,7 +444,7 @@ function StudentsManagementContent() {
                         {st.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-rose-600 font-medium">
-                        {st.lockedUntil ? new Date(st.lockedUntil).toLocaleTimeString() : 'Bloqueado'}
+                        {st.lockedUntil ? new Date(st.lockedUntil).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' }) : 'Bloqueado'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold">
                         <button

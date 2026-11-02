@@ -527,7 +527,10 @@ export async function seedDev() {
   // Closed assignment
   const assignClosed = await prisma.assignment.upsert({
     where: { id: '30000000-0000-4000-8000-000000000001' },
-    update: {},
+    update: {
+      opens_at: pastOpens,
+      due_at: pastDue,
+    },
     create: {
       id: '30000000-0000-4000-8000-000000000001',
       organization_id: org.id,
@@ -542,7 +545,10 @@ export async function seedDev() {
   // Open assignment
   const assignOpen = await prisma.assignment.upsert({
     where: { id: '30000000-0000-4000-8000-000000000002' },
-    update: {},
+    update: {
+      opens_at: pastOpens,
+      due_at: futureDue,
+    },
     create: {
       id: '30000000-0000-4000-8000-000000000002',
       organization_id: org.id,
@@ -556,7 +562,10 @@ export async function seedDev() {
   // Upcoming assignment
   await prisma.assignment.upsert({
     where: { id: '30000000-0000-4000-8000-000000000003' },
-    update: {},
+    update: {
+      opens_at: futureOpens,
+      due_at: new Date(futureOpens.getTime() + 7 * 24 * 3600 * 1000),
+    },
     create: {
       id: '30000000-0000-4000-8000-000000000003',
       organization_id: org.id,
@@ -596,7 +605,11 @@ export async function seedDev() {
   // 1. Graded attempt
   await prisma.attempt.upsert({
     where: { id: '40000000-0000-4000-8000-000000000001' },
-    update: {},
+    update: {
+      graded_at: new Date(now.getTime() - 3 * 24 * 3600 * 1000),
+      started_at: new Date(now.getTime() - 4 * 24 * 3600 * 1000),
+      finished_at: new Date(now.getTime() - 4 * 24 * 3600 * 1000 + 300 * 1000),
+    },
     create: {
       id: '40000000-0000-4000-8000-000000000001',
       organization_id: org.id,
@@ -615,7 +628,10 @@ export async function seedDev() {
   // 2. Pending review attempt (speaking)
   const pendingAttempt = await prisma.attempt.upsert({
     where: { id: '40000000-0000-4000-8000-000000000002' },
-    update: {},
+    update: {
+      started_at: new Date(now.getTime() - 1 * 24 * 3600 * 1000),
+      finished_at: new Date(now.getTime() - 1 * 24 * 3600 * 1000 + 60 * 1000),
+    },
     create: {
       id: '40000000-0000-4000-8000-000000000002',
       organization_id: org.id,
@@ -651,7 +667,9 @@ export async function seedDev() {
   // 3. Abandoned attempt
   await prisma.attempt.upsert({
     where: { id: '40000000-0000-4000-8000-000000000003' },
-    update: {},
+    update: {
+      started_at: new Date(now.getTime() - 5 * 24 * 3600 * 1000),
+    },
     create: {
       id: '40000000-0000-4000-8000-000000000003',
       organization_id: org.id,
@@ -668,7 +686,13 @@ export async function seedDev() {
   // 4. Retry authorization unconsumed with retry_extend_until
   const attemptWithRetry = await prisma.attempt.upsert({
     where: { id: '40000000-0000-4000-8000-000000000004' },
-    update: {},
+    update: {
+      graded_at: new Date(now.getTime() - 2 * 24 * 3600 * 1000),
+      started_at: new Date(now.getTime() - 3 * 24 * 3600 * 1000),
+      finished_at: new Date(now.getTime() - 3 * 24 * 3600 * 1000 + 120 * 1000),
+      retry_granted_at: new Date(now.getTime() - 1 * 24 * 3600 * 1000),
+      retry_extend_until: new Date(now.getTime() + 5 * 24 * 3600 * 1000),
+    },
     create: {
       id: '40000000-0000-4000-8000-000000000004',
       organization_id: org.id,

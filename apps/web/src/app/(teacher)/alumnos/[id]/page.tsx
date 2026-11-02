@@ -535,10 +535,10 @@ function StudentDetailContent({
                         {m.groupName}
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-600">
-                        {new Date(m.joinedAt).toLocaleDateString()}
+                        {new Date(m.joinedAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-600">
-                        {m.leftAt ? new Date(m.leftAt).toLocaleDateString() : '—'}
+                        {m.leftAt ? new Date(m.leftAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : '—'}
                       </td>
                       <td className="px-4 py-3 text-sm text-right">
                         <span

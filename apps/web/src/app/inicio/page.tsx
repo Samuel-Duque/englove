@@ -460,6 +460,7 @@ export default function InicioPage() {
                       <p className="text-xs text-zinc-500 mt-1">
                         Límite:{' '}
                         {new Date(card.effectiveDueAt ?? card.dueAt).toLocaleDateString('es-CO', {
+                          timeZone: 'America/Bogota',
                           day: 'numeric',
                           month: 'short',
                           hour: '2-digit',
@@ -477,6 +478,7 @@ export default function InicioPage() {
                             <span className="font-normal text-indigo-700 ml-1">
                               (hasta el{' '}
                               {new Date(card.effectiveDueAt).toLocaleDateString('es-CO', {
+                                timeZone: 'America/Bogota',
                                 day: 'numeric',
                                 month: 'short',
                                 hour: '2-digit',

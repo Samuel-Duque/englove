@@ -138,7 +138,7 @@ export default function StudentProgresoPage() {
                   </h3>
                   <p className="text-xs text-zinc-600 line-clamp-2">{b.description}</p>
                   <p className="text-[10px] font-semibold text-amber-700">
-                    Ganada el {new Date(b.awardedAt).toLocaleDateString('es-CO')}
+                    Ganada el {new Date(b.awardedAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}
                   </p>
                 </div>
               </div>

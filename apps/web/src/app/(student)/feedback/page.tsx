@@ -206,6 +206,7 @@ export default function StudentFeedbackPage() {
                         Tienes plazo hasta el{' '}
                         <strong>
                           {new Date(item.effectiveDueAt).toLocaleDateString('es-CO', {
+                            timeZone: 'America/Bogota',
                             day: 'numeric',
                             month: 'short',
                             hour: '2-digit',
@@ -253,6 +254,7 @@ export default function StudentFeedbackPage() {
                               <span>Intento #{att.attemptNumber}</span>
                               <span className="text-zinc-500 text-[11px]">
                                 {new Date(att.gradedAt).toLocaleDateString('es-CO', {
+                                  timeZone: 'America/Bogota',
                                   day: 'numeric',
                                   month: 'short',
                                 })}

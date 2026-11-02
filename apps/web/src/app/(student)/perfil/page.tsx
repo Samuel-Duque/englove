@@ -228,7 +228,7 @@ export default function StudentPerfilPage() {
               Fecha de nacimiento civil
             </span>
             <p className="text-base font-extrabold text-amber-950 mt-0.5">
-              {student?.birthDate ? new Date(student.birthDate).toLocaleDateString('es-CO') : '—'}
+              {student?.birthDate ? new Date(student.birthDate).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : '—'}
             </p>
           </div>
         </div>

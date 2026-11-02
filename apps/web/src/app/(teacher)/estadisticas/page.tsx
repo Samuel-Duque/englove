@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -71,6 +71,11 @@ function EstadisticasContent() {
 
   const tabParam = (searchParams.get('tab') as TabType) || 'overview';
   const [activeTab, setActiveTab] = useState<TabType>(tabParam);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Period controls
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('30d');
@@ -200,7 +205,7 @@ function EstadisticasContent() {
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500 bg-zinc-100 px-3 py-1 rounded-full">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            Actualizado {lastRefreshedAt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} (cada 30 s)
+            Actualizado {isMounted ? lastRefreshedAt.toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} (cada 30 s)
           </span>
           <button
             type="button"
@@ -426,7 +431,7 @@ function EstadisticasContent() {
                         </td>
                         <td className="px-3 py-2 text-zinc-500">
                           {alert.lastActivityAt
-                            ? new Date(alert.lastActivityAt).toLocaleDateString()
+                            ? new Date(alert.lastActivityAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })
                             : '—'}
                         </td>
                       </tr>
@@ -751,7 +756,7 @@ function EstadisticasContent() {
                         </td>
                         <td className="px-3 py-3 text-zinc-500">
                           {st.lastActivityAt
-                            ? new Date(st.lastActivityAt).toLocaleDateString()
+                            ? new Date(st.lastActivityAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })
                             : '—'}
                         </td>
                       </tr>

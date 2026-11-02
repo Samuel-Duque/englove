@@ -122,7 +122,7 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
           </div>
           <p className="text-xs text-zinc-500 mt-1">
             Grupo: <strong className="text-zinc-800">{data?.student.groupName || 'Sin grupo'}</strong> • Registrado el:{' '}
-            {data?.student.joinedAt ? new Date(data.student.joinedAt).toLocaleDateString() : '—'}
+            {data?.student.joinedAt ? new Date(data.student.joinedAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : '—'}
           </p>
         </div>
 
@@ -371,7 +371,7 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
                           )}
                         </td>
                         <td className="px-4 py-3 text-zinc-500">
-                          {new Date(item.gradedAt).toLocaleDateString()}
+                          {new Date(item.gradedAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}
                         </td>
                       </tr>
                     ))}

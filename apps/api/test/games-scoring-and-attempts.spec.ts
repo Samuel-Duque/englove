@@ -330,6 +330,8 @@ describe('SPEC-06 Microjuegos — ScoringService y AttemptsService (RF-7, RF-8, 
         update: ReturnType<typeof vi.fn>;
       };
       gameDetail: { findFirst: ReturnType<typeof vi.fn> };
+      $queryRaw: ReturnType<typeof vi.fn>;
+      $transaction: ReturnType<typeof vi.fn>;
     };
     let mockFeatureFlags: { isFeatureEnabled: ReturnType<typeof vi.fn> };
     let mockGamification: { recordAttemptCompleted: ReturnType<typeof vi.fn> };
@@ -355,7 +357,12 @@ describe('SPEC-06 Microjuegos — ScoringService y AttemptsService (RF-7, RF-8, 
         gameDetail: {
           findFirst: vi.fn(),
         },
+        $queryRaw: vi.fn(),
+        $transaction: vi.fn(),
       };
+      mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => unknown) =>
+        fn(mockPrisma),
+      );
 
       mockFeatureFlags = {
         isFeatureEnabled: vi.fn().mockResolvedValue(true),
@@ -511,6 +518,15 @@ describe('SPEC-06 Microjuegos — ScoringService y AttemptsService (RF-7, RF-8, 
         },
       });
       mockPrisma.attempt.update.mockResolvedValue({});
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          status: AttemptStatus.in_progress,
+          payload: {
+            answers: { placements: { obj1: 'catA', obj2: 'catB' } },
+            processedEventIds: ['ev-0'],
+          },
+        },
+      ]);
 
       // Submitting new placements where obj2 was removed
       await attemptsService.submitEvents('org-1', 'stu-1', 'att-1', 'valid-token', {

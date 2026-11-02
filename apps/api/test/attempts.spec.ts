@@ -43,6 +43,8 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
     progressEvent: { create: MockFn; findMany: MockFn };
     fillBlankDetail: { findFirst: MockFn };
     examDetail: { findFirst: MockFn };
+    $queryRaw: MockFn;
+    $transaction: MockFn;
   };
   let mockConfigService: { get: MockFn };
   let mockJwtService: { sign: MockFn; verify: MockFn };
@@ -183,7 +185,14 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
           answer_key: { items: {} },
         }),
       },
+      $queryRaw: vi.fn().mockResolvedValue([
+        { status: AttemptStatus.in_progress, payload: { answers: {} } },
+      ]),
+      $transaction: vi.fn(),
     };
+    mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockPrisma) => unknown) =>
+      fn(mockPrisma),
+    );
 
     mockConfigService = {
       get: vi.fn((_key: string, def?: string) => def ?? 'test-secret'),
@@ -349,6 +358,12 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
           due_at: new Date(Date.now() + 86400000),
         },
       });
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          status: AttemptStatus.in_progress,
+          payload: { answers: { 'item-1': 'cat' }, processedEventIds: ['ev-1'] },
+        },
+      ]);
 
       const response = await service.submitEvents(orgId, studentId, attemptId, validToken, {
         events: [

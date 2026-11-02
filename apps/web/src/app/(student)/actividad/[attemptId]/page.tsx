@@ -16,6 +16,7 @@ import {
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { GameRenderer } from '../../../../components/activities/GameRenderer';
 import { fireCelebrationConfetti } from '../../../../lib/confetti';
+import { uploadAudioBlob } from '../../../../lib/audio-upload';
 
 interface PageProps {
   params: Promise<{ attemptId: string }>;
@@ -46,6 +47,7 @@ export default function ActividadRunnerPage({ params }: PageProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingEventsRef = useRef<Set<Promise<unknown>>>(new Set());
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -219,37 +221,46 @@ export default function ActividadRunnerPage({ params }: PageProps) {
 
   // Debounced auto-save event emitter
   const sendEvent = useCallback(
-    async (itemId: string, answer: unknown) => {
-      if (!runtime?.attemptToken) return;
-      try {
-        const clientEventId =
-          typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `evt-${Date.now()}-${Math.random()}`;
+    (itemId: string, answer: unknown): Promise<void> => {
+      if (!runtime?.attemptToken) return Promise.resolve();
+      const attemptToken = runtime.attemptToken;
+      const clientEventId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `evt-${Date.now()}-${Math.random()}`;
 
-        await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-attempt-token': runtime.attemptToken,
-            Origin: window.location.origin,
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            events: [
-              {
-                clientEventId,
-                eventType: 'answer_changed',
-                timestamp: new Date().toISOString(),
-                itemId,
-                answer,
-              },
-            ],
-          }),
-        });
-      } catch {
-        // Background auto-save failures are non-fatal
-      }
+      const promise = (async () => {
+        try {
+          await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-attempt-token': attemptToken,
+              Origin: window.location.origin,
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              events: [
+                {
+                  clientEventId,
+                  eventType: 'answer_changed',
+                  timestamp: new Date().toISOString(),
+                  itemId,
+                  answer,
+                },
+              ],
+            }),
+          });
+        } catch {
+          // Background auto-save failures are non-fatal
+        }
+      })();
+
+      pendingEventsRef.current.add(promise);
+      promise.finally(() => {
+        pendingEventsRef.current.delete(promise);
+      });
+      return promise;
     },
     [apiUrl, attemptId, runtime?.attemptToken],
   );
@@ -341,50 +352,18 @@ export default function ActividadRunnerPage({ params }: PageProps) {
     setUploadError(null);
     setUploadProgress('Obteniendo enlace de subida seguro…');
     try {
-      const mimeType = recordedAudioBlob.type || 'audio/webm';
-      const sizeBytes = recordedAudioBlob.size;
-
-      // 1. Get Presigned Upload URL
-      const presignedRes = await fetch(`${apiUrl}/api/v1/media/upload-url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          attemptId,
-          mimeType,
-          sizeBytes,
-        }),
+      // URL firmada + PUT a R2; devuelve el mediaId del contrato (ENG-074)
+      const uploadedMediaId = await uploadAudioBlob({
+        apiUrl,
+        origin: window.location.origin,
+        attemptId,
+        blob: recordedAudioBlob,
       });
 
-      if (!presignedRes.ok) {
-        const err = await presignedRes.json().catch(() => ({}));
-        throw new Error(err.message || 'Error al autorizar subida');
-      }
-
-      const presignedData = await presignedRes.json();
-      const { uploadUrl, assetId } = presignedData;
-
-      // 2. Upload to Cloudflare R2 via PUT
-      setUploadProgress('Subiendo audio a la nube…');
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-        },
-        body: recordedAudioBlob,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error('Error al transferir archivo a almacenamiento');
-      }
-
-      setMediaId(assetId);
+      setMediaId(uploadedMediaId);
       setUploadProgress(null);
       setUploadError(null);
-      return assetId;
+      return uploadedMediaId;
     } catch {
       setUploadProgress(null);
       setUploadError('No pudimos enviar tu grabación. Sigue guardada en este dispositivo');
@@ -400,11 +379,21 @@ export default function ActividadRunnerPage({ params }: PageProps) {
       alert('Token de intento no disponible');
       return;
     }
+    const attemptToken = runtime.attemptToken;
 
-    const payloadAnswers = overrideAnswers ?? answers;
+    if (overrideAnswers) {
+      setAnswers((prev) => ({ ...prev, ...overrideAnswers }));
+      for (const [itemId, value] of Object.entries(overrideAnswers)) {
+        void sendEvent(itemId, value);
+      }
+    }
 
     setIsSubmitting(true);
     try {
+      if (pendingEventsRef.current.size > 0) {
+        await Promise.allSettled(Array.from(pendingEventsRef.current));
+      }
+
       let finalMediaId = mediaId;
       if (runtime.activity.type === ActivityType.speaking) {
         if (!recordedAudioBlob && !mediaId) {
@@ -425,13 +414,12 @@ export default function ActividadRunnerPage({ params }: PageProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-attempt-token': runtime.attemptToken,
+          'x-attempt-token': attemptToken,
           Origin: window.location.origin,
         },
         credentials: 'include',
         body: JSON.stringify({
-          answers: payloadAnswers,
-          mediaId: finalMediaId,
+          ...(finalMediaId ? { mediaId: finalMediaId } : {}),
         }),
       });
 

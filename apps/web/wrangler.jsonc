@@ -1,13 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "englove-web",
-  "main": ".vinext/worker.js",
+  "main": "vinext/server/fetch-handler",
   "compatibility_date": "2024-09-23",
   "compatibility_flags": [
     "nodejs_compat"
   ],
   "assets": {
-    "directory": ".vinext/client",
+    "directory": "dist/client",
+    "not_found_handling": "none",
     "binding": "ASSETS"
   }
 }

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-145)', () => {
-  test('Flujo docente: cola de revisión con TanStack Query y visualización de feedback', async ({
+  test('Flujo docente completo: cola con TanStack Query, audio speaking, calificación 0.0-5.0, stickers, reintento e inmutabilidad tras graded', async ({
     page,
     context,
   }) => {
@@ -48,7 +48,9 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
       });
     });
 
-    const mockAttemptItem = {
+    let isGraded = false;
+
+    const mockPendingAttemptItem = {
       student: {
         id: 'std-1',
         displayName: 'Mateo Gómez',
@@ -91,13 +93,33 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
       },
     };
 
+    const mockGradedAttemptItem = {
+      ...mockPendingAttemptItem,
+      attempt: {
+        ...mockPendingAttemptItem.attempt,
+        status: 'graded',
+        score: 4.5,
+        stars: 2,
+        gradedAt: '2026-11-02T14:00:00.000Z',
+        retryGrantedAt: '2026-11-02T14:00:00.000Z',
+      },
+      review: {
+        id: 'rev-1',
+        comment: '¡Excelente fluidez y vocabulario!',
+        stickers: ['grammar_star'],
+        reviewerId: 'teacher-1',
+        createdAt: '2026-11-02T14:00:00.000Z',
+        updatedAt: '2026-11-02T14:00:00.000Z',
+      },
+    };
+
     await page.route('**/api/v1/reviews/queue*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          items: [mockAttemptItem],
-          total: 1,
+          items: isGraded ? [] : [mockPendingAttemptItem],
+          total: isGraded ? 0 : 1,
           offset: 0,
           limit: 20,
         }),
@@ -109,8 +131,8 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          items: [],
-          total: 0,
+          items: isGraded ? [mockGradedAttemptItem] : [],
+          total: isGraded ? 1 : 0,
           offset: 0,
           limit: 20,
         }),
@@ -118,11 +140,12 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
     });
 
     await page.route('**/api/v1/attempts/att-rev-1/review-detail', async (route) => {
+      const base = isGraded ? mockGradedAttemptItem : mockPendingAttemptItem;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          ...mockAttemptItem,
+          ...base,
           items: [
             {
               id: 'spk-item-1',
@@ -159,9 +182,59 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
     // 4. Seleccionar el intento para calificar
     await page.locator('button:has-text("Speaking: My Daily Routine")').first().click();
 
-    // 5. Verificar que el panel de detalle muestre la rúbrica y formulario de calificación
+    // 5. Verificar panel de detalle y audio de speaking
     await expect(page.getByRole('heading', { name: 'Speaking: My Daily Routine' })).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=Describe your morning routine in 30 seconds.')).toBeVisible();
-    await expect(page.locator('input#score-input')).toBeVisible();
+    await expect(page.locator('button:has-text("Descargar audio")')).toBeVisible();
+
+    // 6. Calificar con nota 4.5, comentario, sticker y reintento
+    const scoreInput = page.locator('input#score-input');
+    await expect(scoreInput).toBeVisible();
+    await scoreInput.fill('4.5');
+
+    const commentInput = page.locator('textarea#comment-input');
+    await expect(commentInput).toBeVisible();
+    await commentInput.fill('¡Excelente fluidez y vocabulario!');
+
+    // Seleccionar sticker
+    await page.locator('button:has-text("Estrella")').click();
+
+    // Habilitar reintento (checkbox has sr-only class)
+    await page.locator('input[type="checkbox"]').check({ force: true });
+
+    // 7. Enviar calificación
+    await page.route('**/api/v1/attempts/att-rev-1/review', async (route) => {
+      isGraded = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...mockGradedAttemptItem,
+          items: [
+            {
+              id: 'spk-item-1',
+              prompt: 'Describe your morning routine in 30 seconds.',
+              rubricText: 'Usa presente simple y pronunciación clara.',
+              maxDurationSeconds: 60,
+            },
+          ],
+          answers: { audioAssetId: 'asset-1' },
+          attemptHistory: [],
+        }),
+      });
+    });
+
+    await page.click('button:has-text("Guardar Revisión y Retroalimentación")');
+    await expect(page.locator('text=¡Calificación y retroalimentación guardadas exitosamente!')).toBeVisible();
+
+    // 8. Cambiar a pestaña Calificados y comprobar inmutabilidad de la nota
+    await page.click('button[role="tab"]:has-text("Calificados")');
+    await expect(page.locator('button:has-text("Speaking: My Daily Routine")').first()).toBeVisible();
+    await page.locator('button:has-text("Speaking: My Daily Routine")').first().click();
+
+    // En estado graded, la calificación es inmutable y no muestra input editable
+    await expect(page.locator('text=🔒 Calificación inmutable:')).toBeVisible();
+    await expect(page.locator('text=4,5 / 5,0').first()).toBeVisible();
+    await expect(page.locator('input#score-input')).not.toBeVisible();
   });
 });

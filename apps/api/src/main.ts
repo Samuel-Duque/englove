@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -52,7 +52,11 @@ async function bootstrap() {
 
   // Global prefix /api/v1 with root exceptions for /health and /docs (Rule G-C07, Decision 83)
   app.setGlobalPrefix('api/v1', {
-    exclude: ['health', 'docs'],
+    exclude: [
+      { path: 'health', method: RequestMethod.ALL },
+      { path: 'docs', method: RequestMethod.ALL },
+      { path: 'docs/(.*)', method: RequestMethod.ALL },
+    ],
   });
 
   // Swagger Documentation: enabled in local and staging, disabled (404) in production (Rule G-C07, RF-4)

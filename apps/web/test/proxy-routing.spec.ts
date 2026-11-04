@@ -70,6 +70,16 @@ describe('RF-17: proxy routing and redirect logic', () => {
     expect(location).toContain('/login?next=%2Factividades%2F123%3Flevel%3DA1%26page%3D2');
   });
 
+  it('allows public routes like /recuperar and /restablecer without redirecting to login', async () => {
+    const reqRecuperar = new NextRequest('http://localhost:3000/recuperar');
+    const resRecuperar = await proxy(reqRecuperar);
+    expect(resRecuperar.headers.get('location')).toBeNull();
+
+    const reqReset = new NextRequest('http://localhost:3000/restablecer/sample-token');
+    const resReset = await proxy(reqReset);
+    expect(resReset.headers.get('location')).toBeNull();
+  });
+
   it('rejects open-redirect attempts with backslashes without setting next param', async () => {
     const req = new NextRequest('http://localhost:3000/\\evil.com');
     const res = await proxy(req);
@@ -77,5 +87,83 @@ describe('RF-17: proxy routing and redirect logic', () => {
     const location = res.headers.get('location');
     // Location redirects to /login without any next query param
     expect(location).toBe('http://localhost:3000/login');
+  });
+
+  it('redirects authenticated user on root / to /inicio', async () => {
+    const req = new NextRequest('http://localhost:3000/', {
+      headers: {
+        cookie: 'englove_access_token=valid-jwt-token',
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/inicio');
+  });
+
+  it('redirects student accessing teacher routes like /alumnos to /inicio', async () => {
+    const studentPayload = Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url');
+    const studentToken = `header.${studentPayload}.sig`;
+    const req = new NextRequest('http://localhost:3000/alumnos', {
+      headers: {
+        cookie: `englove_access_token=${studentToken}`,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/inicio');
+  });
+
+  it('redirects teacher accessing student routes like /perfil to /inicio', async () => {
+    const teacherPayload = Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url');
+    const teacherToken = `header.${teacherPayload}.sig`;
+    const req = new NextRequest('http://localhost:3000/perfil', {
+      headers: {
+        cookie: `englove_access_token=${teacherToken}`,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/inicio');
+  });
+
+  it('allows teacher to access /actividades and /actividades/nueva without redirecting', async () => {
+    const teacherPayload = Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url');
+    const teacherToken = `header.${teacherPayload}.sig`;
+    const req = new NextRequest('http://localhost:3000/actividades', {
+      headers: {
+        cookie: `englove_access_token=${teacherToken}`,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.headers.get('location')).toBeNull();
+
+    const reqNueva = new NextRequest('http://localhost:3000/actividades/nueva', {
+      headers: {
+        cookie: `englove_access_token=${teacherToken}`,
+      },
+    });
+    const resNueva = await proxy(reqNueva);
+    expect(resNueva.headers.get('location')).toBeNull();
+  });
+
+  it('redirects student accessing /actividades to /inicio but allows /actividad/123', async () => {
+    const studentPayload = Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url');
+    const studentToken = `header.${studentPayload}.sig`;
+    const reqTeacherSection = new NextRequest('http://localhost:3000/actividades', {
+      headers: {
+        cookie: `englove_access_token=${studentToken}`,
+      },
+    });
+    const resTeacherSection = await proxy(reqTeacherSection);
+    expect(resTeacherSection.status).toBe(307);
+    expect(resTeacherSection.headers.get('location')).toContain('/inicio');
+
+    const reqStudentRunner = new NextRequest('http://localhost:3000/actividad/attempt-123', {
+      headers: {
+        cookie: `englove_access_token=${studentToken}`,
+      },
+    });
+    const resStudentRunner = await proxy(reqStudentRunner);
+    expect(resStudentRunner.headers.get('location')).toBeNull();
   });
 });

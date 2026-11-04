@@ -1,6 +1,7 @@
 'use client';
 
 import { fetchSharedSession } from '../../lib/auth-session';
+import { getActivityTypeLabel } from '../../lib/activity-labels';
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -443,13 +444,7 @@ export default function InicioPage() {
                         Nivel {card.activity.level}
                       </span>
                       <span className="text-xs font-bold text-zinc-500">
-                        {card.activity.type === 'fill_blank'
-                          ? '✍️ Espacios'
-                          : card.activity.type === 'speaking'
-                            ? '🎙️ Speaking'
-                            : card.activity.type === 'exam'
-                              ? '📝 Examen'
-                              : '📄 Pregunta'}
+                        {getActivityTypeLabel(card.activity.type)}
                       </span>
                     </div>
 

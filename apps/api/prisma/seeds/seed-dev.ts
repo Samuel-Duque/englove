@@ -254,10 +254,26 @@ export async function seedDev() {
           organization_id: org.id,
           config: {
             instructions: 'Fill the blanks with the correct verb form',
-            items: [{ id: 'item1', prompt: 'She ___ (play) tennis every day.', blanks: ['plays'] }],
+            items: [
+              {
+                id: '11111111-1111-4111-8111-111111111101',
+                prompt: 'She {{22222222-2222-4222-8222-222222222101}} tennis every day.',
+                blanks: [
+                  {
+                    id: '22222222-2222-4222-8222-222222222101',
+                    options: [
+                      { id: '33333333-3333-4333-8333-333333333101', text: 'plays' },
+                      { id: '33333333-3333-4333-8333-333333333102', text: 'play' },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
           answer_key: {
-            items: { item1: ['plays'] },
+            items: {
+              '22222222-2222-4222-8222-222222222101': '33333333-3333-4333-8333-333333333101',
+            },
           },
         },
       },
@@ -377,8 +393,8 @@ export async function seedDev() {
         instructions: 'Drag each item into its correct category',
         settings: {
           targets: [
-            { id: '22222222-2222-4222-8222-222222222301', label: 'Fruits' },
-            { id: '22222222-2222-4222-8222-222222222302', label: 'Animals' },
+            { id: '22222222-2222-4222-8222-222222222301', text: 'Fruits' },
+            { id: '22222222-2222-4222-8222-222222222302', text: 'Animals' },
           ],
           objects: [
             { id: '11111111-1111-4111-8111-111111111301', text: 'Apple' },
@@ -505,12 +521,47 @@ export async function seedDev() {
           config: {
             title: 'Midterm Evaluation',
             items: [
-              { id: 'ex1', weight: 50, item: { id: 'ex1', prompt: 'I ___ happy.', blanks: ['am'] } },
-              { id: 'ex2', weight: 50, item: { id: 'ex2', prompt: 'They ___ students.', blanks: ['are'] } },
+              {
+                id: 'ex1',
+                weight: 50,
+                item: {
+                  id: '11111111-1111-4111-8111-111111111501',
+                  prompt: 'I {{22222222-2222-4222-8222-222222222501}} happy.',
+                  blanks: [
+                    {
+                      id: '22222222-2222-4222-8222-222222222501',
+                      options: [
+                        { id: '33333333-3333-4333-8333-333333333501', text: 'am' },
+                        { id: '33333333-3333-4333-8333-333333333502', text: 'is' },
+                      ],
+                    },
+                  ],
+                },
+              },
+              {
+                id: 'ex2',
+                weight: 50,
+                item: {
+                  id: '11111111-1111-4111-8111-111111111502',
+                  prompt: 'They {{22222222-2222-4222-8222-222222222502}} students.',
+                  blanks: [
+                    {
+                      id: '22222222-2222-4222-8222-222222222502',
+                      options: [
+                        { id: '33333333-3333-4333-8333-333333333503', text: 'are' },
+                        { id: '33333333-3333-4333-8333-333333333504', text: 'was' },
+                      ],
+                    },
+                  ],
+                },
+              },
             ],
           },
           answer_key: {
-            items: { ex1: ['am'], ex2: ['are'] },
+            items: {
+              '22222222-2222-4222-8222-222222222501': '33333333-3333-4333-8333-333333333501',
+              '22222222-2222-4222-8222-222222222502': '33333333-3333-4333-8333-333333333503',
+            },
           },
         },
       },

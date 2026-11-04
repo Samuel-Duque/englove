@@ -51,10 +51,13 @@ export async function clearSharedDeviceSession(
     }
   }
 
-  // Clear session storage
-  if (typeof window !== 'undefined' && 'sessionStorage' in window) {
+  // Clear session storage & session indicators
+  if (typeof window !== 'undefined') {
     try {
-      window.sessionStorage.clear();
+      if ('sessionStorage' in window) window.sessionStorage.clear();
+      if (typeof document !== 'undefined') {
+        document.cookie = 'englove_user_logged=; path=/; max-age=0; SameSite=Lax';
+      }
     } catch {
       // Ignore
     }

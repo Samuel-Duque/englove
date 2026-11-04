@@ -68,27 +68,23 @@ export function DragDropGame({
   }, [initialObjects, placements]);
 
   const handlePlace = (objectId: string, targetId: string) => {
-    setPlacements((prev) => {
-      const next = { ...prev, [objectId]: targetId };
-      onEvent?.({ itemId: 'placements', answer: next });
-
-      if (solution?.placements) {
-        const isCorrect = solution.placements[objectId] === targetId;
-        soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
-      }
-      return next;
-    });
+    const next = { ...placements, [objectId]: targetId };
+    setPlacements(next);
     setSelectedObjectId(null);
+    onEvent?.({ itemId: 'placements', answer: next });
+
+    if (solution?.placements) {
+      const isCorrect = solution.placements[objectId] === targetId;
+      soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
+    }
   };
 
   const handleReturnToTray = (objectId: string) => {
-    setPlacements((prev) => {
-      const next = { ...prev };
-      delete next[objectId];
-      onEvent?.({ itemId: 'placements', answer: next });
-      return next;
-    });
+    const next = { ...placements };
+    delete next[objectId];
+    setPlacements(next);
     if (selectedObjectId === objectId) setSelectedObjectId(null);
+    onEvent?.({ itemId: 'placements', answer: next });
   };
 
   const handleComplete = () => {
@@ -130,7 +126,12 @@ export function DragDropGame({
             <TargetCategoryContainer
               key={target.id}
               id={target.id}
-              name={target.text}
+              name={
+                target.text ||
+                (target as unknown as { label?: string }).label ||
+                (target as unknown as { name?: string }).name ||
+                'Categoría'
+              }
               placedObjects={placedInThis}
               isKids={isKids}
               isTargetActive={isTargetActive}

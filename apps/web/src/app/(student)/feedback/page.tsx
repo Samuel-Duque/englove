@@ -61,6 +61,7 @@ export default function StudentFeedbackPage() {
         router.push(`/actividad/${runtime.attempt.id}`);
       } catch (err) {
         alert((err as ApiError)?.message || 'No fue posible iniciar el nuevo intento.');
+      } finally {
         setStartingAssignmentId(null);
       }
     });

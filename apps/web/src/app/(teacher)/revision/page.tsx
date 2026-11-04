@@ -423,7 +423,9 @@ function RevisionContent() {
                             ? 'Speaking'
                             : item.activity.type === 'exam'
                               ? 'Examen'
-                              : 'Pregunta'}
+                              : item.activity.type === 'game'
+                                ? 'Minijuego'
+                                : 'Pregunta'}
                       </span>
                     </div>
 

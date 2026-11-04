@@ -34,25 +34,155 @@ function getStringProp(obj: unknown, key: string, fallback = ''): string {
   return fallback;
 }
 
-function getFirstItem(config: unknown): Record<string, unknown> | null {
-  const rec = asRecord(config);
-  if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
-    return asRecord(rec['items'][0]);
-  }
-  return null;
+export interface FormSentenceItem {
+  prompt: string;
+  option1: string;
+  option2: string;
+  correctOption: 'opt1' | 'opt2';
+  weight?: string;
 }
 
-function getFirstBlankOption(config: unknown, optIndex: number, fallback: string): string {
-  const item = getFirstItem(config);
-  if (item && Array.isArray(item['blanks']) && item['blanks'].length > 0) {
-    const blank = asRecord(item['blanks'][0]);
-    if (blank && Array.isArray(blank['options']) && blank['options'].length > optIndex) {
-      const opt = asRecord(blank['options'][optIndex]);
-      if (opt && typeof opt['text'] === 'string') return opt['text'] as string;
+function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
+  const rec = asRecord(cfg);
+  if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
+    const akRec = asRecord(ak);
+    const akItems =
+      akRec && asRecord(akRec['items']) ? (akRec['items'] as Record<string, unknown>) : {};
+
+    const items: FormSentenceItem[] = [];
+    for (const rawItem of rec['items']) {
+      const item = asRecord(rawItem);
+      if (!item) continue;
+      const itemId = typeof item['id'] === 'string' ? item['id'] : '';
+      const prompt = typeof item['prompt'] === 'string' ? item['prompt'] : '';
+      let opt1 = 'cat';
+      let opt2 = 'dog';
+      let correct: 'opt1' | 'opt2' = 'opt1';
+
+      if (Array.isArray(item['blanks']) && item['blanks'].length > 0) {
+        const blank = asRecord(item['blanks'][0]);
+        if (blank) {
+          const blankId = typeof blank['id'] === 'string' ? blank['id'] : '';
+          if (Array.isArray(blank['options'])) {
+            const o1 = asRecord(blank['options'][0]);
+            const o2 = asRecord(blank['options'][1]);
+            if (o1 && typeof o1['text'] === 'string') opt1 = o1['text'];
+            if (o2 && typeof o2['text'] === 'string') opt2 = o2['text'];
+
+            const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
+            const correctOptId =
+              itemSol && typeof itemSol[blankId] === 'string' ? itemSol[blankId] : null;
+            if (o2 && correctOptId === o2['id']) {
+              correct = 'opt2';
+            }
+          }
+        }
+      }
+
+      items.push({
+        prompt,
+        option1: opt1,
+        option2: opt2,
+        correctOption: correct,
+      });
     }
+
+    if (items.length > 0) return items;
   }
-  return fallback;
+
+  return [
+    {
+      prompt: 'The {{blank1}} is sleeping.',
+      option1: 'cat',
+      option2: 'dog',
+      correctOption: 'opt1',
+    },
+  ];
 }
+
+function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
+  const rec = asRecord(cfg);
+  if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
+    const akRec = asRecord(ak);
+    const akItems =
+      akRec && asRecord(akRec['items']) ? (akRec['items'] as Record<string, unknown>) : {};
+
+    const items: FormSentenceItem[] = [];
+    for (const rawItem of rec['items']) {
+      const item = asRecord(rawItem);
+      if (!item) continue;
+      const itemId = typeof item['id'] === 'string' ? item['id'] : '';
+      const prompt = typeof item['prompt'] === 'string' ? item['prompt'] : '';
+      const weight = typeof item['weight'] === 'number' ? String(item['weight']) : '50';
+      let opt1 = 'goes';
+      let opt2 = 'go';
+      let correct: 'opt1' | 'opt2' = 'opt1';
+
+      if (Array.isArray(item['blanks']) && item['blanks'].length > 0) {
+        const blank = asRecord(item['blanks'][0]);
+        if (blank) {
+          const blankId = typeof blank['id'] === 'string' ? blank['id'] : '';
+          if (Array.isArray(blank['options'])) {
+            const o1 = asRecord(blank['options'][0]);
+            const o2 = asRecord(blank['options'][1]);
+            if (o1 && typeof o1['text'] === 'string') opt1 = o1['text'];
+            if (o2 && typeof o2['text'] === 'string') opt2 = o2['text'];
+
+            const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
+            const correctOptId =
+              itemSol && typeof itemSol[blankId] === 'string' ? itemSol[blankId] : null;
+            if (o2 && correctOptId === o2['id']) {
+              correct = 'opt2';
+            }
+          }
+        }
+      }
+
+      items.push({
+        prompt,
+        option1: opt1,
+        option2: opt2,
+        correctOption: correct,
+        weight,
+      });
+    }
+
+    if (items.length > 0) return items;
+  }
+
+  return [
+    {
+      prompt: 'The {{blank1}} is sleeping.',
+      option1: 'cat',
+      option2: 'dog',
+      correctOption: 'opt1',
+      weight: '50',
+    },
+    {
+      prompt: 'She {{blank1}} to school.',
+      option1: 'goes',
+      option2: 'go',
+      correctOption: 'opt1',
+      weight: '50',
+    },
+  ];
+}
+
+function balanceExamWeights(items: FormSentenceItem[]): FormSentenceItem[] {
+  if (items.length === 0) return items;
+  const count = items.length;
+  const base = Math.floor((100 / count) * 10) / 10;
+  let running = 0;
+  return items.map((item, idx) => {
+    if (idx === count - 1) {
+      const lastWeight = Number((100 - running).toFixed(1));
+      return { ...item, weight: String(lastWeight) };
+    }
+    running = Number((running + base).toFixed(1));
+    return { ...item, weight: String(base) };
+  });
+}
+
 
 function generateUuid(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -261,24 +391,12 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
   const [fbInstructions, setFbInstructions] = useState(
     getStringProp(initialCfg, 'instructions', ''),
   );
-  const [fbPrompt, setFbPrompt] = useState(
-    getStringProp(getFirstItem(initialCfg), 'prompt', 'The {{blank1}} is sleeping.'),
+  const [fbItems, setFbItems] = useState<FormSentenceItem[]>(() =>
+    parseInitialFillBlankItems(initialCfg, initialAk),
   );
-  const [fbOption1, setFbOption1] = useState(
-    getFirstBlankOption(initialCfg, 0, 'cat'),
+  const [examItems, setExamItems] = useState<FormSentenceItem[]>(() =>
+    parseInitialExamItems(initialCfg, initialAk),
   );
-  const [fbOption2, setFbOption2] = useState(
-    getFirstBlankOption(initialCfg, 1, 'dog'),
-  );
-  const [fbCorrectOption, setFbCorrectOption] = useState<'opt1' | 'opt2'>('opt1');
-
-  // Exam second item (for publishing >= 2 items)
-  const [examItem2Prompt, setExamItem2Prompt] = useState('She {{blank2}} to school.');
-  const [examItem2Opt1, setExamItem2Opt1] = useState('goes');
-  const [examItem2Opt2, setExamItem2Opt2] = useState('go');
-  const [examItem2Correct, setExamItem2Correct] = useState<'opt1' | 'opt2'>('opt1');
-  const [examItem1Weight, setExamItem1Weight] = useState('50');
-  const [examItem2Weight, setExamItem2Weight] = useState('50');
 
   // Open Question
   const [oqPrompt, setOqPrompt] = useState(
@@ -356,40 +474,77 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
     let answerKey: unknown = null;
 
     if (type === ActivityType.fill_blank) {
-      const itemId = '11111111-1111-4111-8111-111111111101';
-      const blankId = '22222222-2222-4222-8222-222222222201';
-      const opt1Id = '33333333-3333-4333-8333-333333333301';
-      const opt2Id = '33333333-3333-4333-8333-333333333302';
+      if (fbItems.length < 1) {
+        throw new Error('La actividad debe tener al menos 1 oración');
+      }
 
-      const promptWithMarker = fbPrompt.includes(`{{${blankId}}}`)
-        ? fbPrompt
-        : fbPrompt.replace(/\{\{[^}]+\}\}/, `{{${blankId}}}`);
+      const itemsPayload: Array<{
+        id: string;
+        prompt: string;
+        blanks: Array<{
+          id: string;
+          options: Array<{ id: string; text: string }>;
+        }>;
+      }> = [];
+
+      const answerKeyItems: Record<string, Record<string, string>> = {};
+
+      for (const [idx, item] of fbItems.entries()) {
+        if (!item.prompt.trim()) {
+          throw new Error(`La oración ${idx + 1} no puede tener texto vacío`);
+        }
+        if (!item.option1.trim() || !item.option2.trim()) {
+          throw new Error(`Las opciones de la oración ${idx + 1} no pueden estar vacías`);
+        }
+        if (item.option1.trim().toLowerCase() === item.option2.trim().toLowerCase()) {
+          throw new Error(`Las opciones de la oración ${idx + 1} deben ser diferentes entre sí`);
+        }
+
+        const itemId = generateUuid();
+        const blankId = generateUuid();
+        const opt1Id = generateUuid();
+        const opt2Id = generateUuid();
+
+        let promptWithMarker = item.prompt.trim();
+        if (/\{\{[^}]+\}\}/.test(promptWithMarker)) {
+          let replaced = false;
+          promptWithMarker = promptWithMarker.replace(/\{\{[^}]+\}\}/g, () => {
+            if (!replaced) {
+              replaced = true;
+              return `{{${blankId}}}`;
+            }
+            return '';
+          });
+        } else {
+          promptWithMarker = `${promptWithMarker} {{${blankId}}}`;
+        }
+
+        itemsPayload.push({
+          id: itemId,
+          prompt: promptWithMarker,
+          blanks: [
+            {
+              id: blankId,
+              options: [
+                { id: opt1Id, text: item.option1.trim() },
+                { id: opt2Id, text: item.option2.trim() },
+              ],
+            },
+          ],
+        });
+
+        answerKeyItems[itemId] = {
+          [blankId]: item.correctOption === 'opt1' ? opt1Id : opt2Id,
+        };
+      }
 
       config = {
         instructions: fbInstructions.trim() || undefined,
-        items: [
-          {
-            id: itemId,
-            prompt: promptWithMarker,
-            blanks: [
-              {
-                id: blankId,
-                options: [
-                  { id: opt1Id, text: fbOption1.trim() },
-                  { id: opt2Id, text: fbOption2.trim() },
-                ],
-              },
-            ],
-          },
-        ],
+        items: itemsPayload,
       };
 
       answerKey = {
-        items: {
-          [itemId]: {
-            [blankId]: fbCorrectOption === 'opt1' ? opt1Id : opt2Id,
-          },
-        },
+        items: answerKeyItems,
       };
     } else if (type === ActivityType.open_question) {
       config = {
@@ -407,62 +562,81 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
       };
       answerKey = null;
     } else if (type === ActivityType.exam) {
-      const item1Id = '11111111-1111-4111-8111-111111111101';
-      const blank1Id = '22222222-2222-4222-8222-222222222201';
-      const opt1Id = '33333333-3333-4333-8333-333333333301';
-      const opt2Id = '33333333-3333-4333-8333-333333333302';
+      if (examItems.length < 1) {
+        throw new Error('El examen debe tener al menos 1 oración');
+      }
 
-      const item2Id = '11111111-1111-4111-8111-111111111102';
-      const blank2Id = '22222222-2222-4222-8222-222222222202';
-      const opt3Id = '33333333-3333-4333-8333-333333333303';
-      const opt4Id = '33333333-3333-4333-8333-333333333304';
+      const itemsPayload: Array<{
+        id: string;
+        weight: number;
+        prompt: string;
+        blanks: Array<{
+          id: string;
+          options: Array<{ id: string; text: string }>;
+        }>;
+      }> = [];
 
-      const prompt1 = fbPrompt.includes(`{{${blank1Id}}}`)
-        ? fbPrompt
-        : fbPrompt.replace(/\{\{[^}]+\}\}/, `{{${blank1Id}}}`);
-      const prompt2 = examItem2Prompt.includes(`{{${blank2Id}}}`)
-        ? examItem2Prompt
-        : examItem2Prompt.replace(/\{\{[^}]+\}\}/, `{{${blank2Id}}}`);
+      const answerKeyItems: Record<string, Record<string, string>> = {};
+
+      for (const [idx, item] of examItems.entries()) {
+        if (!item.prompt.trim()) {
+          throw new Error(`La oración ${idx + 1} no puede tener texto vacío`);
+        }
+        if (!item.option1.trim() || !item.option2.trim()) {
+          throw new Error(`Las opciones de la oración ${idx + 1} no pueden estar vacías`);
+        }
+        if (item.option1.trim().toLowerCase() === item.option2.trim().toLowerCase()) {
+          throw new Error(`Las opciones de la oración ${idx + 1} deben ser diferentes entre sí`);
+        }
+
+        const itemId = generateUuid();
+        const blankId = generateUuid();
+        const opt1Id = generateUuid();
+        const opt2Id = generateUuid();
+
+        let promptWithMarker = item.prompt.trim();
+        if (/\{\{[^}]+\}\}/.test(promptWithMarker)) {
+          let replaced = false;
+          promptWithMarker = promptWithMarker.replace(/\{\{[^}]+\}\}/g, () => {
+            if (!replaced) {
+              replaced = true;
+              return `{{${blankId}}}`;
+            }
+            return '';
+          });
+        } else {
+          promptWithMarker = `${promptWithMarker} {{${blankId}}}`;
+        }
+
+        const weightVal = parseFloat(item.weight || '0') || 0;
+
+        itemsPayload.push({
+          id: itemId,
+          weight: weightVal,
+          prompt: promptWithMarker,
+          blanks: [
+            {
+              id: blankId,
+              options: [
+                { id: opt1Id, text: item.option1.trim() },
+                { id: opt2Id, text: item.option2.trim() },
+              ],
+            },
+          ],
+        });
+
+        answerKeyItems[itemId] = {
+          [blankId]: item.correctOption === 'opt1' ? opt1Id : opt2Id,
+        };
+      }
 
       config = {
         instructions: fbInstructions.trim() || undefined,
-        items: [
-          {
-            id: item1Id,
-            prompt: prompt1,
-            weight: parseFloat(examItem1Weight) || 50,
-            blanks: [
-              {
-                id: blank1Id,
-                options: [
-                  { id: opt1Id, text: fbOption1.trim() },
-                  { id: opt2Id, text: fbOption2.trim() },
-                ],
-              },
-            ],
-          },
-          {
-            id: item2Id,
-            prompt: prompt2,
-            weight: parseFloat(examItem2Weight) || 50,
-            blanks: [
-              {
-                id: blank2Id,
-                options: [
-                  { id: opt3Id, text: examItem2Opt1.trim() },
-                  { id: opt4Id, text: examItem2Opt2.trim() },
-                ],
-              },
-            ],
-          },
-        ],
+        items: itemsPayload,
       };
 
       answerKey = {
-        items: {
-          [item1Id]: { [blank1Id]: fbCorrectOption === 'opt1' ? opt1Id : opt2Id },
-          [item2Id]: { [blank2Id]: examItem2Correct === 'opt1' ? opt3Id : opt4Id },
-        },
+        items: answerKeyItems,
       };
     } else if (type === ActivityType.game) {
       if (gameMechanic === 'order_words') {
@@ -976,8 +1150,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
           Contenido de la actividad
         </h2>
 
-        {/* FILL BLANK & EXAM */}
-        {(type === ActivityType.fill_blank || type === ActivityType.exam) && (
+        {/* FILL BLANK */}
+        {type === ActivityType.fill_blank && (
           <div className="space-y-4">
             <div>
               <label htmlFor="fb-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
@@ -994,146 +1168,94 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
               />
             </div>
 
-            <div className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-3">
+            <div className="flex items-center justify-between pt-2">
               <h3 className="text-sm font-bold text-zinc-800">
-                Oración 1 {type === ActivityType.exam && `(Peso: ${examItem1Weight}%)`}
+                Oraciones con huecos ({fbItems.length})
               </h3>
-
-              {type === ActivityType.exam && (
-                <div>
-                  <label htmlFor="exam-w1" className="block text-xs font-medium text-zinc-700 mb-1">
-                    Peso de la oración (0-100):
-                  </label>
-                  <input
-                    id="exam-w1"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={examItem1Weight}
-                    onChange={(e) => setExamItem1Weight(e.target.value)}
-                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="fb-prompt" className="block text-xs font-medium text-zinc-700 mb-1">
-                  Texto con hueco: usa <code>&#123;&#123;blank1&#125;&#125;</code> para indicar el espacio
-                </label>
-                <input
-                  id="fb-prompt"
-                  type="text"
-                  value={fbPrompt}
-                  onChange={(e) => setFbPrompt(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="fb-opt1" className="block text-xs font-medium text-zinc-700 mb-1">
-                    Opción 1
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="fb-opt1"
-                      type="text"
-                      value={fbOption1}
-                      onChange={(e) => setFbOption1(e.target.value)}
-                      className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                    />
-                    <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
-                      <input
-                        type="radio"
-                        name="correct-opt1"
-                        checked={fbCorrectOption === 'opt1'}
-                        onChange={() => setFbCorrectOption('opt1')}
-                      />
-                      Correcta
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="fb-opt2" className="block text-xs font-medium text-zinc-700 mb-1">
-                    Opción 2
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="fb-opt2"
-                      type="text"
-                      value={fbOption2}
-                      onChange={(e) => setFbOption2(e.target.value)}
-                      className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                    />
-                    <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
-                      <input
-                        type="radio"
-                        name="correct-opt1"
-                        checked={fbCorrectOption === 'opt2'}
-                        onChange={() => setFbCorrectOption('opt2')}
-                      />
-                      Correcta
-                    </label>
-                  </div>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setFbItems([
+                    ...fbItems,
+                    {
+                      prompt: 'The {{blank1}} is sleeping.',
+                      option1: 'cat',
+                      option2: 'dog',
+                      correctOption: 'opt1',
+                    },
+                  ])
+                }
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+              >
+                + Añadir oración
+              </button>
             </div>
 
-            {/* Exam requires >= 2 items to publish */}
-            {type === ActivityType.exam && (
-              <div className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-3">
-                <h3 className="text-sm font-bold text-zinc-800">
-                  Oración 2 (Peso: {examItem2Weight}%)
-                </h3>
-
-                <div>
-                  <label htmlFor="exam-w2" className="block text-xs font-medium text-zinc-700 mb-1">
-                    Peso de la oración (0-100):
-                  </label>
-                  <input
-                    id="exam-w2"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={examItem2Weight}
-                    onChange={(e) => setExamItem2Weight(e.target.value)}
-                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
-                  />
+            {fbItems.map((item, idx) => (
+              <div key={idx} className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-zinc-800">Oración {idx + 1}</h4>
+                  {fbItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setFbItems(fbItems.filter((_, i) => i !== idx))}
+                      className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                      aria-label={`Eliminar oración ${idx + 1}`}
+                    >
+                      Eliminar
+                    </button>
+                  )}
                 </div>
 
                 <div>
-                  <label htmlFor="exam-p2" className="block text-xs font-medium text-zinc-700 mb-1">
-                    Texto con hueco: usa <code>&#123;&#123;blank2&#125;&#125;</code> para indicar el espacio
+                  <label htmlFor={`fb-prompt-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
+                    Texto con hueco: usa <code>&#123;&#123;blank1&#125;&#125;</code> para indicar el espacio
                   </label>
                   <input
-                    id="exam-p2"
+                    id={`fb-prompt-${idx}`}
+                    aria-label={`Texto con hueco oración ${idx + 1}`}
                     type="text"
-                    value={examItem2Prompt}
-                    onChange={(e) => setExamItem2Prompt(e.target.value)}
+                    value={item.prompt}
+                    onChange={(e) =>
+                      setFbItems(
+                        fbItems.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)),
+                      )
+                    }
                     className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="exam-opt1" className="block text-xs font-medium text-zinc-700 mb-1">
+                    <label htmlFor={`fb-opt1-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
                       Opción 1
                     </label>
                     <div className="flex items-center gap-2">
                       <input
-                        id="exam-opt1"
+                        id={`fb-opt1-${idx}`}
+                        aria-label={`Opción 1 oración ${idx + 1}`}
                         type="text"
-                        value={examItem2Opt1}
-                        onChange={(e) => setExamItem2Opt1(e.target.value)}
+                        value={item.option1}
+                        onChange={(e) =>
+                          setFbItems(
+                            fbItems.map((it, i) => (i === idx ? { ...it, option1: e.target.value } : it)),
+                          )
+                        }
                         className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
                       />
                       <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
                         <input
                           type="radio"
-                          name="correct-opt2"
-                          checked={examItem2Correct === 'opt1'}
-                          onChange={() => setExamItem2Correct('opt1')}
+                          name={`fb-correct-${idx}`}
+                          aria-label={`Marcar opción 1 como correcta para oración ${idx + 1}`}
+                          checked={item.correctOption === 'opt1'}
+                          onChange={() =>
+                            setFbItems(
+                              fbItems.map((it, i) =>
+                                i === idx ? { ...it, correctOption: 'opt1' } : it,
+                              ),
+                            )
+                          }
                         />
                         Correcta
                       </label>
@@ -1141,23 +1263,35 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                   </div>
 
                   <div>
-                    <label htmlFor="exam-opt2" className="block text-xs font-medium text-zinc-700 mb-1">
+                    <label htmlFor={`fb-opt2-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
                       Opción 2
                     </label>
                     <div className="flex items-center gap-2">
                       <input
-                        id="exam-opt2"
+                        id={`fb-opt2-${idx}`}
+                        aria-label={`Opción 2 oración ${idx + 1}`}
                         type="text"
-                        value={examItem2Opt2}
-                        onChange={(e) => setExamItem2Opt2(e.target.value)}
+                        value={item.option2}
+                        onChange={(e) =>
+                          setFbItems(
+                            fbItems.map((it, i) => (i === idx ? { ...it, option2: e.target.value } : it)),
+                          )
+                        }
                         className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
                       />
                       <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
                         <input
                           type="radio"
-                          name="correct-opt2"
-                          checked={examItem2Correct === 'opt2'}
-                          onChange={() => setExamItem2Correct('opt2')}
+                          name={`fb-correct-${idx}`}
+                          aria-label={`Marcar opción 2 como correcta para oración ${idx + 1}`}
+                          checked={item.correctOption === 'opt2'}
+                          onChange={() =>
+                            setFbItems(
+                              fbItems.map((it, i) =>
+                                i === idx ? { ...it, correctOption: 'opt2' } : it,
+                              ),
+                            )
+                          }
                         />
                         Correcta
                       </label>
@@ -1165,7 +1299,210 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                   </div>
                 </div>
               </div>
-            )}
+            ))}
+          </div>
+        )}
+
+        {/* EXAM */}
+        {type === ActivityType.exam && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="exam-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
+                Instrucciones del examen (opcional)
+              </label>
+              <input
+                id="exam-instructions"
+                type="text"
+                value={fbInstructions}
+                onChange={(e) => setFbInstructions(e.target.value)}
+                maxLength={2000}
+                placeholder="Ej. Lee con atención cada oración y completa con la forma verbal correcta."
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-800">
+                  Oraciones del examen ({examItems.length})
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  Suma de pesos:{' '}
+                  {examItems
+                    .reduce((acc, it) => acc + (parseFloat(it.weight || '0') || 0), 0)
+                    .toFixed(1)}
+                  % (Debe sumar 100% para publicar)
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExamItems(balanceExamWeights(examItems))}
+                  className="text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1 rounded-md cursor-pointer"
+                >
+                  ⚖️ Balancear pesos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newItems: FormSentenceItem[] = [
+                      ...examItems,
+                      {
+                        prompt: 'She {{blank1}} to school.',
+                        option1: 'goes',
+                        option2: 'go',
+                        correctOption: 'opt1',
+                        weight: '0',
+                      },
+                    ];
+                    setExamItems(balanceExamWeights(newItems));
+                  }}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                >
+                  + Añadir oración
+                </button>
+              </div>
+            </div>
+
+            {examItems.map((item, idx) => (
+              <div key={idx} className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-zinc-800">
+                    Oración {idx + 1} (Peso: {item.weight || '0'}%)
+                  </h4>
+                  {examItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const filtered = examItems.filter((_, i) => i !== idx);
+                        setExamItems(balanceExamWeights(filtered));
+                      }}
+                      className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                      aria-label={`Eliminar oración ${idx + 1}`}
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor={`exam-w${idx + 1}`} className="block text-xs font-medium text-zinc-700 mb-1">
+                    Peso de la oración (0-100%):
+                  </label>
+                  <input
+                    id={`exam-w${idx + 1}`}
+                    aria-label={`Peso de la oración ${idx + 1}`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={item.weight ?? '0'}
+                    onChange={(e) =>
+                      setExamItems(
+                        examItems.map((it, i) => (i === idx ? { ...it, weight: e.target.value } : it)),
+                      )
+                    }
+                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor={`exam-prompt-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
+                    Texto con hueco: usa <code>&#123;&#123;blank1&#125;&#125;</code> para indicar el espacio
+                  </label>
+                  <input
+                    id={`exam-prompt-${idx}`}
+                    aria-label={`Texto con hueco oración ${idx + 1}`}
+                    type="text"
+                    value={item.prompt}
+                    onChange={(e) =>
+                      setExamItems(
+                        examItems.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)),
+                      )
+                    }
+                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor={`exam-opt1-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
+                      Opción 1
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`exam-opt1-${idx}`}
+                        aria-label={`Opción 1 oración ${idx + 1}`}
+                        type="text"
+                        value={item.option1}
+                        onChange={(e) =>
+                          setExamItems(
+                            examItems.map((it, i) =>
+                              i === idx ? { ...it, option1: e.target.value } : it,
+                            ),
+                          )
+                        }
+                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                      />
+                      <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`exam-correct-${idx}`}
+                          aria-label={`Marcar opción 1 como correcta para oración ${idx + 1}`}
+                          checked={item.correctOption === 'opt1'}
+                          onChange={() =>
+                            setExamItems(
+                              examItems.map((it, i) =>
+                                i === idx ? { ...it, correctOption: 'opt1' } : it,
+                              ),
+                            )
+                          }
+                        />
+                        Correcta
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor={`exam-opt2-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
+                      Opción 2
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`exam-opt2-${idx}`}
+                        aria-label={`Opción 2 oración ${idx + 1}`}
+                        type="text"
+                        value={item.option2}
+                        onChange={(e) =>
+                          setExamItems(
+                            examItems.map((it, i) =>
+                              i === idx ? { ...it, option2: e.target.value } : it,
+                            ),
+                          )
+                        }
+                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                      />
+                      <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`exam-correct-${idx}`}
+                          aria-label={`Marcar opción 2 como correcta para oración ${idx + 1}`}
+                          checked={item.correctOption === 'opt2'}
+                          onChange={() =>
+                            setExamItems(
+                              examItems.map((it, i) =>
+                                i === idx ? { ...it, correctOption: 'opt2' } : it,
+                              ),
+                            )
+                          }
+                        />
+                        Correcta
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1351,6 +1688,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                   {matchPairs.map((pair, idx) => (
                     <div key={idx} className="flex items-center gap-2">
                       <input
+                        id={`match-pair-left-${idx}`}
+                        aria-label={`Elemento izquierdo pareja ${idx + 1}`}
                         type="text"
                         placeholder="Elemento izquierdo (ej. Apple)"
                         value={pair.leftText}
@@ -1365,6 +1704,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       />
                       <span className="text-xs text-zinc-400">↔</span>
                       <input
+                        id={`match-pair-right-${idx}`}
+                        aria-label={`Elemento derecho pareja ${idx + 1}`}
                         type="text"
                         placeholder="Elemento derecho (ej. Manzana)"
                         value={pair.rightText}
@@ -1381,8 +1722,9 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                         type="button"
                         disabled={matchPairs.length <= 2}
                         onClick={() => setMatchPairs(matchPairs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1"
+                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
                         title="Eliminar pareja"
+                        aria-label={`Eliminar pareja ${idx + 1}`}
                       >
                         ✕
                       </button>
@@ -1405,7 +1747,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                     <button
                       type="button"
                       onClick={() => setDragTargets([...dragTargets, { name: '' }])}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                     >
                       + Añadir categoría
                     </button>
@@ -1415,6 +1757,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       <div key={idx} className="flex items-center gap-2">
                         <span className="text-xs text-zinc-500 w-16">Cat. {idx + 1}:</span>
                         <input
+                          id={`drag-target-${idx}`}
+                          aria-label={`Nombre de la categoría ${idx + 1}`}
                           type="text"
                           placeholder="Nombre del destino (ej. Fruits)"
                           value={target.name}
@@ -1442,8 +1786,9 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                               })),
                             );
                           }}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1"
+                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
                           title="Eliminar categoría"
+                          aria-label={`Eliminar categoría ${idx + 1}`}
                         >
                           ✕
                         </button>
@@ -1464,7 +1809,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       onClick={() =>
                         setDragObjects([...dragObjects, { text: '', targetIndex: 0 }])
                       }
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                     >
                       + Añadir elemento
                     </button>
@@ -1473,6 +1818,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                     {dragObjects.map((obj, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <input
+                          id={`drag-object-${idx}`}
+                          aria-label={`Texto del elemento a clasificar ${idx + 1}`}
                           type="text"
                           placeholder="Texto del elemento (ej. Orange)"
                           value={obj.text}
@@ -1487,6 +1834,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                         />
                         <span className="text-xs text-zinc-500">→</span>
                         <select
+                          id={`drag-target-select-${idx}`}
+                          aria-label={`Categoría asignada para el elemento ${idx + 1}`}
                           value={obj.targetIndex}
                           onChange={(e) =>
                             setDragObjects(
@@ -1509,8 +1858,9 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                           type="button"
                           disabled={dragObjects.length <= 2}
                           onClick={() => setDragObjects(dragObjects.filter((_, i) => i !== idx))}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1"
+                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
                           title="Eliminar elemento"
+                          aria-label={`Eliminar elemento a clasificar ${idx + 1}`}
                         >
                           ✕
                         </button>
@@ -1536,7 +1886,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                     onClick={() =>
                       setMemoryPairs([...memoryPairs, { card1Text: '', card2Text: '' }])
                     }
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                   >
                     + Añadir pareja
                   </button>
@@ -1545,6 +1895,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                   {memoryPairs.map((pair, idx) => (
                     <div key={idx} className="flex items-center gap-2">
                       <input
+                        id={`memory-card-1-${idx}`}
+                        aria-label={`Tarjeta 1 pareja ${idx + 1}`}
                         type="text"
                         placeholder="Tarjeta 1 (ej. Dog)"
                         value={pair.card1Text}
@@ -1559,6 +1911,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       />
                       <span className="text-xs text-zinc-400">♥</span>
                       <input
+                        id={`memory-card-2-${idx}`}
+                        aria-label={`Tarjeta 2 pareja ${idx + 1}`}
                         type="text"
                         placeholder="Tarjeta 2 (ej. Perro)"
                         value={pair.card2Text}
@@ -1575,8 +1929,9 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                         type="button"
                         disabled={memoryPairs.length <= 2}
                         onClick={() => setMemoryPairs(memoryPairs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1"
+                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
                         title="Eliminar pareja"
+                        aria-label={`Eliminar pareja de memoria ${idx + 1}`}
                       >
                         ✕
                       </button>
@@ -1618,7 +1973,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                           { prompt: '', opt1: '', opt2: '', correct: 'opt1' },
                         ])
                       }
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                     >
                       + Añadir pregunta
                     </button>
@@ -1632,13 +1987,16 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                           type="button"
                           disabled={timedQuestions.length <= 1}
                           onClick={() => setTimedQuestions(timedQuestions.filter((_, i) => i !== idx))}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                          aria-label={`Eliminar pregunta contra reloj ${idx + 1}`}
                         >
                           Eliminar
                         </button>
                       </div>
 
                       <input
+                        id={`tc-prompt-${idx}`}
+                        aria-label={`Consigna pregunta contra reloj ${idx + 1}`}
                         type="text"
                         placeholder="Consigna (ej. What color is the sun?)"
                         value={q.prompt}
@@ -1655,6 +2013,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         <div className="flex items-center gap-2">
                           <input
+                            id={`tc-opt1-${idx}`}
+                            aria-label={`Opción 1 pregunta ${idx + 1}`}
                             type="text"
                             placeholder="Opción 1"
                             value={q.opt1}
@@ -1671,6 +2031,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                             <input
                               type="radio"
                               name={`tc-correct-${idx}`}
+                              aria-label={`Marcar opción 1 como correcta para pregunta ${idx + 1}`}
                               checked={q.correct === 'opt1'}
                               onChange={() =>
                                 setTimedQuestions(
@@ -1686,6 +2047,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
 
                         <div className="flex items-center gap-2">
                           <input
+                            id={`tc-opt2-${idx}`}
+                            aria-label={`Opción 2 pregunta ${idx + 1}`}
                             type="text"
                             placeholder="Opción 2"
                             value={q.opt2}
@@ -1702,6 +2065,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                             <input
                               type="radio"
                               name={`tc-correct-${idx}`}
+                              aria-label={`Marcar opción 2 como correcta para pregunta ${idx + 1}`}
                               checked={q.correct === 'opt2'}
                               onChange={() =>
                                 setTimedQuestions(
@@ -1799,15 +2163,27 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
 
               {type === ActivityType.fill_blank && (
                 <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
-                  <p className="text-base text-zinc-800">{fbPrompt}</p>
-                  <div className="flex gap-2 pt-2">
-                    <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
-                      Opción A: {fbOption1}
-                    </span>
-                    <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
-                      Opción B: {fbOption2}
-                    </span>
-                  </div>
+                  <p className="text-xs font-bold text-zinc-500">
+                    Oraciones con huecos ({fbItems.length})
+                  </p>
+                  {fbItems.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0 space-y-1"
+                    >
+                      <p className="text-base text-zinc-800">
+                        {idx + 1}. {it.prompt}
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
+                          A: {it.option1}
+                        </span>
+                        <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
+                          B: {it.option2}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1834,9 +2210,28 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
 
               {type === ActivityType.exam && (
                 <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
-                  <p className="text-xs font-bold text-zinc-500">Ítems ponderados del examen</p>
-                  <p className="text-sm text-zinc-800">1. {fbPrompt}</p>
-                  {examItem2Prompt && <p className="text-sm text-zinc-800">2. {examItem2Prompt}</p>}
+                  <p className="text-xs font-bold text-zinc-500">
+                    Ítems ponderados del examen ({examItems.length})
+                  </p>
+                  {examItems.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0"
+                    >
+                      <p className="text-sm text-zinc-800">
+                        {idx + 1}. {it.prompt}{' '}
+                        <span className="text-xs text-zinc-500">({it.weight || '0'}%)</span>
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
+                          A: {it.option1}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
+                          B: {it.option2}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 

@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
+ * Extracts the user role from a JWT payload without cryptographic verification (Decision A45 & A75).
+ * Only used for perimeter UI routing/redirection in proxy.ts; business authorization remains in NestJS.
+ */
+function extractRoleFromJwt(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    const part1 = parts[1];
+    if (!part1) return null;
+    const base64 = part1.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
+    const payload = JSON.parse(jsonStr) as { role?: unknown };
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Next.js 16 proxy convention (replacing legacy middleware.ts, Decision 81 & 85).
- * Rule G-B03: Runs in Node.js runtime and ONLY inspects cookie presence to redirect.
+ * Rule G-B03: Runs in Node.js runtime and ONLY inspects cookie presence / decoded role to redirect.
  * It never authorizes business logic or validates JWT cryptographic signatures.
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
@@ -28,7 +46,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const isPublicAuthRoute =
     pathname.startsWith('/login') ||
     pathname.startsWith('/registro') ||
-    pathname.startsWith('/recuperar-contrasena') ||
+    pathname.startsWith('/recuperar') ||
     pathname.startsWith('/restablecer');
 
   const isPublicRoute = pathname === '/' || isPublicAuthRoute;
@@ -48,9 +66,49 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If authenticated and attempting public auth route, redirect to role destination or /inicio
-  if (sessionCookie && isPublicAuthRoute) {
+  // If authenticated and visiting root or public auth routes, redirect to /inicio (H11)
+  if (sessionCookie && (isPublicAuthRoute || pathname === '/')) {
     return NextResponse.redirect(new URL('/inicio', request.url));
+  }
+
+  // Role segregation redirection (Decisions A45, A75, H9)
+  if (sessionCookie) {
+    const role = extractRoleFromJwt(sessionCookie.value);
+    if (role === 'student') {
+      const isTeacherRoute =
+        pathname === '/alumnos' ||
+        pathname.startsWith('/alumnos/') ||
+        pathname === '/actividades' ||
+        pathname.startsWith('/actividades/') ||
+        pathname === '/asignaciones' ||
+        pathname.startsWith('/asignaciones/') ||
+        pathname === '/revision' ||
+        pathname.startsWith('/revision/') ||
+        pathname === '/estadisticas' ||
+        pathname.startsWith('/estadisticas/') ||
+        pathname === '/grupos' ||
+        pathname.startsWith('/grupos/') ||
+        pathname === '/contenidos' ||
+        pathname.startsWith('/contenidos/');
+      if (isTeacherRoute) {
+        return NextResponse.redirect(new URL('/inicio', request.url));
+      }
+    } else if (role === 'teacher') {
+      const isStudentRoute =
+        pathname === '/perfil' ||
+        pathname.startsWith('/perfil/') ||
+        pathname === '/progreso' ||
+        pathname.startsWith('/progreso/') ||
+        pathname === '/juegos' ||
+        pathname.startsWith('/juegos/') ||
+        pathname === '/feedback' ||
+        pathname.startsWith('/feedback/') ||
+        pathname === '/actividad' ||
+        pathname.startsWith('/actividad/');
+      if (isStudentRoute) {
+        return NextResponse.redirect(new URL('/inicio', request.url));
+      }
+    }
   }
 
   return NextResponse.next();

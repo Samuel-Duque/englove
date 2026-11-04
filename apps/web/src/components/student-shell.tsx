@@ -11,7 +11,6 @@ interface StudentShellProps {
 
 export function StudentShell({ children }: StudentShellProps) {
   const [profile, setProfile] = useState<StudentProfileView | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -23,10 +22,6 @@ export function StudentShell({ children }: StudentShellProps) {
         }
       } catch {
         // Fallback to default kids theme if not loaded yet
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
       }
     }
     fetchMe();
@@ -53,13 +48,7 @@ export function StudentShell({ children }: StudentShellProps) {
         level={profile?.student?.level}
       />
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {isLoading ? (
-          <div className="py-16 text-center text-sm opacity-60">
-            Cargando tu espacio…
-          </div>
-        ) : (
-          children
-        )}
+        {children}
       </main>
     </div>
   );

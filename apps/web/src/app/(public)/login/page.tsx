@@ -30,11 +30,23 @@ function LoginForm() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Silent refresh check on load (RF-17, §7)
+  // Silent refresh check on load (RF-17, §7, H12)
   useEffect(() => {
     let isMounted = true;
 
     async function trySilentRefresh() {
+      // Only attempt silent refresh if there is a session hint (H12)
+      const hasSessionHint =
+        typeof window !== 'undefined' &&
+        (document.cookie.includes('englove_session') ||
+          document.cookie.includes('access_token') ||
+          document.cookie.includes('englove_user_logged=1'));
+
+      if (!hasSessionHint) {
+        if (isMounted) setIsCheckingSession(false);
+        return;
+      }
+
       try {
         const res = await fetch(`${apiUrl}/api/v1/auth/refresh`, {
           method: 'POST',
@@ -45,12 +57,15 @@ function LoginForm() {
         });
 
         if (res.ok && isMounted) {
+          document.cookie = 'englove_user_logged=1; path=/; SameSite=Lax';
           const destination = isSafeNextDestination(nextParam) ? nextParam! : '/inicio';
           router.replace(destination);
           return;
+        } else {
+          document.cookie = 'englove_user_logged=; path=/; max-age=0; SameSite=Lax';
         }
       } catch {
-        // Fall through to show login form
+        document.cookie = 'englove_user_logged=; path=/; max-age=0; SameSite=Lax';
       }
 
       if (isMounted) {
@@ -89,6 +104,9 @@ function LoginForm() {
           return;
         }
 
+        if (typeof document !== 'undefined') {
+          document.cookie = 'englove_user_logged=1; path=/; SameSite=Lax';
+        }
         const destination = isSafeNextDestination(nextParam) ? nextParam! : '/inicio';
         router.push(destination);
       } catch {
@@ -177,6 +195,64 @@ function LoginForm() {
             Crear cuenta
           </Link>
         </div>
+
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="mt-6 pt-4 border-t border-dashed border-zinc-200">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 text-center">
+              Credenciales de prueba (Clic para rellenar)
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('profesora@englove.org');
+                  setPassword('Englove2026!');
+                  setErrorMessage(null);
+                }}
+                className="p-2 text-left rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 transition cursor-pointer"
+              >
+                <div className="font-bold">👩‍🏫 Docente</div>
+                <div className="text-[11px] text-blue-700 truncate">profesora@englove.org</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('sofia.kids@englove.org');
+                  setPassword('Estudiante2026!');
+                  setErrorMessage(null);
+                }}
+                className="p-2 text-left rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 transition cursor-pointer"
+              >
+                <div className="font-bold">👧 Alumna (Kids)</div>
+                <div className="text-[11px] text-emerald-700 truncate">sofia.kids@englove.org</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('lucas.kids@englove.org');
+                  setPassword('Estudiante2026!');
+                  setErrorMessage(null);
+                }}
+                className="p-2 text-left rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition cursor-pointer"
+              >
+                <div className="font-bold">👦 Alumno (Kids)</div>
+                <div className="text-[11px] text-amber-700 truncate">lucas.kids@englove.org</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('camila.teens@englove.org');
+                  setPassword('Estudiante2026!');
+                  setErrorMessage(null);
+                }}
+                className="p-2 text-left rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 transition cursor-pointer"
+              >
+                <div className="font-bold">🧑 Alumna (Teens)</div>
+                <div className="text-[11px] text-purple-700 truncate">camila.teens@englove.org</div>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

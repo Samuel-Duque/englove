@@ -1,6 +1,8 @@
 import React, { Suspense } from 'react';
 import { StudentShell } from '../../components/student-shell';
 
+export const instant = false;
+
 export default function StudentLayout({
   children,
 }: {

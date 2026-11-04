@@ -12,10 +12,11 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
+    headless: process.env.CI ? true : process.env.HEADLESS === 'true',
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     launchOptions: {
-      slowMo: process.env.SLOWMO ? parseInt(process.env.SLOWMO, 10) : 800,
+      slowMo: process.env.SLOWMO ? parseInt(process.env.SLOWMO, 10) : 50,
     },
   },
   projects: [

@@ -67,38 +67,33 @@ export function MatchGame({
 
   // Handle pairing action
   const handleLink = (leftId: string, rightId: string) => {
-    setPairs((prev) => {
-      const next = { ...prev };
+    const next = { ...pairs };
 
-      // Free previous assignment of rightId if used by another leftId
-      for (const [lKey, rVal] of Object.entries(next)) {
-        if (rVal === rightId && lKey !== leftId) {
-          delete next[lKey];
-        }
+    // Free previous assignment of rightId if used by another leftId
+    for (const [lKey, rVal] of Object.entries(next)) {
+      if (rVal === rightId && lKey !== leftId) {
+        delete next[lKey];
       }
+    }
 
-      next[leftId] = rightId;
-
-      // Sound & feedback
-      if (solution?.pairs) {
-        const isCorrect = solution.pairs[leftId] === rightId;
-        soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
-      }
-
-      onEvent?.({ itemId: 'pairs', answer: next });
-      return next;
-    });
-
+    next[leftId] = rightId;
+    setPairs(next);
     setSelectedLeftId(null);
+
+    // Sound & feedback
+    if (solution?.pairs) {
+      const isCorrect = solution.pairs[leftId] === rightId;
+      soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
+    }
+
+    onEvent?.({ itemId: 'pairs', answer: next });
   };
 
   const handleUnlink = (leftId: string) => {
-    setPairs((prev) => {
-      const next = { ...prev };
-      delete next[leftId];
-      onEvent?.({ itemId: 'pairs', answer: next });
-      return next;
-    });
+    const next = { ...pairs };
+    delete next[leftId];
+    setPairs(next);
+    onEvent?.({ itemId: 'pairs', answer: next });
   };
 
   const handleComplete = () => {

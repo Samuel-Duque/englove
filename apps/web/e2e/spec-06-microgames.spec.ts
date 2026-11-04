@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
-  test('RF-11: Zona /juegos disponible tras flag games y runner de microjuegos interactivo', async ({
+  test('RF-11: Zona /juegos disponible tras flag games, runner de microjuegos interactivo y reinicio con Jugar de nuevo', async ({
     page,
     context,
   }) => {
@@ -168,8 +168,9 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
       });
     });
 
-    // 3. Navegar a /juegos
-    await page.goto('/juegos');
+    // 3. Probar redirección transparente desde /juegos/:activityId hacia /juegos
+    await page.goto('/juegos/act-game-1');
+    await expect(page).toHaveURL(/\/juegos/);
 
     // Verificar que la pestaña Juegos cargue y muestre la tarjeta
     await expect(page.locator('text=Colors Match Challenge')).toBeVisible({ timeout: 5000 });
@@ -184,5 +185,60 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     await expect(page.locator('text=Azul')).toBeVisible();
     await expect(page.locator('text=Red')).toBeVisible();
     await expect(page.locator('text=Blue')).toBeVisible();
+
+    // 6. Completar partida
+    await page.route('**/api/v1/attempts/att-game-1/complete', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          attempt: {
+            id: 'att-game-1',
+            assignmentId: 'asg-game-1',
+            status: 'graded',
+            score: 5.0,
+          },
+          newBadges: [],
+        },
+      });
+    });
+
+    await page.click('button:has-text("Finalizar")');
+    await expect(page.locator('text=¡Misión completada!')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('button:has-text("Jugar de nuevo")')).toBeVisible();
+  });
+
+  test('RF-11: Zona /juegos cuando feature flag games = false muestra aviso informativo', async ({
+    page,
+    context,
+  }) => {
+    await context.addCookies([
+      { name: 'englove_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'englove_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+    ]);
+
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-e2e-nogames', email: 'nogames@englove.local', name: 'Sin Juegos', role: 'student' },
+          student: { id: 'std-e2e-nogames', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
+          organizationId: 'org-e2e',
+        },
+      });
+    });
+
+    await page.route('**/api/v1/feature-flags', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          flags: { games: false, extra_content: false },
+        },
+      });
+    });
+
+    await page.goto('/juegos');
+    await expect(page.locator('text=Zona de Juegos en preparación')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=La zona de juegos no está habilitada')).toBeVisible();
+    await expect(page.locator('a:has-text("Volver al inicio")')).toBeVisible();
   });
 });

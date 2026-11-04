@@ -20,6 +20,7 @@ const baseEnvSchema = z.object({
   R2_ACCESS_KEY_ID: z.string().min(1, 'R2_ACCESS_KEY_ID is required'),
   R2_SECRET_ACCESS_KEY: z.string().min(1, 'R2_SECRET_ACCESS_KEY is required'),
   R2_BUCKET_NAME: z.string().min(1, 'R2_BUCKET_NAME is required'),
+  R2_ENDPOINT: z.string().optional().default(''),
   R2_PUBLIC_URL: z.string().optional().default(''),
   COOKIE_DOMAIN: z.string().optional().default(''),
   COOKIE_PREFIX: z.string().default('englove_'),

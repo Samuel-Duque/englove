@@ -3,7 +3,10 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Englove — Plataforma en preparación',
+  title: {
+    default: 'Englove — Aprende inglés jugando',
+    template: '%s | Englove',
+  },
   description: 'Plataforma web gamificada para enseñar inglés a niños y adolescentes.',
 };
 

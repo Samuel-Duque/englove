@@ -38,6 +38,7 @@ export class MediaService implements OnModuleInit {
   private readonly bucketName: string;
   private readonly transcodeQueue: string[] = [];
   private isProcessingQueue = false;
+  private readonly isMock: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -47,14 +48,24 @@ export class MediaService implements OnModuleInit {
     const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID') || 'mock-key';
     const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || 'mock-secret';
     this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || 'englove-dev';
+    const r2Endpoint = this.configService.get<string>('R2_ENDPOINT');
+
+    this.isMock =
+      !r2Endpoint &&
+      (accountId.includes('placeholder') ||
+        accountId === 'mock-account' ||
+        accountId === 'dummy');
+
+    const endpoint = r2Endpoint || `https://${accountId}.r2.cloudflarestorage.com`;
 
     this.s3Client = new S3Client({
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      endpoint,
       region: 'auto',
       credentials: {
         accessKeyId,
         secretAccessKey,
       },
+      forcePathStyle: Boolean(r2Endpoint),
     });
   }
 
@@ -175,10 +186,20 @@ export class MediaService implements OnModuleInit {
 
     const expiresSeconds = 600; // 10 minutes (SPEC-05 RF-12)
     let uploadUrl: string;
-    try {
-      uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
-    } catch {
-      uploadUrl = `https://${this.bucketName}.mock-r2/${key}?expires=${expiresSeconds}`;
+    if (this.isMock) {
+      const apiUrl =
+        this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
+        `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
+      uploadUrl = `${apiUrl}/api/v1/media/mock-upload/${assetId}`;
+    } else {
+      try {
+        uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
+      } catch {
+        const apiUrl =
+          this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
+          `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
+        uploadUrl = `${apiUrl}/api/v1/media/mock-upload/${assetId}`;
+      }
     }
 
     const expiresAt = new Date(Date.now() + expiresSeconds * 1000).toISOString();
@@ -226,27 +247,29 @@ export class MediaService implements OnModuleInit {
     }
 
     // Verify object exists in R2 with HeadObject
-    try {
-      await this.s3Client.send(
-        new HeadObjectCommand({
-          Bucket: this.bucketName,
-          Key: asset.key,
-        }),
-      );
-    } catch (err: unknown) {
-      const isNotFound =
-        (err as { name?: string })?.name === 'NotFound' ||
-        (err as { name?: string })?.name === 'NoSuchKey' ||
-        (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode === 404;
+    if (!this.isMock) {
+      try {
+        await this.s3Client.send(
+          new HeadObjectCommand({
+            Bucket: this.bucketName,
+            Key: asset.key,
+          }),
+        );
+      } catch (err: unknown) {
+        const isNotFound =
+          (err as { name?: string })?.name === 'NotFound' ||
+          (err as { name?: string })?.name === 'NoSuchKey' ||
+          (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode === 404;
 
-      if (isNotFound) {
-        throw new ConflictException({
-          statusCode: 409,
-          code: 'MEDIA_NOT_UPLOADED',
-          message: 'La subida no terminó. Intenta enviarla de nuevo',
-        });
+        if (isNotFound) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'MEDIA_NOT_UPLOADED',
+            message: 'La subida no terminó. Intenta enviarla de nuevo',
+          });
+        }
+        // In local dev/test without credentials, we treat simulated head as ok
       }
-      // In local dev/test without credentials, we treat simulated head as ok
     }
 
     // Measure duration
@@ -322,10 +345,20 @@ export class MediaService implements OnModuleInit {
 
     const expiresSeconds = 300; // 5 minutes (SPEC-05 RF-15)
     let url: string;
-    try {
-      url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
-    } catch {
-      url = `https://${this.bucketName}.mock-r2/${key}?expires=${expiresSeconds}`;
+    if (this.isMock) {
+      const apiUrl =
+        this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
+        `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
+      url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
+    } else {
+      try {
+        url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
+      } catch {
+        const apiUrl =
+          this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
+          `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
+        url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
+      }
     }
 
     return {
@@ -370,10 +403,20 @@ export class MediaService implements OnModuleInit {
 
     const expiresSeconds = 300;
     let url: string;
-    try {
-      url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
-    } catch {
-      url = `https://${this.bucketName}.mock-r2/${key}?expires=${expiresSeconds}&download=true`;
+    if (this.isMock) {
+      const apiUrl =
+        this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
+        `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
+      url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
+    } else {
+      try {
+        url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
+      } catch {
+        const apiUrl =
+          this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
+          `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
+        url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
+      }
     }
 
     return {
@@ -436,6 +479,10 @@ export class MediaService implements OnModuleInit {
     });
 
     if (!asset || asset.status !== MediaAssetStatus.ready || asset.converted_key || asset.transcode_failed_at) {
+      return;
+    }
+
+    if (this.isMock) {
       return;
     }
 

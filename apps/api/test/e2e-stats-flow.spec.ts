@@ -93,12 +93,13 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
       return;
     }
 
-    if (!process.env.DATABASE_URL && (await checkPortOpen(5433))) {
-      process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/englove_dev?schema=public';
-    }
+    try {
+      if (!process.env.DATABASE_URL && (await checkPortOpen(5433))) {
+        process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/englove_dev?schema=public';
+      }
 
-    prisma = new PrismaService();
-    await prisma.$connect();
+      prisma = new PrismaService();
+      await prisma.$connect();
 
     const gamificationService = new GamificationService(prisma);
     statsService = new StatsService(prisma, gamificationService);
@@ -459,6 +460,10 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
         occurred_at: new Date(now.getTime() - 25 * 24 * 3600 * 1000),
       },
     });
+    } catch (err) {
+      console.warn('Error conectando a Docker PostgreSQL para E2E de estadísticas:', err);
+      isPostgresAvailable = false;
+    }
   });
 
   afterAll(async () => {

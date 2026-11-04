@@ -18,6 +18,9 @@ import { GameRenderer } from '../../../../components/activities/GameRenderer';
 import { fireCelebrationConfetti } from '../../../../lib/confetti';
 import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
+import { setActiveAttemptState } from '../../../../lib/pwa-manager';
+import { enqueueEvent, enqueueUpload } from '../../../../lib/offline-queue';
+import { OfflineStatusBanner } from '../../../../components/offline-status-banner';
 
 interface ActividadRunnerProps {
   attemptId: string;
@@ -34,6 +37,23 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const [completion, setCompletion] = useState<CompletionView | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [theme, setTheme] = useState<'kids' | 'teens'>('kids');
+  const [isOfflineSaved, setIsOfflineSaved] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>('std-local');
+  const [hasTtsSupport, setHasTtsSupport] = useState(false);
+
+  // Check TTS support (RF-22)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const checkVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        setHasTtsSupport(voices.length > 0 || !('onvoiceschanged' in window.speechSynthesis));
+      };
+      checkVoices();
+      if ('onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = checkVoices;
+      }
+    }
+  }, []);
 
   // Speaking state
   const [mediaId, setMediaId] = useState<string | null>(null);
@@ -175,19 +195,26 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       try {
         const [data, profile] = await Promise.all([
           apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`),
-          apiFetch<{ student?: { ageSegment?: 'kids' | 'teens' } }>('/api/v1/me').catch(() => null),
+          apiFetch<{ user?: { id?: string }; student?: { ageSegment?: 'kids' | 'teens' } }>('/api/v1/me').catch(() => null),
         ]);
         if (isMounted) {
+          if (profile?.user?.id) {
+            setCurrentUserId(profile.user.id);
+          }
           const ageSegment = profile?.student?.ageSegment ?? 'kids';
           setTheme(ageSegment);
           setSoundEnabled(ageSegment === 'kids'); // soundEnabled starts true for kids, false for teens (RF-9)
           setRuntime(data);
           setAnswers(data.answers || {});
           if (data.mediaId) setMediaId(data.mediaId);
+          if (data.attempt.status === AttemptStatus.in_progress) {
+            setActiveAttemptState(true); // RF-9: defer update notices during active attempt
+          }
           if (
             data.attempt.status === AttemptStatus.graded ||
             data.attempt.status === AttemptStatus.pending_review
           ) {
+            setActiveAttemptState(false);
             setCompletion({
               attempt: data.attempt,
               correction: data.correction,
@@ -213,13 +240,14 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     loadAttempt();
     return () => {
       isMounted = false;
+      setActiveAttemptState(false);
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
     };
   }, [attemptId]);
 
-  // Debounced auto-save event emitter
+  // Persistent event emitter (RF-10, Decision 37)
   const sendEvent = useCallback(
     (itemId: string, answer: unknown): Promise<void> => {
       if (!runtime?.attemptToken) return Promise.resolve();
@@ -229,32 +257,15 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           ? crypto.randomUUID()
           : `evt-${Date.now()}-${Math.random()}`;
 
-      const promise = (async () => {
-        try {
-          await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-attempt-token': attemptToken,
-              Origin: window.location.origin,
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              events: [
-                {
-                  clientEventId,
-                  eventType: 'answer_changed',
-                  timestamp: new Date().toISOString(),
-                  itemId,
-                  answer,
-                },
-              ],
-            }),
-          });
-        } catch {
-          // Background auto-save failures are non-fatal
-        }
-      })();
+      // 1. Guardar primero en IndexedDB (RF-10) y vaciar con la cola automática (RF-11); at/createdAt nunca viaja a la API (Decisión 37)
+      const promise = enqueueEvent({
+        userId: currentUserId,
+        attemptId,
+        clientEventId,
+        eventType: 'answered',
+        payload: { itemId, answer },
+        attemptToken,
+      }).then(() => {});
 
       pendingEventsRef.current.add(promise);
       promise.finally(() => {
@@ -262,7 +273,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       });
       return promise;
     },
-    [apiUrl, attemptId, runtime?.attemptToken],
+    [attemptId, runtime?.attemptToken, currentUserId],
   );
 
   const handleAnswerChange = (itemId: string, value: unknown) => {
@@ -273,12 +284,14 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     sendEvent(itemId, value);
   };
 
-  // Text-To-Speech for Kids
+  // Text-To-Speech for Kids prompts (RF-22)
   const speakText = (text: string) => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      // Spanish vs English detection (RF-22)
+      const isSpanish = /[áéíóúñ¿¡]|(\b(selecciona|completa|escucha|arrastra|responde|elige|traduce|escribe|une|haz|marca|graba|instrucción|pregunta|oración)\b)/i.test(text);
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
+      utterance.lang = isSpanish ? 'es-CO' : 'en-US';
       utterance.rate = 0.85;
       window.speechSynthesis.speak(utterance);
     }
@@ -389,12 +402,12 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
 
     setIsSubmitting(true);
+    let finalMediaId: string | null = mediaId;
     try {
       if (pendingEventsRef.current.size > 0) {
         await Promise.allSettled(Array.from(pendingEventsRef.current));
       }
 
-      let finalMediaId = mediaId;
       if (runtime.activity.type === ActivityType.speaking) {
         if (!recordedAudioBlob && !mediaId) {
           alert('Debes grabar un audio antes de entregar la actividad.');
@@ -402,8 +415,18 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           return;
         }
         if (recordedAudioBlob && !mediaId) {
+          const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+          if (isCurrentlyOffline) {
+            throw new TypeError('Network request failed');
+          }
           finalMediaId = await uploadAudioRecording();
           if (!finalMediaId) {
+            const isOfflineNow =
+              (typeof navigator !== 'undefined' && !navigator.onLine) ||
+              Boolean(uploadError);
+            if (isOfflineNow) {
+              throw new TypeError('Network request failed');
+            }
             setIsSubmitting(false);
             return;
           }
@@ -430,6 +453,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
       const compData: CompletionView = await res.json();
       setCompletion(compData);
+      setActiveAttemptState(false);
 
       // Trigger celebration confetti when student scores >= 3.0 (RF-9, ENG-086)
       if (compData.attempt.score !== null && compData.attempt.score !== undefined && compData.attempt.score >= 3.0) {
@@ -439,7 +463,43 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       // Clean local storage upon confirmed completion (RF-13, RF-28)
       await clearLocalRecording(attemptId);
     } catch (err: unknown) {
-      alert((err as Error)?.message || 'No se pudo completar la entrega');
+      const isNetworkError =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        err instanceof TypeError ||
+        Boolean((err as Error)?.message && /network|fetch|offline|failed to fetch/i.test((err as Error).message));
+
+      if (isNetworkError) {
+        // RF-12: Entrega sin conexión. Queda en la cola y muestra mensaje sin nota ficticia.
+        const compEventId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `evt-comp-${Date.now()}`;
+        await enqueueEvent({
+          userId: currentUserId,
+          attemptId,
+          clientEventId: compEventId,
+          eventType: 'completed',
+          payload: { ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}) },
+          attemptToken,
+        });
+
+        if (recordedAudioBlob) {
+          await enqueueUpload({
+            userId: currentUserId,
+            attemptId,
+            blob: recordedAudioBlob,
+            mimeType: recordedAudioBlob.type || 'audio/webm',
+            durationMs: recordingSeconds * 1000,
+            mediaId: finalMediaId || mediaId || null,
+            attemptToken,
+          });
+        }
+
+        setIsOfflineSaved(true);
+        setActiveAttemptState(false);
+      } else {
+        alert((err as Error)?.message || 'No se pudo completar la entrega');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -493,8 +553,47 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const { activity, attempt } = runtime;
   const isFinished =
     completion !== null ||
+    isOfflineSaved ||
     attempt.status === AttemptStatus.graded ||
     attempt.status === AttemptStatus.pending_review;
+
+  // Render Offline Delivery Receipt (RF-12, §7)
+  if (isOfflineSaved) {
+    const isKids = theme === 'kids';
+    return (
+      <div className="max-w-2xl mx-auto py-8">
+        <div className="rounded-3xl border border-amber-200 bg-white p-8 sm:p-10 text-center shadow-lg">
+          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
+            💾
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-amber-950 mb-3">
+            {isKids
+              ? '¡Listo! Tu trabajo quedó guardado y se enviará solo cuando vuelva el internet.'
+              : 'Guardado en este dispositivo. Se enviará cuando vuelva la conexión.'}
+          </h2>
+          <p className="text-sm text-zinc-600 max-w-md mx-auto mb-8">
+            {isKids
+              ? 'No te preocupes por tu progreso: tus respuestas están seguras en esta tablet.'
+              : 'Las respuestas se sincronizarán automáticamente con el servidor al restablecerse la red.'}
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <Link
+              href="/inicio"
+              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+            >
+              Ir a Mis Misiones
+            </Link>
+            <Link
+              href="/progreso"
+              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+            >
+              Ver Mi Progreso
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Render Completion Modal/Card
   if (completion) {
@@ -569,20 +668,20 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                 type="button"
                 onClick={handlePlayAgain}
                 disabled={isSubmitting}
-                className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all disabled:opacity-50"
+                className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
               >
                 🎮 {isSubmitting ? 'Iniciando…' : 'Jugar de nuevo'}
               </button>
             )}
             <Link
               href="/inicio"
-              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all"
+              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
             >
               Ir a Mis Misiones
             </Link>
             <Link
               href="/progreso"
-              className="rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all"
+              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
             >
               Ver Mi Progreso
             </Link>
@@ -605,6 +704,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   return (
     <div className="max-w-3xl mx-auto py-6 space-y-6">
+      <OfflineStatusBanner />
+
       {/* Activity Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-amber-200/80 shadow-xs">
         <div>
@@ -639,7 +740,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             <button
               type="button"
               onClick={() => setSoundEnabled((prev) => !prev)}
-              className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
               title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
               aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
             >
@@ -648,15 +749,18 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => speakText(activity.title)}
-            className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
-            title="Escuchar título en inglés"
-          >
-            <span>🗣️</span>
-            <span>Escuchar</span>
-          </button>
+          {hasTtsSupport && (
+            <button
+              type="button"
+              onClick={() => speakText(activity.title)}
+              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+              title="Escuchar título"
+              aria-label="Escuchar título"
+            >
+              <span>🗣️</span>
+              <span>Escuchar</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -675,13 +779,16 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-amber-800">Pregunta {itemIdx + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => speakText(item.prompt)}
-                    className="text-xs font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1"
-                  >
-                    🔊 Escuchar
-                  </button>
+                  {hasTtsSupport && (
+                    <button
+                      type="button"
+                      onClick={() => speakText(item.prompt)}
+                      className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+                      aria-label={`Escuchar pregunta ${itemIdx + 1}`}
+                    >
+                      <span aria-hidden="true">🔊</span> Escuchar
+                    </button>
+                  )}
                 </div>
                 <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
                   {item.prompt}
@@ -709,7 +816,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                               const updatedItem = { ...itemAnswers, [blank.id]: e.target.value };
                               handleAnswerChange(item.id, updatedItem);
                             }}
-                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
                           >
                             <option value="">-- Elige una opción --</option>
                             {blank.options.map((opt) => (
@@ -730,7 +837,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                               handleAnswerChange(item.id, updatedItem);
                             }}
                             placeholder="Escribe tu respuesta…"
-                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
                           />
                         )}
                       </div>
@@ -759,13 +866,16 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     <span className="text-xs font-extrabold text-amber-800">
                       Ítem #{itemIdx + 1} (Peso: {item.weight})
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => speakText(item.prompt)}
-                      className="text-xs font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1"
-                    >
-                      🔊 Escuchar
-                    </button>
+                    {hasTtsSupport && (
+                      <button
+                        type="button"
+                        onClick={() => speakText(item.prompt)}
+                        className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+                        aria-label={`Escuchar ítem ${itemIdx + 1}`}
+                      >
+                        <span aria-hidden="true">🔊</span> Escuchar
+                      </button>
+                    )}
                   </div>
                   <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
                     {item.prompt}
@@ -789,7 +899,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                                 const updatedItem = { ...itemAnswers, [b.id]: e.target.value };
                                 handleAnswerChange(item.id, updatedItem);
                               }}
-                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
                             >
                               <option value="">-- Elige una opción --</option>
                               {b.options.map((opt) => (
@@ -810,7 +920,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                                 handleAnswerChange(item.id, updatedItem);
                               }}
                               placeholder="Tu respuesta…"
-                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
                             />
                           )}
                         </div>
@@ -826,13 +936,25 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         {/* Open Question Type */}
         {activity.type === ActivityType.open_question && (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-1">
-                Pregunta abierta
-              </h3>
-              <p className="text-base font-semibold leading-relaxed">
-                {openQConfig?.prompt || 'Escribe tu respuesta a continuación en inglés:'}
-              </p>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-1">
+                  Pregunta abierta
+                </h3>
+                <p className="text-base font-semibold leading-relaxed">
+                  {openQConfig?.prompt || 'Escribe tu respuesta a continuación en inglés:'}
+                </p>
+              </div>
+              {hasTtsSupport && (
+                <button
+                  type="button"
+                  onClick={() => speakText(openQConfig?.prompt || 'Escribe tu respuesta a continuación en inglés:')}
+                  className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shrink-0 cursor-pointer"
+                  aria-label="Escuchar consigna"
+                >
+                  <span aria-hidden="true">🔊</span> Escuchar
+                </button>
+              )}
             </div>
             <textarea
               id="open-question-answer"
@@ -857,13 +979,16 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               <p className="text-lg font-bold">
                 {speakingConfig?.prompt || 'Graba tu voz leyendo la oración en voz alta.'}
               </p>
-              <button
-                type="button"
-                onClick={() => speakText(speakingConfig?.prompt || '')}
-                className="mt-2 text-xs font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5"
-              >
-                🔊 Escuchar modelo
-              </button>
+              {hasTtsSupport && (
+                <button
+                  type="button"
+                  onClick={() => speakText(speakingConfig?.prompt || '')}
+                  className="mt-2 text-xs font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-xl inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+                  aria-label="Escuchar modelo"
+                >
+                  <span aria-hidden="true">🔊</span> Escuchar modelo
+                </button>
+              )}
             </div>
 
             {/* Recorder Controls */}
@@ -891,7 +1016,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                       type="button"
                       onClick={startRecording}
                       disabled={isUploadingAudio}
-                      className="rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center gap-2"
+                      className="rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer disabled:opacity-50"
                     >
                       <span>🎙️</span>
                       <span>{recordedAudioBlob ? 'Volver a grabar' : 'Empezar a grabar'}</span>
@@ -900,7 +1025,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     <button
                       type="button"
                       onClick={stopRecording}
-                      className="rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center gap-2"
+                      className="rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
                     >
                       <span>⏹️</span>
                       <span>Detener grabación</span>
@@ -924,7 +1049,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                       type="button"
                       onClick={uploadAudioRecording}
                       disabled={isUploadingAudio}
-                      className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 shadow-xs transition-colors"
+                      className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 min-h-[48px] min-w-[48px] shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
                     >
                       {isUploadingAudio ? 'Reintentando…' : 'Reintentar envío'}
                     </button>
@@ -966,7 +1091,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               type="button"
               disabled={isSubmitting || isUploadingAudio}
               onClick={() => handleCompleteAttempt()}
-              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-8 py-3.5 text-base shadow-md transition-all disabled:opacity-50 min-h-[48px]"
+              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-8 py-3.5 text-base shadow-md transition-all disabled:opacity-50 min-h-[48px] min-w-[48px] focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
             >
               {isSubmitting ? 'Entregando actividad…' : 'Entregar actividad ✨'}
             </button>

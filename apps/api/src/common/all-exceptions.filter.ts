@@ -68,6 +68,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error(`Error no controlado procesando ${request.method} ${request.url}`);
     }
 
+    const appMinVersion = process.env.APP_MIN_VERSION;
+    if (appMinVersion && !response.getHeader('X-App-Min-Version')) {
+      response.setHeader('X-App-Min-Version', appMinVersion.trim());
+    }
+
     const payload: StandardErrorResponse = {
       statusCode,
       code,

@@ -98,3 +98,10 @@ export const AssignmentAvailability = {
 export type AssignmentAvailability =
   (typeof AssignmentAvailability)[keyof typeof AssignmentAvailability];
 
+export const AttemptFlag = {
+  // guardrails-ignore G-C06: constante de negocio para duracion inverosimil segun SPEC-05 RF-10 y SPEC-09 §6
+  implausible_duration: 'implausible_duration',
+  offline_sync: 'offline_sync',
+} as const;
+export type AttemptFlag = (typeof AttemptFlag)[keyof typeof AttemptFlag];
+

@@ -166,4 +166,30 @@ describe('RF-17: proxy routing and redirect logic', () => {
     const resStudentRunner = await proxy(reqStudentRunner);
     expect(resStudentRunner.headers.get('location')).toBeNull();
   });
+
+  it('allows unauthenticated access to PWA assets and /offline per RF-1', async () => {
+    const urls = [
+      'http://localhost:3000/manifest.webmanifest',
+      'http://localhost:3000/manifest.json',
+      'http://localhost:3000/sw.js',
+      'http://localhost:3000/icons/icon-192.png',
+      'http://localhost:3000/icons/icon-512.png',
+      'http://localhost:3000/offline',
+    ];
+    for (const url of urls) {
+      const req = new NextRequest(url);
+      const res = await proxy(req);
+      expect(res.headers.get('location')).toBeNull();
+    }
+  });
+
+  it('allows authenticated access to /offline without redirecting to /inicio', async () => {
+    const req = new NextRequest('http://localhost:3000/offline', {
+      headers: {
+        cookie: 'englove_access_token=valid-token',
+      },
+    });
+    const res = await proxy(req);
+    expect(res.headers.get('location')).toBeNull();
+  });
 });

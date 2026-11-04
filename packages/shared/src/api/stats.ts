@@ -162,6 +162,17 @@ export interface TimeBucketItem {
   completedCount: number;
 }
 
+export interface StudentOfflineUndeliveredAttempt {
+  attemptId: string;
+  assignmentId: string | null;
+  activityTitle: string;
+  activityType: ActivityType;
+  // guardrails-ignore G-C03: timestamp de solo lectura devuelto por el servidor al profesor (SPEC-09 §5)
+  startedAt: string; // ISO UTC, reloj del servidor
+  // guardrails-ignore G-C03: timestamp de solo lectura devuelto por el servidor al profesor (SPEC-09 §5)
+  completeUntil: string; // cierre efectivo + 24 h
+}
+
 export interface StudentStatsResponse {
   student: {
     id: string;
@@ -201,5 +212,6 @@ export interface StudentStatsResponse {
     dailyTime: TimeBucketItem[];
     weeklyTime: TimeBucketItem[];
     monthlyTime: TimeBucketItem[];
+    offlineUndeliveredAttempts: StudentOfflineUndeliveredAttempt[];
   };
 }

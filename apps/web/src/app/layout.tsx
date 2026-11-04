@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
@@ -8,6 +8,21 @@ export const metadata: Metadata = {
     template: '%s | Englove',
   },
   description: 'Plataforma web gamificada para enseñar inglés a niños y adolescentes.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: '/favicon.ico',
+    apple: [
+      {
+        url: '/icons/apple-touch-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
+      },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#4f46e5',
 };
 
 export default function RootLayout({

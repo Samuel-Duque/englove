@@ -44,10 +44,13 @@ async function bootstrap() {
   // Global safe exception filter returning { statusCode, code, message } (RF-5, Rule G-C10)
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // CORS configuration with explicit origin allowlist (Rule G-B11)
+  const appMinVersion = configService.get<string>('APP_MIN_VERSION');
+
+  // CORS configuration with explicit origin allowlist (Rule G-B11, SPEC-09 RF-7)
   app.enableCors({
     origin: [webBaseUrl],
     credentials: true,
+    exposedHeaders: appMinVersion ? ['X-App-Min-Version'] : undefined,
   });
 
   // Global prefix /api/v1 with root exceptions for /health and /docs (Rule G-C07, Decision 83)

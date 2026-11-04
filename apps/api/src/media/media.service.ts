@@ -138,23 +138,41 @@ export class MediaService implements OnModuleInit {
       });
     }
 
-    if (attempt.status !== 'in_progress') {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'ATTEMPT_NOT_IN_PROGRESS',
-        message: 'El intento no está en curso',
-      });
-    }
-
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ?? attempt.assignment.due_at;
     const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
 
     if (new Date() > completeUntil) {
+      if (
+        attempt.status === 'in_progress' ||
+        attempt.status === ('abandoned' as import('@englove/shared').AttemptStatus)
+      ) {
+        const currentFlags = attempt.flags || [];
+        const newFlags = currentFlags.includes('offline_sync')
+          ? currentFlags
+          : [...currentFlags, 'offline_sync'];
+
+        await this.prisma.attempt.update({
+          where: { id: attempt.id },
+          data: {
+            status: 'abandoned',
+            flags: newFlags,
+          },
+        });
+      }
+
       throw new ConflictException({
         statusCode: 409,
         code: 'ATTEMPT_CLOSED',
         message: 'La actividad ya está cerrada',
+      });
+    }
+
+    if (attempt.status !== 'in_progress') {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ATTEMPT_NOT_IN_PROGRESS',
+        message: 'El intento no está en curso',
       });
     }
 

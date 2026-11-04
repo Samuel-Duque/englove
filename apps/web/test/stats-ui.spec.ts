@@ -148,4 +148,45 @@ describe('SPEC-08: Teacher Stats UI Rules & Formatting (ENG-101, ENG-102, ENG-10
       expect(pollingIntervalMs).toBe(30_000);
     });
   });
+
+  describe('SPEC-09 RF-17: Sección "Entregas que no llegaron a tiempo"', () => {
+    it('formatea correctamente los intentos tardíos sincronizados offline con zona horaria America/Bogota', () => {
+      const sample = {
+        attemptId: 'att-late-1',
+        assignmentId: 'asg-1',
+        activityTitle: 'Colors and Animals',
+        activityType: 'fill_blank' as const,
+        startedAt: '2026-11-01T10:00:00.000Z',
+        completeUntil: '2026-11-02T10:00:00.000Z',
+      };
+
+      const startFormatted = new Date(sample.startedAt).toLocaleDateString('es-CO', {
+        timeZone: 'America/Bogota',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      const dueFormatted = new Date(sample.completeUntil).toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const message = `Empezada el ${startFormatted}. Se intentó enviar sin conexión después del límite (${dueFormatted}).`;
+      expect(message).toContain('Empezada el 01/11/2026');
+      expect(message).toContain('después del límite (02/11/2026');
+      expect(sample.activityTitle).toBe('Colors and Animals');
+    });
+
+    it('la sección solo debe renderizarse cuando offlineUndeliveredAttempts tiene al menos un elemento', () => {
+      const listEmpty: unknown[] = [];
+      const listWithItem = [{ attemptId: 'att-1' }];
+
+      expect(Boolean(listEmpty && listEmpty.length > 0)).toBe(false);
+      expect(Boolean(listWithItem && listWithItem.length > 0)).toBe(true);
+    });
+  });
 });

@@ -435,22 +435,17 @@ export class AttemptsService {
       attempt.previous_attempt?.retry_extend_until ?? attempt.assignment.due_at;
     const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
 
-    // Verify token authentic and not expired
-    this.verifyAttemptToken(token, attempt.id, studentId, organizationId, completeUntil);
+    // Verify token authentic (signature and claims)
+    this.verifyAttemptTokenSignature(token, attempt.id, studentId, organizationId);
+
+    // Check expiration and mark offline_sync if late (SPEC-09 RF-16)
+    await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil);
 
     if (attempt.status !== AttemptStatus.in_progress) {
       throw new ConflictException({
         statusCode: 409,
         code: 'ATTEMPT_NOT_IN_PROGRESS',
         message: 'El intento ya no admite cambios',
-      });
-    }
-
-    if (new Date() > completeUntil) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'ATTEMPT_CLOSED',
-        message: 'La actividad ya está cerrada',
       });
     }
 
@@ -562,27 +557,22 @@ export class AttemptsService {
       attempt.previous_attempt?.retry_extend_until ?? attempt.assignment.due_at;
     const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
 
-    // Verify token
-    this.verifyAttemptToken(token, attempt.id, studentId, organizationId, completeUntil);
+    // Verify token authentic (signature and claims)
+    this.verifyAttemptTokenSignature(token, attempt.id, studentId, organizationId);
 
     // If already finished and within tolerance: idempotent return of completion receipt (RF-8)
     if (attempt.status === AttemptStatus.graded || attempt.status === AttemptStatus.pending_review) {
       return this.buildExistingCompletionView(attempt, attempt.assignment.activity);
     }
 
+    // Check expiration and mark offline_sync if late (SPEC-09 RF-16)
+    await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil);
+
     if (attempt.status !== AttemptStatus.in_progress) {
       throw new ConflictException({
         statusCode: 409,
         code: 'ATTEMPT_NOT_IN_PROGRESS',
         message: 'El intento ya no admite cambios',
-      });
-    }
-
-    if (new Date() > completeUntil) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'ATTEMPT_CLOSED',
-        message: 'La actividad ya está cerrada',
       });
     }
 
@@ -1074,12 +1064,11 @@ export class AttemptsService {
     );
   }
 
-  private verifyAttemptToken(
+  private verifyAttemptTokenSignature(
     token: string,
     attemptId: string,
     studentId: string,
     organizationId: string,
-    completeUntil: Date,
   ): void {
     if (!token) {
       throw new UnauthorizedException({
@@ -1114,13 +1103,38 @@ export class AttemptsService {
         message: 'Token de intento discordante',
       });
     }
+  }
 
-    // Check expiration against completeUntil
+  /**
+   * Helper that checks if submission is past completeUntil and marks offline_sync if applicable (SPEC-09 RF-16).
+   */
+  private async checkLateSubmissionAndMarkOfflineSync(
+    attempt: { id: string; status: AttemptStatus; flags: string[] },
+    completeUntil: Date,
+  ): Promise<void> {
     if (new Date() > completeUntil) {
+      if (
+        attempt.status === AttemptStatus.in_progress ||
+        attempt.status === AttemptStatus.abandoned
+      ) {
+        const currentFlags = attempt.flags || [];
+        const newFlags = currentFlags.includes('offline_sync')
+          ? currentFlags
+          : [...currentFlags, 'offline_sync'];
+
+        await this.prisma.attempt.update({
+          where: { id: attempt.id },
+          data: {
+            status: AttemptStatus.abandoned,
+            flags: newFlags,
+          },
+        });
+      }
+
       throw new ConflictException({
         statusCode: 409,
         code: 'ATTEMPT_CLOSED',
-        message: 'La ventana de entrega del intento ha expirado',
+        message: 'La actividad ya está cerrada',
       });
     }
   }

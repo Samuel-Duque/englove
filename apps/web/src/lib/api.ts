@@ -1,3 +1,5 @@
+import { checkAppMinVersion } from './pwa-manager';
+
 export interface ApiErrorResponse {
   statusCode: number;
   code: string;
@@ -39,6 +41,12 @@ export async function apiFetch<T>(
     headers,
     credentials: 'include',
   });
+
+  // Check minimum required version header from API (RF-7)
+  const minVersion = response.headers.get('x-app-min-version');
+  if (minVersion && typeof window !== 'undefined') {
+    checkAppMinVersion(minVersion);
+  }
 
   if (response.status === 204) {
     return undefined as unknown as T;

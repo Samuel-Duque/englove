@@ -25,6 +25,7 @@ import {
   StudentWeekCalendarItem,
   TimeBucketItem,
   StudentStatsResponse,
+  StudentOfflineUndeliveredAttempt,
 } from '@englove/shared';
 import {
   StatsOverviewQueryDto,
@@ -1403,6 +1404,40 @@ export class StatsService {
     const completionRatePercent =
       assignedCount > 0 ? this.round1((completedAssignedCount / assignedCount) * 100) : null;
 
+    // Offline undelivered attempts (SPEC-09 RF-17)
+    const offlineSyncAttempts = await this.prisma.attempt.findMany({
+      where: {
+        organization_id: organizationId,
+        student_id: studentId,
+        status: AttemptStatus.abandoned,
+        flags: { has: 'offline_sync' },
+        started_at: { gte: from, lte: to },
+      },
+      include: {
+        assignment: {
+          include: { activity: true },
+        },
+        previous_attempt: true,
+      },
+      orderBy: { started_at: 'desc' },
+    });
+
+    const offlineUndeliveredAttempts: StudentOfflineUndeliveredAttempt[] = offlineSyncAttempts.map((att) => {
+      const effectiveDueAt =
+        att.previous_attempt?.retry_extend_until ?? att.assignment?.due_at ?? att.started_at;
+      const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+      return {
+        attemptId: att.id,
+        assignmentId: att.assignment_id,
+        activityTitle: att.assignment?.activity?.title ?? 'Actividad',
+        activityType: att.assignment?.activity?.type ?? ActivityType.fill_blank,
+        // guardrails-ignore G-C03: timestamp de solo lectura asignado por el servidor
+        startedAt: att.started_at.toISOString(),
+        // guardrails-ignore G-C03: timestamp de solo lectura calculado por el servidor
+        completeUntil: completeUntil.toISOString(),
+      };
+    });
+
     return {
       student: {
         id: student.id,
@@ -1445,6 +1480,7 @@ export class StatsService {
         dailyTime,
         weeklyTime,
         monthlyTime,
+        offlineUndeliveredAttempts,
       },
     };
   }

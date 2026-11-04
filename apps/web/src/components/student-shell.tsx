@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { StudentNav } from './student-nav';
+import { OfflineStatusBanner } from './offline-status-banner';
 import { apiFetch } from '../lib/api';
+import { purgeOtherUsersEntries } from '../lib/offline-queue';
 import type { StudentProfileView } from '@englove/shared';
 
 interface StudentShellProps {
@@ -19,6 +21,9 @@ export function StudentShell({ children }: StudentShellProps) {
         const data = await apiFetch<StudentProfileView>('/api/v1/me');
         if (isMounted) {
           setProfile(data);
+          if (data?.user?.id) {
+            void purgeOtherUsersEntries(data.user.id);
+          }
         }
       } catch {
         // Fallback to default kids theme if not loaded yet
@@ -47,6 +52,7 @@ export function StudentShell({ children }: StudentShellProps) {
         ageSegment={ageSegment}
         level={profile?.student?.level}
       />
+      <OfflineStatusBanner />
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </main>

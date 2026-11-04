@@ -29,6 +29,10 @@ const baseEnvSchema = z.object({
   MAIL_FROM: z.string().min(1, 'MAIL_FROM is required'),
   RESEND_API_KEY: z.string().optional().default(''),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').default('englove-dev-jwt-secret-min-32-chars-long-local-secret!'),
+  APP_MIN_VERSION: z
+    .string()
+    .regex(/^\d+\.\d+\.\d+$/, 'APP_MIN_VERSION must be valid SemVer (MAJOR.MINOR.PATCH)')
+    .optional(),
 });
 
 export type ValidatedEnv = z.infer<typeof baseEnvSchema>;

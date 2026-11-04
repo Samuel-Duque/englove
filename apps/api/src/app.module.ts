@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnvironment } from './config/env.validation';
+import { AppMinVersionMiddleware } from './common/middleware/app-min-version.middleware';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
@@ -92,4 +93,8 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AppMinVersionMiddleware).forRoutes('*');
+  }
+}

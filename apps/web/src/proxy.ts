@@ -30,7 +30,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
-    /\.(?:ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot|webp|map|txt)$/i.test(pathname)
+    pathname.startsWith('/icons/') ||
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    /\.(?:ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot|webp|map|txt|webmanifest|json)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
@@ -49,7 +53,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     pathname.startsWith('/recuperar') ||
     pathname.startsWith('/restablecer');
 
-  const isPublicRoute = pathname === '/' || isPublicAuthRoute;
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname === '/offline' ||
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    pathname.startsWith('/icons/') ||
+    isPublicAuthRoute;
 
   // If unauthenticated and attempting private route, redirect to login with safe next parameter (RF-17)
   if (!sessionCookie && !isPublicRoute) {

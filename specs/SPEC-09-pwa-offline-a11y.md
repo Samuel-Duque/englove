@@ -2,11 +2,11 @@
 
 | Campo                | Valor |
 | -------------------- | ----- |
-| Estado               | En revisión |
+| Estado               | Verificada |
 | Etapa                | 9 — PWA, offline y accesibilidad |
 | Tareas               | ENG-110, ENG-111, ENG-112, ENG-113 |
-| Referencias          | CONTEXT §2.4, §3, §5.2, §9, §10, §11.2, §12, §15, §16 · architecture §3.1, §3.6–§3.8, §7.5, §7.6, §8.2–§8.5, §10, §11.3, §12, §13 · decisiones 12, 20 (A2, A10, A12, A29), 37, 38, 51, 58, 60, 61, 64, 85, 87, 105, 111 · pbp Etapa 9 · SPEC-02 RF-18 · SPEC-05 RF-7, RF-11, RF-13, RF-29 · SPEC-08 RF-10 |
-| Aprobada por / fecha | — |
+| Referencias          | CONTEXT §2.4, §3, §5.2, §9, §10, §11.2, §12, §15, §16 · architecture §3.1, §3.6–§3.8, §7.5, §7.6, §8.2–§8.5, §10, §11.3, §12, §13 · decisiones 12, 20 (A2, A10, A12, A29), 37, 38, 51, 58, 60, 61, 64, 85, 87, 105, 111, 116–123 · pbp Etapa 9 · SPEC-02 RF-18 · SPEC-05 RF-7, RF-11, RF-13, RF-29 · SPEC-08 RF-10 |
+| Aprobada por / fecha | Sebastián Gómez / 2026-11-04 |
 
 ## 1. Contexto y objetivo
 
@@ -327,3 +327,4 @@ Sin P-n asignados a esta spec (CONTEXT §15). El líder del proyecto respondió 
 | Fecha | Cambio | Motivo |
 | --- | --- | --- |
 | 2026-11-01 | Creación del borrador con 24 RF y respuestas del líder a Q-01 a Q-08; propuesta En revisión | Tarea SPEC-09 del taskboard |
+| 2026-11-04 | Implementación de ENG-110, ENG-111, ENG-112 y ENG-113; verificación de 24 RFs (unitarios, E2E con axe, informe en tablet real); estado pasa a Verificada | Finalización de Etapa 9 y pase de calidad |

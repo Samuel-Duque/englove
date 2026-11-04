@@ -51,6 +51,22 @@ export async function clearSharedDeviceSession(
     }
   }
 
+  // Clear non-static entries from Cache Storage (RF-5)
+  if (typeof window !== 'undefined' && 'caches' in window) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.map(async (key) => {
+          if (!key.startsWith('englove-static-')) {
+            await caches.delete(key);
+          }
+        }),
+      );
+    } catch {
+      // Ignore
+    }
+  }
+
   // Clear session storage & session indicators
   if (typeof window !== 'undefined') {
     try {

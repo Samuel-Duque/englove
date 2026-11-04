@@ -12,6 +12,7 @@ import {
   MediaAssetStatus,
   AuditAction,
   JobRunStatus,
+  AttemptFlag,
 } from '../src/enums';
 import { toPublicConfig } from '../src/activities/registry';
 
@@ -120,5 +121,14 @@ describe('RF-13: enums coinciden y DTOs no aceptan timestamps ni score del alumn
     const completeDto = { clientFinishedNotice: true };
     expect((completeDto as Record<string, unknown>).finishedAt).toBeUndefined();
     expect((completeDto as Record<string, unknown>).score).toBeUndefined();
+  });
+
+  // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-09 §6
+  it('AttemptFlag contains exactly implausible_duration and offline_sync (SPEC-09 §6)', () => {
+    expect(Object.values(AttemptFlag).sort()).toEqual([
+      // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-09 §6
+      'implausible_duration',
+      'offline_sync',
+    ]);
   });
 });

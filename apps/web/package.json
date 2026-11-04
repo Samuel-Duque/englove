@@ -29,6 +29,7 @@
     "vinext": "^1.2.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@cloudflare/vite-plugin": "^1.66.0",
     "@cloudflare/workers-types": "^4.20250224.0",
     "@englove/eslint-config": "workspace:*",

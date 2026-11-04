@@ -3,6 +3,7 @@
 import React, { useState, use, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { AlertTriangle } from 'lucide-react';
 import {
   StudentStatsResponse,
   WeekCalendarStatus,
@@ -395,7 +396,7 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
                   Por Tipo de Actividad
                 </h4>
                 <div className="space-y-2">
-                  {data.performance.byActivityType.map((t) => (
+                  {(data.performance.byActivityType || []).map((t) => (
                     <div
                       key={t.type}
                       className="flex items-center justify-between text-xs py-1 border-b border-zinc-100 last:border-0"
@@ -415,7 +416,7 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
                   Por Mecánica de Juego
                 </h4>
                 <div className="space-y-2">
-                  {data.performance.byGameMechanic.map((m) => (
+                  {(data.performance.byGameMechanic || []).map((m) => (
                     <div
                       key={m.mechanic}
                       className="flex items-center justify-between text-xs py-1 border-b border-zinc-100 last:border-0"
@@ -435,7 +436,7 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
                   Por Nivel MCER
                 </h4>
                 <div className="space-y-2">
-                  {data.performance.byLevel.map((l) => (
+                  {(data.performance.byLevel || []).map((l) => (
                     <div
                       key={l.level}
                       className="flex items-center justify-between text-xs py-1 border-b border-zinc-100 last:border-0"
@@ -622,6 +623,50 @@ function StudentDetailContent({ studentId }: { studentId: string }) {
                 </table>
               </div>
             </div>
+
+            {/* Entregas que no llegaron a tiempo (RF-17, SPEC-09) */}
+            {data.consistency.offlineUndeliveredAttempts && data.consistency.offlineUndeliveredAttempts.length > 0 && (
+              <div
+                data-testid="offline-undelivered-attempts-section"
+                className="bg-amber-50/60 border border-amber-200 rounded-xl p-5 shadow-xs space-y-3"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" aria-hidden="true" />
+                  <h3 className="text-sm font-bold text-zinc-900">
+                    Entregas que no llegaron a tiempo
+                  </h3>
+                </div>
+                <div className="divide-y divide-amber-200/60">
+                  {data.consistency.offlineUndeliveredAttempts.map((attempt) => {
+                    const startFormatted = new Date(attempt.startedAt).toLocaleDateString('es-CO', {
+                      timeZone: 'America/Bogota',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    });
+                    const dueFormatted = new Date(attempt.completeUntil).toLocaleString('es-CO', {
+                      timeZone: 'America/Bogota',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                    return (
+                      <div
+                        key={attempt.attemptId}
+                        className="py-2.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs"
+                      >
+                        <span className="font-semibold text-zinc-900">{attempt.activityTitle}</span>
+                        <span className="text-zinc-700">
+                          Empezada el {startFormatted}. Se intentó enviar sin conexión después del límite ({dueFormatted}).
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

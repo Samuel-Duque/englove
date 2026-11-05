@@ -13,36 +13,51 @@ interface StudentNavProps {
   ageSegment?: 'kids' | 'teens';
   level?: string | null;
   gamesEnabled?: boolean;
+  extraContentEnabled?: boolean;
 }
 
-export function StudentNav({ studentName, ageSegment = 'kids', level, gamesEnabled }: StudentNavProps) {
+export function StudentNav({
+  studentName,
+  ageSegment = 'kids',
+  level,
+  gamesEnabled,
+  extraContentEnabled,
+}: StudentNavProps) {
   const pathname = usePathname();
   const [isLoggingOut, startLogout] = useTransition();
   const [gamesOn, setGamesOn] = React.useState(gamesEnabled ?? false);
+  const [extraContentOn, setExtraContentOn] = React.useState(extraContentEnabled ?? false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [isAttemptingFlush, setIsAttemptingFlush] = useState(false);
 
   React.useEffect(() => {
-    if (gamesEnabled !== undefined) {
+    if (gamesEnabled !== undefined && extraContentEnabled !== undefined) {
       setGamesOn(gamesEnabled);
+      setExtraContentOn(extraContentEnabled);
       return;
     }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     fetch(`${apiUrl}/api/v1/feature-flags`, { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.flags?.games !== undefined) {
+        if (data?.flags?.games !== undefined && gamesEnabled === undefined) {
           setGamesOn(Boolean(data.flags.games));
+        }
+        if (data?.flags?.extra_content !== undefined && extraContentEnabled === undefined) {
+          setExtraContentOn(Boolean(data.flags.extra_content));
         }
       })
       .catch(() => {});
-  }, [gamesEnabled]);
+  }, [gamesEnabled, extraContentEnabled]);
 
   const navItems = [
-    { label: 'Inicio', href: '/inicio', icon: '🏠' },
-    ...(gamesOn ? [{ label: 'Juegos', href: '/juegos', icon: '🎮' }] : []),
-    { label: 'Progreso', href: '/progreso', icon: '⭐' },
-    { label: 'Feedback', href: '/feedback', icon: '💬' },
+    { label: 'Inicio', href: '/inicio', icon: '🏠', ariaLabel: undefined },
+    ...(gamesOn ? [{ label: 'Juegos', href: '/juegos', icon: '🎮', ariaLabel: undefined }] : []),
+    { label: 'Progreso', href: '/progreso', icon: '⭐', ariaLabel: undefined },
+    { label: 'Feedback', href: '/feedback', icon: '💬', ariaLabel: undefined },
+    ...(extraContentOn
+      ? [{ label: 'Extra', href: '/extra', icon: '🔗', ariaLabel: 'Contenido extra' }]
+      : []),
   ];
 
   const performLogout = () => {
@@ -117,7 +132,7 @@ export function StudentNav({ studentName, ageSegment = 'kids', level, gamesEnabl
             >
               🌟
             </span>
-            <span className={isKids ? 'text-amber-900' : 'text-zinc-100'}>
+            <span className={isKids ? 'text-amber-950 font-black' : 'text-zinc-100 font-black'}>
               Englove
             </span>
           </Link>
@@ -129,14 +144,15 @@ export function StudentNav({ studentName, ageSegment = 'kids', level, gamesEnabl
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={item.ariaLabel}
                   className={`flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 ${
                     isActive
                       ? isKids
                         ? 'bg-amber-200/80 text-amber-950 shadow-xs'
                         : 'bg-zinc-800 text-white shadow-xs'
                       : isKids
-                        ? 'text-amber-900/70 hover:bg-amber-100 hover:text-amber-950'
-                        : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+                        ? 'text-amber-950 font-medium hover:bg-amber-100'
+                        : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100'
                   }`}
                 >
                   <span className="text-base" aria-hidden="true">{item.icon}</span>
@@ -171,7 +187,7 @@ export function StudentNav({ studentName, ageSegment = 'kids', level, gamesEnabl
                   ? 'bg-amber-100/80 hover:bg-amber-200 text-amber-900'
                   : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
             }`}
-            aria-label="Ir a mi perfil"
+            aria-label={studentName ? `Perfil: ${studentName}` : 'Perfil'}
           >
             <span className="text-sm" aria-hidden="true">👤</span>
             <span className="hidden sm:inline-block max-w-[120px] truncate">

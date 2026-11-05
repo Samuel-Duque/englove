@@ -2,11 +2,11 @@
 
 | Campo                | Valor                                                                                                                                                                                                          |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Estado               | Aprobada                                                                                                                                                                                                       |
+| Estado               | Verificada                                                                                                                                                                                                     |
 | Etapa                | 10 — Contenido extra                                                                                                                                                                                           |
 | Tareas               | ENG-120, ENG-121                                                                                                                                                                                               |
 | Referencias          | CONTEXT §2.4, §4.2, §5.1, §5.2, §12.10, §14 (decisiones 17, 20, 29, 34, 41, 50, 51, 59, 66, 67, 75, 79, 83, 89, 120, 122, 124–126), §16; architecture §3.1–§3.6, §4.1, §4.2, §6.1, §6.2, §8.3; pbp Etapa 10 |
-| Aprobada por / fecha | Sebastián Gómez / 2026-11-04                                                                                                                                                                                   |
+| Aprobada por / fecha | Líder del proyecto / 2026-11-04                                                                                                                                                                                   |
 
 ## 1. Contexto y objetivo
 
@@ -246,3 +246,4 @@ Sin pendientes `P-n` en `CONTEXT §15`. Las tres preguntas de diseño (`Q-01` a 
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
 | 2026-11-04 | Creación del borrador                                                                                                                | Tarea `SPEC-10` del taskboard   |
 | 2026-11-04 | Resolución de `Q-01` a `Q-03` (decisiones 124–126), definición de tareas técnicas `T-01` a `T-05` y paso de la spec a estado `Aprobada` | Aprobación del líder del proyecto |
+| 2026-11-04 | Implementación integral de `ENG-120` y `ENG-121`, suite Playwright E2E y axe (8/8), 537/537 tests y paso de la spec a `Verificada`   | Verificación completa de Etapa 10 |

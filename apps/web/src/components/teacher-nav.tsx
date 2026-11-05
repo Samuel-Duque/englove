@@ -21,6 +21,7 @@ export function TeacherNav({ teacherName }: TeacherNavProps) {
     { label: 'Estadísticas', href: '/estadisticas' },
     { label: 'Grupos', href: '/grupos' },
     { label: 'Alumnos', href: '/alumnos' },
+    { label: 'Contenido extra', href: '/contenido-extra' },
   ];
 
   const handleLogout = () => {

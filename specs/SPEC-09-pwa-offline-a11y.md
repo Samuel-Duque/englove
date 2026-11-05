@@ -6,7 +6,7 @@
 | Etapa                | 9 — PWA, offline y accesibilidad |
 | Tareas               | ENG-110, ENG-111, ENG-112, ENG-113 |
 | Referencias          | CONTEXT §2.4, §3, §5.2, §9, §10, §11.2, §12, §15, §16 · architecture §3.1, §3.6–§3.8, §7.5, §7.6, §8.2–§8.5, §10, §11.3, §12, §13 · decisiones 12, 20 (A2, A10, A12, A29), 37, 38, 51, 58, 60, 61, 64, 85, 87, 105, 111, 116–123 · pbp Etapa 9 · SPEC-02 RF-18 · SPEC-05 RF-7, RF-11, RF-13, RF-29 · SPEC-08 RF-10 |
-| Aprobada por / fecha | Sebastián Gómez / 2026-11-04 |
+| Aprobada por / fecha | Líder del proyecto / 2026-11-04 |
 
 ## 1. Contexto y objetivo
 

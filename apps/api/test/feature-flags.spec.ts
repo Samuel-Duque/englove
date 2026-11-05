@@ -110,4 +110,65 @@ describe('RF-14: aislamiento y ConfigurationError ante organización/fila/parám
       },
     });
   });
+
+  describe('updateExtraContentFlag (RF-3, Decisiones 41, 124)', () => {
+    it('throws ConfigurationError if organizationId is missing or organization not found', async () => {
+      const mockPrisma = {
+        organization: {
+          findUnique: vi.fn().mockResolvedValue(null),
+        },
+      } as unknown as PrismaService;
+
+      const service = new FeatureFlagsService(mockPrisma);
+      await expect(service.updateExtraContentFlag('', true)).rejects.toThrow(ConfigurationError);
+      await expect(service.updateExtraContentFlag(orgId, true)).rejects.toThrow(ConfigurationError);
+    });
+
+    it('upserts extra_content flag and returns updated configuration preserving games config', async () => {
+      const mockPrisma = {
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({ id: orgId, name: 'Pilot Org' }),
+        },
+        featureFlag: {
+          upsert: vi.fn().mockResolvedValue({ key: 'extra_content', enabled: true, config: {} }),
+          findMany: vi.fn().mockResolvedValue([
+            {
+              key: 'games',
+              enabled: false,
+              config: {
+                passing_score: 3.0,
+                retention_days: 30,
+                pending_upload_ttl_days: 7,
+                ungraded_reminder_days: 3,
+              },
+            },
+            { key: 'extra_content', enabled: true, config: {} },
+          ]),
+        },
+      } as unknown as PrismaService;
+
+      const service = new FeatureFlagsService(mockPrisma);
+      const result = await service.updateExtraContentFlag(orgId, true);
+
+      expect(mockPrisma.featureFlag.upsert).toHaveBeenCalledWith({
+        where: {
+          organization_id_key: {
+            organization_id: orgId,
+            key: 'extra_content',
+          },
+        },
+        update: { enabled: true },
+        create: {
+          organization_id: orgId,
+          key: 'extra_content',
+          enabled: true,
+          config: {},
+        },
+      });
+
+      expect(result.flags.extra_content).toBe(true);
+      expect(result.flags.games).toBe(false);
+      expect(result.config.passing_score).toBe(3.0);
+    });
+  });
 });

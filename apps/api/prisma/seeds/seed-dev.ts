@@ -39,6 +39,22 @@ export async function seedDev() {
     },
   });
 
+  await prisma.featureFlag.upsert({
+    where: {
+      organization_id_key: {
+        organization_id: org.id,
+        key: 'extra_content',
+      },
+    },
+    update: { enabled: true },
+    create: {
+      organization_id: org.id,
+      key: 'extra_content',
+      enabled: true,
+      config: {},
+    },
+  });
+
   const studentHash = await argon2.hash('Estudiante2026!', {
     type: argon2.argon2id,
   });
@@ -797,6 +813,67 @@ export async function seedDev() {
       },
     },
   });
+
+  // External resources (SPEC-10 ENG-120, T-02)
+  const sampleResources = [
+    {
+      id: '20000000-0000-4000-8000-000000000001',
+      title: 'Diccionario Visual en Inglés - Cambridge',
+      url: 'https://dictionary.cambridge.org/es/diccionario/ingles/',
+      description: 'Diccionario interactivo con pronunciación y ejemplos para todos los niveles.',
+      level: null,
+      position: 0,
+    },
+    {
+      id: '20000000-0000-4000-8000-000000000002',
+      title: 'Animals & Colors - Educaplay A1',
+      url: 'https://es.educaplay.com/recursos-educativos/a1-animals-colors.html',
+      description: 'Juego de memoria y vocabulario básico sobre animales y colores.',
+      level: Level.A1,
+      position: 1,
+    },
+    {
+      id: '20000000-0000-4000-8000-000000000003',
+      title: 'Daily Routines & Time - Educaplay A2',
+      url: 'https://es.educaplay.com/recursos-educativos/a2-daily-routines.html',
+      description: 'Actividad de repaso sobre rutinas diarias y expresiones de tiempo.',
+      level: Level.A2,
+      position: 2,
+    },
+    {
+      id: '20000000-0000-4000-8000-000000000004',
+      title: 'Past Tenses & Storytelling - LearnEnglish Teens B1',
+      url: 'https://learnenglishteens.britishcouncil.org/grammar/b1-past-tenses',
+      description: 'Guía práctica y ejercicios sobre tiempos verbales pasados para narración.',
+      level: Level.B1,
+      position: 3,
+    },
+    {
+      id: '20000000-0000-4000-8000-000000000005',
+      title: 'Debate & Advanced Vocabulary - BBC Learning English B2',
+      url: 'https://www.bbc.co.uk/learningenglish/english/features/6-minute-english',
+      description: 'Podcasts y transcripciones con vocabulario temático para debates y redacción.',
+      level: Level.B2,
+      position: 4,
+    },
+  ];
+
+  for (const res of sampleResources) {
+    await prisma.externalResource.upsert({
+      where: { id: res.id },
+      update: {},
+      create: {
+        id: res.id,
+        organization_id: org.id,
+        title: res.title,
+        url: res.url,
+        description: res.description,
+        level: res.level,
+        position: res.position,
+        created_by: teacher.id,
+      },
+    });
+  }
 
   return { org, teacher, students, attemptWithRetry };
 }

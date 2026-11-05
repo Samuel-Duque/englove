@@ -7,3 +7,4 @@ export * from './dashboard';
 export * from './assignments';
 export * from './reviews';
 export * from './stats';
+export * from './resources';

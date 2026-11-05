@@ -106,4 +106,46 @@ export class FeatureFlagsService {
     const config = await this.getConfiguration(organizationId);
     return Boolean(config.flags[feature]);
   }
+
+  /**
+   * Conmuta el feature flag extra_content para una organización (Decisiones 41, 124).
+   * Preserva games.enabled y games.config intactos.
+   */
+  async updateExtraContentFlag(
+    organizationId: string,
+    enabled: boolean,
+  ): Promise<OrganizationConfiguration> {
+    if (!organizationId) {
+      throw new ConfigurationError('organizationId is required');
+    }
+
+    // Verify organization exists (Rule G-A06)
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    if (!org) {
+      throw new ConfigurationError(`Organization not found: ${organizationId}`);
+    }
+
+    await this.prisma.featureFlag.upsert({
+      where: {
+        organization_id_key: {
+          organization_id: organizationId,
+          key: 'extra_content',
+        },
+      },
+      update: {
+        enabled,
+      },
+      create: {
+        organization_id: organizationId,
+        key: 'extra_content',
+        enabled,
+        config: {},
+      },
+    });
+
+    return this.getConfiguration(organizationId);
+  }
 }

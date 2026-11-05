@@ -99,8 +99,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         pathname.startsWith('/estadisticas/') ||
         pathname === '/grupos' ||
         pathname.startsWith('/grupos/') ||
-        pathname === '/contenidos' ||
-        pathname.startsWith('/contenidos/');
+        pathname === '/contenido-extra' ||
+        pathname.startsWith('/contenido-extra/');
       if (isTeacherRoute) {
         return NextResponse.redirect(new URL('/inicio', request.url));
       }
@@ -115,7 +115,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         pathname === '/feedback' ||
         pathname.startsWith('/feedback/') ||
         pathname === '/actividad' ||
-        pathname.startsWith('/actividad/');
+        pathname.startsWith('/actividad/') ||
+        pathname === '/extra' ||
+        pathname.startsWith('/extra/');
       if (isStudentRoute) {
         return NextResponse.redirect(new URL('/inicio', request.url));
       }

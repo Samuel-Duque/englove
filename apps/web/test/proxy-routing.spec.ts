@@ -126,6 +126,54 @@ describe('RF-17: proxy routing and redirect logic', () => {
     expect(res.headers.get('location')).toContain('/inicio');
   });
 
+  it('T-01: redirects student accessing /contenido-extra to /inicio', async () => {
+    const studentPayload = Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url');
+    const studentToken = `header.${studentPayload}.sig`;
+    const req = new NextRequest('http://localhost:3000/contenido-extra', {
+      headers: {
+        cookie: `englove_access_token=${studentToken}`,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/inicio');
+  });
+
+  it('T-01: redirects teacher accessing /extra to /inicio', async () => {
+    const teacherPayload = Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url');
+    const teacherToken = `header.${teacherPayload}.sig`;
+    const req = new NextRequest('http://localhost:3000/extra', {
+      headers: {
+        cookie: `englove_access_token=${teacherToken}`,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/inicio');
+  });
+
+  it('T-01: allows teacher accessing /contenido-extra and student accessing /extra', async () => {
+    const teacherPayload = Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url');
+    const teacherToken = `header.${teacherPayload}.sig`;
+    const reqTeacher = new NextRequest('http://localhost:3000/contenido-extra', {
+      headers: {
+        cookie: `englove_access_token=${teacherToken}`,
+      },
+    });
+    const resTeacher = await proxy(reqTeacher);
+    expect(resTeacher.headers.get('location')).toBeNull();
+
+    const studentPayload = Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url');
+    const studentToken = `header.${studentPayload}.sig`;
+    const reqStudent = new NextRequest('http://localhost:3000/extra', {
+      headers: {
+        cookie: `englove_access_token=${studentToken}`,
+      },
+    });
+    const resStudent = await proxy(reqStudent);
+    expect(resStudent.headers.get('location')).toBeNull();
+  });
+
   it('allows teacher to access /actividades and /actividades/nueva without redirecting', async () => {
     const teacherPayload = Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url');
     const teacherToken = `header.${teacherPayload}.sig`;

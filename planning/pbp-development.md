@@ -533,7 +533,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tamaño.** M, 1.5–2 semanas.
 
-**Tareas.** ENG-110 a ENG-113, SPEC-10.
+**Tareas.** ENG-110 a ENG-113, SPEC-10. **Estado actual (2026-11-04):** [SPEC-09](../specs/SPEC-09-pwa-offline-a11y.md) figura en estado `Verificada` tras la implementación integral de ENG-110 a ENG-113 (492/492 tests en monorepo, suite Playwright + axe sin violaciones e informe en `planning/informe-etapa-9.md`); [SPEC-10](../specs/SPEC-10-contenido-extra.md) figura en estado `Aprobada`.
 
 ---
 
@@ -551,7 +551,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Tamaño.** S, 0.5 semanas.
 
-**Tareas.** ENG-120 y ENG-121.
+**Tareas.** ENG-120 y ENG-121. **Estado actual (2026-11-04):** [SPEC-10](../specs/SPEC-10-contenido-extra.md) figura en estado `Aprobada` por el líder del proyecto tras el cierre de `Q-01` a `Q-03` mediante las Decisiones 124 a 126 de CONTEXT §14 y la definición de las tareas técnicas `T-01` a `T-05` en su §11; compuerta SDD abierta para implementar ENG-120 y ENG-121.
 
 ---
 

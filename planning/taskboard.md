@@ -2,7 +2,7 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-11-04. [SPEC-09 PWA, offline y accesibilidad](../specs/SPEC-09-pwa-offline-a11y.md) en estado `Verificada` tras la implementación y verificación integral de las tareas ENG-110, ENG-111, ENG-112 y ENG-113 con 492/492 pruebas en verde en monorepo, suite Playwright E2E de 7/7 pruebas en Chromium real, suite de accesibilidad axe sin violaciones, e informe de rendimiento en tablet real (`planning/informe-etapa-9.md`). Formalizadas las Decisiones 116 a 123 en CONTEXT §14. Resumen: 103 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 12 Backlog (Total 120).
+> Última actualización: 2026-11-04. [SPEC-10 Contenido extra](../specs/SPEC-10-contenido-extra.md) en estado `Aprobada` por el líder del proyecto tras la resolución de `Q-01` a `Q-03` mediante las Decisiones 124 a 126 de CONTEXT §14 y la formalización de las tareas técnicas `T-01` a `T-05` en su §11; la tarea `SPEC-10` pasa a `Hecho` y queda abierta la compuerta SDD para `ENG-120` y `ENG-121` (en `Backlog`). En la misma fecha, [SPEC-09 PWA, offline y accesibilidad](../specs/SPEC-09-pwa-offline-a11y.md) quedó en estado `Verificada` tras la implementación y verificación integral de ENG-110 a ENG-113 con 492/492 pruebas en verde en monorepo, suite Playwright E2E de 7/7 pruebas en Chromium real, suite de accesibilidad axe sin violaciones, informe de rendimiento en tablet real (`planning/informe-etapa-9.md`) y Decisiones 116 a 123 en CONTEXT §14. Resumen: 104 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 11 Backlog (Total 120).
 >
 > Actualización anterior: 2026-11-01. [SPEC-09 PWA, offline y accesibilidad](../specs/SPEC-09-pwa-offline-a11y.md) redactada y propuesta `En revisión`; la tarea SPEC-09 pasa a En curso hasta su aprobación. ENG-074 (defectos de SPEC-05), ENG-141 (build `vinext` con Tailwind compilado), ENG-142 (TanStack Query), ENG-144 (corrección E2E y dev NestJS) y ENG-145 (suite Playwright en Chromium real sobre SPEC-05 a SPEC-08) en Hecho; ENG-143 creada. Resumen: 98 Hecho, 1 En curso, 5 Por hacer, 0 Bloqueado, 16 Backlog (Total 120).
 >
@@ -30,11 +30,11 @@
 
 | Estado    | Tareas  |
 | --------- | ------- |
-| Hecho     | 103     |
+| Hecho     | 104     |
 | En curso  | 0       |
 | Por hacer | 5       |
 | Bloqueado | 0       |
-| Backlog   | 12      |
+| Backlog   | 11      |
 | **Total** | **120** |
 
 Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `englove-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). Creada y cerrada el 2026-10-19: DOC-08 (skill propia `englove-guardrails`). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes.
@@ -153,6 +153,7 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 | ENG-111 | Cola persistente en IndexedDB (`pendingEvents`, `pendingUploads`), vaciado automático en lotes de 50 con backoff y lock mono-pestaña, subida desatendida de audio con reuso de `mediaId`, marca atómica `offline_sync` en entregas tardías y visualización en ficha del alumno (RF-10 a RF-18) | 2026-11-04 |
 | ENG-112 | Pase de accesibilidad: indicadores `focus-visible` $\ge 2\text{ px}$ y contraste $\ge 3:1$, objetivos táctiles $\ge 48\text{ px}$ en Kids/Teens, síntesis de voz (TTS `es-CO` y `en-US`) en consignas Kids y suite automatizada axe (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) en CI (RF-19 a RF-22) | 2026-11-04 |
 | ENG-113 | Evaluación de rendimiento en tablet Android de gama baja/media (3-4 GB RAM), iPad y control desktop; informe técnico en `planning/informe-etapa-9.md` con Core Web Vitals (LCP < 2,5s, INP < 200ms, CLS < 0,10) y evidencia de los 6 escenarios operativos (RF-23, RF-24) | 2026-11-04 |
+| SPEC-10 | Redactar y aprobar [SPEC-10 Contenido extra](../specs/SPEC-10-contenido-extra.md) (aprobada con las Decisiones 124 a 126 de CONTEXT §14: preparación previa de enlaces con la sección apagada y conmutación con `PATCH /api/v1/feature-flags/extra_content`, filtrado por nivel MCER y recursos generales `level = null`, ordenamiento `position ASC`, tope de 200 recursos y reordenamiento atómico, más tareas técnicas `T-01` a `T-05` en su §11) | 2026-11-04 |
 
 ---
 
@@ -161,6 +162,8 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 Límite: 3.
 
 *Ninguna tarea en curso.*
+
+
 
 ---
 
@@ -264,9 +267,9 @@ Compuerta cumplida: [SPEC-09](../specs/SPEC-09-pwa-offline-a11y.md) se encuentra
 
 | ID      | Tarea                                                                                                                                              | Prioridad | Depende de       | Spec    | Estado  |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------- | ------- | ------- |
-| SPEC-10 | Redactar y aprobar SPEC-10 Contenido extra                                                                                                         | P1        | SPEC-00          | —       | Backlog |
-| ENG-120 | `ExternalResource`: CRUD en API y panel (`title`, `url` https, `description`, `level`, `position`, `created_by`; decisión 79)                      | P1        | SPEC-10, ENG-033 | SPEC-10 | Backlog |
-| ENG-121 | Sección "Contenido extra" en el portal del alumno (`extra/`, 3 clics): enlaces externos en pestaña nueva, sin iframe, bajo el flag `extra_content` | P1        | ENG-120, ENG-060 | SPEC-10 | Backlog |
+| SPEC-10 | Redactar y aprobar [SPEC-10 Contenido extra](../specs/SPEC-10-contenido-extra.md) (Aprobada el 2026-11-04; Decisiones 124–126 y `T-01`–`T-05`)     | P1        | SPEC-00          | —       | Hecho   |
+| ENG-120 | `ExternalResource`: CRUD en API y panel (`title`, `url` https, `description`, `level`, `position`, `created_by`; decisiones 79, 124–126; incluye `PATCH /feature-flags/extra_content`, `PUT /resources/reorder`, TanStack Query `T-04`, corrección de `proxy.ts` `T-01`, `seed-dev.ts` `T-02` y sin migración DDL `T-03`) | P1        | SPEC-10, ENG-033 | SPEC-10 | Backlog |
+| ENG-121 | Sección "Contenido extra" en el portal del alumno (`extra/`, 3 clics): enlaces externos en pestaña nueva, sin iframe, bajo el flag `extra_content`, filtrado por nivel `Student.level` + generales (`level = null`) (decisión 125), TanStack Query `T-04`, ruta `/extra` en `proxy.ts` `T-01`, aviso offline y suite `axe` `T-05` | P1        | ENG-120, ENG-060 | SPEC-10 | Backlog |
 
 ### Etapa 11 — Lanzamiento (Hito H4)
 

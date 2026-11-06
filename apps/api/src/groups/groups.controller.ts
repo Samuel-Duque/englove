@@ -21,6 +21,7 @@ import {
   CreateGroupDto,
   UpdateGroupDto,
   GroupQueryDto,
+  GroupMembersQueryDto,
 } from './dto/groups.dto';
 import {
   Role,
@@ -105,7 +106,7 @@ export class GroupsController {
   async listMembers(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', uuidPipe) id: string,
-    @Query() query: { offset?: number; limit?: number },
+    @Query() query: GroupMembersQueryDto,
   ): Promise<StudentListResponse> {
     return this.groupsService.listMembers(user.organizationId, id, query);
   }

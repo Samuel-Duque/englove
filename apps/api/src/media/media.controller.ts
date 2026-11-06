@@ -92,6 +92,7 @@ export class MediaController {
   @Public()
   @Get('mock-stream/:id')
   async handleMockStream(@Param('id') _id: string, @Res() res: Response) {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Content-Type', 'audio/webm');
     res.setHeader('Content-Length', '0');
     res.status(HttpStatus.OK).end();

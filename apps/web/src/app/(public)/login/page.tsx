@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
+import { fetchSharedSession } from '../../../lib/auth-session';
 
 function isSafeNextDestination(next: string | null | undefined): boolean {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
@@ -48,15 +49,9 @@ function LoginForm() {
       }
 
       try {
-        const res = await fetch(`${apiUrl}/api/v1/auth/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        });
+        const session = await fetchSharedSession(true);
 
-        if (res.ok && isMounted) {
+        if (session && isMounted) {
           document.cookie = 'englove_user_logged=1; path=/; SameSite=Lax';
           const destination = isSafeNextDestination(nextParam) ? nextParam! : '/inicio';
           router.replace(destination);

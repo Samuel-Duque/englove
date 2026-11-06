@@ -1,9 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { getQueryClient } from './query-client';
+import { clearSharedSession } from './auth-session';
+import { clearSharedFeatureFlags } from './feature-flags-client';
 
 /**
  * Performs client-side hygiene on logout or session expiration (Rule G-C13, RF-18).
- * Clears TanStack Query cache and IndexedDB pending queues on shared tablets.
+ * Clears TanStack Query cache, in-memory caches, and IndexedDB pending queues on shared tablets.
  */
 export async function clearSharedDeviceSession(
   queryClient: QueryClient = getQueryClient(),
@@ -11,22 +13,52 @@ export async function clearSharedDeviceSession(
   // Cancel in-flight queries and drop every cached response of the previous account
   await queryClient.cancelQueries();
   queryClient.clear();
+  clearSharedSession();
+  clearSharedFeatureFlags();
 
   // Clear IndexedDB pending queues if running in browser
   if (typeof window !== 'undefined' && 'indexedDB' in window) {
     try {
       const dbNames = ['englove_offline', 'englove_storage'];
+      let targetDbs = dbNames;
+
+      // Check if databases() API exists so we do NOT prematurely create empty DBs (ISSUE-04)
+      if ('databases' in window.indexedDB) {
+        try {
+          const existing = await window.indexedDB.databases();
+          const existingNames = new Set(existing.map((d) => d.name));
+          targetDbs = dbNames.filter((name) => existingNames.has(name));
+        } catch {
+          targetDbs = dbNames;
+        }
+      }
+
       await Promise.allSettled(
-        dbNames.map(
+        targetDbs.map(
           (name) =>
             new Promise<void>((resolve) => {
               try {
                 const req = window.indexedDB.open(name);
+                req.onupgradeneeded = (event) => {
+                  if (event.oldVersion === 0) {
+                    const openReq = event.target as IDBOpenDBRequest | null;
+                    if (openReq?.transaction) {
+                      openReq.transaction.abort();
+                    }
+                  }
+                };
                 req.onerror = () => resolve();
                 req.onblocked = () => resolve();
                 req.onsuccess = () => {
                   try {
                     const db = req.result;
+                    // If the database has 0 stores (created empty or corrupt), close and delete it immediately (ISSUE-04)
+                    if (db.objectStoreNames && 'length' in db.objectStoreNames && db.objectStoreNames.length === 0) {
+                      db.close();
+                      window.indexedDB.deleteDatabase(name);
+                      resolve();
+                      return;
+                    }
                     const storeNames = ['pendingEvents', 'pendingUploads'];
                     for (const sName of storeNames) {
                       if (db.objectStoreNames.contains(sName)) {

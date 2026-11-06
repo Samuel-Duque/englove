@@ -10,6 +10,7 @@ import {
   IsInt,
   Min,
   Max,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -36,6 +37,10 @@ export class CompleteAttemptDto {
   @IsOptional()
   @IsUUID('4', { message: 'mediaId debe ser un UUID v4 válido' })
   mediaId?: string;
+
+  @IsOptional()
+  @IsObject({ message: 'answers debe ser un objeto' })
+  answers?: Record<string, unknown>;
 }
 
 export class AssignmentCardQueryDto {

@@ -29,14 +29,17 @@ function GroupDetailContent({
     setIsLoading(true);
     setError(null);
     try {
-      const [groupData, membersData] = await Promise.all([
-        apiFetch<GroupView>(`/api/v1/groups/${id}`),
-        apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`),
-      ]);
+      const groupData = await apiFetch<GroupView>(`/api/v1/groups/${id}`);
       setGroup(groupData);
       setNewName(groupData.name);
-      setMembers(membersData.items);
-      setTotalMembers(membersData.total);
+      try {
+        const membersData = await apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`);
+        setMembers(membersData.items);
+        setTotalMembers(membersData.total);
+      } catch (memberErr) {
+        if (memberErr instanceof ApiError) setError(memberErr.message);
+        else setError('Error al cargar la lista de alumnos del grupo');
+      }
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError('Error al cargar la información del grupo');
@@ -70,9 +73,10 @@ function GroupDetailContent({
   };
 
   const handleArchive = async () => {
-    if (members.length > 0) {
+    const activeCount = group?.activeStudentCount ?? totalMembers ?? members.length;
+    if (activeCount > 0) {
       setError(
-        'No es posible archivar un grupo con alumnos activos (decisión 96). Traslada a los alumnos a otro grupo antes de archivar.',
+        `No es posible archivar el grupo: tiene ${activeCount} alumno(s) activo(s) (decisión 96). Traslada los alumnos antes de archivar.`,
       );
       return;
     }
@@ -88,8 +92,17 @@ function GroupDetailContent({
       setGroup(updated);
       setSuccess('Grupo archivado exitosamente.');
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo archivar el grupo');
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
+          setError(
+            'Este grupo tiene alumnos activos. Para archivarlo, traslada sus alumnos a otro grupo desde su ficha de alumno.',
+          );
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('No se pudo archivar el grupo');
+      }
     }
   };
 
@@ -122,7 +135,7 @@ function GroupDetailContent({
   if (!group) {
     return (
       <div role="alert" className="rounded-lg bg-rose-50 border border-rose-200 p-6 text-center text-rose-800">
-        Grupo no encontrado
+        {error || 'Grupo no encontrado'}
       </div>
     );
   }

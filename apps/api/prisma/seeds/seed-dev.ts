@@ -488,6 +488,7 @@ export async function seedDev() {
       where: { id: def.actId },
       update: {
         title: def.title,
+        status: ActivityStatus.published,
       },
       create: {
         id: def.actId,

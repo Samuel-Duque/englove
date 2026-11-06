@@ -474,7 +474,13 @@ function StudentDetailContent({
           </div>
 
           <div className="flex items-center gap-2">
+            <label htmlFor="destination-group-select" className="sr-only">
+              Seleccionar grupo de destino
+            </label>
             <select
+              id="destination-group-select"
+              name="destinationGroupId"
+              aria-label="Seleccionar grupo de destino"
               value={selectedDestinationGroup}
               onChange={(e) => setSelectedDestinationGroup(e.target.value)}
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"

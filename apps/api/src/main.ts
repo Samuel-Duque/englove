@@ -21,8 +21,12 @@ async function bootstrap() {
   const expressInstance = app.getHttpAdapter().getInstance() as express.Application;
   expressInstance.set('trust proxy', 1);
 
-  // Security headers with Helmet (Rule G-C10, SPEC-02 RF-16)
-  app.use(helmet());
+  // Security headers with Helmet (Rule G-C10, SPEC-02 RF-16, ISSUE-01)
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Cookie parser for reading session cookies (Rule G-B11)
   app.use(cookieParser());

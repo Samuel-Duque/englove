@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { StudentNav } from './student-nav';
 import { OfflineStatusBanner } from './offline-status-banner';
-import { apiFetch } from '../lib/api';
+import { fetchSharedProfile } from '../lib/auth-session';
 import { purgeOtherUsersEntries } from '../lib/offline-queue';
 import type { StudentProfileView } from '@englove/shared';
 
@@ -18,10 +18,10 @@ export function StudentShell({ children }: StudentShellProps) {
     let isMounted = true;
     async function fetchMe() {
       try {
-        const data = await apiFetch<StudentProfileView>('/api/v1/me');
-        if (isMounted) {
+        const data = await fetchSharedProfile();
+        if (isMounted && data) {
           setProfile(data);
-          if (data?.user?.id) {
+          if (data.user?.id) {
             void purgeOtherUsersEntries(data.user.id);
           }
         }

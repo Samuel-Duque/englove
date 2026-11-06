@@ -289,6 +289,36 @@ describe('SPEC-03: Gestor de Contenidos — GroupsService (ENG-040)', () => {
       expect(result.items[0]?.name).toBe('Juan Perez');
       expect(result.items[0]?.groupId).toBe(groupId);
     });
+
+    it('convierte parámetros offset y limit pasados como string a number para Prisma skip/take (ISSUE-02)', async () => {
+      mockPrisma.group.findFirst.mockResolvedValue({ id: groupId, organization_id: orgId });
+      mockPrisma.student.count.mockResolvedValue(0);
+      mockPrisma.student.findMany.mockResolvedValue([]);
+
+      await service.listMembers(orgId, groupId, { offset: '10' as any, limit: '100' as any });
+
+      expect(mockPrisma.student.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 10,
+          take: 100,
+        }),
+      );
+    });
+
+    it('defiende contra valores NaN o no finitos en offset y limit usando defaults seguros (ISSUE-02)', async () => {
+      mockPrisma.group.findFirst.mockResolvedValue({ id: groupId, organization_id: orgId });
+      mockPrisma.student.count.mockResolvedValue(0);
+      mockPrisma.student.findMany.mockResolvedValue([]);
+
+      await service.listMembers(orgId, groupId, { offset: 'invalido' as any, limit: 'nan' as any });
+
+      expect(mockPrisma.student.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 0,
+          take: 20,
+        }),
+      );
+    });
   });
 
   describe('Aislamiento de Tenant (Anti-IDOR)', () => {

@@ -47,3 +47,18 @@ export class GroupQueryDto {
   @IsBoolean()
   archived?: boolean;
 }
+
+export class GroupMembersQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}

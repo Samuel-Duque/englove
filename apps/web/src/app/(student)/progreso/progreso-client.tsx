@@ -79,7 +79,7 @@ export function ProgresoClient() {
                 Racha Semanal
               </p>
               <h2 className="text-2xl sm:text-3xl font-black text-amber-950">
-                {streak.weeks} {streak.weeks === 1 ? 'semana' : 'semanas'} consecutivas
+                {streak.weeks} {streak.weeks === 1 ? 'semana consecutiva' : 'semanas consecutivas'}
               </h2>
             </div>
           </div>

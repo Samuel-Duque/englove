@@ -311,8 +311,10 @@ export class GroupsService {
       });
     }
 
-    const offset = query.offset ?? 0;
-    const limit = query.limit ?? 20;
+    const rawOffset = query.offset !== undefined ? Number(query.offset) : 0;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+    const rawLimit = query.limit !== undefined ? Number(query.limit) : 20;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 20;
 
     const [total, items] = await Promise.all([
       this.prisma.student.count({

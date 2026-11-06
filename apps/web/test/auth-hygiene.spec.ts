@@ -130,4 +130,49 @@ describe('RF-18: client-side storage hygiene on shared devices', () => {
 
     await expect(clearSharedDeviceSession()).resolves.toBeUndefined();
   });
+
+  it('detects and deletes databases created with 0 object stores (ISSUE-04)', async () => {
+    const mockClose = vi.fn();
+    const mockDeleteDatabase = vi.fn();
+
+    const emptyDb = {
+      objectStoreNames: {
+        length: 0,
+        contains: () => false,
+      },
+      close: mockClose,
+    };
+
+    const mockOpen = vi.fn().mockImplementation(() => {
+      const req: {
+        result: typeof emptyDb;
+        onsuccess: (() => void) | null;
+        onerror: (() => void) | null;
+      } = {
+        result: emptyDb,
+        onsuccess: null,
+        onerror: null,
+      };
+      setTimeout(() => {
+        if (req.onsuccess) req.onsuccess();
+      }, 5);
+      return req;
+    });
+
+    (globalThis as unknown as { window: unknown }).window = {
+      indexedDB: {
+        open: mockOpen,
+        deleteDatabase: mockDeleteDatabase,
+      },
+      sessionStorage: {
+        clear: vi.fn(),
+      },
+    };
+
+    await clearSharedDeviceSession();
+
+    expect(mockClose).toHaveBeenCalled();
+    expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_offline');
+    expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_storage');
+  });
 });

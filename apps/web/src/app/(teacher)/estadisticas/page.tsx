@@ -548,11 +548,15 @@ function EstadisticasContent() {
       {/* Tab 2: Groups */}
       {!isLoading && activeTab === 'groups' && (
         <div className="space-y-6">
-          {/* Controls: Group Selector and Trend Comparison Toggle (Decisión 112) */}
           <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-zinc-700">Seleccionar grupo:</label>
+              <label htmlFor="stats-group-select" className="text-xs font-semibold text-zinc-700">
+                Seleccionar grupo:
+              </label>
               <select
+                id="stats-group-select"
+                name="groupId"
+                aria-label="Seleccionar grupo"
                 value={effectiveGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
                 className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs text-zinc-800 bg-white"
@@ -806,8 +810,13 @@ function EstadisticasContent() {
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-zinc-700">Grupo:</label>
+              <label htmlFor="leaderboard-group-select" className="text-xs font-semibold text-zinc-700">
+                Grupo:
+              </label>
               <select
+                id="leaderboard-group-select"
+                name="leaderboardGroupId"
+                aria-label="Filtrar por grupo"
                 value={leaderboardGroupId}
                 onChange={(e) => setLeaderboardGroupId(e.target.value)}
                 className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs text-zinc-800 bg-white"

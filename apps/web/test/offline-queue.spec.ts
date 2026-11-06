@@ -6,6 +6,7 @@ import {
   hasPendingWork,
   purgeOtherUsersEntries,
   clearOfflineQueue,
+  triggerFlush,
   type PendingEventRecord,
   type PendingUploadRecord,
 } from '../src/lib/offline-queue';
@@ -14,6 +15,7 @@ describe('SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service', () => {
   let eventsDb: PendingEventRecord[] = [];
   let uploadsDb: PendingUploadRecord[] = [];
   let autoIncId = 1;
+  let mockDb: any;
 
   beforeEach(() => {
     eventsDb = [];
@@ -21,7 +23,7 @@ describe('SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service', () => {
     autoIncId = 1;
 
     // In-memory IndexedDB mock
-    const mockDb = {
+    mockDb = {
       objectStoreNames: {
         contains: (name: string) => name === 'pendingEvents' || name === 'pendingUploads',
       },
@@ -274,6 +276,162 @@ describe('SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service', () => {
       expect(eventsDb).toHaveLength(0);
       expect(uploadsDb).toHaveLength(0);
       expect(await hasPendingWork()).toBe(false);
+    });
+
+    it('forwards answers in completionEvent payload to POST /complete during flush (ISSUE-05)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      });
+      globalThis.fetch = mockFetch;
+
+      // Enqueue offline first (matching real student offline completion)
+      await enqueueEvent({
+        userId: 'user-1',
+        attemptId: 'att-1',
+        clientEventId: 'comp-1',
+        eventType: 'completed',
+        payload: {
+          answers: { pair1: 'a', pair2: 'b' },
+        },
+        attemptToken: 'valid-token',
+      });
+
+      // Now come back online and flush
+      Object.defineProperty(globalThis, 'navigator', {
+        value: { onLine: true },
+        configurable: true,
+        writable: true,
+      });
+
+      await triggerFlush();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/attempts/att-1/complete'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            answers: { pair1: 'a', pair2: 'b' },
+          }),
+        }),
+      );
+    });
+
+    it('self-heals by deleting empty database and recreating stores cleanly when stores are missing (ISSUE-04)', async () => {
+      let openedCount = 0;
+      const mockClose = vi.fn();
+      const mockDeleteDatabase = vi.fn().mockImplementation(() => {
+        const req = {
+          onsuccess: null as (() => void) | null,
+          onerror: null as (() => void) | null,
+        };
+        setTimeout(() => {
+          if (req.onsuccess) req.onsuccess();
+        }, 0);
+        return req;
+      });
+
+      const emptyDb = {
+        objectStoreNames: {
+          contains: () => false,
+        },
+        close: mockClose,
+      };
+
+      const validDb = {
+        objectStoreNames: {
+          contains: (name: string) => name === 'pendingEvents' || name === 'pendingUploads',
+        },
+        close: vi.fn(),
+        transaction: mockDb.transaction,
+      };
+
+      (globalThis as unknown as { window: unknown }).window = {
+        indexedDB: {
+          open: vi.fn(() => {
+            openedCount++;
+            const req = {
+              result: openedCount === 1 ? emptyDb : validDb,
+              onsuccess: null as (() => void) | null,
+              onerror: null as (() => void) | null,
+              onupgradeneeded: null as (() => void) | null,
+            };
+            setTimeout(() => {
+              if (req.onsuccess) req.onsuccess();
+            }, 0);
+            return req;
+          }),
+          deleteDatabase: mockDeleteDatabase,
+        },
+      };
+
+      const eventId = await enqueueEvent({
+        userId: 'user-1',
+        attemptId: 'att-heal',
+        clientEventId: 'heal-1',
+        eventType: 'answered',
+        payload: { item: '1' },
+        attemptToken: 'tok',
+      });
+
+      expect(mockClose).toHaveBeenCalled();
+      expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_offline');
+      expect(openedCount).toBeGreaterThanOrEqual(2);
+      expect(eventId).toBeDefined();
+    });
+
+    it('ISSUE-09: batches rapid answered events and flushes combined payload', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      });
+      globalThis.fetch = mockFetch;
+
+      Object.defineProperty(globalThis, 'navigator', {
+        value: { onLine: true },
+        configurable: true,
+        writable: true,
+      });
+
+      // Enqueue 2 events rapidly
+      await enqueueEvent({
+        userId: 'user-1',
+        attemptId: 'att-debounce',
+        clientEventId: 'deb-1',
+        eventType: 'answered',
+        payload: { item: '1' },
+        attemptToken: 'tok',
+      });
+      await enqueueEvent({
+        userId: 'user-1',
+        attemptId: 'att-debounce',
+        clientEventId: 'deb-2',
+        eventType: 'answered',
+        payload: { item: '2' },
+        attemptToken: 'tok',
+      });
+
+      // Immediately after enqueuing, debounce is waiting (fetch not yet called)
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      // Wait 350ms for debounce timer to fire
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/attempts/att-debounce/events'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            events: [
+              { clientEventId: 'deb-1', eventType: 'answer_changed', item: '1' },
+              { clientEventId: 'deb-2', eventType: 'answer_changed', item: '2' },
+            ],
+          }),
+        }),
+      );
     });
   });
 });

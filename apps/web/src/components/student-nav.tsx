@@ -2,6 +2,7 @@ import React, { useTransition, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clearSharedDeviceSession } from '../lib/auth-hygiene';
+import { fetchSharedFeatureFlags } from '../lib/feature-flags-client';
 import {
   hasPendingWork,
   triggerFlush,
@@ -36,9 +37,7 @@ export function StudentNav({
       setExtraContentOn(extraContentEnabled);
       return;
     }
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    fetch(`${apiUrl}/api/v1/feature-flags`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
+    fetchSharedFeatureFlags()
       .then((data) => {
         if (data?.flags?.games !== undefined && gamesEnabled === undefined) {
           setGamesOn(Boolean(data.flags.games));

@@ -129,7 +129,9 @@ export default function GroupsPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
-          setError('No es posible archivar un grupo con alumnos activos.');
+          setError(
+            'No es posible archivar un grupo con alumnos activos. Traslada sus alumnos a otro grupo antes de archivar.',
+          );
         } else {
           setError(err.message);
         }

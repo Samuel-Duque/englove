@@ -709,8 +709,11 @@ function RevisionContent() {
                       ✓ Reintento ya concedido
                     </span>
                   ) : (
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label htmlFor="allow-retry-toggle" className="relative inline-flex items-center cursor-pointer">
                       <input
+                        id="allow-retry-toggle"
+                        name="allowRetry"
+                        aria-label="Permitir nuevo intento al estudiante"
                         type="checkbox"
                         checked={allowRetry}
                         onChange={(e) => setAllowRetry(e.target.checked)}

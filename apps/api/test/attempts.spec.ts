@@ -402,6 +402,50 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
       );
     });
 
+    it('fusiona defensivamente answers pasadas en completeAttempt y actualiza el payload del intento (ISSUE-05)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 30000),
+        payload: {
+          answers: { item1: 'existingAnswer' },
+          processedEventIds: ['ev-1'],
+        },
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.fill_blank,
+            title: 'Fill blank practice',
+            level: Level.A1,
+            fill_blank_detail: { config: { items: [] } },
+          },
+        },
+      });
+
+      await service.completeAttempt(orgId, studentId, attemptId, validToken, {
+        answers: { item2: 'submittedInComplete' },
+      });
+
+      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: attemptId },
+          data: expect.objectContaining({
+            payload: {
+              answers: {
+                item1: 'existingAnswer',
+                item2: 'submittedInComplete',
+              },
+              processedEventIds: ['ev-1'],
+            },
+          }),
+        }),
+      );
+    });
+
     it('marca pending_review con score null para open_question (no autocalificado)', async () => {
       mockPrisma.attempt.findFirst.mockResolvedValueOnce({
         id: attemptId,

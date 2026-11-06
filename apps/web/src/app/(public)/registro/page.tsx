@@ -211,8 +211,10 @@ export default function RegistroPage() {
           </div>
 
           <div className="pt-2">
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label htmlFor="accept-terms-checkbox" className="flex items-start gap-3 cursor-pointer">
               <input
+                id="accept-terms-checkbox"
+                name="acceptTerms"
                 type="checkbox"
                 required
                 checked={acceptTerms}

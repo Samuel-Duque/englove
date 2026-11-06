@@ -39,17 +39,31 @@ export interface OfflineStatus {
 }
 
 const DB_NAME = 'englove_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const EVENTS_STORE = 'pendingEvents';
 const UPLOADS_STORE = 'pendingUploads';
+
+function createStoresIfMissing(db: IDBDatabase) {
+  if (!db.objectStoreNames.contains(EVENTS_STORE)) {
+    const eventStore = db.createObjectStore(EVENTS_STORE, { keyPath: 'id', autoIncrement: true });
+    eventStore.createIndex('attemptId', 'attemptId', { unique: false });
+    eventStore.createIndex('userId', 'userId', { unique: false });
+  }
+  if (!db.objectStoreNames.contains(UPLOADS_STORE)) {
+    const uploadStore = db.createObjectStore(UPLOADS_STORE, { keyPath: 'attemptId' });
+    uploadStore.createIndex('userId', 'userId', { unique: false });
+  }
+}
 
 let isQueuePausedDueToAuth = false;
 let isFlushingInternal = false;
 let currentRetryTimeout: NodeJS.Timeout | null = null;
+let flushDebounceTimer: NodeJS.Timeout | null = null;
 let retryAttempt = 0; // 0 -> 10s, 1 -> 30s, 2 -> 60s, then 60s
 let lastSyncedAt: number | null = null;
 let justFlushed = false;
 let justFlushedTimer: NodeJS.Timeout | null = null;
+let hasBeenOffline = false;
 
 const statusListeners = new Set<(status: OfflineStatus) => void>();
 
@@ -89,18 +103,23 @@ function openOfflineDb(): Promise<IDBDatabase> {
     }
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(EVENTS_STORE)) {
-        const eventStore = db.createObjectStore(EVENTS_STORE, { keyPath: 'id', autoIncrement: true });
-        eventStore.createIndex('attemptId', 'attemptId', { unique: false });
-        eventStore.createIndex('userId', 'userId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(UPLOADS_STORE)) {
-        const uploadStore = db.createObjectStore(UPLOADS_STORE, { keyPath: 'attemptId' });
-        uploadStore.createIndex('userId', 'userId', { unique: false });
-      }
+      createStoresIfMissing(request.result);
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(EVENTS_STORE) || !db.objectStoreNames.contains(UPLOADS_STORE)) {
+        // Self-heal: database was created without stores. Delete and recreate at DB_VERSION to avoid VersionError drift (ISSUE-04)
+        db.close();
+        const delReq = window.indexedDB.deleteDatabase(DB_NAME);
+        delReq.onsuccess = () => {
+          openOfflineDb().then(resolve, reject);
+        };
+        delReq.onerror = () => reject(delReq.error);
+        delReq.onblocked = () => reject(new Error('IndexedDB delete blocked'));
+        return;
+      }
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
     request.onblocked = () => reject(new Error('IndexedDB blocked'));
   });
@@ -128,7 +147,7 @@ export async function enqueueEvent(record: Omit<PendingEventRecord, 'id' | 'crea
     tx.oncomplete = () => {
       db.close();
       notifyStatus();
-      void triggerFlush();
+      scheduleDebouncedFlush(250);
     };
   });
 }
@@ -279,6 +298,10 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
  * Clears all pending events and uploads on logout (RF-5).
  */
 export async function clearOfflineQueue(): Promise<void> {
+  if (flushDebounceTimer) {
+    clearTimeout(flushDebounceTimer);
+    flushDebounceTimer = null;
+  }
   try {
     const db = await openOfflineDb();
     const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) => db.objectStoreNames.contains(s));
@@ -384,6 +407,7 @@ async function discardAudioBlob(attemptId: string): Promise<void> {
  * Schedules next retry following backoff (10s, 30s, 60s, then 60s) (RF-11).
  */
 function scheduleBackoffRetry() {
+  hasBeenOffline = true;
   if (currentRetryTimeout) {
     clearTimeout(currentRetryTimeout);
     currentRetryTimeout = null;
@@ -412,7 +436,29 @@ function resetBackoff() {
  * Single-tab concurrency lock wrapper (RF-11).
  * Uses navigator.locks when available; falls back to internal flag.
  */
+
+/**
+ * Schedules a debounced flush (micro-batching) to avoid flooding the API
+ * with individual HTTP requests on every rapid user interaction (ISSUE-09).
+ */
+export function scheduleDebouncedFlush(delayMs = 250): void {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return;
+  }
+  if (flushDebounceTimer) {
+    clearTimeout(flushDebounceTimer);
+  }
+  flushDebounceTimer = setTimeout(() => {
+    flushDebounceTimer = null;
+    void triggerFlush();
+  }, delayMs);
+}
+
 export async function triggerFlush(): Promise<void> {
+  if (flushDebounceTimer) {
+    clearTimeout(flushDebounceTimer);
+    flushDebounceTimer = null;
+  }
   if (typeof window === 'undefined') return;
   if (isQueuePausedDueToAuth) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -517,7 +563,7 @@ async function executeFlush(): Promise<void> {
             headers: {
               'Content-Type': 'application/json',
               'x-attempt-token': attemptToken,
-              Origin: window.location.origin,
+              Origin: (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000',
             },
             credentials: 'include',
             body: JSON.stringify({
@@ -640,17 +686,24 @@ async function executeFlush(): Promise<void> {
       // 3. Complete Attempt if completed event is queued (RF-12)
       if (completionEvent) {
         try {
+          const compPayload = (completionEvent.payload || {}) as {
+            answers?: Record<string, unknown>;
+          };
+          const compAnswers = compPayload.answers;
+          const completeBody: Record<string, unknown> = {
+            ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {}),
+            ...(compAnswers && Object.keys(compAnswers).length > 0 ? { answers: compAnswers } : {}),
+          };
+
           const completeRes = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'x-attempt-token': completionEvent.attemptToken,
-              Origin: window.location.origin,
+              Origin: (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000',
             },
             credentials: 'include',
-            body: JSON.stringify({
-              ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {}),
-            }),
+            body: JSON.stringify(completeBody),
           });
 
           if (completeRes.ok) {
@@ -682,7 +735,8 @@ async function executeFlush(): Promise<void> {
       resetBackoff();
       lastSyncedAt = Date.now();
       const remaining = await getPendingCount();
-      if (remaining === 0) {
+      if (remaining === 0 && hasBeenOffline) {
+        hasBeenOffline = false;
         justFlushed = true;
         if (justFlushedTimer) clearTimeout(justFlushedTimer);
         justFlushedTimer = setTimeout(() => {

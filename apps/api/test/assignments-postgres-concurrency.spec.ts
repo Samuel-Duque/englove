@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import {
   ActivityStatus,
@@ -177,11 +177,22 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
     }
   });
 
+  beforeEach(async () => {
+    if (!isPostgresAvailable || !prisma) return;
+    await prisma.assignment.deleteMany({
+      where: { organization_id: testOrgId },
+    });
+  });
+
+  const getActiveDates = () => ({
+    opensAt: new Date(Date.now() - 3600000).toISOString(),
+    dueAt: new Date(Date.now() + 86400000 * 7).toISOString(),
+  });
+
   it('SPEC-04 RF-2: crea asignaciones multigrupo atómicamente y persisten en PostgreSQL', async () => {
     if (!isPostgresAvailable || !prisma) return;
 
-    const opensAt = '2026-11-01T10:00:00.000Z';
-    const dueAt = '2026-11-05T18:00:00.000Z';
+    const { opensAt, dueAt } = getActiveDates();
 
     const result = await service.createAssignments(testOrgId, {
       activityId: testActivityId,
@@ -216,8 +227,7 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   it('SPEC-04 RF-5: carrera de dos conexiones concurrentes para el mismo par deja una sola ganadora con 409', async () => {
     if (!isPostgresAvailable || !prisma) return;
 
-    const opensAt = '2026-11-01T10:00:00.000Z';
-    const dueAt = '2026-11-05T18:00:00.000Z';
+    const { opensAt, dueAt } = getActiveDates();
 
     // Lanzar dos peticiones simultáneas idénticas compitiendo por el mismo par (actividad, grupo)
     const [res1, res2] = await Promise.allSettled([
@@ -269,8 +279,7 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   it('SPEC-04 RF-11: cancela en PostgreSQL real, es idempotente y permite nueva asignación con ID distinto', async () => {
     if (!isPostgresAvailable || !prisma) return;
 
-    const opensAt = '2026-11-01T10:00:00.000Z';
-    const dueAt = '2026-11-05T18:00:00.000Z';
+    const { opensAt, dueAt } = getActiveDates();
 
     // 1. Crear asignación
     const created = await service.createAssignments(testOrgId, {
@@ -295,8 +304,8 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
     const newCreated = await service.createAssignments(testOrgId, {
       activityId: testActivityId,
       groupIds: [testGroupId1],
-      opensAt: '2026-11-10T10:00:00.000Z',
-      dueAt: '2026-11-15T18:00:00.000Z',
+      opensAt: new Date(Date.now() + 86400000 * 10).toISOString(),
+      dueAt: new Date(Date.now() + 86400000 * 15).toISOString(),
     });
     expect(newCreated.items).toHaveLength(1);
     expect(newCreated.items[0]!.id).not.toBe(assignmentId);
@@ -326,8 +335,7 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
       service.createAssignments(testOrgId, {
         activityId: testActivityId,
         groupIds: [testGroupId1, nonExistentGroupId],
-        opensAt: '2026-11-01T10:00:00.000Z',
-        dueAt: '2026-11-05T18:00:00.000Z',
+        ...getActiveDates(),
       }),
     ).rejects.toThrow(HttpException);
 
@@ -354,8 +362,7 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
       service.createAssignments(testOrgId, {
         activityId: testActivityId,
         groupIds: [testGroupId1],
-        opensAt: '2026-11-01T10:00:00.000Z',
-        dueAt: '2026-11-05T18:00:00.000Z',
+        ...getActiveDates(),
       }),
     ).rejects.toMatchObject({
       status: HttpStatus.CONFLICT,
@@ -378,8 +385,7 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
       service.createAssignments(testOrgId, {
         activityId: testActivityId,
         groupIds: [testGroupId1],
-        opensAt: '2026-11-01T10:00:00.000Z',
-        dueAt: '2026-11-05T18:00:00.000Z',
+        ...getActiveDates(),
       }),
     ).rejects.toMatchObject({
       status: HttpStatus.CONFLICT,

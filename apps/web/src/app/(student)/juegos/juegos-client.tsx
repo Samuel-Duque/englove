@@ -12,13 +12,8 @@ import {
   GAME_MECHANIC_LABELS,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
 
-interface FeatureFlagsResponse {
-  flags: {
-    games: boolean;
-    extra_content: boolean;
-  };
-}
 
 export function JuegosClient() {
   const router = useRouter();
@@ -37,7 +32,8 @@ export function JuegosClient() {
       setError(null);
       try {
         // 1. Check feature flags
-        const flagRes = await apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags');
+        const flagRes = await fetchSharedFeatureFlags();
+        if (!flagRes) throw new Error('No se pudieron obtener las feature flags');
         if (!isMounted) return;
 
         const isGamesOn = Boolean(flagRes.flags?.games);

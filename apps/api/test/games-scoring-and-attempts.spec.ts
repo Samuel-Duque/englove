@@ -4,6 +4,7 @@ import { AttemptsService } from '../src/attempts/attempts.service';
 import {
   ActivityType,
   AttemptStatus,
+  ActivityStatus,
   GameMechanic,
   GameConfig,
   GameAnswerKey,
@@ -631,6 +632,57 @@ describe('SPEC-06 Microjuegos — ScoringService y AttemptsService (RF-7, RF-8, 
       expect(contRes.items.length).toBe(1);
       expect(contRes.items[0]?.canStart).toBe(true);
       expect(contRes.items[0]?.activity.mechanic).toBe(GameMechanic.memory);
+    });
+
+    it('getAssignmentsCards: en scope continuity marca canStart = false si la actividad está archivada', async () => {
+      mockPrisma.student.findFirst.mockResolvedValue({
+        id: 'stu-1',
+        memberships: [{ group_id: 'grp-1', left_at: null }],
+      });
+
+      const now = new Date();
+      const assignmentRecordArchived = {
+        id: 'asg-game-archived',
+        opens_at: new Date(now.getTime() - 10000),
+        due_at: new Date(now.getTime() + 100000),
+        cancelled_at: null,
+        activity: {
+          id: 'act-game-archived',
+          title: 'Memory Animals Archived',
+          type: ActivityType.game,
+          level: Level.A1,
+          status: ActivityStatus.archived,
+          version: 1,
+          game_detail: {
+            mechanic: GameMechanic.memory,
+          },
+        },
+      };
+
+      mockPrisma.attempt.findMany.mockResolvedValue([
+        {
+          id: 'att-archived-1',
+          assignment_id: 'asg-game-archived',
+          attempt_number: 1,
+          status: AttemptStatus.graded,
+          started_at: new Date(now.getTime() - 5000),
+          finished_at: new Date(now.getTime() - 2000),
+          graded_at: new Date(now.getTime() - 2000),
+          score: 4.5,
+          flags: [],
+          retry_granted_at: null,
+          retry_extend_until: null,
+          next_attempt: null,
+          assignment: assignmentRecordArchived,
+        },
+      ]);
+
+      const contRes = await attemptsService.listStudentAssignments('org-1', 'stu-1', {
+        scope: 'continuity',
+      });
+      expect(contRes.items.length).toBe(1);
+      expect(contRes.items[0]?.canStart).toBe(false);
+      expect(contRes.items[0]?.canContinue).toBe(false);
     });
   });
 });

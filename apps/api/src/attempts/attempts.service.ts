@@ -582,8 +582,18 @@ export class AttemptsService {
     const minPlausible =
       activity.min_plausible_seconds ?? (activity.type === ActivityType.game ? 15 : undefined);
 
-    const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};
-    const answers = payload.answers || {};
+    const payload = (attempt.payload as {
+      answers?: Record<string, unknown>;
+      processedEventIds?: string[];
+    } | null) || {};
+    const answers = {
+      ...(payload.answers || {}),
+      ...(dto.answers || {}),
+    };
+    const updatedPayload = {
+      ...payload,
+      answers,
+    };
 
     let updatedAttempt;
     let correction: Record<string, unknown> | null = null;
@@ -610,6 +620,7 @@ export class AttemptsService {
       updatedAttempt = await this.prisma.attempt.update({
         where: { id: attempt.id },
         data: {
+          payload: updatedPayload as unknown as Prisma.InputJsonValue,
           status: AttemptStatus.pending_review,
           finished_at: now,
         },
@@ -624,6 +635,7 @@ export class AttemptsService {
       updatedAttempt = await this.prisma.attempt.update({
         where: { id: attempt.id },
         data: {
+          payload: updatedPayload as unknown as Prisma.InputJsonValue,
           status: AttemptStatus.pending_review,
           finished_at: now,
         },
@@ -658,6 +670,7 @@ export class AttemptsService {
       updatedAttempt = await this.prisma.attempt.update({
         where: { id: attempt.id },
         data: {
+          payload: updatedPayload as unknown as Prisma.InputJsonValue,
           status: AttemptStatus.graded,
           score: new Prisma.Decimal(scoreResult.score),
           graded_at: now,
@@ -694,6 +707,7 @@ export class AttemptsService {
       updatedAttempt = await this.prisma.attempt.update({
         where: { id: attempt.id },
         data: {
+          payload: updatedPayload as unknown as Prisma.InputJsonValue,
           status: AttemptStatus.graded,
           score: new Prisma.Decimal(scoreResult.score),
           graded_at: now,
@@ -748,6 +762,7 @@ export class AttemptsService {
       updatedAttempt = await this.prisma.attempt.update({
         where: { id: attempt.id },
         data: {
+          payload: updatedPayload as unknown as Prisma.InputJsonValue,
           status: AttemptStatus.graded,
           score: new Prisma.Decimal(scoreResult.score),
           graded_at: now,
@@ -943,18 +958,21 @@ export class AttemptsService {
         const effectiveDueAt = latestAttempt.retry_extend_until ?? a.due_at;
         const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
 
-        const canContinue =
+        const isActivityPublished = a.activity.status !== ActivityStatus.archived && a.activity.status !== ActivityStatus.draft;
+
+        const canContinue = isActivityPublished &&
           latestAttempt.status === AttemptStatus.in_progress && now <= completeUntil;
         const retryAvailable =
           latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt;
 
         const canStart =
-          a.activity.type === ActivityType.game && gamesEnabled
+          isActivityPublished &&
+          (a.activity.type === ActivityType.game && gamesEnabled
             ? latestAttempt.status !== AttemptStatus.in_progress &&
               now >= a.opens_at &&
               now <= effectiveDueAt &&
               a.cancelled_at === null
-            : retryAvailable && now <= effectiveDueAt && a.cancelled_at === null;
+            : retryAvailable && now <= effectiveDueAt && a.cancelled_at === null);
 
         cards.push({
           id: a.id,

@@ -398,20 +398,37 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
     parseInitialExamItems(initialCfg, initialAk),
   );
 
-  // Open Question
-  const [oqPrompt, setOqPrompt] = useState(
-    getStringProp(
-      initialCfg,
-      'prompt',
-      'Describe your best friend and what you like doing together.',
-    ),
+  // Open Question (RFC-01: multi-pregunta abierta)
+  interface OqQuestionItem {
+    id: string;
+    prompt: string;
+    rubric: string;
+    maxLength: string;
+  }
+  const [oqInstructions, setOqInstructions] = useState(
+    getStringProp(initialCfg, 'instructions', ''),
   );
-  const [oqRubric, setOqRubric] = useState(
-    getStringProp(initialCfg, 'rubric', 'Grammar, vocabulary, and coherence.'),
-  );
-  const [oqMaxLength, setOqMaxLength] = useState(
-    getStringProp(initialCfg, 'maxLength', '2000'),
-  );
+  const [oqQuestions, setOqQuestions] = useState<OqQuestionItem[]>(() => {
+    if (initialCfg && typeof initialCfg === 'object' && Array.isArray((initialCfg as { items?: unknown[] }).items)) {
+      const items = (initialCfg as { items: Array<Record<string, unknown>> }).items;
+      if (items.length > 0) {
+        return items.map((it) => ({
+          id: typeof it.id === 'string' ? it.id : crypto.randomUUID(),
+          prompt: typeof it.prompt === 'string' ? it.prompt : '',
+          rubric: typeof it.rubric === 'string' ? it.rubric : '',
+          maxLength: it.maxLength ? String(it.maxLength) : '2000',
+        }));
+      }
+    }
+    return [
+      {
+        id: crypto.randomUUID(),
+        prompt: getStringProp(initialCfg, 'prompt', 'Describe your best friend and what you like doing together.'),
+        rubric: getStringProp(initialCfg, 'rubric', 'Grammar, vocabulary, and coherence.'),
+        maxLength: getStringProp(initialCfg, 'maxLength', '2000'),
+      },
+    ];
+  });
 
   // Speaking
   const [spPrompt, setSpPrompt] = useState(
@@ -547,10 +564,37 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
         items: answerKeyItems,
       };
     } else if (type === ActivityType.open_question) {
+      if (oqQuestions.length === 0) {
+        setError('Debes agregar al menos una pregunta abierta');
+        setIsSaving(false);
+        return;
+      }
+      for (let i = 0; i < oqQuestions.length; i++) {
+        const q = oqQuestions[i];
+        if (!q || !q.prompt.trim()) {
+          setError(`La pregunta ${i + 1} no puede estar vacía`);
+          setIsSaving(false);
+          return;
+        }
+      }
+      const firstQ = oqQuestions[0];
+      if (!firstQ) {
+        setError('Debes agregar al menos una pregunta abierta');
+        setIsSaving(false);
+        return;
+      }
+
       config = {
-        prompt: oqPrompt.trim(),
-        rubric: oqRubric.trim() || undefined,
-        maxLength: oqMaxLength ? parseInt(oqMaxLength, 10) : 2000,
+        instructions: oqInstructions.trim() || undefined,
+        items: oqQuestions.map((q) => ({
+          id: q.id,
+          prompt: q.prompt.trim(),
+          rubric: q.rubric.trim() || undefined,
+          maxLength: q.maxLength ? parseInt(q.maxLength, 10) : 2000,
+        })),
+        prompt: firstQ.prompt.trim(),
+        rubric: firstQ.rubric.trim() || undefined,
+        maxLength: firstQ.maxLength ? parseInt(firstQ.maxLength, 10) : 2000,
       };
       answerKey = null;
     } else if (type === ActivityType.speaking) {
@@ -866,6 +910,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
 
     try {
       const payload = buildPayload();
+      if (!payload) return;
 
       if (isEditing && initialActivity?.id) {
         const updated = await apiFetch<ActivityEditor>(
@@ -1506,50 +1551,147 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
           </div>
         )}
 
-        {/* OPEN QUESTION */}
+        {/* OPEN QUESTION (RFC-01: multi-pregunta) */}
         {type === ActivityType.open_question && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <label htmlFor="oq-prompt" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Consigna / Pregunta *
+              <label htmlFor="oq-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
+                Instrucciones generales de la actividad (opcional)
               </label>
-              <textarea
-                id="oq-prompt"
-                rows={4}
-                value={oqPrompt}
-                onChange={(e) => setOqPrompt(e.target.value)}
-                maxLength={5000}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="oq-rubric" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Rúbrica de evaluación (visible para el alumno, opcional)
-              </label>
-              <textarea
-                id="oq-rubric"
-                rows={2}
-                value={oqRubric}
-                onChange={(e) => setOqRubric(e.target.value)}
+              <input
+                id="oq-instructions"
+                type="text"
+                placeholder="Ej. Responde a las siguientes preguntas en inglés con oraciones completas."
+                value={oqInstructions}
+                onChange={(e) => setOqInstructions(e.target.value)}
                 maxLength={2000}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div>
-              <label htmlFor="oq-max-len" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Límite de caracteres de respuesta
-              </label>
-              <input
-                id="oq-max-len"
-                type="number"
-                min="1"
-                max="10000"
-                value={oqMaxLength}
-                onChange={(e) => setOqMaxLength(e.target.value)}
-                className="w-48 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
-              />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-zinc-900">
+                  Preguntas abiertas ({oqQuestions.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOqQuestions((prev) => [
+                      ...prev,
+                      {
+                        id: crypto.randomUUID(),
+                        prompt: '',
+                        rubric: '',
+                        maxLength: '2000',
+                      },
+                    ])
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <span>+</span>
+                  <span>Agregar otra pregunta</span>
+                </button>
+              </div>
+
+              {oqQuestions.map((q, idx) => (
+                <div
+                  key={q.id || idx}
+                  className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3 relative"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-zinc-600 tracking-wide">
+                      Pregunta #{idx + 1}
+                    </span>
+                    {oqQuestions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOqQuestions((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded transition-colors"
+                        aria-label={`Eliminar pregunta ${idx + 1}`}
+                      >
+                        Eliminar pregunta
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor={`oq-prompt-${idx}`}
+                      className="block text-xs font-semibold text-zinc-700 mb-1"
+                    >
+                      Consigna / Pregunta *
+                    </label>
+                    <textarea
+                      id={`oq-prompt-${idx}`}
+                      rows={3}
+                      value={q.prompt}
+                      onChange={(e) =>
+                        setOqQuestions((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, prompt: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      maxLength={5000}
+                      placeholder="Escribe la consigna en inglés..."
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor={`oq-rubric-${idx}`}
+                        className="block text-xs font-semibold text-zinc-700 mb-1"
+                      >
+                        Rúbrica (opcional)
+                      </label>
+                      <input
+                        id={`oq-rubric-${idx}`}
+                        type="text"
+                        value={q.rubric}
+                        onChange={(e) =>
+                          setOqQuestions((prev) =>
+                            prev.map((item, i) =>
+                              i === idx ? { ...item, rubric: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        maxLength={2000}
+                        placeholder="Ej. Vocabulario y tiempos verbales"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor={`oq-max-len-${idx}`}
+                        className="block text-xs font-semibold text-zinc-700 mb-1"
+                      >
+                        Límite de caracteres
+                      </label>
+                      <input
+                        id={`oq-max-len-${idx}`}
+                        type="number"
+                        min="1"
+                        max="10000"
+                        value={q.maxLength}
+                        onChange={(e) =>
+                          setOqQuestions((prev) =>
+                            prev.map((item, i) =>
+                              i === idx ? { ...item, maxLength: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -2197,14 +2339,29 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
               )}
 
               {type === ActivityType.open_question && (
-                <div className="space-y-2 bg-white p-4 rounded-xl border border-amber-200">
-                  <p className="text-sm font-semibold text-zinc-800">{oqPrompt || 'Consigna abierta'}</p>
-                  <textarea
-                    disabled
-                    placeholder="Aquí el alumno escribirá su respuesta..."
-                    className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-500"
-                    rows={3}
-                  />
+                <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
+                  {oqInstructions && (
+                    <div className="p-2.5 bg-amber-50 rounded-lg text-xs text-amber-900 border border-amber-200 font-medium">
+                      <strong>Instrucciones:</strong> {oqInstructions}
+                    </div>
+                  )}
+                  {oqQuestions.map((q, idx) => (
+                    <div key={q.id || idx} className="space-y-1.5 p-3 rounded-lg border border-amber-100 bg-amber-50/30">
+                      <p className="text-xs font-bold text-amber-900">
+                        {oqQuestions.length > 1 ? `Pregunta ${idx + 1}:` : 'Consigna:'}
+                      </p>
+                      <p className="text-sm font-semibold text-zinc-800">{q.prompt || 'Sin consigna'}</p>
+                      {q.rubric && (
+                        <p className="text-[11px] text-zinc-500 italic">Rúbrica: {q.rubric}</p>
+                      )}
+                      <textarea
+                        disabled
+                        placeholder="Aquí el alumno escribirá su respuesta..."
+                        className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-400 bg-white"
+                        rows={2}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -2239,10 +2396,14 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                 let previewConfig: GamePublicConfig | null;
                 try {
                   const payload = buildPayload();
-                  previewConfig = {
-                    ...(payload.config as GamePublicConfig),
-                    answerKey: (payload.answerKey as GameAnswerKey) || undefined,
-                  };
+                  if (!payload) {
+                    previewConfig = null;
+                  } else {
+                    previewConfig = {
+                      ...(payload.config as GamePublicConfig),
+                      answerKey: (payload.answerKey as GameAnswerKey) || undefined,
+                    };
+                  }
                 } catch {
                   previewConfig = null;
                 }

@@ -98,6 +98,7 @@ export interface SubmitEventsResponse {
 export interface CompleteAttemptInput {
   mediaId?: string;
   clientFinishedNotice?: boolean;
+  answers?: Record<string, unknown>;
 }
 
 export interface AttemptResponse {

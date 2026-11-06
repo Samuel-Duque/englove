@@ -637,6 +637,74 @@ describe('SPEC-07: ReviewsService — Calificación, feedback, retención y nuev
         'My favorite animal is the panda because it sleeps a lot.',
       );
     });
+
+    it('RFC-01: extrae multiples preguntas abiertas y mapea respuestas individuales de cada ítem', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValue({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        status: AttemptStatus.pending_review,
+        score: null,
+        attempt_number: 1,
+        assignment_id: assignmentId,
+        payload: {
+          answers: {
+            '11111111-1111-4111-8111-111111111101': 'I like dogs because they are friendly.',
+            '11111111-1111-4111-8111-111111111102': 'They eat meat and dog food.',
+          },
+        },
+        student: { id: studentId, age_segment: AgeSegment.teens, user: { name: 'Carlos Teens' } },
+        assignment: {
+          id: assignmentId,
+          due_at: new Date('2026-10-30T18:00:00Z'),
+          cancelled_at: null,
+          group: { id: 'g-1', name: 'Teens B1' },
+          activity: {
+            id: 'act-oq-multi',
+            title: 'Multi-Question Essay',
+            type: ActivityType.open_question,
+            open_question_detail: {
+              config: {
+                instructions: 'Answer all questions.',
+                items: [
+                  {
+                    id: '11111111-1111-4111-8111-111111111101',
+                    prompt: 'What animal do you like?',
+                    rubric: 'Check animal vocabulary.',
+                  },
+                  {
+                    id: '11111111-1111-4111-8111-111111111102',
+                    prompt: 'What do they eat?',
+                    rubric: 'Check food vocabulary.',
+                  },
+                ],
+              },
+            },
+          },
+        },
+        review: null,
+        media_assets: [],
+      });
+
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+
+      const detail = await service.getReviewDetail(orgId, attemptId);
+
+      expect(detail.activity.type).toBe(ActivityType.open_question);
+      expect(detail.items.length).toBe(2);
+      expect(detail.items[0]?.id).toBe('11111111-1111-4111-8111-111111111101');
+      expect(detail.items[0]?.prompt).toBe('What animal do you like?');
+      expect(detail.items[0]?.rubricText).toBe('Check animal vocabulary.');
+      expect(detail.answers['11111111-1111-4111-8111-111111111101']).toBe(
+        'I like dogs because they are friendly.',
+      );
+
+      expect(detail.items[1]?.id).toBe('11111111-1111-4111-8111-111111111102');
+      expect(detail.items[1]?.prompt).toBe('What do they eat?');
+      expect(detail.answers['11111111-1111-4111-8111-111111111102']).toBe(
+        'They eat meat and dog food.',
+      );
+    });
   });
 
   describe('RF-12: Anti-IDOR isolation', () => {

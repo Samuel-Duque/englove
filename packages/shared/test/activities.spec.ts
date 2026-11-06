@@ -7,6 +7,7 @@ import {
   FillBlankItemSchema,
   parseFillBlankSimpleSyntax,
   OpenQuestionConfigSchema,
+  getOpenQuestionItems,
   SpeakingConfigSchema,
   MatchSettingsSchema,
   OrderWordsSettingsSchema,

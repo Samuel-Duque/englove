@@ -36,7 +36,7 @@ Reutiliza identidad, consultas de alumnos y correo de [SPEC-01](./SPEC-01-scaffo
 
 **RF-4 — Pregunta abierta.** ENG-035; CONTEXT §5.1.
 
-- **Dado** una consigna y criterios/límite opcionales **Cuando** guarda **Entonces** conserva `open_question` sin clave ni nota automática; los criterios son texto pedagógico público, no una respuesta correcta oculta.
+- **Dado** una consigna y criterios/límite opcionales (formato clásico monoriguroso) o una lista de preguntas abiertas con instrucciones generales (RFC-01) **Cuando** guarda **Entonces** conserva `open_question` (soportando tanto consigna única como lista de ítems `items: [{ id, prompt, rubric?, maxLength? }]`) sin clave ni nota automática; los criterios/rúbricas son texto pedagógico público, no una respuesta correcta oculta.
 
 **RF-5 — Speaking.** ENG-036; decisión 47.
 
@@ -153,7 +153,7 @@ Textos recortados, sin HTML; título/nombre de grupo 1–100 caracteres, consign
 | Tipo | `config` | `answerKey` / respuestas futuras |
 | --- | --- | --- |
 | `fill_blank` | `{ instructions?, items: [{ id, prompt, blanks: [{ id, options: [{ id, text }] }] }] }`; ≥1 oración/hueco; `prompt` usa `{{blankId}}` exactamente una vez por hueco, sin marcadores huérfanos | `{ items: { [itemId]: { [blankId]: optionId } } }`; respuestas con igual estructura parcial; ausencia = omitida |
-| `open_question` | `{ prompt, rubric?, maxLength? }`; límite entero 1–10000, default 2000; rubric pública | Sin clave; respuestas `{ text }`, hasta límite |
+| `open_question` | Clásico: `{ prompt, rubric?, maxLength? }` o Multi-pregunta (RFC-01): `{ instructions?, items: [{ id, prompt, rubric?, maxLength? }] }` (1–50 preguntas); límite entero 1–10000, default 2000 por pregunta; rúbricas públicas | Sin clave; respuestas `{ text }` o mapa `{ [itemId]: text }`, hasta límite |
 | `speaking` | `{ prompt, exampleUrl?, minDurationSeconds: 2, maxDurationSeconds: 120 }`, rango RF-5; exampleUrl HTTPS o ausente | Sin clave; grabación/entrega en SPEC-05 |
 | `exam` | `{ instructions?, items: [{ id, prompt, blanks, weight }] }`; reutiliza oración anterior, permite 0/1 en borrador; al publicar ≥2 | Mapa `items[itemId][blankId] = optionId`; respuestas parciales, misma estructura |
 | `game` | `{ mechanic, instructions?, settings }`; unión discriminada siguiente | `{ solution }` según mecánica; nunca un diccionario sin validar |

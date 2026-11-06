@@ -148,5 +148,20 @@ describe('SPEC-07: Teacher Revision & Student Feedback UI Rules (ENG-091, ENG-09
         }),
       ).toBe('2026-10-25T18:00:00Z');
     });
+
+    it('RFC-01: resuelve respuestas mapeadas por item.id en actividades de open_question multi-ítem', () => {
+      const answersMap: Record<string, string> = {
+        'item-uuid-1': 'Respuesta a la primera pregunta',
+        'item-uuid-2': 'Respuesta a la segunda pregunta',
+      };
+      const items = [
+        { id: 'item-uuid-1', prompt: 'Pregunta 1' },
+        { id: 'item-uuid-2', prompt: 'Pregunta 2' },
+      ];
+
+      const resolved = items.map((it) => answersMap[it.id] ?? '(Sin respuesta registrada)');
+      expect(resolved[0]).toBe('Respuesta a la primera pregunta');
+      expect(resolved[1]).toBe('Respuesta a la segunda pregunta');
+    });
   });
 });

@@ -28,10 +28,13 @@ export function resolveActivityDurations(
       defaultMinPlausible = 3;
       break;
 
-    case ActivityType.open_question:
-      defaultExpected = 180;
-      defaultMinPlausible = 3;
+    case ActivityType.open_question: {
+      const cfg = config as { items?: unknown[] } | undefined;
+      const count = Array.isArray(cfg?.items) ? Math.max(1, cfg.items.length) : 1;
+      defaultExpected = 180 * count;
+      defaultMinPlausible = 3 * count;
       break;
+    }
 
     case ActivityType.speaking: {
       const cfg = config as { maxDurationSeconds?: number } | undefined;

@@ -279,13 +279,25 @@ export class ReviewsService {
         rubric_text?: string;
         rubricText?: string;
         sample_answer?: string;
+        items?: Array<{ id: string; prompt?: string; rubric?: string; rubricText?: string }>;
       };
-      items.push({
-        id: act.id,
-        prompt: config.prompt,
-        rubricText: config.rubric || config.rubricText || config.rubric_text || null,
-        correctAnswer: config.sample_answer || null,
-      });
+      if (Array.isArray(config.items) && config.items.length > 0) {
+        for (const it of config.items) {
+          items.push({
+            id: it.id,
+            prompt: it.prompt,
+            rubricText: it.rubric || it.rubricText || null,
+            correctAnswer: null,
+          });
+        }
+      } else {
+        items.push({
+          id: act.id,
+          prompt: config.prompt,
+          rubricText: config.rubric || config.rubricText || config.rubric_text || null,
+          correctAnswer: config.sample_answer || null,
+        });
+      }
     } else if (act.type === ActivityType.speaking && act.speaking_detail) {
       items.push({
         id: act.id,
@@ -311,7 +323,16 @@ export class ReviewsService {
     }
 
     const payloadObj = (attempt.payload as { answers?: Record<string, unknown> }) || {};
-    const answers = { ...(payloadObj.answers || {}) };
+    let rawAnswers = payloadObj.answers || {};
+    if (
+      rawAnswers &&
+      typeof rawAnswers === 'object' &&
+      'items' in rawAnswers &&
+      typeof (rawAnswers as { items: unknown }).items === 'object'
+    ) {
+      rawAnswers = { ...rawAnswers, ...(rawAnswers as { items: Record<string, unknown> }).items };
+    }
+    const answers = { ...rawAnswers };
 
     // If open_question, bridge answers['text'] with answers[act.id]
     if (act.type === ActivityType.open_question) {

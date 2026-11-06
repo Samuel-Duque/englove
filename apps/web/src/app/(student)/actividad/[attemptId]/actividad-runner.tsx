@@ -12,6 +12,7 @@ import {
   ExamConfig,
   GamePublicConfig,
   GameAnswers,
+  getOpenQuestionItems,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { GameRenderer } from '../../../../components/activities/GameRenderer';
@@ -19,8 +20,8 @@ import { fireCelebrationConfetti } from '../../../../lib/confetti';
 import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
 import { setActiveAttemptState } from '../../../../lib/pwa-manager';
-import { enqueueEvent, enqueueUpload } from '../../../../lib/offline-queue';
-import { OfflineStatusBanner } from '../../../../components/offline-status-banner';
+import { enqueueEvent, enqueueUpload, triggerFlush } from '../../../../lib/offline-queue';
+import { fetchSharedProfile } from '../../../../lib/auth-session';
 
 interface ActividadRunnerProps {
   attemptId: string;
@@ -163,6 +164,12 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     return new Promise((resolve) => {
       try {
         const req = window.indexedDB.open('englove_storage', 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('pendingUploads')) {
+            db.createObjectStore('pendingUploads', { keyPath: 'attemptId' });
+          }
+        };
         req.onsuccess = () => {
           try {
             const db = req.result;
@@ -195,7 +202,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       try {
         const [data, profile] = await Promise.all([
           apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`),
-          apiFetch<{ user?: { id?: string }; student?: { ageSegment?: 'kids' | 'teens' } }>('/api/v1/me').catch(() => null),
+          fetchSharedProfile().catch(() => null),
         ]);
         if (isMounted) {
           if (profile?.user?.id) {
@@ -265,7 +272,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         eventType: 'answered',
         payload: { itemId, answer },
         attemptToken,
-      }).then(() => {});
+      })
+        .then(() => {})
+        .catch((err) => {
+          console.warn('[OfflineQueue] Fallback no fatal al encolar evento:', err);
+        });
 
       pendingEventsRef.current.add(promise);
       promise.finally(() => {
@@ -394,6 +405,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
     const attemptToken = runtime.attemptToken;
 
+    const effectiveAnswers = overrideAnswers
+      ? { ...answers, ...overrideAnswers }
+      : answers;
+
     if (overrideAnswers) {
       setAnswers((prev) => ({ ...prev, ...overrideAnswers }));
       for (const [itemId, value] of Object.entries(overrideAnswers)) {
@@ -406,6 +421,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     try {
       if (pendingEventsRef.current.size > 0) {
         await Promise.allSettled(Array.from(pendingEventsRef.current));
+      }
+
+      // Flush queued events before completing to sync events (ISSUE-05)
+      try {
+        await triggerFlush();
+      } catch (flushErr) {
+        console.warn('[OfflineQueue] Flush previo a entrega no fatal:', flushErr);
       }
 
       if (runtime.activity.type === ActivityType.speaking) {
@@ -433,6 +455,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         }
       }
 
+      const completeBody: Record<string, unknown> = {
+        ...(finalMediaId ? { mediaId: finalMediaId } : {}),
+      };
+      if (effectiveAnswers && Object.keys(effectiveAnswers).length > 0) {
+        completeBody.answers = effectiveAnswers;
+      }
+
       const res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
         method: 'POST',
         headers: {
@@ -441,9 +470,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           Origin: window.location.origin,
         },
         credentials: 'include',
-        body: JSON.stringify({
-          ...(finalMediaId ? { mediaId: finalMediaId } : {}),
-        }),
+        body: JSON.stringify(completeBody),
       });
 
       if (!res.ok) {
@@ -479,7 +506,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           attemptId,
           clientEventId: compEventId,
           eventType: 'completed',
-          payload: { ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}) },
+          payload: {
+            ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}),
+            answers: effectiveAnswers,
+          },
           attemptToken,
         });
 
@@ -700,11 +730,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     minDurationSeconds?: number;
     maxDurationSeconds?: number;
   };
-  const openQConfig = activity.config as { prompt?: string };
+  const openQItems = getOpenQuestionItems(activity.config, activity.id);
+  const openQInstructions = (activity.config as { instructions?: string })?.instructions;
 
   return (
     <div className="max-w-3xl mx-auto py-6 space-y-6">
-      <OfflineStatusBanner />
 
       {/* Activity Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-amber-200/80 shadow-xs">
@@ -933,39 +963,73 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           </div>
         )}
 
-        {/* Open Question Type */}
+        {/* Open Question Type (RFC-01: multi-pregunta y monoriguroso) */}
         {activity.type === ActivityType.open_question && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-1">
-                  Pregunta abierta
-                </h3>
-                <p className="text-base font-semibold leading-relaxed">
-                  {openQConfig?.prompt || 'Escribe tu respuesta a continuación en inglés:'}
-                </p>
+          <div className="space-y-6">
+            {openQInstructions && (
+              <div className="p-4 rounded-2xl bg-amber-100/70 border border-amber-300 text-amber-950">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block mb-1">
+                  Instrucciones generales
+                </span>
+                <p className="text-sm font-medium">{openQInstructions}</p>
               </div>
-              {hasTtsSupport && (
-                <button
-                  type="button"
-                  onClick={() => speakText(openQConfig?.prompt || 'Escribe tu respuesta a continuación en inglés:')}
-                  className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shrink-0 cursor-pointer"
-                  aria-label="Escuchar consigna"
-                >
-                  <span aria-hidden="true">🔊</span> Escuchar
-                </button>
-              )}
-            </div>
-            <textarea
-              id="open-question-answer"
-              aria-label="Tu respuesta en inglés"
-              disabled={isFinished}
-              rows={6}
-              value={(answers['text'] as string) || ''}
-              onChange={(e) => handleAnswerChange('text', e.target.value)}
-              placeholder="Escribe aquí tu respuesta detallada…"
-              className="w-full rounded-2xl border border-amber-300 p-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
-            />
+            )}
+
+            {openQItems.map((item, idx) => {
+              const itemAnswer =
+                (answers[item.id] as string) ??
+                (idx === 0 ? (answers['text'] as string) : '') ??
+                '';
+              const maxLen = item.maxLength || 2000;
+
+              return (
+                <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white border border-amber-200 shadow-xs">
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-1">
+                        {openQItems.length > 1 ? `Pregunta ${idx + 1}` : 'Pregunta abierta'}
+                      </h3>
+                      <p className="text-base font-semibold leading-relaxed">
+                        {item.prompt || 'Escribe tu respuesta a continuación en inglés:'}
+                      </p>
+                    </div>
+                    {hasTtsSupport && (
+                      <button
+                        type="button"
+                        onClick={() => speakText(item.prompt || 'Escribe tu respuesta a continuación en inglés:')}
+                        className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shrink-0 cursor-pointer"
+                        aria-label={`Escuchar consigna ${idx + 1}`}
+                      >
+                        <span aria-hidden="true">🔊</span> Escuchar
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <textarea
+                      id={`open-question-answer-${item.id}`}
+                      aria-label={`Tu respuesta en inglés para pregunta ${idx + 1}`}
+                      disabled={isFinished}
+                      rows={openQItems.length > 1 ? 4 : 6}
+                      maxLength={maxLen}
+                      value={itemAnswer}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleAnswerChange(item.id, val);
+                        if (idx === 0) {
+                          handleAnswerChange('text', val);
+                        }
+                      }}
+                      placeholder="Escribe aquí tu respuesta detallada…"
+                      className="w-full rounded-2xl border border-amber-300 p-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
+                    />
+                    <div className="flex justify-end text-[11px] font-semibold text-zinc-400">
+                      <span>{itemAnswer.length} / {maxLen} caracteres</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

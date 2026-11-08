@@ -6,7 +6,9 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-11-04. SPEC-01 a SPEC-10 figuran Verificadas (Etapa 10: tareas ENG-120 y ENG-121 completadas con 537/537 tests en monorepo: 65 shared, 333 api, 139 web, suite Playwright E2E y axe 8/8 en Chromium, guardrails en verde; Etapa 9: tareas ENG-110 a ENG-113 completadas con 492 tests y axe sin violaciones; decisiones 124 a 126 de CONTEXT §14 formalizadas y cubiertas: preparación docente con flag apagado, filtrado por nivel MCER y generales, y ordenamiento determinista con reordenamiento transaccional y tope de 200). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-10](../specs/SPEC-10-contenido-extra.md) en estado `Verificada`.
+> Última actualización: 2026-11-08. Se añade la **Etapa 12 «Calidad y remediación»** (decisiones 127 a 129 de CONTEXT §14, más las decisiones 130 a 137 que cierran todas sus preguntas Q-01 a Q-08; spec `SPEC-11` lista para redactar; tareas ENG-150 a ENG-162, DOC-09 y ENG-143 reasignada), que se ejecuta antes de cerrar la Etapa 11 (§2.1, §4). No añade funcionalidades, salvo la excepción única de la decisión 137 (ENG-162). SPEC-01 a SPEC-10 permanecen Verificadas con las cifras de la actualización siguiente.
+>
+> Actualización anterior: 2026-11-04. SPEC-01 a SPEC-10 figuran Verificadas (Etapa 10: tareas ENG-120 y ENG-121 completadas con 537/537 tests en monorepo: 65 shared, 333 api, 139 web, suite Playwright E2E y axe 8/8 en Chromium, guardrails en verde; Etapa 9: tareas ENG-110 a ENG-113 completadas con 492 tests y axe sin violaciones; decisiones 124 a 126 de CONTEXT §14 formalizadas y cubiertas: preparación docente con flag apagado, filtrado por nivel MCER y generales, y ordenamiento determinista con reordenamiento transaccional y tope de 200). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-10](../specs/SPEC-10-contenido-extra.md) en estado `Verificada`.
 >
 > Actualización anterior: 2026-10-28. SPEC-01 a SPEC-08 figuran Verificadas (tareas ENG-100 a ENG-104 completadas con 451/451 tests en monorepo: 58 shared, 298 api, 95 web, suite E2E en PostgreSQL real con Docker, presupuesto de latencia < 500 ms con seed de volumen, guardrails en verde; tareas ENG-090 a ENG-096 completadas con 407/407 tests en monorepo, suite E2E en PostgreSQL real y job nocturno de retención de audios en R2; decisiones 112 a 115 de CONTEXT §14 formalizadas y cubiertas: tendencia a 30 días y semanal en vista de grupo, filtro canónico de `game`, ventana de 3 días en `ScheduledJobRun` y filtrado por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-08](../specs/SPEC-08-estadisticas.md) en estado `Verificada`.
 >
@@ -21,7 +23,7 @@
 1. Principios de ejecución
 2. Mapa de etapas e hitos
 3. Definición de Hecho
-4. Etapas del piloto (0 a 11)
+4. Etapas del piloto (0 a 12)
 5. Observaciones al orden decidido
 6. Después del piloto: Fase 2 y Fase 3
 7. Riesgos transversales
@@ -60,11 +62,14 @@ flowchart LR
   E7 --> E8
   E8 --> E9["9 PWA / offline / a11y"]
   E5 -.-> E10["10 Contenido extra"]
-  E9 --> E11["11 Lanzamiento"]
-  E10 --> E11
+  E9 --> E12["12 Calidad y remediación"]
+  E10 --> E12
+  E12 -- "SPEC-11 Verificada" --> E11["11 Lanzamiento"]
 ```
 
 Las líneas discontinuas indican trabajo que puede ejecutarse en paralelo con la etapa a la que apuntan. Las Etapas 6 y 7 comparten dependencia (la 5) y pueden solaparse si hay más de una persona.
+
+**La Etapa 12 va antes de cerrar la Etapa 11 (Decidido, decisión 127).** Se numera 12 porque se planificó después de la 11 y no se renumera nada, pero la secuencia de ejecución es 10 → 12 → 11: las tareas de decisión de lanzamiento y de producción (ENG-137 y ENG-138) dependen de ENG-161, el cierre de la Etapa 12. La preparación y las tareas de la Etapa 11 que no dependen del código corregido (por ejemplo, la carga de contenido de la profesora, ENG-135) pueden avanzar en paralelo.
 
 **Secuencia de arranque (Decidido, CONTEXT §14, decisión 65).** La Etapa 0 no es paralela a las Etapas 1 y 2 en lo que respecta a sus dependencias obligatorias:
 
@@ -94,11 +99,14 @@ Supuesto: una persona full-stack senior a tiempo completo. Con dos personas, las
 | 9     | PWA, offline y accesibilidad | M      | 1.5–2                      |
 | 10    | Contenido extra              | S      | 0.5                        |
 | 11    | Lanzamiento                  | M      | 1–2                        |
-|       | **Total**                    |        | **18–24 semanas (una persona)** |
+| 12    | Calidad y remediación        | L      | 3–4 (Propuesto; se ejecuta antes de cerrar la Etapa 11) |
+|       | **Total**                    |        | **21–28 semanas (una persona)** |
 
 La redacción de specs (SDD) no añade semanas a partir de SPEC-02: se hace en paralelo con la etapa anterior y su coste ya está dentro de estos rangos. SPEC-00 y SPEC-01 sí están en la ruta crítica, dentro de la semana de Etapa 0 que precede a la Etapa 1.
 
 **Corrección del calendario (2026-09-28, decisión 65).** El total anterior, "12–13 semanas (3 meses)", trataba la Etapa 0 como completamente paralela y además no coincidía con la suma de las filas de esta tabla (17–23 semanas para las Etapas 1 a 11), ni con el riesgo de §7 ("total 17–24 semanas" con una persona). El total corregido suma las Etapas 1 a 11 (17–23) más la semana de Etapa 0 en la ruta crítica: **18–24 semanas con una persona; aproximadamente 16,5–22 con dos personas** solapando las Etapas 6 y 7. Los tamaños por etapa no cambian.
+
+**Etapa 12 (2026-11-08, decisión 127).** El total de la tabla suma la Etapa 12 (3–4 semanas) a las 18–24 anteriores: **21–28 semanas con una persona**. La cifra para dos personas no se recalcula; la Etapa 12 se divide por áreas independientes (ENG-150 a ENG-160 y ENG-162) y se solapa según la disponibilidad. Es una estimación orientativa y no un compromiso.
 
 ### 2.3 Hitos
 
@@ -107,7 +115,7 @@ La redacción de specs (SDD) no añade semanas a partir de SPEC-02: se hace en p
 | **H1 — La profesora puede crear contenido** | Recibe acceso al panel en staging y empieza a cargar actividades reales | Etapa 3              |
 | **H2 — Un alumno completa una actividad**   | El ciclo Activity → Assignment → Attempt funciona de punta a punta      | Etapa 5              |
 | **H3 — Ciclo pedagógico completo**          | Grabar → calificar → recibir feedback, el corazón del producto          | Etapa 7              |
-| **H4 — Listo para el piloto**               | Condiciones de CONTEXT §12.11 cumplidas; decisión go/no-go              | Etapa 11             |
+| **H4 — Listo para el piloto**               | Condiciones de CONTEXT §12.11 cumplidas, incluida la Etapa 12 verificada; decisión go/no-go | Etapa 11 (con Etapa 12 cerrada) |
 
 ---
 
@@ -125,6 +133,7 @@ Una tarea o etapa está Hecha cuando:
 - [ ] No construye nada de CONTEXT §2.4.
 - [ ] Interfaz en español, identificadores en inglés.
 - [ ] Si cerró un pendiente de CONTEXT §15 o cambió una decisión de §14, CONTEXT se actualizó en el mismo cambio.
+- [ ] Si la tarea corrige un hallazgo (Etapa 12, decisión 129), tiene al menos una prueba de regresión nombrada por el identificador del hallazgo que falla sin la corrección, ejecutada en el entorno real donde el defecto aparece, y su fila de la matriz hallazgo → tarea → prueba de `SPEC-11` está completa.
 - [ ] El taskboard refleja el nuevo estado y, si era la última tarea de una spec, la spec pasó a Implementada (y a Verificada cuando sus pruebas pasan en CI).
 
 ---
@@ -572,7 +581,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - **Manual de uso de la profesora (Decidido, decisión 34 §19):** documento en español, tono casual y conversacional, que cubre alumnos (incluido cuándo usar el cambio administrativo del correo), grupos, actividades, asignaciones (con la tolerancia de 24 h), calificación, feedback, nuevo intento con plazo, estadísticas, bloqueados y configuración, con capturas o descripciones de cada flujo; entregado como `.md` o como sección de ayuda del panel.
 - Alumnos activos auto-registrados y aprobados desde la bandeja antes del primer día; prueba de login de una muestra en producción.
 - Checklist de lanzamiento y reunión go/no-go.
-- Todas las specs SPEC-01 a SPEC-10 en estado Verificada.
+- Todas las specs SPEC-01 a SPEC-11 en estado Verificada (la Etapa 12 se cierra antes).
 
 **Entregables.** Producción desplegada; manual entregado; checklist firmada.
 
@@ -584,15 +593,63 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 - Restauración de backup ensayada con éxito al menos una vez.
 - Los tres E2E verdes en la versión que se despliega.
 - Captura de errores recibiendo eventos de producción.
-- Ninguna spec en estado distinto de Verificada u Obsoleta.
+- Ninguna spec en estado distinto de Verificada u Obsoleta (incluida SPEC-11).
 
-**Dependencias.** Todas las anteriores.
+**Dependencias.** Todas las anteriores, incluida la Etapa 12 (ENG-137 y ENG-138 dependen de ENG-161, decisión 127).
 
 **Riesgos.** Alumnos que no consiguen entrar el primer día por contraseñas olvidadas; mitigación: la profesora envía el enlace de recuperación a un clic desde la ficha del alumno y tiene la pestaña de bloqueados visible. Nombre definitivo del producto sin decidir: se lanza con "Englove" como provisional (CONTEXT §15).
 
 **Tamaño.** M, 1–2 semanas, más el tiempo de carga de contenido de la profesora, que empieza en H1.
 
-**Tareas.** ENG-130 a ENG-132, ENG-135, ENG-137 a ENG-139, DOC-06. (ENG-136 se eliminó el 2026-09-22 por la decisión 34 §2; DOC-06 es nueva: manual de la profesora.)
+**Tareas.** ENG-130 a ENG-132, ENG-135, ENG-137 a ENG-139, DOC-06. (ENG-136 se eliminó el 2026-09-22 por la decisión 34 §2; DOC-06 es nueva: manual de la profesora; ENG-143 pasó a la Etapa 12 el 2026-11-08, decisión 127.)
+
+---
+
+### Etapa 12 — Calidad y remediación (CONTEXT §12.12) → compuerta de calidad del Hito H4
+
+**Objetivo.** Corregir los errores, incongruencias, brechas de seguridad, defectos de accesibilidad y código no limpio recogidos en `AUDITORIA.md` (2026-11-05) y en `testing-issues/` (2026-11-06), y demostrarlo con pruebas de regresión, de modo que el producto llegue al lanzamiento sin hallazgos críticos ni altos abiertos. Es una etapa de calidad: **no añade funcionalidades, salvo la excepción única y expresa de la decisión 137 (ranking de juegos y panel «Práctica en juegos», ENG-162), y no construye nada de CONTEXT §2.4** (decisión 127).
+
+**Alcance.** Se organiza por áreas; cada tarea cubre un conjunto de hallazgos y lleva sus pruebas (decisión 129). El detalle de requisitos y criterios lo fijará `SPEC-11`.
+
+- **Microjuegos y decisión 111 (ENG-150):** implementar la decisión 130 (microjuegos abiertos a todos los estudiantes, sin `Assignment` y sin filtro por nivel) en esquema, API, seeds y `/juegos`, y corregir la contradicción interna de `SPEC-06` (§1–§4 frente a §5–§7); migración que descarta los intentos y asignaciones de microjuegos de prueba sin migrar datos (decisión 136); verificación de `ISSUE-05` e `ISSUE-07`.
+- **Sesión y autenticación (ENG-151):** `JWT_SECRET` obligatorio fuera de `local` y token de intento separado por tipo (`SEC-01`); `logout` que solo revoca con prueba criptográfica (`SEC-04`); carrera del OTP de cambio de correo (`SEC-05`); cookies leídas solo por prefijo y validación de `exp` en `proxy.ts` (`SEC-08`); cotas de `LoginDto` y de concurrencia de Argon2id (`SEC-09c`); saneamiento del parámetro `next` (`SEC-09f`); renovación automática ante `401` con una sola petición de refresco en vuelo y conexión real de `auth-session`.
+- **Aislamiento de tenant y concurrencia (ENG-152):** cobertura de `TenantPrismaExtension` y fallo cerrado sin contexto (`SEC-09a`); supresión errónea de `students.service` y `me.controller` (`G-A06`, `G-A11`); carreras en `completeAttempt`, `submitReview`, `failed_login_count` y `rejectStudent` (`SEC-09d`).
+- **Persistencia y robustez del backend (ENG-153):** `pg.Pool` acotado y cerrado en `onModuleDestroy` (`G-A03`); cotas de `SubmitEventsDto` y de `Attempt.payload` (`SEC-07`); límite de cuerpo HTTP; `RateLimiterService` sin fuga de memoria y `/health` fuera del límite (`SEC-09b`); sin `@Optional()` en servicios críticos; índices parciales y `CHECK` protegidos por prueba, índice de `MediaAsset.student_id`; `seed-volume` válido; códigos `422 SCORE_OUT_OF_RANGE` y `422 SCORE_NOT_EDITABLE` según SPEC-07.
+- **Audio `speaking` en el servidor (ENG-154):** cota firmada y validada del tamaño subido, descarga por streaming a disco, intentos de transcodificación contados antes de descargar y duración medida con `ffprobe` real (`SEC-03`, `G-B13`, `G-C08`); expresión regular de `mimeType` compatible con Firefox y Safari; endpoints `mock-upload` y `mock-stream` solo en `local` y error real si falla la firma (`SEC-06`); cabecera CORP de `helmet` (`ISSUE-01`).
+- **Cola offline, IndexedDB y dispositivos compartidos (ENG-155):** `ActividadRunner` (reinicio de `mediaId`, auto-parada, falso «guardado sin conexión»); `deleteDatabase` e IndexedDB unificada, purga y filtro por `activeUserId` en login y vaciado (`SEC-02`, `G-C13`, `ISSUE-04`, `ISSUE-05`); salida del bucle de audio inválido en `offline-queue`; Service Worker con Serwist (decisión 135) con versión y precaché por build; manifiesto único; un solo `OfflineStatusBanner` (`ISSUE-08`); micro-batching anti-429 (`ISSUE-09`); mensaje correcto cuando el micrófono no está disponible por contexto inseguro.
+- **Lógica de negocio y contratos (ENG-156):** `correctAnswer` en `/revision` y `buildExistingCompletionView` (omisión tipada de `answer_key`); `GET /groups/:id/members` con DTO (`ISSUE-02`); calendario de rachas y semanas perdonadas; `WEB_BASE_URL` en notificaciones y enlace absoluto en `teacher-pending-summary` con registro correcto en `ScheduledJobRun`; contrato de `open_question` alineado con SPEC-05 §5 y con `RFC-01`; aviso previo y confirmación de la profesora al cambiar de grupo a un alumno con nuevo intento concedido sin consumir, que se pierde (decisión 131); estrellas de microjuegos de 0 a 3 con mensajes motivadores, como indicador de práctica y no como nota (decisión 132); ruta pública `/terminos` y enlace desde `/registro`; edad con `America/Bogota` en el job mensual y fechas de la interfaz; notas con coma decimal; copia y formularios de `ISSUE-06`; verificación de `ISSUE-03`.
+- **Rendimiento de estadísticas (ENG-157):** eliminar el N+1 de `StatsService` y la carga de todo el historial de `ProgressEvent`, con presupuesto < 500 ms de SPEC-08 RF-4 verificado con `seed-volume`.
+- **Ranking de juegos y panel «Práctica en juegos» (ENG-162, decisión 137; única funcionalidad nueva de la etapa):** los microjuegos salen del promedio de rendimiento, de las series de notas y del leaderboard de notas; nueva sección «Práctica en juegos» con cuándo y por cuánto tiempo practicó cada estudiante, partidas y estrellas por partida; ranking de juegos privado de la profesora por puntos de juego derivados de las estrellas. Los estudiantes no ven rankings ni puntos.
+- **Tipado estricto y limpieza de código (ENG-158):** sustituir las aserciones ciegas `as Type` por validación (`safeParse` de Zod, `omit` tipado, `toPublicConfig` usado de verdad); retirar `fluent-ffmpeg` y otras dependencias muertas; ampliar `check-guardrails.mjs` para detectar `as Type` y revisar las 54 supresiones `guardrails-ignore`; enlaces externos `https:` revalidados al renderizar.
+- **Páginas del cliente (ENG-143, reasignada desde la Etapa 11):** completar la migración a TanStack Query y RSC por defecto en las 15 rutas `page.tsx` que declaran `'use client'` en la raíz (`G-B04`), con `metadata` por ruta.
+- **Accesibilidad y UI (ENG-159):** contraste del tema Teens, controles interactivos anidados, foco y `aria-live` en microjuegos, diálogos con trampa de foco, `Escape` y etiquetas, enlace «Saltar al contenido», lectura en voz alta en microjuegos (SPEC-09 RF-22), objetivos táctiles, etiqueta visible igual a la accesible, sustitución de `alert` y `confirm` nativos; objetivo WCAG 2.2 AA (decisión 133); `axe` con `wcag22aa` ampliado a rutas autenticadas.
+- **Entorno local reproducible (ENG-160):** `docker-compose.yml` y `.env.example` coherentes (puerto de PostgreSQL, `R2_ENDPOINT`, bucket y CORS locales, `JWT_SECRET`, `WEB_BASE_URL`, `COOKIE_PREFIX` también en la web) con MinIO y Mailpit estándar para probar el almacenamiento de audios y los correos (decisión 134).
+- **Alineación documental (DOC-09):** unificar estados, conteos y números de decisión entre `AGENTS.md`, `README.md`, CONTEXT, architecture, sdd-process, taskboard e informes; retirar las referencias vigentes a decisiones revocadas (Howler.js, decisión 107; `NetworkFirst` para la API, decisiones 116 y 117); alinear las dependencias declaradas con las instaladas (Zod, Framer Motion; Serwist queda instalado por la decisión 135); corregir referencias a secciones inexistentes y la decisión 110 (`submitted`); y sincronizar las skills propias con sus tres copias.
+- **Cierre y regresión (ENG-161):** matriz hallazgo → tarea → prueba completa; suite de regresión en PostgreSQL real, navegador real y almacenamiento S3 local; Playwright con `axe` en rutas autenticadas; `check-spec.mjs` y `check-guardrails.mjs --all` sin errores; informe de cierre.
+
+**Fuera de alcance.** Nuevas funcionalidades (salvo ENG-162, decisión 137) y todo lo de CONTEXT §2.4. El aprovisionamiento de plataformas, el hosting, el CI/CD de despliegue y la puesta en producción (ENG-003, ENG-004, ENG-015, ENG-138). Las sesiones de observación con niños (ENG-007, ENG-008), la monitorización de errores (ENG-131) y las copias de seguridad (ENG-132). La redacción del texto legal de los Términos y Condiciones. Que los estudiantes vean rankings o puntos de juego (la decisión 137 los limita a la profesora).
+
+**Entregables.** `SPEC-11` `Verificada`; hallazgos críticos y altos cerrados con prueba; hallazgos medios y bajos cerrados o aplazados de forma explícita con su motivo en la matriz; documentos y specs coherentes entre sí; informe de cierre de la etapa.
+
+**Criterios de salida.**
+
+- Cada hallazgo de la matriz tiene tarea, corrección y prueba de regresión que falla sin ella (decisión 129); ninguno crítico o alto queda abierto.
+- `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` en verde; `check-spec.mjs` y `check-guardrails.mjs --all` sin errores, con el guardrails ampliado para aserciones `as Type`.
+- Los defectos de audio, tablets compartidas y concurrencia se verifican en entorno real: un audio de 2 a 4 s grabado en Chromium y en Firefox se sube, se transcodifica y se reproduce desde `/revision`; un segundo alumno que inicia sesión en la misma tablet no envía ni ve datos del anterior; dos peticiones simultáneas no superan los topes de OTP, de calificación ni de finalización de intento (tests).
+- Suite Playwright con `axe` sin violaciones en rutas autenticadas Kids, Teens y panel.
+- Ninguna contradicción abierta entre documentos, specs y código (verificación de DOC-09); `SPEC-06` coherente entre sus secciones.
+- Todas las preguntas Q-01 a Q-08 de CONTEXT §15 están decididas y registradas en §14 (decisiones 130 a 137); ninguna tarea queda excluida del cierre por falta de decisión.
+- Panel de juegos: la profesora ve para cada estudiante cuándo y por cuánto tiempo practicó y el ranking de juegos; los microjuegos no alteran el promedio de notas, las series de notas ni el leaderboard de notas; ningún endpoint de ranking responde a `student` (decisión 137; tests, incluido 403 para `student` y promedio idéntico con y sin partidas de juego).
+- Datos: tras la migración de ENG-150 no queda ningún `Attempt` de microjuego con `assignment_id` ni `Assignment` de microjuego (decisión 136; test de migración).
+- Microjuegos: cualquier estudiante, de cualquier nivel, ve todos los microjuegos publicados en `/juegos` sin que la profesora los asigne y cada partida termina con 0 a 3 estrellas y un mensaje motivador (decisiones 130 y 132; tests). Cambiar de grupo a un alumno con nuevo intento sin consumir exige confirmación de la profesora y la autorización se pierde (decisión 131; test).
+
+**Dependencias.** SPEC-11 Aprobada (compuerta de inicio, decisión 65) (todas sus preguntas Q-01 a Q-08 ya están decididas, decisiones 130 a 137). Etapas 1 a 10 implementadas. Es compuerta de ENG-137 y ENG-138.
+
+**Riesgos.** Que la etapa se convierta en rediseño: mitigación, el criterio de la decisión 128 (se corrige hacia lo decidido) y la regla de no añadir funcionalidades (con la única excepción de ENG-162). Que ENG-150 cambie el modelo de datos con efecto en estadísticas y revisión: mitigación, que SPEC-11 defina los RF de SPEC-08 que cambian por la decisión 137 y probar con PostgreSQL real. Que el ranking de juegos se perciba como evaluación del niño: mitigación, es privado de la profesora, no usa la escala de notas y no lo ve el estudiante. Correcciones que pasen con mocks y fallen en ejecución real (como `correctAnswer: null`): mitigación, la decisión 129. Regresiones de seguridad por tocar autenticación y tenant a la vez: mitigación, ENG-151 y ENG-152 con pruebas de integración antes de fusionar.
+
+**Tamaño.** L, 3–4 semanas (Propuesto).
+
+**Tareas.** SPEC-11, ENG-143, ENG-150 a ENG-162, DOC-09.
 
 ---
 
@@ -656,4 +713,5 @@ Un rol de acudiente con pantallas (el valor `parent` del enum queda reservado) o
 | Abuso del auto-registro (endpoint público) | Solicitudes falsas o repetidas en la bandeja de la profesora | Throttling de 10 por hora por IP en `signup` (architecture §8.3); rechazo borra en cascada sin dejar rastro; la profesora nunca aprueba sin reconocer al alumno; CAPTCHA posible en Etapa 2 |
 | Almacenamiento de audios se desborda | Uso de R2 cerca del límite de la capa gratuita                 | Retención de 30 / 7 días; MP4 comprimido y raw borrado tras convertir; tope de 5 minutos por audio; alerta de uso del bucket |
 | Scope creep hacia CONTEXT §2.4      | Aparece una tarea de WebSockets, Phaser, pagos o muro           | Detener y proponer en CONTEXT §14; el taskboard no admite tareas de §2.4                                     |
-| Una sola persona en el equipo       | Las Etapas 6 y 7 no se solapan; total 18–24 semanas (§2.2)      | Aceptar el calendario (el intercambio de etapas fue rechazado, decisión 31) o sumar una segunda persona en la Etapa 6 |
+| Hallazgos de calidad que llegan al lanzamiento | Hallazgos críticos o altos de `AUDITORIA.md` sin prueba de regresión | Etapa 12 (decisiones 127 a 137): compuerta ENG-161 antes de ENG-137 y ENG-138 |
+| Una sola persona en el equipo       | Las Etapas 6 y 7 no se solapan; total 21–28 semanas con la Etapa 12 (§2.2) | Aceptar el calendario (el intercambio de etapas fue rechazado, decisión 31) o sumar una segunda persona en la Etapa 6 |

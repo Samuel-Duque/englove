@@ -4,7 +4,9 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-10-27. SPEC-01 a SPEC-07 figuran Verificadas y [SPEC-08](../specs/SPEC-08-estadisticas.md) figura `Aprobada` por el líder del proyecto tras cerrar Q-01 a Q-04 mediante las Decisiones 112 a 115 de CONTEXT §14 (tendencia cada 30 días y semanal en vista de grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtrado por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado); tareas de Etapa 7 (ENG-090 a ENG-096) en Hecho con 407/407 tests monorepo (58 shared, 265 api, 84 web) y suite E2E de revisión y nuevo intento en PostgreSQL real con Docker. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales.
+> Última actualización: 2026-11-08. Se planifica `SPEC-11` (Etapa 12 «Calidad y remediación», decisiones 127 a 137 de CONTEXT §14), que aún no está redactada: figura en el calendario de §7 y en el índice de `specs/` como pendiente de redacción. SPEC-01 a SPEC-10 figuran Verificadas (el estado detallado de cada una está en `specs/README.md`). El resto de esta cabecera y el párrafo de estado de §7 conservan el texto de actualizaciones anteriores y se unifican en la tarea DOC-09.
+>
+> Actualización anterior: 2026-10-27. SPEC-01 a SPEC-07 figuran Verificadas y [SPEC-08](../specs/SPEC-08-estadisticas.md) figura `Aprobada` por el líder del proyecto tras cerrar Q-01 a Q-04 mediante las Decisiones 112 a 115 de CONTEXT §14 (tendencia cada 30 días y semanal en vista de grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtrado por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado); tareas de Etapa 7 (ENG-090 a ENG-096) en Hecho con 407/407 tests monorepo (58 shared, 265 api, 84 web) y suite E2E de revisión y nuevo intento en PostgreSQL real con Docker. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales.
 >
 > Actualización anterior: 2026-09-28. Aplica la decisión 65 de CONTEXT §14 (secuencia de las Etapas 0, 1 y 2 condicionada por la aprobación de SPEC-01 y SPEC-02) y asigna a cada spec las decisiones menores pendientes de CONTEXT §15 (P-1 a P-4) que debe cerrar antes de aprobarse.
 
@@ -87,7 +89,8 @@ specs/
 ├── SPEC-07-revision-y-feedback.md
 ├── SPEC-08-estadisticas.md
 ├── SPEC-09-pwa-offline-a11y.md
-└── SPEC-10-contenido-extra.md
+├── SPEC-10-contenido-extra.md
+└── SPEC-11-calidad-y-correcciones.md   # planificada; se crea al redactarla (tarea SPEC-11)
 ```
 
 - La numeración sigue las etapas de `pbp-development.md`. Si una etapa necesita más de una spec, se usa un sufijo: `SPEC-05a`, `SPEC-05b`.
@@ -217,8 +220,11 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 | SPEC-08 Estadísticas                 | Etapa 6–7          | Etapa 8                      | —                                                                         |
 | SPEC-09 PWA, offline y accesibilidad | Etapa 8            | Etapa 9                      | —                                                                         |
 | SPEC-10 Contenido extra              | Cualquier hueco    | Etapa 10                     | —                                                                         |
+| SPEC-11 Calidad, correcciones y verificación | Etapa 10 y posteriores (con SPEC-01 a SPEC-10 ya verificadas) | Etapa 12 (se ejecuta antes de cerrar la Etapa 11) | Ninguno abierto: Q-01 a Q-08 de CONTEXT §15 están decididas (decisiones 130 a 137) y la spec puede redactarse |
 
 **La aprobación es la compuerta de inicio (Decidido, CONTEXT §14, decisión 65).** "Debe estar Aprobada antes de" es literal: la Etapa 1 empieza cuando SPEC-01 está Aprobada, y la Etapa 2 cuando SPEC-02 está Aprobada y las dependencias técnicas de la Etapa 1 están entregadas. La Etapa 0 no corre en paralelo con las Etapas 1 y 2 en lo que respecta a esas dependencias; solo la preparación que no las bloquea (cuentas, dominio, repositorio, tokens de diseño, observación con niños) puede solaparse. Lo mismo vale para el resto: redactar la spec de la etapa N+1 durante la etapa N no autoriza a empezar su código.
+
+**SPEC-11 es una spec de remediación (Decidido, decisión 127).** Se rige por este mismo proceso y plantilla (§5), con dos particularidades: (a) su §3 enumera hallazgos de `AUDITORIA.md` y de `testing-issues/` como requisitos (cada RF = un hallazgo o grupo de hallazgos con criterios Dado/Cuando/Entonces) y su §9 incluye la matriz hallazgo → tarea → prueba (decisión 129); (b) cuando corrige una spec ya `Verificada` solo para alinearla con una decisión vigente o con el código, esa spec registra el cambio en su registro de cambios y conserva su estado, y si cambia un RF vuelve a `En revisión` (§6, decisión 128). Todas sus preguntas (Q-01 a Q-08) ya están decididas en las decisiones 130 a 137 y la spec las incorpora (su sección 11 las lista como resueltas); además debe definir qué RF de SPEC-08 cambian por la decisión 137. Sus tareas `ENG` no pasan a «En curso» hasta que esté `Aprobada`.
 
 **Pendientes P-1 a P-5 cerrados (Decidido, decisiones 84 y 92).** Los pendientes menores P-1 a P-4 de CONTEXT §15 fueron formalizados y confirmados por el líder del proyecto el 2026-10-10 (decisión 84, con P-4 actualizado por la decisión 92). Las specs que los cubren ya no necesitan dejarlos en §11 como preguntas abiertas: pueden redactarse directamente con los valores decididos. P-5 (identidad multi-organización) queda diferido a la compuerta de Fase 2 y no pertenece a ninguna spec del piloto.
 

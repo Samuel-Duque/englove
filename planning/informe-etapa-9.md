@@ -178,4 +178,4 @@ Se ejecutó la suite de integración de Playwright equipada con `@axe-core/playw
 La implementación de la Etapa 9 dota a **Englove** de robustez de nivel de producción frente a contingencias de conectividad en escuelas rurales o urbanas con redes intermitentes, cumpliendo los principios de inclusión y accesibilidad para niños y docentes.
 
 1. **Aprobación de SPEC-09:** La especificación queda formalmente en estado `Verificada`.
-2. **Transición a Etapa 10:** Se habilita el inicio de la Etapa 10 (Transaccionalidad por correo y observabilidad con Resend / Sentry).
+2. **Transición a Etapa 10:** Se habilita el inicio de la Etapa 10 (Contenido extra, [SPEC-10](../specs/SPEC-10-contenido-extra.md)). La observabilidad con Sentry pertenece a la Etapa 11 (ENG-131). *(Corregido el 2026-11-08: el texto original describía la Etapa 10 como «Transaccionalidad por correo y observabilidad con Resend / Sentry», lo cual no coincide con CONTEXT §12.)*

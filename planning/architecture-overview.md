@@ -10,7 +10,9 @@
 >
 > Documentos hermanos: [`sdd-process.md`](./sdd-process.md) (metodología), [`pbp-development.md`](./pbp-development.md) (etapas de construcción) y [`taskboard.md`](./taskboard.md) (tareas y estado). Las specs de `specs/` detallan cada capacidad a partir de este documento.
 >
-> Última actualización: 2026-10-28. SPEC-08 Verificada tras implementar íntegramente ENG-100 a ENG-104 con 451/451 tests en verde en el monorepo (298 api, 95 web, 58 shared), suite E2E en PostgreSQL real con Docker y presupuesto de latencia < 500 ms con seed de volumen; decisiones 112 a 115 de CONTEXT §14 formalizadas y cubiertas: comparación de tendencia a 30 días y semanal en vista de grupo, filtro canónico de `game` frente a asignaciones, bloques exactos de 3 días en `ScheduledJobRun` para `teacher_pending_summary`, y ordenamiento y filtro por grupos de nivel `A1`, `A2`, `B1`, `B2` en el leaderboard privado. SPEC-07 Verificada tras implementar íntegramente ENG-090 a ENG-096 con 407/407 tests en verde en el monorepo; decisiones 108 a 111 de CONTEXT §14 formalizadas y cubiertas. SPEC-06 Verificada con 370/370 tests monorepo. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. SPEC-01 a SPEC-08 permanecen Verificadas. Actualización anterior: 2026-10-26 (SPEC-07 Verificada).
+> Última actualización: 2026-11-08. Planeación de la Etapa 12 «Calidad y remediación» (`SPEC-11`, sin redactar) con las decisiones 127 a 129 de CONTEXT §14 y las decisiones 130 a 137 que cierran todas sus preguntas Q-01 a Q-08 (§14.8 y §15): los cambios que estas últimas implican en §4.4, §6.4, §6.5, §7.5, §7.7, §9.4, §10.2, §10.3 y §11.1 se aplican en la Etapa 12 y mientras tanto esas secciones conservan su texto vigente; SPEC-01 a SPEC-10 permanecen Verificadas. Las incongruencias de este documento detectadas por `AUDITORIA.md` (estado congelado en SPEC-08, catálogo de errores en §13, referencias a `NetworkFirst`, Howler.js, Serwist y Framer Motion) se corrigen en la Etapa 12 (tarea DOC-09), no en esta actualización.
+>
+> Actualización anterior: 2026-10-28. SPEC-08 Verificada tras implementar íntegramente ENG-100 a ENG-104 con 451/451 tests en verde en el monorepo (298 api, 95 web, 58 shared), suite E2E en PostgreSQL real con Docker y presupuesto de latencia < 500 ms con seed de volumen; decisiones 112 a 115 de CONTEXT §14 formalizadas y cubiertas: comparación de tendencia a 30 días y semanal en vista de grupo, filtro canónico de `game` frente a asignaciones, bloques exactos de 3 días en `ScheduledJobRun` para `teacher_pending_summary`, y ordenamiento y filtro por grupos de nivel `A1`, `A2`, `B1`, `B2` en el leaderboard privado. SPEC-07 Verificada tras implementar íntegramente ENG-090 a ENG-096 con 407/407 tests en verde en el monorepo; decisiones 108 a 111 de CONTEXT §14 formalizadas y cubiertas. SPEC-06 Verificada con 370/370 tests monorepo. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. SPEC-01 a SPEC-08 permanecen Verificadas. Actualización anterior: 2026-10-26 (SPEC-07 Verificada).
 >
 > Actualización anterior (2026-10-08, Ronda 6): corrige tres incongruencias: `ValidationPipe` configurado solo con `whitelist: true` (campos no declarados se ignoran, no se rechazan con 400; A71), `MediaAsset.student_id` como propietario explícito del asset (A72) con diagrama ER y política `onDelete` actualizados, y aclaración de A28 en §8.1. Sin cambios de comportamiento ni nuevas decisiones de producto.
 >
@@ -99,7 +101,7 @@ Herramientas: pnpm workspaces + Turborepo. Justificación: caché de builds y ej
 englove/
 ├── .agents/CONTEXT.md          # fuente de verdad de producto y decisiones
 ├── planning/                   # este documento, proceso SDD, etapas, taskboard
-├── specs/                      # especificaciones por capacidad (SPEC-01 … SPEC-10), ver sdd-process.md
+├── specs/                      # especificaciones por capacidad (SPEC-01 … SPEC-11), ver sdd-process.md
 ├── apps/
 │   ├── web/                    # Next.js: panel profesora + portal alumno + PWA
 │   └── api/                    # NestJS: API REST, scoring, media, jobs programados
@@ -1053,6 +1055,7 @@ Resultado: un informe breve en [`planning/poc-eng-140-informe.md`](./poc-eng-140
 - Rendimiento: prueba manual en una tablet Android real de gama media o baja antes del lanzamiento (Decidido, control de higiene; no restringe Framer Motion).
 - Pirámide de pruebas: unitarias (scorers, conversión a escala 0,0–5,0, motor de insignias, rachas, cálculo del cierre efectivo y de la tolerancia de 24 h), integración (guards, tenant, cascada, bloqueo por intentos, recuperación de contraseña, registro con correo existente sin enumeración, cambio administrativo del correo con auditoría y revocación de sesiones, inicios simultáneos con una sola habilitación, recuperación de transcodificaciones al arrancar), E2E (los tres flujos de CONTEXT §11). En staging se verifica además que el `proxy.ts` de `app-staging.` ve la cookie emitida por `api-staging.` y que las cookies de staging y producción no se pisan (§8.2).
 - Las pruebas se nombran por el requisito de la spec que verifican (`RF-n: …`), según sdd-process §8.
+- **Compuerta de calidad de la Etapa 12 (Decidido, decisión 129):** las pruebas de las correcciones de `SPEC-11` se nombran por el identificador del hallazgo (`SEC-03`, `G-C13`, `ISSUE-04`…) además del RF, deben fallar sin la corrección y se ejecutan contra el entorno real donde el defecto aparece (PostgreSQL real, navegador real, almacenamiento S3 local, IndexedDB) y no solo con mocks. Los defectos de tablets compartidas, concurrencia, multi-tenant y audio exigen prueba de integración o E2E, no solo unitaria.
 
 ---
 
@@ -1200,10 +1203,28 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
 | A84 | Cancelación definitiva e idempotente mediante `Assignment.cancelled_at` del servidor; preserva trabajo y plazos previos, bloquea nuevos intentos/habilitaciones y excluye canceladas de ambos términos del cumplimiento. Entrega repartida entre SPEC-04/05/07/08; SPEC-04 Verificada el 2026-10-22 (ENG-050 a ENG-053 Hecho) | §4.1, §6.4, §7.5, §7.7, §9.4, §13 |
 | A85 | Una activa por tenant, actividad concreta y grupo: no cancelada y `due_at ≥ ahora`, incluidas futuras no solapadas; reasignación tras cierre/cancelación, serialización y atomicidad multigrupo. SPEC-04 Verificada el 2026-10-22 (ENG-050 a ENG-053 Hecho) | §6.4, §13 |
 
+### 14.8 Aplicadas el 2026-11-08 (CONTEXT §14, decisiones 127 a 137) — Decidido / Propuesto
+
+| # | Detalle | Sección |
+| --- | --- | --- |
+| A86 | Etapa 12 «Calidad y remediación» (`SPEC-11`, ENG-150 a ENG-162 y ENG-143 reasignada): corrige hallazgos de `AUDITORIA.md` y `testing-issues/` sin añadir funcionalidades (salvo la excepción de la decisión 137, A96); no toca infraestructura ni despliegue. Se ejecuta antes de cerrar la Etapa 11 (decisión 127). **Decidido** | §12, §13 |
+| A87 | Las correcciones se alinean con las decisiones vigentes; solo las preguntas de CONTEXT §15 requieren decisión humana y no se implementan antes (decisión 128). **Propuesto** | §6.4, §6.5, §7.5, §7.6, §8, §10, §13 |
+| A89 | Microjuegos abiertos a todos los estudiantes sin `Assignment` ni filtro por nivel: `Attempt.assignment_id` nullable, `Attempt.activity_id` y `@@unique([activity_id, student_id, attempt_number])` (decisión 130; confirma la decisión 111). Se aplica en ENG-150; hasta entonces §6.4, §6.5 y §7.5 conservan su texto. **Decidido** | §6.4, §6.5, §7.5, §9.4 |
+| A90 | La autorización de nuevo intento no consumida se pierde al cambiar al alumno de grupo, con aviso y confirmación previos de la profesora en `PUT /students/:id/group` (decisión 131). **Decidido** | §7.7 |
+| A91 | Las estrellas de los microjuegos (0 a 3, tramos fijos de la decisión 101, independientes de `passing_score`) son un indicador de práctica y no una nota; el puntaje `0.0–5.0` sigue siendo dato interno, base de las estrellas y de los puntos de juego, y no se muestra como nota (decisión 132). La vista docente la define A96. **Decidido** | §4.4, §9.4 |
+| A92 | Objetivo de accesibilidad WCAG 2.2 AA con `axe` y la etiqueta `wcag22aa` (decisión 133). **Decidido** | §10.3 |
+| A93 | MinIO y Mailpit estándar en el entorno local; se elimina el modo `isMock` y los endpoints `mock-*`; `MailService` local por SMTP a Mailpit (decisión 134). **Decidido** | §4.6, §7.6, §11.1 |
+| A94 | Serwist real como Service Worker, con el comportamiento de las decisiones 116 a 119 y comprobación previa de compatibilidad con `vinext` (decisión 135). **Decidido** | §3.7, §10.2 |
+| A95 | Se descartan, sin migrar, los `Attempt` de microjuegos ligados a un `Assignment` y las `Assignment` de microjuegos (datos de prueba): migración explícita y transaccional en ENG-150 antes de `assignment_id` nullable y de la unicidad por `activity_id` (decisión 136). **Decidido** | §6.4, §6.5 |
+| A96 | Ranking de juegos (privado de la profesora, por puntos de juego derivados de las estrellas) y sección «Práctica en juegos» (cuándo y cuánto tiempo, con tiempo recortado a `expected_duration_seconds × 3`); los microjuegos salen del promedio de notas, de las series de notas y del leaderboard de notas (precisa la decisión 113); sin tablas ni flags nuevos salvo que SPEC-11 lo justifique (decisión 137, ENG-162). **Decidido** | §9.4 |
+| A88 | Prueba de regresión por hallazgo, ejecución en entorno real y compuerta de cierre con guardrails ampliado para aserciones `as Type` (decisión 129). **Decidido** | §12 |
+
 ---
 
 ## 15. Preguntas abiertas de arquitectura
 
+- Cerradas el 2026-11-08 (decisiones 130 a 135, Q-01 a Q-06 de SPEC-11): microjuegos sin `Assignment` ni filtro por nivel, pérdida avisada del nuevo intento al cambiar de grupo, estrellas de práctica, WCAG 2.2 AA, MinIO y Mailpit locales y Serwist real (A89 a A94).
+- Cerradas el 2026-11-08 (decisiones 136 y 137, Q-07 y Q-08 de SPEC-11): descarte de los intentos de microjuego de prueba y ranking de juegos con panel «Práctica en juegos» (A95 y A96). No quedan preguntas abiertas de SPEC-11; los cambios de §6.4, §6.5, §9.4 y los demás se aplican en la Etapa 12 y mientras tanto esas secciones conservan su texto vigente.
 - ~~¿La profesora necesita exportar datos (CSV) en el piloto?~~ Cerrada: fuera del alcance del piloto (CONTEXT §2.4). Si la profesora lo pide, se evalúa como mejora post-piloto.
 - Sin endpoints para cambio de contraseña desde perfil autenticado (`POST /me/change-password`): decisión consciente de diseño; el cambio de contraseña se gestiona únicamente a través del flujo de recuperación (`POST /auth/forgot-password` y `POST /auth/reset-password`).
 - Re-registro tras rechazo: ratificado como comportamiento previsto; al rechazar un alumno en `pending_approval` se eliminan completamente sus datos (`Student` y `User`), por lo que ese correo queda habilitado para registrarse nuevamente si fue un error (decisiones 59 y 77).

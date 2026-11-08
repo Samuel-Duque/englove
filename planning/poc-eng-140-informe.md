@@ -3,6 +3,8 @@
 > **Propósito:** Registrar la evidencia técnica empírica de las siete comprobaciones de plataforma requeridas por las decisiones 81 y 82 (PoC ENG-140, [architecture §11.5](./architecture-overview.md#115-prueba-de-concepto-de-plataforma-poc-go-no-go) y [taskboard](./taskboard.md)) para autorizar el cierre de la pregunta abierta **Q-4** y la aprobación final de [SPEC-01](../specs/SPEC-01-scaffold.md).  
 > **Fecha de ejecución:** 2026-10-10  
 > **Entorno de pruebas:** Prototipo desechable declarado en `scratch/poc-eng-140/` (excluido en `.gitignore`), ejecutado sobre Node.js v24.16.0, pnpm v11.8.0, Windows 11, Wrangler v4.149.0, FFmpeg 9.0.2, Neon PostgreSQL 18.6 (`ep-divine-rain-b4szdkmf`, AWS `us-east-2`).  
+> **Nota de seguimiento (2026-11-08):** los enlaces `file:///c:/Users/sebas/...` de este informe apuntan a un equipo anterior y no abren en otros equipos (el prototipo vivía en `scratch/poc-eng-140/`, excluido del repositorio), y la prueba de `ffmpeg` usó una configuración distinta de la contratada en SPEC-05 (AAC mono 64k) y un respaldo diario en lugar del semanal de CONTEXT §11.2. Se corrigen en la Etapa 12 (tarea DOC-09); el veredicto no cambia.
+>
 > **Veredicto general:** **GO condicionado**: las siete comprobaciones pasan para el prototipo y habilitan la revisión final de SPEC-01; antes del lanzamiento se repite el smoke test en el contenedor Linux de Render y con la versión mínima fijada en el lockfile. Para el lanzamiento, el criterio de P95 de login queda fijado en **≤ 2,1 s**.
 
 ---

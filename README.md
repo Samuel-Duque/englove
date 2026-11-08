@@ -124,7 +124,7 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 ```
 englove/
 ├── .agents/
-│ ├── CONTEXT.md # Fuente única de verdad técnica y de producto (Decisiones 1–115)
+│ ├── CONTEXT.md # Fuente única de verdad técnica y de producto (Decisiones 1–137)
 │ └── skills/ # Habilidades y scripts automáticos del proyecto (guardrails, spec)
 ├── apps/
 │ ├── api/ # Backend NestJS 11
@@ -164,7 +164,7 @@ englove/
 │ ├── architecture-overview.md# Especificación técnica exhaustiva de la arquitectura del sistema
 │ ├── sdd-process.md # Manual del proceso Spec-Driven Development
 │ └── taskboard.md # Tablero de tareas del proyecto
-├── specs/ # Especificaciones formales por capacidad (SPEC-01 a SPEC-08)
+├── specs/ # Especificaciones formales por capacidad (SPEC-01 a SPEC-10 redactadas; SPEC-11 planificada)
 ├── tooling/ # Configuraciones transversales compartidas (tsconfig, eslint, prettier)
 ├── docker-compose.yml # Configuración de contenedores locales (PostgreSQL 18)
 ├── package.json # Scripts globales y dependencias de la raíz del monorepo
@@ -336,7 +336,12 @@ Para conocer en detalle el proceso y las especificaciones activas:
 | [SPEC-05](./specs/SPEC-05-portal-e-intentos.md)    | Portal del alumno y resolución de intentos            | **Verificada** | Etapa 5 |
 | [SPEC-06](./specs/SPEC-06-microjuegos.md)          | Microjuegos formativos autónomos                      | **Verificada** | Etapa 6 |
 | [SPEC-07](./specs/SPEC-07-revision-y-feedback.md)  | Revisión docente, retroalimentación y nuevo intento   | **Verificada** | Etapa 7 |
-| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Aprobada**   | Etapa 8 |
+| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Verificada** | Etapa 8 |
+| [SPEC-09](./specs/SPEC-09-pwa-offline-a11y.md)     | PWA, offline y accesibilidad                          | **Verificada** | Etapa 9 |
+| [SPEC-10](./specs/SPEC-10-contenido-extra.md)      | Contenido extra                                       | **Verificada** | Etapa 10 |
+| SPEC-11 (por redactar)                             | Calidad, correcciones y verificación                  | **Pendiente de redacción** | Etapa 12 |
+
+La Etapa 12 «Calidad y remediación» (decisiones 127 a 137 de [`CONTEXT.md`](./.agents/CONTEXT.md) §14) corrige los hallazgos de `AUDITORIA.md` y de `testing-issues/` sin añadir funcionalidades (salvo el ranking de juegos y el panel «Práctica en juegos») y se ejecuta antes de cerrar la Etapa 11. Las cifras, versiones y descripciones de este README que difieren del código se corrigen en la tarea DOC-09 de esa etapa.
 
 ---
 

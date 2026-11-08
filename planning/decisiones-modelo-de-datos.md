@@ -6,6 +6,8 @@
 >
 > Fecha: 2026-09-28
 >
+> **Seguimiento (2026-11-08, Etapa 12, decisiones 127 a 129).** `AUDITORIA.md` señala cambios de modelo de datos que la Etapa 12 trata en `SPEC-11` y no se adoptan aquí: (a) cinco índices únicos parciales y `attempts_score_check` de la migración inicial que `schema.prisma` no representa y que deben protegerse con prueba contra `prisma migrate dev` (ENG-153); (b) índice de `MediaAsset.student_id` por su `onDelete: Cascade` (ENG-153); (c) por la decisión 130 (CONTEXT §14, 2026-11-08), `Attempt.assignment_id` nullable y `Attempt.activity_id` con `@@unique([activity_id, student_id, attempt_number])` para los microjuegos, tras descartar sin migrar los intentos y asignaciones de microjuegos de prueba (decisión 136; ENG-150). Los puntos de juego y el tiempo de práctica de la decisión 137 se derivan de `Attempt` sin tablas ni columnas nuevas, salvo que SPEC-11 lo justifique (ENG-162). Hasta que ENG-150 y ENG-153 se ejecuten, este documento y architecture §6 conservan su texto vigente.
+>
 > **Estado: aplicado el 2026-09-28** mediante la Ronda 5 del registro de decisiones (`CONTEXT.md` §14, decisiones 67–80), con reflejo en `architecture-overview.md` (§6 y §14.5, detalles A56–A70), `pbp-development.md` y `taskboard.md`. La propuesta de parámetros de organización con tipo (auditoría C2) **no se adopta** (§15).
 
 ## Resumen de la auditoría

@@ -1,6 +1,6 @@
 # Englove — Guía para agentes
 
-Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. El proyecto avanza por etapas bajo Spec-Driven Development (Etapas 0–10 implementadas; SPEC-01 a SPEC-10 Verificadas; cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales). **Etapa 12 «Calidad y remediación» planificada (decisiones 127 a 137): `SPEC-11` lista para redactar, sin preguntas abiertas**; se ejecuta antes de cerrar la Etapa 11 (Lanzamiento) y corrige hallazgos de `AUDITORIA.md` y de `testing-issues/`, sin añadir funcionalidades salvo el ranking de juegos y el panel «Práctica en juegos» (decisión 137). No se escribe código de producción sin una spec aprobada en `specs/`.
+Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. El proyecto avanza por etapas bajo Spec-Driven Development (Etapas 0–10 implementadas; SPEC-01 a SPEC-10 Verificadas; cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales). **Etapa 12 «Calidad y remediación» planificada (decisiones 127 a 137): `SPEC-11` redactada en estado `Borrador`, sin preguntas abiertas y pendiente de aprobación del líder**; se ejecuta antes de cerrar la Etapa 11 (Lanzamiento) y corrige hallazgos de `AUDITORIA.md` y de `testing-issues/`, sin añadir funcionalidades salvo el ranking de juegos y el panel «Práctica en juegos» (decisión 137). No se escribe código de producción sin una spec aprobada en `specs/`.
 
 ## Dónde está cada cosa
 
@@ -16,7 +16,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 3. `planning/sdd-process.md` — proceso SDD y plantilla de spec (§5).
 4. `planning/pbp-development.md` — etapas e hitos.
 5. `planning/taskboard.md` — tareas.
-6. `specs/` — especificaciones (`SPEC-00` a `SPEC-10` redactadas; `SPEC-11` planificada y sin redactar).
+6. `specs/` — especificaciones (`SPEC-00` creada; `SPEC-01` a `SPEC-10` Verificadas; `SPEC-11` redactada en `Borrador`).
 
 Insumos de la Etapa 12 (no son fuente de verdad, sirven de base para `SPEC-11`): `AUDITORIA.md` (auditoría del 2026-11-05) y `testing-issues/` (ISSUE-01 a ISSUE-09 y RFC-01, del 2026-11-06).
 

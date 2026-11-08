@@ -2,7 +2,7 @@
 
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
-> Última actualización: 2026-11-08. Se planifica la **Etapa 12 «Calidad y remediación»** (decisiones 127 a 129 de CONTEXT §14; `SPEC-11` por redactar, sin archivo en `specs/` todavía; las decisiones 130 a 137 cerraron las preguntas Q-01 a Q-08, de modo que SPEC-11 ya puede redactarse): nuevas tareas `SPEC-11`, `ENG-150` a `ENG-162` y `DOC-09`, y `ENG-143` pasa de la Etapa 11 a la 12. Se corrige además el conteo de `Hecho`: `SPEC-07`, `ENG-120` y `ENG-121` figuraban solo en las tablas por etapa y se añaden a la tabla `Hecho` (el resumen ya las contaba). Resumen: 106 Hecho, 0 En curso, 6 Por hacer, 0 Bloqueado, 23 Backlog (Total 135).
+> Última actualización: 2026-11-08. Se planifica la **Etapa 12 «Calidad y remediación»** (decisiones 127 a 137 de CONTEXT §14) y se redacta [SPEC-11 Calidad, correcciones y verificación](../specs/SPEC-11-calidad-y-correcciones.md) en estado `Borrador` (las decisiones 130 a 137 cerraron Q-01 a Q-08; la tarea `SPEC-11` pasa a `En curso` hasta su revisión y aprobación por el líder del proyecto): nuevas tareas `SPEC-11`, `ENG-150` a `ENG-162` y `DOC-09`, y `ENG-143` pasa de la Etapa 11 a la 12. Se corrige además el conteo de `Hecho`: `SPEC-07`, `ENG-120` y `ENG-121` figuraban solo en las tablas por etapa y se añaden a la tabla `Hecho` (el resumen ya las contaba). Resumen: 106 Hecho, 1 En curso, 5 Por hacer, 0 Bloqueado, 23 Backlog (Total 135).
 >
 > Actualización anterior: 2026-11-04. [SPEC-10 Contenido extra](../specs/SPEC-10-contenido-extra.md) en estado `Verificada` tras la implementación y verificación integral de `ENG-120` y `ENG-121` con 537/537 pruebas en verde en monorepo (65 shared, 333 api, 139 web), suite Playwright E2E y accesibilidad axe de 8/8 pruebas en Chromium real, y 0 errores en guardrails del proyecto. Las tareas `ENG-120` y `ENG-121` pasan a `Hecho`. Resumen: 106 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 9 Backlog (Total 120).
 >
@@ -36,8 +36,8 @@
 | Estado    | Tareas  |
 | --------- | ------- |
 | Hecho     | 106     |
-| En curso  | 0       |
-| Por hacer | 6       |
+| En curso  | 1       |
+| Por hacer | 5       |
 | Bloqueado | 0       |
 | Backlog   | 23      |
 | **Total** | **135** |
@@ -169,7 +169,9 @@ Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se 
 
 Límite: 3.
 
-*Ninguna tarea en curso.*
+| ID      | Tarea | Prioridad | Depende de | Spec | Estado |
+| ------- | ----- | --------- | ---------- | ---- | ------ |
+| SPEC-11 | Redactar y aprobar [SPEC-11 Calidad, correcciones y verificación](../specs/SPEC-11-calidad-y-correcciones.md) (redactada en estado `Borrador` el 2026-11-08, pendiente de revisión y aprobación por el líder del proyecto) con la plantilla de sdd-process §5: RF-1 a RF-15 sobre `AUDITORIA.md` (2026-11-05) y `testing-issues/` (ISSUE-01 a ISSUE-09, RFC-01) con criterios Dado/Cuando/Entonces; contratos de API, modelo de datos e interfaz que cambian; matriz hallazgo → tarea → prueba en su §9 (decisión 129); lista explícita de lo que queda fuera (infraestructura, hosting, CI/CD de despliegue y puesta en producción: ENG-001, ENG-003, ENG-004, ENG-015, ENG-138); decisiones 130 a 137 incorporadas, RF de SPEC-08 que cambian definidos en §4.5, y parches previstos sobre SPEC-01 a SPEC-10 más consideraciones previas de implementación en §11 (decisión 128) | P0 | `AUDITORIA.md`, `testing-issues/` | — | En curso |
 
 
 
@@ -194,11 +196,11 @@ Las tareas técnicas ENG-010 a ENG-019 están Hecho y SPEC-01 figura Verificada.
 
 ### Etapa 12 — Calidad y remediación
 
-La redacción de `SPEC-11` es la compuerta de inicio de toda la etapa (decisiones 65 y 127). Las demás tareas de la Etapa 12 están en `Backlog`.
+La aprobación de [SPEC-11](../specs/SPEC-11-calidad-y-correcciones.md) (redactada en estado `Borrador`, tarea `SPEC-11` en `En curso`) es la compuerta de inicio de toda la etapa (decisiones 65 y 127). Las demás tareas de la Etapa 12 permanecen en `Backlog` hasta que `SPEC-11` esté `Aprobada`.
 
-| ID       | Tarea | Prioridad | Depende de | Spec | Estado |
-| -------- | ----- | --------- | ---------- | ---- | ------ |
-| SPEC-11 | Redactar y aprobar SPEC-11 Calidad, correcciones y verificación (`specs/SPEC-11-calidad-y-correcciones.md`, aún no creado) con la plantilla de sdd-process §5: un RF por hallazgo o grupo de hallazgos de `AUDITORIA.md` (2026-11-05) y de `testing-issues/` (ISSUE-01 a ISSUE-09, RFC-01), con criterios Dado/Cuando/Entonces; contratos de API, modelo de datos e interfaz que cambian; matriz hallazgo → tarea → prueba en su §9 (decisión 129); lista explícita de lo que queda fuera (infraestructura, hosting, CI/CD de despliegue y puesta en producción: ENG-003, ENG-004, ENG-015, ENG-138). Debe incorporar las decisiones 130 a 137 (todas las preguntas Q-01 a Q-08 están cerradas), definir los RF de SPEC-08 que cambian por la decisión 137 y registrar los parches que haga a SPEC-01 a SPEC-10 en el registro de cambios de cada una (decisión 128) | P0 | `AUDITORIA.md`, `testing-issues/` | — | Por hacer |
+
+
+
 
 ---
 
@@ -360,4 +362,4 @@ Cerrados el 2026-09-28 (decisión 57) y ya reflejados en las tareas: cookies con
 | H2 — Un alumno completa una actividad   | Etapa 5              | ENG-072             | Pendiente: validación operativa en staging y tablets reales |
 | H3 — Ciclo pedagógico completo          | Etapa 7              | ENG-094             | Pendiente |
 | H4 — Listo para el piloto               | Etapa 11 (con la Etapa 12 cerrada) | ENG-137 | Pendiente: requiere ENG-161 |
-| Compuerta de calidad (no es un hito de producto) | Etapa 12 | ENG-161 | Pendiente: SPEC-11 por redactar |
+| Compuerta de calidad (no es un hito de producto) | Etapa 12 | ENG-161 | Pendiente: SPEC-11 en Borrador (esperando aprobación) |

@@ -4,7 +4,7 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-11-08. Se planifica `SPEC-11` (Etapa 12 «Calidad y remediación», decisiones 127 a 137 de CONTEXT §14), que aún no está redactada: figura en el calendario de §7 y en el índice de `specs/` como pendiente de redacción. SPEC-01 a SPEC-10 figuran Verificadas (el estado detallado de cada una está en `specs/README.md`). El resto de esta cabecera y el párrafo de estado de §7 conservan el texto de actualizaciones anteriores y se unifican en la tarea DOC-09.
+> Última actualización: 2026-11-08. Se planifica y redacta en `Borrador` [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) (Etapa 12 «Calidad y remediación», decisiones 127 a 137 de CONTEXT §14), registrada en el calendario de §7 y en el índice de `specs/` a la espera de aprobación del líder. SPEC-01 a SPEC-10 figuran Verificadas (el estado detallado de cada una está en `specs/README.md`). El resto de esta cabecera y el párrafo de estado de §7 conservan el texto de actualizaciones anteriores y se unifican en la tarea DOC-09.
 >
 > Actualización anterior: 2026-10-27. SPEC-01 a SPEC-07 figuran Verificadas y [SPEC-08](../specs/SPEC-08-estadisticas.md) figura `Aprobada` por el líder del proyecto tras cerrar Q-01 a Q-04 mediante las Decisiones 112 a 115 de CONTEXT §14 (tendencia cada 30 días y semanal en vista de grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtrado por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado); tareas de Etapa 7 (ENG-090 a ENG-096) en Hecho con 407/407 tests monorepo (58 shared, 265 api, 84 web) y suite E2E de revisión y nuevo intento en PostgreSQL real con Docker. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales.
 >
@@ -90,7 +90,7 @@ specs/
 ├── SPEC-08-estadisticas.md
 ├── SPEC-09-pwa-offline-a11y.md
 ├── SPEC-10-contenido-extra.md
-└── SPEC-11-calidad-y-correcciones.md   # planificada; se crea al redactarla (tarea SPEC-11)
+└── SPEC-11-calidad-y-correcciones.md   # Etapa 12: Calidad, correcciones y verificación (Borrador)
 ```
 
 - La numeración sigue las etapas de `pbp-development.md`. Si una etapa necesita más de una spec, se usa un sufijo: `SPEC-05a`, `SPEC-05b`.
@@ -220,7 +220,7 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 | SPEC-08 Estadísticas                 | Etapa 6–7          | Etapa 8                      | —                                                                         |
 | SPEC-09 PWA, offline y accesibilidad | Etapa 8            | Etapa 9                      | —                                                                         |
 | SPEC-10 Contenido extra              | Cualquier hueco    | Etapa 10                     | —                                                                         |
-| SPEC-11 Calidad, correcciones y verificación | Etapa 10 y posteriores (con SPEC-01 a SPEC-10 ya verificadas) | Etapa 12 (se ejecuta antes de cerrar la Etapa 11) | Ninguno abierto: Q-01 a Q-08 de CONTEXT §15 están decididas (decisiones 130 a 137) y la spec puede redactarse |
+| SPEC-11 Calidad, correcciones y verificación | Etapa 10 y posteriores (con SPEC-01 a SPEC-10 ya verificadas) | Etapa 12 (se ejecuta antes de cerrar la Etapa 11) | Ninguno abierto: Q-01 a Q-08 de CONTEXT §15 están decididas (decisiones 130 a 137) y la spec está redactada en `Borrador` |
 
 **La aprobación es la compuerta de inicio (Decidido, CONTEXT §14, decisión 65).** "Debe estar Aprobada antes de" es literal: la Etapa 1 empieza cuando SPEC-01 está Aprobada, y la Etapa 2 cuando SPEC-02 está Aprobada y las dependencias técnicas de la Etapa 1 están entregadas. La Etapa 0 no corre en paralelo con las Etapas 1 y 2 en lo que respecta a esas dependencias; solo la preparación que no las bloquea (cuentas, dominio, repositorio, tokens de diseño, observación con niños) puede solaparse. Lo mismo vale para el resto: redactar la spec de la etapa N+1 durante la etapa N no autoriza a empezar su código.
 

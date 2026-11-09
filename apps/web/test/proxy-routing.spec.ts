@@ -51,15 +51,39 @@ describe('RF-17: proxy routing and redirect logic', () => {
     expect(res.headers.get('location')).toBeNull();
   });
 
-  it('supports custom COOKIE_PREFIX or standard access_token fallback', async () => {
-    const req = new NextRequest('http://localhost:3000/registro', {
+  it('RF-2: ignores cookies without prefix and redirects private route to /login', async () => {
+    const req = new NextRequest('http://localhost:3000/inicio', {
       headers: {
         cookie: 'access_token=valid-token',
       },
     });
     const res = await proxy(req);
     expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toContain('/inicio');
+    expect(res.headers.get('location')).toContain('/login?next=%2Finicio');
+  });
+
+  it('RF-2: ignores cookies without prefix on public auth routes without redirecting to /inicio', async () => {
+    const req = new NextRequest('http://localhost:3000/registro', {
+      headers: {
+        cookie: 'access_token=valid-token',
+      },
+    });
+    const res = await proxy(req);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('RF-2: redirects expired prefixed token on private route to /login', async () => {
+    const pastSec = Math.floor(Date.now() / 1000) - 300;
+    const expiredPayload = Buffer.from(JSON.stringify({ role: 'student', exp: pastSec })).toString('base64url');
+    const expiredToken = `header.${expiredPayload}.sig`;
+    const req = new NextRequest('http://localhost:3000/inicio', {
+      headers: {
+        cookie: `englove_access_token=${expiredToken}`,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/login?next=%2Finicio');
   });
 
   it('preserves query parameters in next parameter when redirecting private routes', async () => {
@@ -218,7 +242,6 @@ describe('RF-17: proxy routing and redirect logic', () => {
   it('allows unauthenticated access to PWA assets and /offline per RF-1', async () => {
     const urls = [
       'http://localhost:3000/manifest.webmanifest',
-      'http://localhost:3000/manifest.json',
       'http://localhost:3000/sw.js',
       'http://localhost:3000/icons/icon-192.png',
       'http://localhost:3000/icons/icon-512.png',

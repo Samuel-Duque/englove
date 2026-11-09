@@ -6,7 +6,6 @@ const CACHE_VERSION = 'englove-static-v1';
 const PRECACHE_ASSETS = [
   '/offline',
   '/manifest.webmanifest',
-  '/manifest.json',
   '/favicon.ico',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

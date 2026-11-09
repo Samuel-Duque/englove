@@ -80,6 +80,8 @@ describe('RF-20: formularios accesibles, mapeo de errores y políticas de autent
 
   it('enforces no-referrer policy metadata on reset-password page to prevent token leakage (RF-20 / §8)', () => {
     expect(resetPasswordMetadata.referrer).toBe('no-referrer');
+    expect(resetPasswordMetadata.title).toBe('Restablecer Contraseña');
+    expect(String(resetPasswordMetadata.title)).not.toContain('| Englove');
   });
 
   it('validates safe next destination routing discarding external URLs, backslashes, and public auth routes (RF-17)', () => {

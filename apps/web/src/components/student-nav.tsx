@@ -1,5 +1,6 @@
 import React, { useTransition, useState } from 'react';
 import Link from 'next/link';
+import { ConfirmDialog } from './ui/modal';
 import { usePathname } from 'next/navigation';
 import { clearSharedDeviceSession } from '../lib/auth-hygiene';
 import { fetchSharedFeatureFlags } from '../lib/feature-flags-client';
@@ -213,44 +214,23 @@ export function StudentNav({
         </div>
       </div>
 
-      {/* Confirmation Dialog when logout attempted with unsaved work (RF-18, §7) */}
-      {showExitConfirm && (
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
-        >
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl border border-zinc-200 p-6 text-zinc-900">
-            <h3 className="text-lg font-bold mb-2 text-zinc-900">
-              {isKids ? '¿Seguro que quieres salir?' : 'Confirmar cierre de sesión'}
-            </h3>
-            <p className="text-sm text-zinc-600 mb-6">
-              {isKids
-                ? 'Tienes trabajo sin enviar. Si sales ahora se perderá.'
-                : 'Tienes respuestas sin enviar. Si sales ahora se perderán.'}
-            </p>
-            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowExitConfirm(false)}
-                className="w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-5 py-2.5 rounded-xl border border-zinc-300 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              >
-                Quedarme
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowExitConfirm(false);
-                  performLogout();
-                }}
-                className="w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-sm font-bold text-white transition-colors cursor-pointer shadow-xs focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              >
-                Salir de todos modos
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showExitConfirm}
+        title={isKids ? '¿Seguro que quieres salir?' : 'Confirmar cierre de sesión'}
+        message={
+          isKids
+            ? 'Tienes trabajo sin enviar. Si sales ahora se perderá.'
+            : 'Tienes respuestas sin enviar. Si sales ahora se perderán.'
+        }
+        confirmText="Salir de todos modos"
+        cancelText="Quedarme"
+        isDestructive={true}
+        onConfirm={() => {
+          setShowExitConfirm(false);
+          performLogout();
+        }}
+        onCancel={() => setShowExitConfirm(false)}
+      />
     </header>
   );
 }

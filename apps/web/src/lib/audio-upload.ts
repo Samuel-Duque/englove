@@ -1,4 +1,5 @@
 import type { MediaUploadUrlInput, MediaUploadUrlResponse } from '@englove/shared';
+import { requestSharedRefresh } from './api';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -22,8 +23,7 @@ function isUploadUrlResponse(value: unknown): value is MediaUploadUrlResponse {
 
 /**
  * Pide la URL firmada a la API, sube el blob directo a R2 y devuelve el `mediaId`
- * del contrato compartido (SPEC-05 RF-12 y RF-13). Lanza error si algún paso falla;
- * el blob local no se toca aquí.
+ * del contrato compartido (SPEC-05 RF-12 y RF-13). Reintenta con refresco único ante 401 (RF-2).
  */
 export async function uploadAudioBlob({
   apiUrl,
@@ -35,12 +35,25 @@ export async function uploadAudioBlob({
   const mimeType = blob.type || 'audio/webm';
   const input: MediaUploadUrlInput = { attemptId, mimeType, sizeBytes: blob.size };
 
-  const presignedRes = await fetchFn(`${apiUrl}/api/v1/media/upload-url`, {
+  let presignedRes = await fetchFn(`${apiUrl}/api/v1/media/upload-url`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: origin },
     credentials: 'include',
     body: JSON.stringify(input),
   });
+
+  if (presignedRes.status === 401 && typeof window !== 'undefined') {
+    const refreshed = await requestSharedRefresh();
+    if (refreshed) {
+      presignedRes = await fetchFn(`${apiUrl}/api/v1/media/upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: origin },
+        credentials: 'include',
+        body: JSON.stringify(input),
+      });
+    }
+  }
+
   if (!presignedRes.ok) {
     throw new Error('UPLOAD_URL_REJECTED');
   }

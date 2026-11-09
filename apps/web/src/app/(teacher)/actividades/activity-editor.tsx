@@ -13,6 +13,7 @@ import {
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { GameRenderer } from '../../../components/activities/GameRenderer';
+import { AccessibleModal } from '../../../components/ui/modal';
 
 interface ActivityEditorProps {
   initialActivity?: ActivityEditor;
@@ -2231,218 +2232,200 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
       </div>
 
       {/* Activity Preview Modal (ENG-039, RF-16 SPEC-04, RF-12 SPEC-05) */}
-      {isPreviewOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-        >
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-200 pb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">👀</span>
-                <div>
-                  <h2 className="text-lg font-bold text-zinc-900">Previsualización Docente</h2>
-                  <p className="text-xs text-zinc-500 font-medium">
-                    Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200"
-                  role="group"
-                  aria-label="Selector de tema para previsualización"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTheme('kids')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      previewTheme === 'kids'
-                        ? 'bg-amber-500 text-white shadow-xs'
-                        : 'text-zinc-600 hover:text-zinc-900'
-                    }`}
-                  >
-                    🧒 Kids
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTheme('teens')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      previewTheme === 'teens'
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-zinc-600 hover:text-zinc-900'
-                    }`}
-                  >
-                    🧑‍🎓 Teens
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPreviewOpen(false)}
-                  className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 font-bold cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
+      <AccessibleModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        title="Previsualización Docente"
+        description="Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas."
+        maxWidthClass="max-w-2xl"
+      >
+        <div className="space-y-6">
+          <div className="flex items-center justify-end">
             <div
-              className={`p-6 rounded-2xl border space-y-4 ${
-                previewTheme === 'kids'
-                  ? 'border-amber-200 bg-amber-50/40 text-amber-950'
-                  : 'border-zinc-700 bg-zinc-900 text-zinc-100'
-              }`}
-              data-theme={previewTheme}
+              className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200"
+              role="group"
+              aria-label="Selector de tema para previsualización"
             >
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900">
-                  Nivel {level}
-                </span>
-                <span className="text-xs font-semibold text-zinc-500 capitalize">{type}</span>
-              </div>
-              <h3 className="text-xl font-black text-amber-950">{title || 'Actividad sin título'}</h3>
-
-              {type === ActivityType.fill_blank && (
-                <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
-                  <p className="text-xs font-bold text-zinc-500">
-                    Oraciones con huecos ({fbItems.length})
-                  </p>
-                  {fbItems.map((it, idx) => (
-                    <div
-                      key={idx}
-                      className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0 space-y-1"
-                    >
-                      <p className="text-base text-zinc-800">
-                        {idx + 1}. {it.prompt}
-                      </p>
-                      <div className="flex gap-2 pt-1">
-                        <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
-                          A: {it.option1}
-                        </span>
-                        <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
-                          B: {it.option2}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {type === ActivityType.speaking && (
-                <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200 text-center">
-                  <p className="text-sm font-bold text-amber-900">{spPrompt || 'Pronuncia la frase en voz alta'}</p>
-                  <div className="p-4 rounded-xl bg-amber-50 inline-block text-xs font-semibold text-zinc-600">
-                    🎙️ Grabadora de voz simulada (2 a 120 segundos)
-                  </div>
-                </div>
-              )}
-
-              {type === ActivityType.open_question && (
-                <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
-                  {oqInstructions && (
-                    <div className="p-2.5 bg-amber-50 rounded-lg text-xs text-amber-900 border border-amber-200 font-medium">
-                      <strong>Instrucciones:</strong> {oqInstructions}
-                    </div>
-                  )}
-                  {oqQuestions.map((q, idx) => (
-                    <div key={q.id || idx} className="space-y-1.5 p-3 rounded-lg border border-amber-100 bg-amber-50/30">
-                      <p className="text-xs font-bold text-amber-900">
-                        {oqQuestions.length > 1 ? `Pregunta ${idx + 1}:` : 'Consigna:'}
-                      </p>
-                      <p className="text-sm font-semibold text-zinc-800">{q.prompt || 'Sin consigna'}</p>
-                      {q.rubric && (
-                        <p className="text-[11px] text-zinc-500 italic">Rúbrica: {q.rubric}</p>
-                      )}
-                      <textarea
-                        disabled
-                        placeholder="Aquí el alumno escribirá su respuesta..."
-                        className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-400 bg-white"
-                        rows={2}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {type === ActivityType.exam && (
-                <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
-                  <p className="text-xs font-bold text-zinc-500">
-                    Ítems ponderados del examen ({examItems.length})
-                  </p>
-                  {examItems.map((it, idx) => (
-                    <div
-                      key={idx}
-                      className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0"
-                    >
-                      <p className="text-sm text-zinc-800">
-                        {idx + 1}. {it.prompt}{' '}
-                        <span className="text-xs text-zinc-500">({it.weight || '0'}%)</span>
-                      </p>
-                      <div className="flex gap-2 pt-1">
-                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
-                          A: {it.option1}
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
-                          B: {it.option2}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {type === ActivityType.game && (() => {
-                let previewConfig: GamePublicConfig | null;
-                try {
-                  const payload = buildPayload();
-                  if (!payload) {
-                    previewConfig = null;
-                  } else {
-                    previewConfig = {
-                      ...(payload.config as GamePublicConfig),
-                      answerKey: (payload.answerKey as GameAnswerKey) || undefined,
-                    };
-                  }
-                } catch {
-                  previewConfig = null;
-                }
-
-                if (!previewConfig) {
-                  return (
-                    <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
-                      <p className="text-xs font-bold text-amber-800 uppercase">Previsualización de {gameMechanic}</p>
-                      <p className="text-xs text-zinc-600 mt-1">
-                        Completa los campos requeridos de la mecánica para interactuar con la previsualización.
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="p-4 bg-white rounded-2xl border border-amber-200">
-                    <GameRenderer
-                      config={previewConfig}
-                      previewMode={true}
-                      theme={previewTheme}
-                    />
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-zinc-100">
               <button
                 type="button"
-                onClick={() => setIsPreviewOpen(false)}
-                className="rounded-xl bg-zinc-900 text-white font-bold px-5 py-2 text-xs hover:bg-zinc-800"
+                onClick={() => setPreviewTheme('kids')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  previewTheme === 'kids'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
               >
-                Cerrar previsualización
+                🧒 Kids
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewTheme('teens')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  previewTheme === 'teens'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                🧑‍🎓 Teens
               </button>
             </div>
           </div>
+
+          <div
+            className={`p-6 rounded-2xl border space-y-4 max-h-[60vh] overflow-y-auto ${
+              previewTheme === 'kids'
+                ? 'border-amber-200 bg-amber-50/40 text-amber-950'
+                : 'border-zinc-700 bg-zinc-900 text-zinc-100'
+            }`}
+            data-theme={previewTheme}
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900">
+                Nivel {level}
+              </span>
+              <span className="text-xs font-semibold text-zinc-500 capitalize">{type}</span>
+            </div>
+            <h3 className="text-xl font-black text-amber-950">{title || 'Actividad sin título'}</h3>
+
+            {type === ActivityType.fill_blank && (
+              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
+                <p className="text-xs font-bold text-zinc-500">
+                  Oraciones con huecos ({fbItems.length})
+                </p>
+                {fbItems.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0 space-y-1"
+                  >
+                    <p className="text-base text-zinc-800">
+                      {idx + 1}. {it.prompt}
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
+                        A: {it.option1}
+                      </span>
+                      <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
+                        B: {it.option2}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {type === ActivityType.speaking && (
+              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200 text-center">
+                <p className="text-sm font-bold text-amber-900">{spPrompt || 'Pronuncia la frase en voz alta'}</p>
+                <div className="p-4 rounded-xl bg-amber-50 inline-block text-xs font-semibold text-zinc-600">
+                  🎙️ Grabadora de voz simulada (2 a 120 segundos)
+                </div>
+              </div>
+            )}
+
+            {type === ActivityType.open_question && (
+              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
+                {oqInstructions && (
+                  <div className="p-2.5 bg-amber-50 rounded-lg text-xs text-amber-900 border border-amber-200 font-medium">
+                    <strong>Instrucciones:</strong> {oqInstructions}
+                  </div>
+                )}
+                {oqQuestions.map((q, idx) => (
+                  <div key={q.id || idx} className="space-y-1.5 p-3 rounded-lg border border-amber-100 bg-amber-50/30">
+                    <p className="text-xs font-bold text-amber-900">
+                      {oqQuestions.length > 1 ? `Pregunta ${idx + 1}:` : 'Consigna:'}
+                    </p>
+                    <p className="text-sm font-semibold text-zinc-800">{q.prompt || 'Sin consigna'}</p>
+                    {q.rubric && (
+                      <p className="text-[11px] text-zinc-500 italic">Rúbrica: {q.rubric}</p>
+                    )}
+                    <textarea
+                      disabled
+                      placeholder="Aquí el alumno escribirá su respuesta..."
+                      className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-400 bg-white"
+                      rows={2}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {type === ActivityType.exam && (
+              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
+                <p className="text-xs font-bold text-zinc-500">
+                  Ítems ponderados del examen ({examItems.length})
+                </p>
+                {examItems.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0"
+                  >
+                    <p className="text-sm text-zinc-800">
+                      {idx + 1}. {it.prompt}{' '}
+                      <span className="text-xs text-zinc-500">({it.weight || '0'}%)</span>
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
+                        A: {it.option1}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
+                        B: {it.option2}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {type === ActivityType.game && (() => {
+              let previewConfig: GamePublicConfig | null;
+              try {
+                const payload = buildPayload();
+                if (!payload) {
+                  previewConfig = null;
+                } else {
+                  previewConfig = {
+                    ...(payload.config as GamePublicConfig),
+                    answerKey: (payload.answerKey as GameAnswerKey) || undefined,
+                  };
+                }
+              } catch {
+                previewConfig = null;
+              }
+
+              if (!previewConfig) {
+                return (
+                  <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
+                    <p className="text-xs font-bold text-amber-800 uppercase">Previsualización de {gameMechanic}</p>
+                    <p className="text-xs text-zinc-600 mt-1">
+                      Completa los campos requeridos de la mecánica para interactuar con la previsualización.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-4 bg-white rounded-2xl border border-amber-200">
+                  <GameRenderer
+                    config={previewConfig}
+                    previewMode={true}
+                    theme={previewTheme}
+                  />
+                </div>
+              );
+            })()}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-zinc-100">
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(false)}
+              className="rounded-xl bg-zinc-900 text-white font-bold px-5 py-2 text-xs hover:bg-zinc-800 cursor-pointer"
+            >
+              Cerrar previsualización
+            </button>
+          </div>
         </div>
-      )}
+      </AccessibleModal>
     </div>
   );
 }

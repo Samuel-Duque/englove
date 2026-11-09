@@ -319,17 +319,7 @@ function TargetCategoryContainer({
   return (
     <div
       ref={elRef}
-      role="button"
-      tabIndex={0}
-      aria-label={`Categoría ${name}. ${placedObjects.length} ítems`}
-      onClick={onClickCategory}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClickCategory();
-        }
-      }}
-      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all touch-manipulation cursor-pointer ${
+      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all select-none ${
         isOver
           ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg'
           : isTargetActive
@@ -340,14 +330,19 @@ function TargetCategoryContainer({
       }`}
     >
       <div>
-        <div className={`flex items-center justify-between pb-2 border-b ${
-          isKids ? 'border-zinc-100' : 'border-zinc-700'
-        }`}>
+        <button
+          type="button"
+          onClick={onClickCategory}
+          aria-label={`Colocar ítem en categoría ${name}. Actualmente ${placedObjects.length} ítems`}
+          className={`w-full flex items-center justify-between pb-2 border-b text-left rounded-lg p-1 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors ${
+            isKids ? 'border-zinc-100 hover:bg-zinc-50' : 'border-zinc-700 hover:bg-zinc-750'
+          }`}
+        >
           <span className={`text-sm font-black ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{name}</span>
           <span className="text-xs font-bold text-zinc-400">
-            {placedObjects.length} ítems
+            {isTargetActive ? '👈 Tocar para colocar' : `${placedObjects.length} ítems`}
           </span>
-        </div>
+        </button>
 
         <div className="flex flex-wrap gap-1.5 pt-3">
           {placedObjects.map((obj) => (

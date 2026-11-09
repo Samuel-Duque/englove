@@ -4,7 +4,7 @@ import { ResetPasswordForm } from './reset-password-form';
 
 export const metadata: Metadata = {
   referrer: 'no-referrer',
-  title: 'Restablecer contraseña | Englove',
+  title: 'Restablecer Contraseña',
 };
 
 export default function ResetPasswordPage() {

@@ -258,7 +258,7 @@ function DraggableLeftItem({
   return (
     <div
       ref={elRef}
-      className={`min-h-12 p-3 sm:p-4 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation cursor-pointer select-none ${
+      className={`min-h-12 p-2 sm:p-2.5 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation select-none ${
         isSelected
           ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-100/90 shadow-md'
           : isPaired
@@ -267,46 +267,39 @@ function DraggableLeftItem({
               ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
               : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
       }`}
-      role="button"
-      tabIndex={0}
-      aria-pressed={isSelected}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        } else if (e.key === 'Escape') {
-          if (isSelected) onSelect();
-        }
-      }}
     >
-      <div className="flex items-center gap-2">
-        <span className={`text-sm font-bold ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{text}</span>
-        {isPaired && pairedText && (
-          <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
-            🔗 {pairedText}
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={isSelected}
+        className="flex-1 flex items-center justify-between text-left p-1.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+      >
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-bold ${isSelected ? 'text-zinc-900' : isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>
+            {text}
           </span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        {isPaired && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUnlink();
-            }}
-            className="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-1 rounded-md"
-            title="Desvincular"
-          >
-            ✕
-          </button>
-        )}
-        <span className="text-xs text-zinc-400 font-bold" aria-hidden="true">
+          {isPaired && pairedText && (
+            <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
+              🔗 {pairedText}
+            </span>
+          )}
+        </div>
+        <span className={`text-xs font-bold mr-1 ${isSelected ? 'text-zinc-900' : 'text-zinc-400'}`} aria-hidden="true">
           {isSelected ? '✓ Activo' : '👉'}
         </span>
-      </div>
+      </button>
+
+      {isPaired && (
+        <button
+          type="button"
+          onClick={onUnlink}
+          className="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-1 rounded-md ml-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-500"
+          title="Desvincular"
+          aria-label={`Desvincular ${text}`}
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

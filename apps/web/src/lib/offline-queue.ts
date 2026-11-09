@@ -441,7 +441,7 @@ function resetBackoff() {
  * Schedules a debounced flush (micro-batching) to avoid flooding the API
  * with individual HTTP requests on every rapid user interaction (ISSUE-09).
  */
-export function scheduleDebouncedFlush(delayMs = 250): void {
+export function scheduleDebouncedFlush(delayMs = 250, activeUserId?: string): void {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return;
   }
@@ -450,11 +450,11 @@ export function scheduleDebouncedFlush(delayMs = 250): void {
   }
   flushDebounceTimer = setTimeout(() => {
     flushDebounceTimer = null;
-    void triggerFlush();
+    void triggerFlush(activeUserId);
   }, delayMs);
 }
 
-export async function triggerFlush(): Promise<void> {
+export async function triggerFlush(activeUserId?: string): Promise<void> {
   if (flushDebounceTimer) {
     clearTimeout(flushDebounceTimer);
     flushDebounceTimer = null;
@@ -470,7 +470,7 @@ export async function triggerFlush(): Promise<void> {
     try {
       await navigator.locks.request('englove_offline_flush', { ifAvailable: true }, async (lock) => {
         if (!lock) return; // Another tab is flushing
-        await executeFlush();
+        await executeFlush(activeUserId);
       });
       return;
     } catch {
@@ -478,7 +478,7 @@ export async function triggerFlush(): Promise<void> {
     }
   }
 
-  await executeFlush();
+  await executeFlush(activeUserId);
 }
 
 /**
@@ -486,8 +486,9 @@ export async function triggerFlush(): Promise<void> {
  * 1. Batches of up to 50 events per attempt.
  * 2. Upload audio (with mediaId reuse).
  * 3. Complete attempt delivery.
+ * Filters strictly by activeUserId when specified (RF-6).
  */
-async function executeFlush(): Promise<void> {
+export async function executeFlush(activeUserId?: string): Promise<void> {
   if (isFlushingInternal) return;
   isFlushingInternal = true;
   notifyStatus();
@@ -513,7 +514,7 @@ async function executeFlush(): Promise<void> {
       uploadsReq = tx.objectStore(UPLOADS_STORE).getAll();
     }
 
-    const [events, uploads] = await new Promise<[PendingEventRecord[], PendingUploadRecord[]]>((resolve, reject) => {
+    const [rawEvents, rawUploads] = await new Promise<[PendingEventRecord[], PendingUploadRecord[]]>((resolve, reject) => {
       tx.oncomplete = () => {
         db.close();
         resolve([eventsReq?.result || [], uploadsReq?.result || []]);
@@ -523,6 +524,9 @@ async function executeFlush(): Promise<void> {
         reject(tx.error);
       };
     });
+
+    const events = activeUserId ? rawEvents.filter((e) => e.userId === activeUserId) : rawEvents;
+    const uploads = activeUserId ? rawUploads.filter((u) => u.userId === activeUserId) : rawUploads;
 
     if (events.length === 0 && uploads.length === 0) {
       isFlushingInternal = false;
@@ -614,8 +618,8 @@ async function executeFlush(): Promise<void> {
                   delDb.close();
                 }
               }
-            } else if (status === 400 || status === 404) {
-              // Discard affected entries
+            } else if (status === 400 || status === 404 || status === 413 || status === 422) {
+              // Discard affected entries on 4xx validation errors (RF-6)
               const delDb = await openOfflineDb();
               if (delDb.objectStoreNames.contains(EVENTS_STORE)) {
                 const delTx = delDb.transaction(EVENTS_STORE, 'readwrite');
@@ -670,7 +674,8 @@ async function executeFlush(): Promise<void> {
             // guardrails-ignore G-C06: constante de error de duracion de audio de SPEC-05/SPEC-09
             errMsg.includes('AUDIO_EXCEEDS_MAX_DURATION') ||
             errMsg.includes('413') ||
-            errMsg.includes('422')
+            errMsg.includes('422') ||
+            errMsg.includes('400')
           ) {
             await discardAudioBlob(attemptId);
           } else if (errMsg.includes('ATTEMPT_CLOSED') || errMsg.includes('409')) {
@@ -683,8 +688,13 @@ async function executeFlush(): Promise<void> {
         }
       }
 
-      // 3. Complete Attempt if completed event is queued (RF-12)
+      // 3. Complete Attempt if completed event is queued (RF-12, RF-6)
       if (completionEvent) {
+        // If audio upload is required but unresolved, omit /complete (RF-6)
+        if (attemptUpload && !resolvedMediaId) {
+          continue;
+        }
+
         try {
           const compPayload = (completionEvent.payload || {}) as {
             answers?: Record<string, unknown>;
@@ -715,7 +725,14 @@ async function executeFlush(): Promise<void> {
             if (status === 401) {
               isQueuePausedDueToAuth = true;
               return;
-            } else if (status === 409) {
+            } else if (
+              status === 409 ||
+              status === 400 ||
+              status === 404 ||
+              status === 413 ||
+              status === 422
+            ) {
+              // 4xx client errors: purge attempt from queue without retrying (RF-6)
               await purgeAttemptFromQueue(attemptId);
             } else if (status >= 500 || status === 429) {
               hadError = true;

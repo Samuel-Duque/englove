@@ -16,14 +16,14 @@ export async function clearSharedDeviceSession(
   clearSharedSession();
   clearSharedFeatureFlags();
 
-  // Clear IndexedDB pending queues if running in browser
+  // Clear IndexedDB pending queues if running in browser (RF-6, ISSUE-04)
   if (typeof window !== 'undefined' && 'indexedDB' in window) {
     try {
       const dbNames = ['englove_offline', 'englove_storage'];
       let targetDbs = dbNames;
 
       // Check if databases() API exists so we do NOT prematurely create empty DBs (ISSUE-04)
-      if ('databases' in window.indexedDB) {
+      if ('databases' in window.indexedDB && typeof window.indexedDB.databases === 'function') {
         try {
           const existing = await window.indexedDB.databases();
           const existingNames = new Set(existing.map((d) => d.name));
@@ -53,7 +53,11 @@ export async function clearSharedDeviceSession(
                   try {
                     const db = req.result;
                     // If the database has 0 stores (created empty or corrupt), close and delete it immediately (ISSUE-04)
-                    if (db.objectStoreNames && 'length' in db.objectStoreNames && db.objectStoreNames.length === 0) {
+                    if (
+                      db.objectStoreNames &&
+                      'length' in db.objectStoreNames &&
+                      db.objectStoreNames.length === 0
+                    ) {
                       db.close();
                       window.indexedDB.deleteDatabase(name);
                       resolve();

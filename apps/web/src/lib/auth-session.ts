@@ -26,16 +26,24 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
-      if (!res.ok) {
+      if (res.status === 401) {
         cachedSession = null;
         return null;
+      }
+      if (!res.ok) {
+        cachedSession = null;
+        throw new Error(`SERVER_ERROR_${res.status}`);
       }
       const data: SessionView = await res.json();
       cachedSession = data;
       return data;
-    } catch {
+    } catch (err: unknown) {
       cachedSession = null;
-      return null;
+      if ((err as Error)?.message?.startsWith('SERVER_ERROR_')) {
+        throw err;
+      }
+      // If network unreachable, throw NETWORK_ERROR so UI does not enter redirect loop
+      throw new Error('NETWORK_ERROR', { cause: err });
     } finally {
       inFlightPromise = null;
     }

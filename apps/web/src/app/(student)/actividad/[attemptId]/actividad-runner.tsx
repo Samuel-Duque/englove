@@ -64,6 +64,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [runnerAlert, setRunnerAlert] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -90,7 +91,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve();
     return new Promise((resolve) => {
       try {
-        const req = window.indexedDB.open('englove_storage', 1);
+        const req = window.indexedDB.open('englove_offline', 2);
         req.onupgradeneeded = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains('pendingUploads')) {
@@ -123,7 +124,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve(null);
     return new Promise((resolve) => {
       try {
-        const req = window.indexedDB.open('englove_storage', 1);
+        const req = window.indexedDB.open('englove_offline', 2);
         req.onupgradeneeded = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains('pendingUploads')) {
@@ -163,7 +164,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve();
     return new Promise((resolve) => {
       try {
-        const req = window.indexedDB.open('englove_storage', 1);
+        const req = window.indexedDB.open('englove_offline', 2);
         req.onupgradeneeded = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains('pendingUploads')) {
@@ -312,7 +313,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const startRecording = async () => {
     try {
       setUploadError(null);
+      setMediaId(null);
+      setRecordedAudioBlob(null);
       audioChunksRef.current = [];
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setUploadError('El acceso al micrófono requiere una conexión segura HTTPS o localhost.');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const preferredMime = getSupportedMimeType();
       const mediaRecorder = preferredMime
@@ -342,7 +349,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
       timerIntervalRef.current = setInterval(() => {
         setRecordingSeconds((prev) => {
-          if (prev >= 120) {
+          const maxSec = (runtime?.activity?.config as { maxDurationSeconds?: number })?.maxDurationSeconds ?? 120;
+          if (prev >= maxSec) {
             stopRecording();
             return prev;
           }
@@ -350,7 +358,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         });
       }, 1000);
     } catch {
-      alert('Por favor habilita el permiso de micrófono en tu navegador para grabar.');
+      setUploadError('Por favor habilita el permiso de micrófono en tu navegador para grabar.');
     }
   };
 
@@ -368,7 +376,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const uploadAudioRecording = async (): Promise<string | null> => {
     if (!recordedAudioBlob) return mediaId;
     if (recordingSeconds > 0 && recordingSeconds < 2) {
-      alert('Graba al menos 2 segundos');
+      setUploadError('Graba al menos 2 segundos');
       return null;
     }
 
@@ -400,7 +408,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   // Submit attempt completion
   const handleCompleteAttempt = async (overrideAnswers?: Record<string, unknown>) => {
     if (!runtime?.attemptToken) {
-      alert('Token de intento no disponible');
+      setRunnerAlert('Token de intento no disponible');
       return;
     }
     const attemptToken = runtime.attemptToken;
@@ -425,14 +433,14 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
       // Flush queued events before completing to sync events (ISSUE-05)
       try {
-        await triggerFlush();
+        await triggerFlush(currentUserId);
       } catch (flushErr) {
         console.warn('[OfflineQueue] Flush previo a entrega no fatal:', flushErr);
       }
 
       if (runtime.activity.type === ActivityType.speaking) {
         if (!recordedAudioBlob && !mediaId) {
-          alert('Debes grabar un audio antes de entregar la actividad.');
+          setUploadError('Debes grabar un audio antes de entregar la actividad.');
           setIsSubmitting(false);
           return;
         }
@@ -475,6 +483,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
+        if (res.status >= 400 && res.status < 500) {
+          setError(errData.message || 'Error al entregar la actividad');
+          setIsSubmitting(false);
+          return;
+        }
         throw new Error(errData.message || 'Error al entregar la actividad');
       }
 
@@ -528,7 +541,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         setIsOfflineSaved(true);
         setActiveAttemptState(false);
       } else {
-        alert((err as Error)?.message || 'No se pudo completar la entrega');
+        setRunnerAlert((err as Error)?.message || 'No se pudo completar la entrega');
       }
     } finally {
       setIsSubmitting(false);
@@ -549,7 +562,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       router.push(`/actividad/${res.attempt.id}`);
       router.refresh();
     } catch (err: unknown) {
-      alert((err as Error)?.message || 'No se pudo iniciar un nuevo intento del juego');
+      setRunnerAlert((err as Error)?.message || 'No se pudo iniciar un nuevo intento del juego');
     } finally {
       setIsSubmitting(false);
     }
@@ -735,6 +748,22 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   return (
     <div className="max-w-3xl mx-auto py-6 space-y-6">
+      {runnerAlert && (
+        <div
+          role="alert"
+          className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 flex items-center justify-between text-sm font-semibold shadow-xs"
+        >
+          <span>⚠️ {runnerAlert}</span>
+          <button
+            type="button"
+            onClick={() => setRunnerAlert(null)}
+            className="font-bold text-rose-600 hover:text-rose-800 ml-4 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-lg p-1"
+            aria-label="Cerrar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Activity Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-amber-200/80 shadow-xs">

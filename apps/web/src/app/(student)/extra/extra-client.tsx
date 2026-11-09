@@ -7,6 +7,7 @@ import {
   ExternalResourceItem,
   ExternalResourceListResponse,
   StudentProfileView,
+  isValidHttpsResourceUrl,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 
@@ -414,18 +415,22 @@ export function ExtraClient() {
                     <div />
                   )}
 
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
-                      isKids
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                    }`}
-                  >
-                    Abrir en pestaña nueva ↗
-                  </a>
+                  {isValidHttpsResourceUrl(item.url) ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      Abrir en pestaña nueva ↗
+                    </a>
+                  ) : (
+                    <span className="text-xs text-zinc-400 italic">Enlace no seguro o inválido</span>
+                  )}
                 </div>
               </li>
             );

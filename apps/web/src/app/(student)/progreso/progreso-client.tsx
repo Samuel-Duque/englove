@@ -169,9 +169,11 @@ export function ProgresoClient() {
                   >
                     <div>
                       <h4 className="text-sm font-extrabold text-amber-950">
-                        Intento #{act.attemptId.slice(0, 8)}
+                        {act.activityTitle || `Actividad #${act.attemptNumber ?? act.attemptId.slice(0, 8)}`}
                       </h4>
-                      <p className="text-xs text-zinc-500 mt-0.5">Actividad calificada</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {act.attemptNumber ? `Intento #${act.attemptNumber} · Calificada` : 'Actividad calificada'}
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-4">

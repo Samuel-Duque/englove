@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface DecodedJwt {
+  role?: string;
+  exp?: number;
+  typ?: string;
+}
+
 /**
- * Extracts the user role from a JWT payload without cryptographic verification (Decision A45 & A75).
+ * Extracts payload fields from a JWT payload without cryptographic verification (Decision A45 & A75).
  * Only used for perimeter UI routing/redirection in proxy.ts; business authorization remains in NestJS.
  */
-function extractRoleFromJwt(token: string): string | null {
+function decodeJwtPayload(token: string): DecodedJwt | null {
   try {
     const parts = token.split('.');
     const part1 = parts[1];
     if (!part1) return null;
     const base64 = part1.replace(/-/g, '+').replace(/_/g, '/');
     const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
-    const payload = JSON.parse(jsonStr) as { role?: unknown };
-    return typeof payload.role === 'string' ? payload.role : null;
+    const payload = JSON.parse(jsonStr) as { role?: unknown; exp?: unknown; typ?: unknown };
+    return {
+      role: typeof payload.role === 'string' ? payload.role : undefined,
+      exp: typeof payload.exp === 'number' ? payload.exp : undefined,
+      typ: typeof payload.typ === 'string' ? payload.typ : undefined,
+    };
   } catch {
     return null;
   }
@@ -32,20 +42,21 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     pathname.startsWith('/static') ||
     pathname.startsWith('/icons/') ||
     pathname === '/manifest.webmanifest' ||
-    pathname === '/manifest.json' ||
     pathname === '/sw.js' ||
     /\.(?:ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot|webp|map|txt|webmanifest|json)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
 
-  // Session cookie detection (with prefix convention, Decision 58)
-  const cookiePrefix = process.env.COOKIE_PREFIX || 'englove_';
-  const sessionCookie =
-    request.cookies.get(`${cookiePrefix}access_token`) ||
-    request.cookies.get('access_token') ||
-    request.cookies.get('englove_access_token') ||
-    request.cookies.get('englove_session');
+  // Session cookie detection: strictly with prefix convention (Decision 58, RF-2)
+  const cookiePrefix =
+    process.env.COOKIE_PREFIX || process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'englove_';
+  const sessionCookie = request.cookies.get(`${cookiePrefix}access_token`);
+
+  const jwt = sessionCookie ? decodeJwtPayload(sessionCookie.value) : null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const isExpired = Boolean(jwt && typeof jwt.exp === 'number' && jwt.exp <= nowSec);
+  const isSessionValid = Boolean(sessionCookie && !isExpired);
 
   const isPublicAuthRoute =
     pathname.startsWith('/login') ||
@@ -55,36 +66,43 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const isPublicRoute =
     pathname === '/' ||
+    pathname === '/terminos' ||
+    pathname.startsWith('/terminos/') ||
     pathname === '/offline' ||
     pathname === '/manifest.webmanifest' ||
-    pathname === '/manifest.json' ||
     pathname === '/sw.js' ||
     pathname.startsWith('/icons/') ||
     isPublicAuthRoute;
 
   // If unauthenticated and attempting private route, redirect to login with safe next parameter (RF-17)
-  if (!sessionCookie && !isPublicRoute) {
+  if (!isSessionValid && !isPublicRoute) {
     const loginUrl = new URL('/login', request.url);
+    const search = request.nextUrl.search || '';
+    const nextCandidate = `${pathname}${search}`;
+    const hasControlChars = Array.from(nextCandidate).some((c) => {
+      const code = c.charCodeAt(0);
+      return code <= 31 || code === 127;
+    });
     if (
       pathname.startsWith('/') &&
       !pathname.startsWith('//') &&
       !pathname.includes('\\') &&
+      !hasControlChars &&
       !isPublicAuthRoute
     ) {
-      const search = request.nextUrl.search || '';
-      loginUrl.searchParams.set('next', `${pathname}${search}`);
+      loginUrl.searchParams.set('next', nextCandidate);
     }
     return NextResponse.redirect(loginUrl);
   }
 
   // If authenticated and visiting root or public auth routes, redirect to /inicio (H11)
-  if (sessionCookie && (isPublicAuthRoute || pathname === '/')) {
+  if (isSessionValid && (isPublicAuthRoute || pathname === '/')) {
     return NextResponse.redirect(new URL('/inicio', request.url));
   }
 
   // Role segregation redirection (Decisions A45, A75, H9)
-  if (sessionCookie) {
-    const role = extractRoleFromJwt(sessionCookie.value);
+  if (isSessionValid && jwt) {
+    const role = jwt.role;
     if (role === 'student') {
       const isTeacherRoute =
         pathname === '/alumnos' ||

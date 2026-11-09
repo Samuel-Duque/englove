@@ -10,6 +10,7 @@ export function PerfilClient() {
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingTheme, setIsUpdatingTheme] = useState(false);
   const [themeSuccess, setThemeSuccess] = useState<string | null>(null);
+  const [themeError, setThemeError] = useState<string | null>(null);
 
   // Email change state
   const [isChangingEmail, setIsChangingEmail] = useState(false);
@@ -62,6 +63,7 @@ export function PerfilClient() {
     if (!profile?.student?.canSwitchInterface) return;
     setIsUpdatingTheme(true);
     setThemeSuccess(null);
+    setThemeError(null);
     try {
       await fetch(`${apiUrl}/api/v1/me/interface`, {
         method: 'PATCH',
@@ -77,7 +79,7 @@ export function PerfilClient() {
       // Reload profile and page to apply cookie
       window.location.reload();
     } catch {
-      alert('No se pudo actualizar la interfaz');
+      setThemeError('No se pudo actualizar la interfaz');
     } finally {
       setIsUpdatingTheme(false);
     }
@@ -248,6 +250,12 @@ export function PerfilClient() {
             Tema actual: {currentSegment}
           </span>
         </div>
+
+        {themeError && (
+          <div className="rounded-xl bg-rose-50 border border-rose-300 p-3 text-xs font-bold text-rose-900" role="alert">
+            {themeError}
+          </div>
+        )}
 
         {student?.canSwitchInterface ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">

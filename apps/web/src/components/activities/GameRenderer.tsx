@@ -119,8 +119,35 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
     }
   };
 
+  const promptToSpeak = config.instructions || '';
+  const [isPlayingTts, setIsPlayingTts] = useState(false);
+
+  const handleSpeakPrompt = () => {
+    if (!promptToSpeak || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(promptToSpeak);
+    utterance.lang = 'en-US';
+    utterance.onend = () => setIsPlayingTts(false);
+    utterance.onerror = () => setIsPlayingTts(false);
+    setIsPlayingTts(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
   return (
     <div className="w-full">
+      {promptToSpeak && (
+        <div className="mb-4 flex items-center justify-between gap-3 p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/80">
+          <p className="text-sm font-bold text-amber-950">{promptToSpeak}</p>
+          <button
+            type="button"
+            onClick={handleSpeakPrompt}
+            aria-label="Escuchar enunciado en inglés"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+          >
+            <span>{isPlayingTts ? '🔊 Reproduciendo…' : '🔊 Escuchar'}</span>
+          </button>
+        </div>
+      )}
       {previewMode && (
         <div className="mb-4 space-y-2">
           <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center shadow-xs">

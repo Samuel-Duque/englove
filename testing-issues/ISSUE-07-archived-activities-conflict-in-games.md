@@ -5,6 +5,10 @@
 - **Severidad:** Alta (Impide iniciar actividades que aparecen como disponibles o reintentables en la interfaz del estudiante)
 - **Estado:** ✅ Resuelto y Verificado (2026-11-06)
 
+> [!NOTE]
+> **HALLAZGO HISTÓRICO — 100% SUBSANADO Y VERIFICADO (2026-11-08).**  
+> Subsanado e integrado en la **Etapa 12 («Calidad y remediación»)** bajo [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md), formalizado en la Decisión 130 de CONTEXT §14 (microjuegos autónomos 24/7 sin `Assignment`) y blindado con pruebas de regresión automáticas en el monorepo (tarea ENG-150).
+
 ---
 
 ## 1. Síntoma / Descripción del Usuario

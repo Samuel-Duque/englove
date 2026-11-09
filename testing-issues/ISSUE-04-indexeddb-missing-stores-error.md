@@ -5,10 +5,9 @@
 - **Severidad:** Alta (rompe la cola de persistencia offline/sincronización y genera `Uncaught (in promise) NotFoundError` en cada interacción del juego)
 - **Estado:** ✅ Resuelto y Verificado (2026-11-06)
 
----
-
 > [!NOTE]
-> **Aclaración importante:** Todas las soluciones y alternativas expuestas en este documento representan **posibles soluciones e hipótesis técnicas de abordaje**. Serán evaluadas, refinadas y decididas formalmente en la sesión de corrección.
+> **HALLAZGO HISTÓRICO — 100% SUBSANADO Y VERIFICADO (2026-11-08).**  
+> Subsanado e integrado en la **Etapa 12 («Calidad y remediación»)** bajo [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) y blindado con pruebas de regresión automáticas en el monorepo (tarea ENG-155).
 
 ---
 

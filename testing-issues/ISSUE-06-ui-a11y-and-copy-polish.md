@@ -2,6 +2,10 @@
 
 ## Estado: ✅ Resuelto y Verificado (2026-11-06)
 - **Fecha de hallazgo:** 2026-11-06
+
+> [!NOTE]
+> **HALLAZGO HISTÓRICO — 100% SUBSANADO Y VERIFICADO (2026-11-08).**  
+> Subsanado e integrado en la **Etapa 12 («Calidad y remediación»)** bajo [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) y blindado con pruebas de regresión automáticas en el monorepo (tarea ENG-156).
 - **Entorno:** Localhost (`http://localhost:3000`), Chrome DevTools MCP.
 - **Vistas afectadas:**
   - `apps/web/src/app/(teacher)/revision/page.tsx`

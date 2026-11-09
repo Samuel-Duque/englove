@@ -5,6 +5,10 @@
 - **Tipo:** Solicitud de Mejora de Producto / Evolución de Diseño
 - **Estado:** ✅ Implementado y Verificado (2026-11-06)
 
+> [!NOTE]
+> **REGISTRO HISTÓRICO — RFC 100% IMPLEMENTADO Y VERIFICADO (2026-11-08).**  
+> Solicitud de mejora arquitectónica implementada y blindada en la **Etapa 12 («Calidad y remediación»)** bajo [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) (tarea ENG-156).
+
 ---
 
 ## 1. Descripción de la Solicitud

@@ -5,10 +5,9 @@
 - **Severidad:** Crítica (Afecta transversalmente a todos los juegos: Match, Order Words, Drag & Drop, Memory, Timed Choice)
 - **Estado:** ✅ Resuelto y Verificado (2026-11-06)
 
----
-
 > [!NOTE]
-> **Aclaración importante:** Todas las soluciones y alternativas expuestas en este documento representan **posibles soluciones e hipótesis técnicas de abordaje**. Serán evaluadas, refinadas y decididas formalmente en la sesión de corrección.
+> **HALLAZGO HISTÓRICO — 100% SUBSANADO Y VERIFICADO (2026-11-08).**  
+> Subsanado e integrado en la **Etapa 12 («Calidad y remediación»)** bajo [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md), formalizado en las Decisiones 130 a 137 de [CONTEXT §14](../.agents/CONTEXT.md#14-registro-de-decisiones-arquitectónicas-y-de-producto) y blindado con pruebas de regresión automáticas en el monorepo (tareas ENG-150 y ENG-155).
 
 ---
 
@@ -86,9 +85,9 @@ A nivel de componentes UI y lógica de interacción, los juegos están implement
 
 ---
 
-## 5. Posibles Soluciones a Evaluar (para la sesión de fixes)
+## 5. Soluciones Evaluadas y Adoptadas en la Etapa 12
 
-> *Propuestas e hipótesis técnicas preliminares:*
+> *Soluciones adoptadas formalmente en la Etapa 12 (ENG-150 y ENG-155):*
 
 - **Posible Solución 1 (Arreglar la raíz de IndexedDB):**
   Corregir `auth-hygiene.ts` y elevar `DB_VERSION` en `offline-queue.ts` con creación garantizada de `pendingEvents`. Al sanar IndexedDB, los eventos se guardarán y vaciarán automáticamente.

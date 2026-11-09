@@ -3,6 +3,8 @@
  * Each formula returns a fraction between 0.0 and 1.0.
  */
 
+import { AgeSegment } from '../enums';
+
 /**
  * Fill in the blanks:
  * Correct blanks / total blanks.
@@ -246,4 +248,51 @@ export function scoreToStars(score: number | null | undefined): number {
   if (score < 3.0) return 1;
   if (score < 4.5) return 2;
   return 3;
+}
+
+/**
+ * Microgames star calculation on percentage (SPEC-11 RF-07, RF-08, Decision 131):
+ * percent < 60 => 0 stars
+ * percent < 80 => 1 star
+ * percent < 100 => 2 stars
+ * percent === 100 => 3 stars
+ */
+export function gamePercentToStars(percent: number): number {
+  if (percent >= 100) return 3;
+  if (percent >= 80) return 2;
+  if (percent >= 60) return 1;
+  return 0;
+}
+
+export function scoreToGameStars(score: number | null | undefined): number {
+  if (score === null || score === undefined || score <= 0) return 0;
+  const percent = Math.round((score / 5.0) * 100);
+  return gamePercentToStars(percent);
+}
+
+export function getGameMotivationMessage(stars: number, ageSegment?: AgeSegment): string {
+  if (ageSegment === AgeSegment.teens) {
+    switch (stars) {
+      case 3:
+        return '¡Excelente dominio del juego!';
+      case 2:
+        return '¡Gran puntuación! Puedes lograr el 100%';
+      case 1:
+        return 'Buen progreso. Repite para perfeccionar';
+      default:
+        return 'Sigue practicando para superar tu récord';
+    }
+  }
+
+  // Kids (default)
+  switch (stars) {
+    case 3:
+      return '¡Increíble! ¡Eres una estrella!';
+    case 2:
+      return '¡Casi perfecto! ¡Sigue así!';
+    case 1:
+      return '¡Buen intento! ¡Inténtalo otra vez!';
+    default:
+      return '¡No te rindas! La práctica hace al maestro';
+  }
 }

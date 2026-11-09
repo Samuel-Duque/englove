@@ -88,6 +88,7 @@ export interface GroupStatsResponse {
   trendMode: TrendComparisonMode;
   summary: GroupStatsSummary;
   students: GroupStudentStatsRow[];
+  gamesPractice?: GamesPracticeSummary;
 }
 
 export interface LeaderboardEntry {
@@ -214,4 +215,54 @@ export interface StudentStatsResponse {
     monthlyTime: TimeBucketItem[];
     offlineUndeliveredAttempts: StudentOfflineUndeliveredAttempt[];
   };
+  gamesPractice?: GamesPracticeSummary;
+}
+
+export interface GamePracticeSessionItem {
+  attemptId: string;
+  activityId: string;
+  activityTitle: string;
+  mechanic: GameMechanic;
+  level: Level;
+  stars: number;
+  durationSeconds: number;
+  playedAtBogota: string;
+  // guardrails-ignore G-C06: bandera de duracion calculada en servidor, no telemetria de terceros
+  implausibleDuration: boolean;
+}
+
+export interface GamesPracticeSummary {
+  totalSessions: number;
+  uniqueGamesPlayed: number;
+  totalPracticeTimeSeconds: number;
+  byMechanic: Array<{
+    mechanic: GameMechanic;
+    sessionsCount: number;
+    uniqueGamesCount: number;
+    practiceTimeSeconds: number;
+  }>;
+  dailySummary: TimeBucketItem[];
+  weeklySummary: TimeBucketItem[];
+  sessions?: GamePracticeSessionItem[];
+}
+
+export interface GamesLeaderboardItem {
+  rank: number;
+  studentId: string;
+  studentName: string;
+  groupId: string | null;
+  groupName: string | null;
+  level: Level;
+  gamePoints: number;
+  totalStars: number;
+  gamesPlayedCount: number;
+  uniqueGamesPlayed: number;
+  practiceTimeSeconds: number;
+  lastPlayedAt: string | null;
+}
+
+export interface GamesLeaderboardResponse {
+  period: { from: string; to: string };
+  filters: { groupId: string | null; level: Level | null };
+  items: GamesLeaderboardItem[];
 }

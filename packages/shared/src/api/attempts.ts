@@ -2,7 +2,8 @@ import { ActivityType, AttemptStatus, Level, Role, AgeSegment, GameMechanic } fr
 
 export interface AttemptView {
   id: string;
-  assignmentId: string;
+  assignmentId: string | null;
+  activityId?: string | null;
   attemptNumber: number;
   previousAttemptId: string | null;
   status: AttemptStatus;
@@ -17,6 +18,28 @@ export interface AttemptView {
   flags: string[];
   effectiveDueAt: string;
   completeUntil: string;
+}
+
+export interface StudentGameCard {
+  id: string;
+  title: string;
+  mechanic: GameMechanic;
+  level: Level;
+  expectedDurationSeconds: number | null;
+  minPlausibleSeconds: number | null;
+  bestStars: number | null;
+  lastStars: number | null;
+  bestScore: number | null;
+  bestMaxScore: number | null;
+  attemptsCount: number;
+  lastPlayedAt: string | null;
+  status: 'not_started' | 'in_progress' | 'completed';
+  inProgressAttemptId?: string | null;
+}
+
+export interface StudentGamesListResponse {
+  items: StudentGameCard[];
+  total: number;
 }
 
 export interface RuntimeView {
@@ -112,6 +135,8 @@ export interface AttemptResponse {
 export interface StudentProgressActivityItem {
   assignmentId: string;
   attemptId: string;
+  activityTitle?: string;
+  attemptNumber?: number;
   // guardrails-ignore G-C02: campo de solo lectura en respuesta devuelta por el servidor
   score: number;
   stars: number;

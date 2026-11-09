@@ -7,7 +7,6 @@ import {
   Level,
   Role,
   AgeSegment,
-  ProgressEventType,
   GameConfig,
   GameAnswerKey,
 } from '@englove/shared';
@@ -21,7 +20,7 @@ import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, HttpException } from '@nestjs/common';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -81,7 +80,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   const rightPerroId = '22222222-2222-4222-8222-222222222202';
 
   let activityId = '';
-  let assignmentId = '';
   let attempt1Id = '';
   let attempt1Token = '';
   let attempt2Id = '';
@@ -317,34 +315,32 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
     expect(published.status).toBe(ActivityStatus.published);
   });
 
-  it('Paso 2: Docente asigna la actividad al grupo de alumnos', async () => {
+  it('Paso 2: Docente intenta asignar microjuego y es rechazado con 422 (Decisión 130, ENG-150)', async () => {
     if (!isPostgresAvailable) return;
 
     const now = new Date();
     const opensAt = new Date(now.getTime() - 60000); // opened 1 min ago
     const dueAt = new Date(now.getTime() + 7 * 24 * 3600000); // due in 7 days
 
-    const result = await assignmentsService.createAssignments(orgId, {
-      activityId,
-      groupIds: [groupId],
-      opensAt: opensAt.toISOString(),
-      dueAt: dueAt.toISOString(),
-    });
-
-    assignmentId = result.items[0]!.id;
-    expect(assignmentId).toBeDefined();
-    expect(result.items[0]?.activity.id).toBe(activityId);
+    await expect(
+      assignmentsService.createAssignments(orgId, {
+        activityId,
+        groupIds: [groupId],
+        opensAt: opensAt.toISOString(),
+        dueAt: dueAt.toISOString(),
+      }),
+    ).rejects.toThrow(HttpException);
   });
 
-  it('Paso 3: Feature Flag gating (RF-11) — startAttempt falla con 409 si flags.games es false', async () => {
+  it('Paso 3: Feature Flag gating (RF-11) — startGameAttempt falla con 409 si flags.games es false', async () => {
     if (!isPostgresAvailable) return;
 
     await expect(
-      attemptsService.startAttempt(orgId, studentId, assignmentId),
+      attemptsService.startGameAttempt(orgId, studentId, activityId),
     ).rejects.toThrow(ConflictException);
   });
 
-  it('Paso 4: Habilitar feature flag games y listar asignaciones disponibles para alumno (RF-11, Decisión 104)', async () => {
+  it('Paso 4: Habilitar feature flag games y listar microjuegos autónomos para alumno (Decisión 130)', async () => {
     if (!isPostgresAvailable) return;
 
     await prisma!.featureFlag.update({
@@ -357,23 +353,19 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
       data: { enabled: true },
     });
 
-    const availList = await attemptsService.listStudentAssignments(orgId, studentId, {
-      scope: 'available',
-    });
-
-    expect(availList.items.length).toBe(1);
-    const card = availList.items[0]!;
-    expect(card.id).toBe(assignmentId);
-    expect(card.activity.type).toBe(ActivityType.game);
-    expect(card.activity.mechanic).toBe(GameMechanic.match);
-    expect(card.canStart).toBe(true);
-    expect(card.latestAttempt).toBeNull();
+    const gamesList = await attemptsService.listStudentGames(orgId, studentId);
+    expect(gamesList.items.length).toBeGreaterThanOrEqual(1);
+    const game = gamesList.items.find((g) => g.id === activityId);
+    expect(game).toBeDefined();
+    expect(game?.mechanic).toBe(GameMechanic.match);
+    expect(game?.attemptsCount).toBe(0);
+    expect(game?.status).toBe('not_started');
   });
 
-  it('Paso 5: Alumno inicia Intento #1 (RF-1, RF-7) — crea Attempt en PostgreSQL con attempt_number = 1 y entrega GamePublicConfig', async () => {
+  it('Paso 5: Alumno inicia Intento #1 (RF-1, RF-7, Decisión 130) — crea Attempt en PostgreSQL con attempt_number = 1 y entrega GamePublicConfig', async () => {
     if (!isPostgresAvailable) return;
 
-    const runtime = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+    const runtime = await attemptsService.startGameAttempt(orgId, studentId, activityId);
 
     attempt1Id = runtime.attempt.id;
     attempt1Token = runtime.attemptToken!;
@@ -392,6 +384,8 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
     });
     expect(attemptInDb).toBeDefined();
     expect(attemptInDb?.attempt_number).toBe(1);
+    expect(attemptInDb?.assignment_id).toBeNull();
+    expect(attemptInDb?.activity_id).toBe(activityId);
     expect(attemptInDb?.previous_attempt_id).toBeNull();
     expect(attemptInDb?.status).toBe(AttemptStatus.in_progress);
   });
@@ -451,8 +445,7 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
     expect(completion.attempt.status).toBe(AttemptStatus.graded);
     expect(completion.attempt.score).toBe(5.0);
     expect(completion.attempt.flags).toEqual([]);
-    expect(completion.newBadges.length).toBeGreaterThanOrEqual(1);
-    expect(completion.newBadges[0]?.key).toBe('first_activity');
+    expect(completion.newBadges).toEqual([]);
 
     // Verify in real PostgreSQL database
     const gradedInDb = await prisma!.attempt.findFirst({
@@ -462,23 +455,12 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
     expect(Number(gradedInDb?.score)).toBe(5.0);
     expect(gradedInDb?.finished_at).toBeDefined();
     expect(gradedInDb?.graded_at).toBeDefined();
-
-    // Verify ProgressEvent in PostgreSQL
-    const progressEventInDb = await prisma!.progressEvent.findFirst({
-      where: {
-        organization_id: orgId,
-        student_id: studentId,
-        type: ProgressEventType.attempt_completed,
-      },
-    });
-    expect(progressEventInDb).toBeDefined();
-    expect(Number(progressEventInDb?.value)).toBe(5.0);
   });
 
-  it('Paso 8: Decisión 104 — Jugar de nuevo en asignación abierta crea un Attempt individual (attempt_number = 2) sin sobrescribir el 1', async () => {
+  it('Paso 8: Decisión 104 y 130 — Jugar de nuevo como microjuego autónomo crea un Attempt individual (attempt_number = 2) sin sobrescribir el 1', async () => {
     if (!isPostgresAvailable) return;
 
-    const runtime2 = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+    const runtime2 = await attemptsService.startGameAttempt(orgId, studentId, activityId);
 
     attempt2Id = runtime2.attempt.id;
     expect(runtime2.attempt.attemptNumber).toBe(2);
@@ -500,7 +482,7 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
 
     // Attempting to start a 3rd attempt while attempt 2 is in_progress must fail with 409
     await expect(
-      attemptsService.startAttempt(orgId, studentId, assignmentId),
+      attemptsService.startGameAttempt(orgId, studentId, activityId),
     ).rejects.toThrow(ConflictException);
   });
 
@@ -547,18 +529,14 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
     expect(att2InDb?.flags).toContain('implausible_duration');
   });
 
-  it('Paso 10: RF-11 — Consultar asignaciones tras completar partidas devuelve canStart = true y estado histórico correcto', async () => {
+  it('Paso 10: RF-11 — Consultar listStudentGames tras completar partidas devuelve estrellas y estado histórico correcto (Decisión 130)', async () => {
     if (!isPostgresAvailable) return;
 
-    const continuityList = await attemptsService.listStudentAssignments(orgId, studentId, {
-      scope: 'continuity',
-    });
-
-    expect(continuityList.items.length).toBe(1);
-    const card = continuityList.items[0]!;
-    expect(card.id).toBe(assignmentId);
-    expect(card.canStart).toBe(true); // Open window allows playing again
-    expect(card.latestAttempt?.attemptNumber).toBe(2);
-    expect(card.latestAttempt?.score).toBe(5.0);
+    const gamesList = await attemptsService.listStudentGames(orgId, studentId);
+    const game = gamesList.items.find((g) => g.id === activityId);
+    expect(game).toBeDefined();
+    expect(game?.attemptsCount).toBe(2);
+    expect(game?.bestStars).toBe(3);
+    expect(game?.status).toBe('completed');
   });
 });

@@ -150,7 +150,12 @@ export class StudentsController {
     @Param('id', uuidPipe) id: string,
     @Body() dto: TransferStudentGroupDto,
   ): Promise<StudentView> {
-    return this.studentsService.transferStudentGroup(user.organizationId, id, dto.groupId);
+    return this.studentsService.transferStudentGroup(
+      user.organizationId,
+      id,
+      dto.groupId,
+      dto.confirmLostRetries,
+    );
   }
 
   @Post(':id/change-email')

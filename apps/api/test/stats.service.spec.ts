@@ -510,17 +510,16 @@ describe('SPEC-08: StatsService — Estadísticas de rendimiento y constancia (E
 
       const stats = await service.getStudentStats(orgId, student1Id, {});
 
-      // scoreSeries should contain exactly 3 points: att-asg-2, att-game-1, att-game-2
-      expect(stats.performance.scoreSeries.length).toBe(3);
-      expect(stats.performance.scoreSeries.map((s) => s.attemptId)).toEqual([
-        'att-asg-2',
-        'att-game-1',
-        'att-game-2',
-      ]);
+      // scoreSeries should contain only the latest attempt of assigned activities (att-asg-2); games live in gamesPractice
+      expect(stats.performance.scoreSeries.length).toBe(1);
+      expect(stats.performance.scoreSeries[0]!.attemptId).toBe('att-asg-2');
 
-      const game2Point = stats.performance.scoreSeries.find((s) => s.attemptId === 'att-game-2');
+      expect(stats.gamesPractice).toBeDefined();
+      expect(stats.gamesPractice?.totalSessions).toBe(2);
+      expect(stats.gamesPractice?.sessions?.length).toBe(2);
+      const game2Session = stats.gamesPractice?.sessions?.find((s) => s.attemptId === 'att-game-2');
       // guardrails-ignore G-C06: prueba de flag de negocio implausibleDuration segun SPEC-05 RF-10 y SPEC-08 RF-9
-      expect(game2Point?.implausibleDuration).toBe(true);
+      expect(game2Session?.implausibleDuration).toBe(true);
 
       const asgPoint = stats.performance.scoreSeries.find((s) => s.attemptId === 'att-asg-2');
       expect(asgPoint?.usedExtendedDeadline).toBe(true);

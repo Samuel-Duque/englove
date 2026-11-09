@@ -30,6 +30,7 @@ import {
   StudentProfileView,
   AssignmentCardListResponse,
   StudentProgressView,
+  StudentGamesListResponse,
 } from '@englove/shared';
 
 @Controller('me')
@@ -53,7 +54,11 @@ export class MeController {
         })
       : null;
 
-    const dbUser = student?.user || (await this.prisma.user.findUnique({ where: { id: user.id } }));
+    const dbUser =
+      student?.user ||
+      (await this.prisma.user.findFirst({
+        where: { id: user.id, organization_id: user.organizationId },
+      }));
 
     return {
       user: {
@@ -157,6 +162,26 @@ export class MeController {
       user.organizationId,
       user.studentId,
       query,
+    );
+  }
+
+  @Get('games')
+  @Roles(Role.student)
+  @HttpCode(HttpStatus.OK)
+  async listGames(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StudentGamesListResponse> {
+    if (!user.studentId) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'STUDENT_PROFILE_REQUIRED',
+        message: 'Se requiere perfil de estudiante',
+      });
+    }
+
+    return this.attemptsService.listStudentGames(
+      user.organizationId,
+      user.studentId,
     );
   }
 

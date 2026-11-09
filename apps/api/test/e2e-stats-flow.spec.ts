@@ -110,8 +110,8 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     maintenanceService = new MaintenanceService(
       prisma,
       gamificationService,
-      undefined,
-      undefined,
+      {} as any,
+      {} as any,
       pendingSummaryService,
       mailService,
     );
@@ -580,9 +580,9 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
 
     // Score series:
     // asgFillBlank has latest attempt 2 (score 4.5, usedExtendedDeadline = true, bandera duración = true)
-    // asgGame has BOTH attempt 1 (4.0) and attempt 2 (5.0) because game includes 1..N!
+    // Microgames (game) are excluded from academic scoreSeries per SPEC-11 RF-12 and Decisión 137!
     const series = studentStats.performance.scoreSeries;
-    expect(series.length).toBe(3);
+    expect(series.length).toBe(1);
 
     const fillBlankPoint = series.find((p) => p.activityType === ActivityType.fill_blank);
     expect(fillBlankPoint).toBeDefined();
@@ -593,9 +593,12 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     expect(fillBlankPoint?.implausibleDuration).toBe(true);
 
     const gamePoints = series.filter((p) => p.activityType === ActivityType.game);
-    expect(gamePoints.length).toBe(2);
-    expect(gamePoints[0]!.attemptNumber).toBe(1);
-    expect(gamePoints[1]!.attemptNumber).toBe(2);
+    expect(gamePoints.length).toBe(0);
+
+    // Microgames sessions 1..N appear in gamesPractice per SPEC-11 RF-12
+    expect(studentStats.gamesPractice).toBeDefined();
+    expect(studentStats.gamesPractice?.totalSessions).toBe(2);
+    expect(studentStats.gamesPractice?.sessions?.length).toBe(2);
 
     // Consistency weekly calendar
     expect(studentStats.consistency.weeklyCalendar.length).toBe(12);
@@ -633,6 +636,12 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   it('Paso 6: Job teacher_pending_summary ejecuta y registra en ScheduledJobRun en PostgreSQL real', async () => {
     if (!isPostgresAvailable || !prisma) return;
 
+    // Set student3 to pending_approval so there is a pending registration for teacher_pending_summary (SPEC-11 RF-12)
+    await prisma.student.update({
+      where: { id: student3Id },
+      data: { approval_status: ApprovalStatus.pending_approval },
+    });
+
     const periodKey = '2026-10-28';
     await maintenanceService.runTeacherPendingSummary(periodKey, undefined, orgId);
 
@@ -659,6 +668,12 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     });
 
     expect(countAfter).toBe(countBefore); // Skipped because 1 day < 3 days!
+
+    // Restore student3 to approved for subsequent steps
+    await prisma.student.update({
+      where: { id: student3Id },
+      data: { approval_status: ApprovalStatus.approved },
+    });
   });
 
   it('Paso 7: Traslado de grupo y reincorporación en PostgreSQL real no produce duplicados y consolida cumplimiento', async () => {

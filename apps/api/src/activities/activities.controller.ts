@@ -12,8 +12,10 @@ import {
   UseInterceptors,
   ParseUUIDPipe,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ActivitiesService } from './activities.service';
+import { AttemptsService } from '../attempts/attempts.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
@@ -26,6 +28,7 @@ import {
   Role,
   ActivityEditor,
   ActivityListResponse,
+  RuntimeView,
 } from '@englove/shared';
 
 const uuidPipe = new ParseUUIDPipe({
@@ -42,7 +45,27 @@ const uuidPipe = new ParseUUIDPipe({
 @Roles(Role.teacher)
 @UseInterceptors(NoCacheInterceptor)
 export class ActivitiesController {
-  constructor(private readonly activitiesService: ActivitiesService) {}
+  constructor(
+    private readonly activitiesService: ActivitiesService,
+    private readonly attemptsService: AttemptsService,
+  ) {}
+
+  @Post(':id/attempts')
+  @Roles(Role.student)
+  @HttpCode(HttpStatus.CREATED)
+  async startGameAttempt(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+  ): Promise<RuntimeView> {
+    if (!user.studentId) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'FORBIDDEN',
+        message: 'Solo accesible para estudiantes',
+      });
+    }
+    return this.attemptsService.startGameAttempt(user.organizationId, user.studentId, id);
+  }
 
   @Get()
   @HttpCode(HttpStatus.OK)

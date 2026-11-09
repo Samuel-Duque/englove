@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,11 +21,11 @@ export class MaintenanceService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly gamificationService?: GamificationService,
-    @Optional() private readonly mediaService?: MediaService,
-    @Optional() private readonly featureFlagsService?: FeatureFlagsService,
-    @Optional() private readonly pendingSummaryService?: PendingSummaryService,
-    @Optional() private readonly mailService?: MailService,
+    private readonly gamificationService: GamificationService,
+    private readonly mediaService: MediaService,
+    private readonly featureFlagsService: FeatureFlagsService,
+    private readonly pendingSummaryService: PendingSummaryService,
+    private readonly mailService: MailService,
   ) {}
 
   @Cron('0 0 0 * * *', { timeZone: 'America/Bogota' })
@@ -166,6 +166,7 @@ export class MaintenanceService {
           });
 
           for (const att of inProgressAttempts) {
+            if (!att.assignment) continue;
             const effectiveDueAt = att.previous_attempt?.retry_extend_until ?? att.assignment.due_at;
             const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
             if (now > completeUntil) {
@@ -703,17 +704,27 @@ export class MaintenanceService {
                 idempotencyKey: `teacher-pending-summary-${org.id}-${teacher.id}-${periodKey}`,
               });
             }
+
+            await this.prisma.scheduledJobRun.updateMany({
+              where: {
+                organization_id: org.id,
+                job_key: 'teacher_pending_summary',
+                period_key: periodKey,
+              },
+              data: { status: JobRunStatus.done, finished_at: new Date() },
+            });
+          } else {
+            // When 0 pending items, do NOT mark as done with finished_at
+            // Clean up the running job record so future executions are not blocked for 3 days (SPEC-11 RF-12, Brecha 5)
+            await this.prisma.scheduledJobRun.deleteMany({
+              where: {
+                organization_id: org.id,
+                job_key: 'teacher_pending_summary',
+                period_key: periodKey,
+              },
+            });
           }
         }
-
-        await this.prisma.scheduledJobRun.updateMany({
-          where: {
-            organization_id: org.id,
-            job_key: 'teacher_pending_summary',
-            period_key: periodKey,
-          },
-          data: { status: JobRunStatus.done, finished_at: new Date() },
-        });
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
         if (code === 'P2003') {

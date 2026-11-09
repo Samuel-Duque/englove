@@ -111,6 +111,17 @@ export class AssignmentsService {
       }
 
       // 3. Assignable check
+      if (activity.type === 'game') {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            code: 'GAME_ASSIGNMENT_NOT_ALLOWED',
+            message: 'Los microjuegos están abiertos a todos los alumnos y no se asignan a grupos',
+          },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
+      }
+
       if (activity.status !== ActivityStatus.published) {
         throw new HttpException(
           {

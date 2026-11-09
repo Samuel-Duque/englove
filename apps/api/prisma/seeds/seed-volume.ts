@@ -118,10 +118,28 @@ export async function seedVolume() {
         create: {
           organization_id: org.id,
           config: {
-            instructions: 'Fill the blank',
-            items: [{ id: 'v1', prompt: 'Hello ___', blanks: ['world'] }],
+            instructions: 'Fill the blanks with the correct word',
+            items: [
+              {
+                id: '11111111-1111-4111-9111-111111111101',
+                prompt: 'Hello {{22222222-2222-4222-9222-222222222101}}',
+                blanks: [
+                  {
+                    id: '22222222-2222-4222-9222-222222222101',
+                    options: [
+                      { id: '33333333-3333-4333-9333-333333333101', text: 'world' },
+                      { id: '33333333-3333-4333-9333-333333333102', text: 'earth' },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
-          answer_key: { items: { v1: ['world'] } },
+          answer_key: {
+            items: {
+              '22222222-2222-4222-9222-222222222101': '33333333-3333-4333-9333-333333333101',
+            },
+          },
         },
       },
     },
@@ -163,7 +181,7 @@ export async function seedVolume() {
         graded_at: attemptTime,
         started_at: new Date(attemptTime.getTime() - 300 * 1000),
         finished_at: attemptTime,
-        payload: { answers: { v1: ['world'] } },
+        payload: { answers: { '22222222-2222-4222-9222-222222222101': '33333333-3333-4333-9333-333333333101' } },
       },
     });
   }

@@ -23,6 +23,7 @@ export class LoginDto implements LoginInput {
 
   @IsString()
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
+  @MaxLength(128, { message: 'La contraseña no puede exceder 128 caracteres' })
   password!: string;
 }
 
@@ -33,6 +34,7 @@ export class SignupDto implements SignupInput {
 
   @IsString()
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
+  @MaxLength(128, { message: 'La contraseña no puede exceder 128 caracteres' })
   password!: string;
 
   @IsString()
@@ -72,6 +74,7 @@ export class ResetPasswordDto implements ResetPasswordInput {
 
   @IsString()
   @IsNotEmpty({ message: 'La nueva contraseña es obligatoria' })
+  @MaxLength(128, { message: 'La nueva contraseña no puede exceder 128 caracteres' })
   newPassword!: string;
 }
 
@@ -82,6 +85,7 @@ export class EmailChangeDto implements EmailChangeInput {
 
   @IsString()
   @IsNotEmpty({ message: 'La contraseña actual es obligatoria' })
+  @MaxLength(128, { message: 'La contraseña actual no puede exceder 128 caracteres' })
   password!: string;
 }
 

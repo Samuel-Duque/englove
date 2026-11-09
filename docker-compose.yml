@@ -17,14 +17,11 @@ services:
     volumes:
       - englove_pgdata:/var/lib/postgresql
 
-  # MinIO es opcional como emulador S3 para Cloudflare R2 en local (RF-19)
-  # Para levantarlo: docker compose --profile storage up -d
+  # MinIO emulador S3 para Cloudflare R2 en local (RF-15, decisión 134)
   minio:
     image: minio/minio:latest
     container_name: englove-minio
     restart: unless-stopped
-    profiles:
-      - storage
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -35,6 +32,34 @@ services:
     volumes:
       - englove_miniodata:/data
 
+  minio-init:
+    image: minio/mc:latest
+    container_name: englove-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until /usr/bin/mc alias set localminio http://minio:9000 minioadmin minioadmin; do
+        echo 'Esperando a MinIO...'
+        sleep 1
+      done;
+      /usr/bin/mc mb -p localminio/englove-dev;
+      /usr/bin/mc anonymous set download localminio/englove-dev;
+      exit 0;
+      "
+
+  # Mailpit para captura SMTP local de correos transaccionales (RF-15, decisión 134)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: englove-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI / HTTP API
+    environment:
+      MP_MAX_MESSAGES: 500
+
 volumes:
   englove_pgdata:
   englove_miniodata:
+

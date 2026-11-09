@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ActivityStatus,
@@ -15,6 +16,7 @@ import {
   validateActivityPayload,
   ActivityValidationError,
   GameConfig,
+  Level,
 } from '@englove/shared';
 import {
   CreateActivityDto,
@@ -26,7 +28,7 @@ interface ActivityWithDetails {
   id: string;
   organization_id: string;
   type: ActivityType;
-  level: ActivitySummary['level'];
+  level: Level;
   title: string;
   status: ActivityStatus;
   version: number;
@@ -36,16 +38,16 @@ interface ActivityWithDetails {
   created_by: string;
   created_at: Date;
   updated_at: Date;
-  fill_blank_detail?: { config: unknown; answer_key: unknown } | null;
-  open_question_detail?: { config: unknown } | null;
+  fill_blank_detail?: { config: Prisma.JsonValue | unknown; answer_key?: Prisma.JsonValue | unknown } | null;
+  open_question_detail?: { config: Prisma.JsonValue | unknown } | null;
   speaking_detail?: {
     prompt: string;
     example_url: string | null;
     min_duration_seconds: number;
     max_duration_seconds: number;
   } | null;
-  game_detail?: { mechanic: unknown; config: unknown; answer_key: unknown } | null;
-  exam_detail?: { config: unknown; answer_key: unknown } | null;
+  game_detail?: { mechanic: unknown; config: Prisma.JsonValue | unknown; answer_key?: Prisma.JsonValue | unknown } | null;
+  exam_detail?: { config: Prisma.JsonValue | unknown; answer_key?: Prisma.JsonValue | unknown } | null;
 }
 
 @Injectable()
@@ -243,7 +245,7 @@ export class ActivitiesService {
       });
     }
 
-    return this.toActivityEditor(activity as unknown as ActivityWithDetails, false);
+    return this.toActivityEditor(activity, false);
   }
 
   async createActivity(
@@ -412,9 +414,7 @@ export class ActivitiesService {
     const attemptCount = await this.prisma.attempt.count({
       where: {
         organization_id: organizationId,
-        assignment: {
-          activity_id: id,
-        },
+        OR: [{ activity_id: id }, { assignment: { activity_id: id } }],
       },
     });
 
@@ -481,8 +481,8 @@ export class ActivitiesService {
     }
 
     const isPublished = activity.status === ActivityStatus.published;
-    const configToValidate = dto.config !== undefined ? dto.config : this.extractConfigAndKey(activity as unknown as ActivityWithDetails).config;
-    const answerKeyToValidate = dto.answerKey !== undefined ? dto.answerKey : this.extractConfigAndKey(activity as unknown as ActivityWithDetails).answerKey;
+    const configToValidate = dto.config !== undefined ? dto.config : this.extractConfigAndKey(activity).config;
+    const answerKeyToValidate = dto.answerKey !== undefined ? dto.answerKey : this.extractConfigAndKey(activity).answerKey;
 
     const { validConfig, validAnswerKey, weightsAdjusted } = this.validateActivityContent(
       activity.type,
@@ -520,10 +520,11 @@ export class ActivitiesService {
     await this.prisma.$transaction(async (tx) => {
       const attemptsCount = await tx.attempt.count({
         where: {
-          assignment: {
-            activity_id: id,
-          },
           organization_id: organizationId,
+          OR: [
+            { activity_id: id },
+            { assignment: { activity_id: id } },
+          ],
         },
       });
 
@@ -645,10 +646,10 @@ export class ActivitiesService {
     }
 
     if (activity.status === ActivityStatus.published) {
-      return this.toActivityEditor(activity as unknown as ActivityWithDetails, false);
+      return this.toActivityEditor(activity, false);
     }
 
-    const { config, answerKey } = this.extractConfigAndKey(activity as unknown as ActivityWithDetails);
+    const { config, answerKey } = this.extractConfigAndKey(activity);
     this.validateActivityContent(activity.type, config, answerKey, true);
 
     await this.prisma.activity.update({
@@ -843,7 +844,7 @@ export class ActivitiesService {
       });
     }
 
-    const { config, answerKey } = this.extractConfigAndKey(activity as unknown as ActivityWithDetails);
+    const { config, answerKey } = this.extractConfigAndKey(activity);
     this.validateActivityContent(activity.type, config, answerKey, true);
 
     await this.prisma.activity.update({
@@ -877,16 +878,24 @@ export class ActivitiesService {
         });
       }
 
+      const attemptsCount = await tx.attempt.count({
+        where: {
+          organization_id: organizationId,
+          OR: [{ activity_id: id }, { assignment: { activity_id: id } }],
+        },
+      });
+
       const isDraft = activity.status === ActivityStatus.draft;
       const hasAssignments = activity.assignments.length > 0;
       const hasChildren = activity.children.length > 0;
+      const hasAttempts = attemptsCount > 0;
 
-      if (!isDraft || hasAssignments || hasChildren) {
+      if (!isDraft || hasAssignments || hasChildren || hasAttempts) {
         throw new ConflictException({
           statusCode: 409,
           code: 'ACTIVITY_DELETE_NOT_ALLOWED',
           message:
-            'No se puede eliminar la actividad. Solo se pueden borrar borradores sin asignaciones ni versiones derivadas.',
+            'No se puede eliminar la actividad. Solo se pueden borrar borradores sin asignaciones, intentos ni versiones derivadas.',
         });
       }
 

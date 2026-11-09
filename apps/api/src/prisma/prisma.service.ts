@@ -10,7 +10,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const connectionString =
       process.env.DATABASE_URL ||
       'postgresql://postgres:postgres@localhost:5432/englove_dev?schema=public';
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({ connectionString, max: 5 });
     const adapter = new PrismaPg(pool);
 
     // guardrails-ignore G-C04: configuracion de omit global de answer_key en PrismaService (decision 75)
@@ -44,6 +44,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       onModuleDestroy: {
         value: async () => {
           await (extended as PrismaClient).$disconnect();
+          await pool.end();
         },
         writable: true,
         configurable: true,

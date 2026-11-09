@@ -118,7 +118,24 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
     });
   });
 
-  it('does not inject organization_id when TenantContext is not active', async () => {
+  it('fails closed and throws error when TenantContext is not active and where.organization_id is missing', async () => {
+    const extensionDef = extractExtensionDef();
+    const findFirstHook = extensionDef.query?.$allModels?.findFirst;
+    expect(findFirstHook).toBeDefined();
+    if (!findFirstHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    await expect(
+      findFirstHook({
+        model: 'Student',
+        args: { where: { id: 'some-student' } },
+        query: mockQuery,
+      }),
+    ).rejects.toThrow(/Operación multi-tenant rechazada: organization_id ausente en TenantContext/);
+  });
+
+  it('allows query without TenantContext if where.organization_id is explicitly passed', async () => {
     const extensionDef = extractExtensionDef();
     const findFirstHook = extensionDef.query?.$allModels?.findFirst;
     expect(findFirstHook).toBeDefined();
@@ -128,26 +145,32 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
 
     await findFirstHook({
       model: 'Student',
-      args: { where: { id: 'some-student' } },
+      args: { where: { id: 'some-student', organization_id: orgId } },
       query: mockQuery,
     });
 
     expect(mockQuery).toHaveBeenCalledWith({
-      where: { id: 'some-student' },
+      where: { id: 'some-student', organization_id: orgId },
     });
   });
 
-  it('injects organization_id on updateMany, deleteMany and count operations', async () => {
+  it('injects organization_id on updateMany, deleteMany, count, aggregate, groupBy and findFirstOrThrow', async () => {
     const extensionDef = extractExtensionDef();
     const countHook = extensionDef.query?.$allModels?.count;
     const updateManyHook = extensionDef.query?.$allModels?.updateMany;
     const deleteManyHook = extensionDef.query?.$allModels?.deleteMany;
+    const aggregateHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.aggregate;
+    const groupByHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.groupBy;
+    const findFirstOrThrowHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.findFirstOrThrow;
 
     expect(countHook).toBeDefined();
     expect(updateManyHook).toBeDefined();
     expect(deleteManyHook).toBeDefined();
+    expect(aggregateHook).toBeDefined();
+    expect(groupByHook).toBeDefined();
+    expect(findFirstOrThrowHook).toBeDefined();
 
-    if (!countHook || !updateManyHook || !deleteManyHook) return;
+    if (!countHook || !updateManyHook || !deleteManyHook || !aggregateHook || !groupByHook || !findFirstOrThrowHook) return;
 
     const mockQuery = vi.fn().mockImplementation(async (args) => args);
 
@@ -159,17 +182,98 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
         query: mockQuery,
       });
       await deleteManyHook({ model: 'User', args: {}, query: mockQuery });
+      await aggregateHook({ model: 'User', args: {}, query: mockQuery });
+      await groupByHook({ model: 'User', args: {}, query: mockQuery });
+      await findFirstOrThrowHook({ model: 'User', args: {}, query: mockQuery });
     });
 
-    expect(mockQuery).toHaveBeenNthCalledWith(1, {
-      where: { organization_id: orgId },
+    expect(mockQuery).toHaveBeenNthCalledWith(1, { where: { organization_id: orgId } });
+    expect(mockQuery).toHaveBeenNthCalledWith(2, { data: { name: 'New' }, where: { organization_id: orgId } });
+    expect(mockQuery).toHaveBeenNthCalledWith(3, { where: { organization_id: orgId } });
+    expect(mockQuery).toHaveBeenNthCalledWith(4, { where: { organization_id: orgId } });
+    expect(mockQuery).toHaveBeenNthCalledWith(5, { where: { organization_id: orgId } });
+    expect(mockQuery).toHaveBeenNthCalledWith(6, { where: { organization_id: orgId } });
+  });
+
+  it('strictly forbids findUnique and findUniqueOrThrow on multi-tenant models (G-A01, decisión 32)', async () => {
+    const extensionDef = extractExtensionDef();
+    const findUniqueHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.findUnique;
+    const findUniqueOrThrowHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.findUniqueOrThrow;
+
+    expect(findUniqueHook).toBeDefined();
+    expect(findUniqueOrThrowHook).toBeDefined();
+    if (!findUniqueHook || !findUniqueOrThrowHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    await expect(
+      findUniqueHook({ model: 'User', args: { where: { id: 'u1' } }, query: mockQuery }),
+    ).rejects.toThrow(/Consulta findUnique prohibida en modelo multi-tenant User/);
+
+    await expect(
+      findUniqueOrThrowHook({ model: 'Student', args: { where: { id: 's1' } }, query: mockQuery }),
+    ).rejects.toThrow(/Consulta findUniqueOrThrow prohibida en modelo multi-tenant Student/);
+
+    // Organization model is exempt
+    await findUniqueHook({ model: 'Organization', args: { where: { id: orgId } }, query: mockQuery });
+    expect(mockQuery).toHaveBeenCalledWith({ where: { id: orgId } });
+  });
+
+  it('allows findUnique and findUniqueOrThrow when TenantContext.isBypassed() is active (ISSUE-10)', async () => {
+    const extensionDef = extractExtensionDef();
+    const findUniqueHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.findUnique;
+    const findUniqueOrThrowHook = (extensionDef.query?.$allModels as Record<string, ExtensionQueryHook>)?.findUniqueOrThrow;
+
+    expect(findUniqueHook).toBeDefined();
+    expect(findUniqueOrThrowHook).toBeDefined();
+    if (!findUniqueHook || !findUniqueOrThrowHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    // With bypass, findUnique on multi-tenant User succeeds
+    await TenantContext.runBypass(async () => {
+      const res = await findUniqueHook({
+        model: 'User',
+        args: { where: { email: 'profesora@englove.org' } },
+        query: mockQuery,
+      });
+      expect(res).toEqual({ where: { email: 'profesora@englove.org' } });
+
+      const resThrow = await findUniqueOrThrowHook({
+        model: 'User',
+        args: { where: { id: 'u1' } },
+        query: mockQuery,
+      });
+      expect(resThrow).toEqual({ where: { id: 'u1' } });
     });
-    expect(mockQuery).toHaveBeenNthCalledWith(2, {
-      data: { name: 'New' },
-      where: { organization_id: orgId },
-    });
-    expect(mockQuery).toHaveBeenNthCalledWith(3, {
-      where: { organization_id: orgId },
+  });
+
+  it('verifies AuthSession findFirst requires TenantContext.runBypass when unauthenticated (ISSUE-10 refresh)', async () => {
+    const extensionDef = extractExtensionDef();
+    const findFirstHook = extensionDef.query?.$allModels?.findFirst;
+    expect(findFirstHook).toBeDefined();
+    if (!findFirstHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    // 1. Without TenantContext and without bypass: throws multi-tenant rejection
+    await expect(
+      findFirstHook({
+        model: 'AuthSession',
+        args: { where: { id: 'some-sid' } },
+        query: mockQuery,
+      }),
+    ).rejects.toThrow(/Operación multi-tenant rechazada: organization_id ausente en TenantContext/);
+
+    // 2. With TenantContext.runBypass: successfully resolves opaque session
+    await TenantContext.runBypass(async () => {
+      const res = await findFirstHook({
+        model: 'AuthSession',
+        args: { where: { id: 'some-sid' } },
+        query: mockQuery,
+      });
+      expect(res).toEqual({ where: { id: 'some-sid' } });
     });
   });
 });
+

@@ -24,6 +24,7 @@ import {
   GroupStatsResponse,
   LeaderboardResponse,
   StudentStatsResponse,
+  GamesLeaderboardResponse,
 } from '@englove/shared';
 
 @Controller('stats')
@@ -58,6 +59,15 @@ export class StatsController {
     @Query() query: StatsLeaderboardQueryDto,
   ): Promise<LeaderboardResponse> {
     return this.statsService.getLeaderboard(user.organizationId, query);
+  }
+
+  @Get('games-leaderboard')
+  @HttpCode(HttpStatus.OK)
+  async getGamesLeaderboard(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: StatsLeaderboardQueryDto,
+  ): Promise<GamesLeaderboardResponse> {
+    return this.statsService.getGamesLeaderboard(user.organizationId, query);
   }
 
   @Get('students/:id')

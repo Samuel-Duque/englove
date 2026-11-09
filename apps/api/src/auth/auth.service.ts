@@ -5,6 +5,7 @@ import {
   ConflictException,
   BadRequestException,
   HttpException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -20,6 +21,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { RateLimiterService } from '../common/rate-limiting/rate-limiter.service';
+import { TenantContext } from '../common/tenant/tenant.context';
 import { AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import {
   LoginDto,
@@ -37,6 +39,55 @@ import {
   generateRandomSecret,
   generateSixDigitOtp,
 } from '../common/utils/identity.utils';
+
+class AsyncSemaphore {
+  private current = 0;
+  private readonly queue: Array<() => void> = [];
+
+  constructor(private readonly max: number) {}
+
+  async acquire(): Promise<() => void> {
+    if (this.current < this.max) {
+      this.current++;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        this.release();
+      };
+    }
+    return new Promise<() => void>((resolve) => {
+      this.queue.push(() => {
+        let released = false;
+        resolve(() => {
+          if (released) return;
+          released = true;
+          this.release();
+        });
+      });
+    });
+  }
+
+  private release(): void {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      if (next) next();
+    } else {
+      this.current--;
+    }
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    const release = await this.acquire();
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+}
+
+const argonSemaphore = new AsyncSemaphore(3);
 
 @Injectable()
 export class AuthService {
@@ -61,6 +112,14 @@ export class AuthService {
     this.webBaseUrl = this.configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
   }
 
+  private async hashPassword(password: string): Promise<string> {
+    return argonSemaphore.run(() => argon2.hash(password));
+  }
+
+  private async verifyPassword(hash: string, plain: string): Promise<boolean> {
+    return argonSemaphore.run(() => argon2.verify(hash, plain));
+  }
+
   setSessionCookies(
     res: Response,
     user: { id: string; email: string; role: Role; organization_id: string },
@@ -82,6 +141,7 @@ export class AuthService {
         sid: session.id,
         student_id: student?.id,
         age_segment: student?.age_segment,
+        typ: 'access',
       },
       {
         secret: this.jwtSecret,
@@ -131,6 +191,7 @@ export class AuthService {
         sid: sessionId,
         student_id: student.id,
         age_segment: student.age_segment,
+        typ: 'access',
       },
       {
         secret: this.jwtSecret,
@@ -176,15 +237,17 @@ export class AuthService {
     this.rateLimiterService.check(`login:ip:${ip}`, 10, 15 * 60 * 1000);
 
     const normalizedEmail = normalizeEmail(dto.email);
-    const user = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+    const user = await TenantContext.runBypass(() =>
+      this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      }),
+    );
 
     if (!user) {
-      // Dummy verify to eliminate timing discrepancies
-      await argon2
-        .verify(
-          '$argon2id$v=19$m=65536,t=3,p=4$dummyhashdummyhash$dummypasswordhashplaceholder',
+      // Dummy verify to eliminate timing discrepancies with valid Argon2id hash
+      await this
+        .verifyPassword(
+          '$argon2id$v=19$m=65536,t=3,p=4$pvP5XtH1hxfSW0mfn9b2ww$lbq+2hil3N3Y/mW4qLtGKIsCoXDA1fYyWY/zobEp204',
           dto.password,
         )
         .catch(() => false);
@@ -208,7 +271,7 @@ export class AuthService {
       currentFailedCount = 0;
     }
 
-    const passwordValid = await argon2.verify(user.password_hash, dto.password);
+    const passwordValid = await this.verifyPassword(user.password_hash, dto.password);
 
     if (!passwordValid) {
       // Under active lock: neither counter nor deadline changes (RF-4)
@@ -220,21 +283,76 @@ export class AuthService {
         });
       }
 
-      // Not under lock: increment counter and lock at 10th failure
-      const newFailedCount = currentFailedCount + 1;
-      if (newFailedCount >= 10) {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            failed_login_count: 10,
-            locked_until: new Date(Date.now() + 10 * 60 * 1000),
-          },
+      // Not under lock: lock user row with FOR UPDATE to serialize failed_login_count (RF-3)
+      if (typeof this.prisma.$transaction === 'function') {
+        await this.prisma.$transaction(async (tx) => {
+          if (typeof tx.$queryRaw === 'function') {
+            const rows = await tx.$queryRaw<Array<{ id: string; failed_login_count: number; locked_until: Date | null }>>`
+              SELECT id, failed_login_count, locked_until
+              FROM users
+              WHERE id = ${user.id}::uuid
+              FOR UPDATE
+            `;
+            const lockedUser = rows[0];
+            if (!lockedUser) return;
+
+            if (lockedUser.locked_until && lockedUser.locked_until > new Date()) {
+              return;
+            }
+
+            const baseCount =
+              lockedUser.locked_until && lockedUser.locked_until <= new Date()
+                ? 0
+                : lockedUser.failed_login_count;
+            const newFailedCount = baseCount + 1;
+            if (newFailedCount >= 10) {
+              await tx.user.update({
+                where: { id: user.id },
+                data: {
+                  failed_login_count: 10,
+                  locked_until: new Date(Date.now() + 10 * 60 * 1000),
+                },
+              });
+            } else {
+              await tx.user.update({
+                where: { id: user.id },
+                data: { failed_login_count: newFailedCount, locked_until: null },
+              });
+            }
+          } else if (tx.user?.update) {
+            const newFailedCount = (user.failed_login_count ?? 0) + 1;
+            if (newFailedCount >= 10) {
+              await tx.user.update({
+                where: { id: user.id },
+                data: {
+                  failed_login_count: 10,
+                  locked_until: new Date(Date.now() + 10 * 60 * 1000),
+                },
+              });
+            } else {
+              await tx.user.update({
+                where: { id: user.id },
+                data: { failed_login_count: newFailedCount, locked_until: null },
+              });
+            }
+          }
         });
-      } else {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { failed_login_count: newFailedCount },
-        });
+      } else if (this.prisma.user?.update) {
+        const newFailedCount = (user.failed_login_count ?? 0) + 1;
+        if (newFailedCount >= 10) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+              failed_login_count: 10,
+              locked_until: new Date(Date.now() + 10 * 60 * 1000),
+            },
+          });
+        } else {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { failed_login_count: newFailedCount, locked_until: null },
+          });
+        }
       }
 
       throw new UnauthorizedException({
@@ -348,9 +466,11 @@ export class AuthService {
     }
 
     // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
-    const session = await this.prisma.authSession.findFirst({
-      where: { id: sid },
-    });
+    const session = await TenantContext.runBypass(() =>
+      this.prisma.authSession.findFirst({
+        where: { id: sid },
+      }),
+    );
 
     if (!session || session.revoked_at !== null || session.expires_at <= new Date()) {
       this.clearSessionCookies(res);
@@ -365,10 +485,12 @@ export class AuthService {
 
     if (incomingHash !== session.refresh_token_hash) {
       // Reuse detected! Revoke the entire session family (RF-3, Decision 68)
-      await this.prisma.authSession.update({
-        where: { id: sid },
-        data: { revoked_at: new Date() },
-      });
+      await TenantContext.runBypass(() =>
+        this.prisma.authSession.update({
+          where: { id: sid },
+          data: { revoked_at: new Date() },
+        }),
+      );
       this.clearSessionCookies(res);
       throw new UnauthorizedException({
         statusCode: 401,
@@ -377,9 +499,11 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: session.user_id },
-    });
+    const user = await TenantContext.runBypass(() =>
+      this.prisma.user.findUnique({
+        where: { id: session.user_id },
+      }),
+    );
 
     if (!user || user.organization_id !== session.organization_id) {
       this.clearSessionCookies(res);
@@ -471,28 +595,45 @@ export class AuthService {
     res: Response,
   ): Promise<void> {
     if (refreshTokenValue && refreshTokenValue.includes('.')) {
-      const [sid] = refreshTokenValue.split('.');
-      if (sid) {
-        await this.prisma.authSession
-          .updateMany({
-            where: { id: sid, revoked_at: null },
-            data: { revoked_at: new Date() },
-          })
-          .catch(() => {});
+      const [sid, secret] = refreshTokenValue.split('.');
+      if (sid && secret) {
+        try {
+          const incomingHash = hashSha256(secret);
+          // Revoke ONLY if cryptographic verification succeeds (SEC-05)
+          await TenantContext.runBypass(async () => {
+            // guardrails-ignore G-A06: revocacion de sesion por hash de token criptografico en logout
+            await this.prisma.authSession.updateMany({
+              where: {
+                id: sid,
+                refresh_token_hash: incomingHash,
+                revoked_at: null,
+              },
+              data: { revoked_at: new Date() },
+            });
+          });
+        } catch {
+          // Cryptographic or DB lookup error: do NOT revoke arbitrary session
+        }
       }
     } else if (accessTokenValue) {
       try {
-        const payload = this.jwtService.decode(accessTokenValue) as { sid?: string };
-        if (payload?.sid) {
-          await this.prisma.authSession
-            .updateMany({
-              where: { id: payload.sid, revoked_at: null },
-              data: { revoked_at: new Date() },
-            })
-            .catch(() => {});
+        const payload = await this.jwtService.verifyAsync<{ sid?: string; typ?: string }>(
+          accessTokenValue,
+          { secret: this.jwtSecret },
+        );
+        if (payload?.typ === 'access' && payload?.sid) {
+          await TenantContext.runBypass(async () => {
+            // guardrails-ignore G-A06: revocacion de sesion por token de acceso verificado en logout
+            await this.prisma.authSession
+              .updateMany({
+                where: { id: payload.sid, revoked_at: null },
+                data: { revoked_at: new Date() },
+              })
+              .catch(() => {});
+          });
         }
       } catch {
-        // Ignore token decode errors on logout
+        // Token verification failed: do NOT revoke DB session
       }
     }
 
@@ -525,9 +666,11 @@ export class AuthService {
     }
 
     // Check if email is already taken anywhere (RF-7, Decision 59)
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+    const existingUser = await TenantContext.runBypass(() =>
+      this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      }),
+    );
 
     if (existingUser) {
       await this.mailService.sendMail({
@@ -542,7 +685,7 @@ export class AuthService {
 
     const ageSegment = age <= 10 ? AgeSegment.kids : AgeSegment.teens;
     const canSwitchInterface = age >= 11;
-    const passwordHash = await argon2.hash(dto.password);
+    const passwordHash = await this.hashPassword(dto.password);
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -604,9 +747,11 @@ export class AuthService {
     this.rateLimiterService.check(`forgot:ip:${ip}`, 5, 60 * 60 * 1000);
     this.rateLimiterService.check(`forgot:email:${normalizedEmail}`, 5, 60 * 60 * 1000);
 
-    const user = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+    const user = await TenantContext.runBypass(() =>
+      this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      }),
+    );
 
     if (user) {
       const token = generateRandomSecret(32);
@@ -642,72 +787,74 @@ export class AuthService {
 
     const tokenHash = hashSha256(dto.token);
 
-    const newPasswordHash = await argon2.hash(dto.newPassword);
+    const newPasswordHash = await this.hashPassword(dto.newPassword);
 
-    await this.prisma.$transaction(async (tx) => {
-      // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
-      const resetToken = await tx.passwordResetToken.findFirst({
-        where: {
-          token_hash: tokenHash,
-          used_at: null,
-          expires_at: { gt: new Date() },
-        },
-      });
-
-      if (!resetToken) {
-        throw new BadRequestException({
-          statusCode: 400,
-          code: 'PASSWORD_RESET_INVALID',
-          message: 'El enlace no es válido o ya venció. Solicita uno nuevo',
+    await TenantContext.runBypass(async () => {
+      await this.prisma.$transaction(async (tx) => {
+        // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
+        const resetToken = await tx.passwordResetToken.findFirst({
+          where: {
+            token_hash: tokenHash,
+            used_at: null,
+            expires_at: { gt: new Date() },
+          },
         });
-      }
 
-      // Atomically consume token (RF-12: only one concurrent reset succeeds)
-      const consumeResult = await tx.passwordResetToken.updateMany({
-        where: {
-          id: resetToken.id,
-          organization_id: resetToken.organization_id,
-          used_at: null,
-        },
-        data: { used_at: new Date() },
-      });
+        if (!resetToken) {
+          throw new BadRequestException({
+            statusCode: 400,
+            code: 'PASSWORD_RESET_INVALID',
+            message: 'El enlace no es válido o ya venció. Solicita uno nuevo',
+          });
+        }
 
-      if (consumeResult.count === 0) {
-        throw new BadRequestException({
-          statusCode: 400,
-          code: 'PASSWORD_RESET_INVALID',
-          message: 'El enlace no es válido o ya venció. Solicita uno nuevo',
+        // Atomically consume token (RF-12: only one concurrent reset succeeds)
+        const consumeResult = await tx.passwordResetToken.updateMany({
+          where: {
+            id: resetToken.id,
+            organization_id: resetToken.organization_id,
+            used_at: null,
+          },
+          data: { used_at: new Date() },
         });
-      }
 
-      // Invalidate all pending reset tokens for this user in tenant
-      await tx.passwordResetToken.updateMany({
-        where: {
-          organization_id: resetToken.organization_id,
-          user_id: resetToken.user_id,
-          used_at: null,
-        },
-        data: { used_at: new Date() },
-      });
+        if (consumeResult.count === 0) {
+          throw new BadRequestException({
+            statusCode: 400,
+            code: 'PASSWORD_RESET_INVALID',
+            message: 'El enlace no es válido o ya venció. Solicita uno nuevo',
+          });
+        }
 
-      // Update password hash and reset lockout
-      await tx.user.update({
-        where: { id: resetToken.user_id },
-        data: {
-          password_hash: newPasswordHash,
-          failed_login_count: 0,
-          locked_until: null,
-        },
-      });
+        // Invalidate all pending reset tokens for this user in tenant
+        await tx.passwordResetToken.updateMany({
+          where: {
+            organization_id: resetToken.organization_id,
+            user_id: resetToken.user_id,
+            used_at: null,
+          },
+          data: { used_at: new Date() },
+        });
 
-      // Revoke all sessions for this user in tenant (RF-12, Decision 68)
-      await tx.authSession.updateMany({
-        where: {
-          organization_id: resetToken.organization_id,
-          user_id: resetToken.user_id,
-          revoked_at: null,
-        },
-        data: { revoked_at: new Date() },
+        // Update password hash and reset lockout
+        await tx.user.update({
+          where: { id: resetToken.user_id },
+          data: {
+            password_hash: newPasswordHash,
+            failed_login_count: 0,
+            locked_until: null,
+          },
+        });
+
+        // Revoke all sessions for this user in tenant (RF-12, Decision 68)
+        await tx.authSession.updateMany({
+          where: {
+            organization_id: resetToken.organization_id,
+            user_id: resetToken.user_id,
+            revoked_at: null,
+          },
+          data: { revoked_at: new Date() },
+        });
       });
     });
 
@@ -725,9 +872,11 @@ export class AuthService {
       60 * 60 * 1000,
     );
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: currentUser.id },
-    });
+    const user = await TenantContext.runBypass(() =>
+      this.prisma.user.findUnique({
+        where: { id: currentUser.id },
+      }),
+    );
 
     if (!user) {
       throw new UnauthorizedException({
@@ -737,7 +886,7 @@ export class AuthService {
       });
     }
 
-    const passwordValid = await argon2.verify(user.password_hash, dto.password);
+    const passwordValid = await this.verifyPassword(user.password_hash, dto.password);
     if (!passwordValid) {
       throw new UnauthorizedException({
         statusCode: 401,
@@ -755,9 +904,11 @@ export class AuthService {
       });
     }
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: normalizedNewEmail },
-    });
+    const existingUser = await TenantContext.runBypass(() =>
+      this.prisma.user.findUnique({
+        where: { email: normalizedNewEmail },
+      }),
+    );
 
     if (existingUser) {
       throw new ConflictException({
@@ -803,64 +954,121 @@ export class AuthService {
     dto: EmailChangeConfirmDto,
     currentUser: AuthenticatedUser,
   ): Promise<MessageResponse> {
-    const activeRequest = await this.prisma.emailChangeRequest.findFirst({
-      where: {
-        organization_id: currentUser.organizationId,
-        user_id: currentUser.id,
-        used_at: null,
-        expires_at: { gt: new Date() },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+    // Rate limit: 5 / 10 min per userId (RF-2, SEC-09c)
+    this.rateLimiterService.check(
+      `email_confirm:user:${currentUser.id}`,
+      5,
+      10 * 60 * 1000,
+    );
 
-    if (!activeRequest || activeRequest.failed_attempts >= 3) {
-      throw new BadRequestException({
-        statusCode: 400,
-        code: 'OTP_INVALID',
-        message: 'El código no es válido o ya venció. Solicita uno nuevo',
-      });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      let activeRequest: {
+        id: string;
+        user_id: string;
+        organization_id: string;
+        new_email: string;
+        otp_hash: string;
+        failed_attempts: number;
+        expires_at: Date;
+        used_at: Date | null;
+      } | null;
 
-    const inputHash = hashSha256(dto.otp);
-
-    if (inputHash !== activeRequest.otp_hash) {
-      const updated = await this.prisma.emailChangeRequest.update({
-        where: { id: activeRequest.id },
-        data: {
-          failed_attempts: { increment: 1 },
-        },
-      });
-
-      if (updated.failed_attempts >= 3) {
-        await this.prisma.emailChangeRequest.updateMany({
+      if (typeof tx.$queryRaw === 'function') {
+        const rows = await tx.$queryRaw<
+          Array<{
+            id: string;
+            user_id: string;
+            organization_id: string;
+            new_email: string;
+            otp_hash: string;
+            failed_attempts: number;
+            expires_at: Date;
+            used_at: Date | null;
+          }>
+        >`
+          SELECT id, user_id, organization_id, new_email, otp_hash, failed_attempts, expires_at, used_at
+          FROM email_change_requests
+          WHERE user_id = ${currentUser.id}::uuid
+            AND organization_id = ${currentUser.organizationId}::uuid
+            AND used_at IS NULL
+            AND expires_at > NOW()
+          ORDER BY created_at DESC
+          LIMIT 1
+          FOR UPDATE
+        `;
+        activeRequest = rows[0] ?? null;
+      } else {
+        const reqFinder =
+          'emailChangeRequest' in tx &&
+          tx.emailChangeRequest &&
+          typeof tx.emailChangeRequest.findFirst === 'function'
+            ? tx.emailChangeRequest
+            : this.prisma.emailChangeRequest;
+        const found = await reqFinder.findFirst({
           where: {
-            id: activeRequest.id,
+            user_id: currentUser.id,
             organization_id: currentUser.organizationId,
             used_at: null,
+            expires_at: { gt: new Date() },
           },
-          data: { used_at: new Date() },
+          orderBy: { created_at: 'desc' },
+        });
+        activeRequest = found
+          ? {
+              id: found.id,
+              user_id: found.user_id,
+              organization_id: found.organization_id,
+              new_email: found.new_email,
+              otp_hash: found.otp_hash,
+              failed_attempts: found.failed_attempts,
+              expires_at: found.expires_at,
+              used_at: found.used_at,
+            }
+          : null;
+      }
+
+      if (!activeRequest || activeRequest.failed_attempts >= 3) {
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'OTP_MAX_ATTEMPTS',
+          message: 'Has alcanzado el límite de intentos o el código ya venció. Solicita uno nuevo',
         });
       }
 
-      throw new BadRequestException({
-        statusCode: 400,
-        code: 'OTP_INVALID',
-        message: 'El código no es válido o ya venció. Solicita uno nuevo',
-      });
-    }
+      const inputHash = hashSha256(dto.otp);
 
-    // OTP matches! Consume and apply change atomically (RF-14: concurrency defenses)
-    await this.prisma.$transaction(async (tx) => {
-      const consumeResult = await tx.emailChangeRequest.updateMany({
-        where: {
-          id: activeRequest.id,
-          organization_id: currentUser.organizationId,
-          used_at: null,
-        },
+      if (inputHash !== activeRequest.otp_hash) {
+        const nextFailed = activeRequest.failed_attempts + 1;
+        if (nextFailed >= 3) {
+          await tx.emailChangeRequest.update({
+            where: { id: activeRequest.id },
+            data: { failed_attempts: nextFailed, used_at: new Date() },
+          });
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            code: 'OTP_MAX_ATTEMPTS',
+            message: 'Has alcanzado el límite de intentos. Solicita un nuevo código',
+          });
+        } else {
+          await tx.emailChangeRequest.update({
+            where: { id: activeRequest.id },
+            data: { failed_attempts: nextFailed },
+          });
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            code: 'OTP_INVALID',
+            message: 'El código no es válido o ya venció. Solicita uno nuevo',
+          });
+        }
+      }
+
+      // OTP matches! Consume and apply change atomically (RF-14: concurrency defenses)
+      const consumed = await tx.emailChangeRequest.updateMany({
+        where: { id: activeRequest.id, used_at: null },
         data: { used_at: new Date() },
       });
 
-      if (consumeResult.count === 0) {
+      if (consumed.count === 0) {
         throw new BadRequestException({
           statusCode: 400,
           code: 'OTP_INVALID',
@@ -868,16 +1076,20 @@ export class AuthService {
         });
       }
 
-      const conflict = await tx.user.findUnique({
-        where: { email: activeRequest.new_email },
-      });
+      if (tx.user?.findUnique) {
+        const conflict = await TenantContext.runBypass(() =>
+          tx.user.findUnique({
+            where: { email: activeRequest.new_email },
+          }),
+        );
 
-      if (conflict && conflict.id !== currentUser.id) {
-        throw new ConflictException({
-          statusCode: 409,
-          code: 'EMAIL_TAKEN',
-          message: 'Ese correo no está disponible',
-        });
+        if (conflict && conflict.id !== currentUser.id) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'EMAIL_TAKEN',
+            message: 'Ese correo no está disponible',
+          });
+        }
       }
 
       await tx.user.update({

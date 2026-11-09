@@ -1,3 +1,12 @@
+try {
+  process.loadEnvFile?.();
+} catch {
+  try {
+    process.loadEnvFile?.('../../.env');
+  } catch {
+    // Optional .env files; environment variables can be provided by the runtime
+  }
+}
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -10,7 +19,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
 
   const configService = app.get(ConfigService);
   const appEnv = configService.get<string>('APP_ENV', 'local');
@@ -31,8 +40,9 @@ async function bootstrap() {
   // Cookie parser for reading session cookies (Rule G-B11)
   app.use(cookieParser());
 
-  // Body parser with 1 MB limit (Rule G-C10, Architecture §8.3)
+  // Body parser with 1 MB limit (Rule G-C10, Architecture §8.3, RF-04)
   app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
   // Structured logging
   app.useLogger(app.get(Logger));

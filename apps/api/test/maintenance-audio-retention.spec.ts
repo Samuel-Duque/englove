@@ -38,8 +38,11 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
 
     service = new MaintenanceService(
       mockPrisma as unknown as PrismaService,
-      undefined,
+      {} as any,
       mockMediaService as unknown as MediaService,
+      {} as any,
+      {} as any,
+      {} as any,
     );
   });
 

@@ -31,6 +31,7 @@ import {
 } from '../common/utils/identity.utils';
 import { Prisma } from '@prisma/client';
 import { MediaService } from '../media/media.service';
+import { TenantContext } from '../common/tenant/tenant.context';
 
 @Injectable()
 export class StudentsService {
@@ -471,33 +472,54 @@ export class StudentsService {
   }
 
   async rejectStudent(organizationId: string, id: string): Promise<void> {
-    const student = await this.prisma.student.findFirst({
-      where: {
-        id,
-        organization_id: organizationId,
-      },
-    });
+    const runTx = async (tx: Prisma.TransactionClient | PrismaService) => {
+      let student: { id: string; user_id: string; approval_status: ApprovalStatus } | null;
+      if ('$queryRaw' in tx && typeof tx.$queryRaw === 'function') {
+        const rows = await tx.$queryRaw<
+          Array<{ id: string; user_id: string; approval_status: ApprovalStatus }>
+        >`
+          SELECT id, user_id, approval_status
+          FROM students
+          WHERE id = ${id}::uuid
+            AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        student = rows[0] ?? null;
+      } else {
+        const studentClient = 'student' in tx && tx.student ? tx.student : this.prisma.student;
+        student = await studentClient.findFirst({
+          where: { id, organization_id: organizationId },
+        });
+      }
 
-    if (!student) {
-      throw new NotFoundException({
-        statusCode: 404,
-        code: 'NOT_FOUND',
-        message: 'Alumno no encontrado',
+      if (!student) {
+        throw new NotFoundException({
+          statusCode: 404,
+          code: 'NOT_FOUND',
+          message: 'Alumno no encontrado',
+        });
+      }
+
+      if (student.approval_status !== ApprovalStatus.pending_approval) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'STUDENT_ALREADY_PROCESSED',
+          message: 'La solicitud ya fue procesada previamente',
+        });
+      }
+
+      // Delete User, cascading to Student, sessions and tokens without orphans (RF-10, Decision 77)
+      const userClient = 'user' in tx && tx.user ? tx.user : this.prisma.user;
+      await userClient.delete({
+        where: { id: student.user_id },
       });
-    }
+    };
 
-    if (student.approval_status !== ApprovalStatus.pending_approval) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'STUDENT_NOT_PENDING',
-        message: 'La solicitud ya no está pendiente. Actualiza la lista',
-      });
+    if (typeof this.prisma.$transaction === 'function') {
+      await this.prisma.$transaction(runTx);
+    } else {
+      await runTx(this.prisma);
     }
-
-    // Delete User, cascading to Student, sessions and tokens without orphans (RF-10, Decision 77)
-    await this.prisma.user.delete({
-      where: { id: student.user_id },
-    });
   }
 
   async unlockStudent(organizationId: string, id: string): Promise<void> {
@@ -638,6 +660,7 @@ export class StudentsService {
     organizationId: string,
     studentId: string,
     groupId: string,
+    confirmLostRetries?: boolean,
   ): Promise<StudentView> {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -703,6 +726,57 @@ export class StudentsService {
       }
 
       const now = new Date();
+
+      // Check unconsumed retries in current group (RF-9, Decision 131)
+      if (currentActive && !confirmLostRetries && tx.attempt) {
+        const unconsumedAttempts = await tx.attempt.findMany({
+          where: {
+            organization_id: organizationId,
+            student_id: studentId,
+            assignment_id: { not: null },
+            retry_granted_at: { not: null },
+            next_attempt: null,
+            assignment: {
+              group_id: currentActive.group_id,
+              cancelled_at: null,
+            },
+          },
+          include: {
+            assignment: {
+              include: {
+                activity: true,
+              },
+            },
+          },
+        });
+
+        const activeUnconsumed = unconsumedAttempts.filter((att) => {
+          if (!att.assignment) return false;
+          const effectiveDue = att.retry_extend_until ?? att.assignment.due_at;
+          return effectiveDue === null || effectiveDue > now;
+        });
+
+        if (activeUnconsumed.length > 0) {
+          const affectedActivities = activeUnconsumed.map((att) => ({
+            assignmentId: att.assignment_id!,
+            activityId: att.assignment!.activity_id,
+            activityTitle: att.assignment!.activity.title,
+            effectiveDueAt: (att.retry_extend_until ?? att.assignment!.due_at).toISOString(),
+            attemptNumber: att.attempt_number,
+          }));
+
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'UNCONSUMED_RETRY_WARNING',
+            message:
+              'El alumno tiene reintentos concedidos pendientes en este grupo que se perderán al transferirlo.',
+            details: {
+              affectedActivities,
+            },
+          });
+        }
+      }
+
       if (currentActive) {
         await tx.groupMembership.update({
           where: { id: currentActive.id },
@@ -759,9 +833,11 @@ export class StudentsService {
       });
     }
 
-    // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
-    const existingUser = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail },
+    // Check global uniqueness across all tenants (RF-3, SEC-09d)
+    const existingUser = await TenantContext.runBypass(async () => {
+      return this.prisma.user.findFirst({
+        where: { email: normalizedEmail },
+      });
     });
 
     if (existingUser) {

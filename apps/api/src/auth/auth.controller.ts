@@ -59,10 +59,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionView> {
     const cookieName = `${this.cookiePrefix}refresh_token`;
-    const tokenValue =
-      req.cookies?.[cookieName] ||
-      req.cookies?.['refresh_token'] ||
-      req.cookies?.['englove_refresh_token'];
+    const tokenValue = req.cookies?.[cookieName];
     return this.authService.refresh(tokenValue, res);
   }
 
@@ -76,15 +73,8 @@ export class AuthController {
     const refreshCookieName = `${this.cookiePrefix}refresh_token`;
     const accessCookieName = `${this.cookiePrefix}access_token`;
 
-    const refreshTokenValue =
-      req.cookies?.[refreshCookieName] ||
-      req.cookies?.['refresh_token'] ||
-      req.cookies?.['englove_refresh_token'];
-
-    const accessTokenValue =
-      req.cookies?.[accessCookieName] ||
-      req.cookies?.['access_token'] ||
-      req.cookies?.['englove_access_token'];
+    const refreshTokenValue = req.cookies?.[refreshCookieName];
+    const accessTokenValue = req.cookies?.[accessCookieName];
 
     await this.authService.logout(refreshTokenValue, accessTokenValue, res);
   }

@@ -27,6 +27,13 @@ const baseEnvSchema = z.object({
   WEB_BASE_URL: z.string().url('WEB_BASE_URL must be a valid URL'),
   NEXT_PUBLIC_API_URL: z.string().url('NEXT_PUBLIC_API_URL must be a valid URL'),
   MAIL_FROM: z.string().min(1, 'MAIL_FROM is required'),
+  SMTP_HOST: z.string().optional().default('localhost'),
+  SMTP_PORT: z
+    .union([z.string(), z.number()])
+    .default(1025)
+    .transform((val) => (typeof val === 'number' ? val : parseInt(val, 10)))
+    .pipe(z.number().int().min(1).max(65535)),
+  MAILPIT_API_URL: z.string().url().optional(),
   RESEND_API_KEY: z.string().optional().default(''),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').default('englove-dev-jwt-secret-min-32-chars-long-local-secret!'),
   APP_MIN_VERSION: z
@@ -54,15 +61,22 @@ export function validateEnvironment(config: Record<string, unknown>): ValidatedE
 
   const env = result.data;
 
-  // Staging and production require RESEND_API_KEY and non-empty COOKIE_DOMAIN
+  // Staging and production require RESEND_API_KEY, non-empty COOKIE_DOMAIN, and a non-dev JWT_SECRET (SEC-01, RF-02)
   if (env.APP_ENV === AppEnv.staging || env.APP_ENV === AppEnv.production) {
     const extraMissing: string[] = [];
     if (!env.RESEND_API_KEY || env.RESEND_API_KEY.trim() === '') {
       extraMissing.push('RESEND_API_KEY');
     }
+    if (
+      !env.JWT_SECRET ||
+      env.JWT_SECRET.trim() === '' ||
+      env.JWT_SECRET === 'englove-dev-jwt-secret-min-32-chars-long-local-secret!'
+    ) {
+      extraMissing.push('JWT_SECRET');
+    }
     if (extraMissing.length > 0) {
       throw new Error(
-        `Configuración de entorno inválida para ${env.APP_ENV}. Variables faltantes: ${extraMissing.join(', ')}`,
+        `Configuración de entorno inválida para ${env.APP_ENV}. Variables faltantes o inseguras: ${extraMissing.join(', ')}`,
       );
     }
   }

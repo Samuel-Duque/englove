@@ -21,8 +21,10 @@ import { randomUUID } from 'node:crypto';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { pipeline } from 'node:stream/promises';
 import { spawn } from 'child_process';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantContext } from '../common/tenant/tenant.context';
 import { MediaUploadUrlDto } from './dto/media.dto';
 import {
   MediaAssetStatus,
@@ -38,7 +40,6 @@ export class MediaService implements OnModuleInit {
   private readonly bucketName: string;
   private readonly transcodeQueue: string[] = [];
   private isProcessingQueue = false;
-  private readonly isMock: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -49,12 +50,6 @@ export class MediaService implements OnModuleInit {
     const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || 'mock-secret';
     this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || 'englove-dev';
     const r2Endpoint = this.configService.get<string>('R2_ENDPOINT');
-
-    this.isMock =
-      !r2Endpoint &&
-      (accountId.includes('placeholder') ||
-        accountId === 'mock-account' ||
-        accountId === 'dummy');
 
     const endpoint = r2Endpoint || `https://${accountId}.r2.cloudflarestorage.com`;
 
@@ -130,7 +125,8 @@ export class MediaService implements OnModuleInit {
       });
     }
 
-    if (attempt.assignment.activity.type !== ActivityType.speaking) {
+    const assignment = attempt.assignment;
+    if (!assignment || assignment.activity.type !== ActivityType.speaking) {
       throw new BadRequestException({
         statusCode: 400,
         code: 'ATTEMPT_NOT_SPEAKING',
@@ -139,7 +135,7 @@ export class MediaService implements OnModuleInit {
     }
 
     const effectiveDueAt =
-      attempt.previous_attempt?.retry_extend_until ?? attempt.assignment.due_at;
+      attempt.previous_attempt?.retry_extend_until ?? assignment.due_at;
     const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
 
     if (new Date() > completeUntil) {
@@ -200,26 +196,11 @@ export class MediaService implements OnModuleInit {
       Bucket: this.bucketName,
       Key: key,
       ContentType: dto.mimeType,
+      ContentLength: dto.sizeBytes,
     });
 
     const expiresSeconds = 600; // 10 minutes (SPEC-05 RF-12)
-    let uploadUrl: string;
-    if (this.isMock) {
-      const apiUrl =
-        this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
-        `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
-      uploadUrl = `${apiUrl}/api/v1/media/mock-upload/${assetId}`;
-    } else {
-      try {
-        uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
-      } catch {
-        const apiUrl =
-          this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
-          `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
-        uploadUrl = `${apiUrl}/api/v1/media/mock-upload/${assetId}`;
-      }
-    }
-
+    const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
     const expiresAt = new Date(Date.now() + expiresSeconds * 1000).toISOString();
 
     return {
@@ -264,10 +245,12 @@ export class MediaService implements OnModuleInit {
       return asset;
     }
 
-    // Verify object exists in R2 with HeadObject
-    if (!this.isMock) {
+    let actualSize = Number(asset.size_bytes);
+    if (forcedDurationSeconds === undefined) {
+      // Verify object exists in R2 with HeadObject
+      let headRes;
       try {
-        await this.s3Client.send(
+        headRes = await this.s3Client.send(
           new HeadObjectCommand({
             Bucket: this.bucketName,
             Key: asset.key,
@@ -286,15 +269,28 @@ export class MediaService implements OnModuleInit {
             message: 'La subida no terminó. Intenta enviarla de nuevo',
           });
         }
-        // In local dev/test without credentials, we treat simulated head as ok
+        throw err;
       }
+      actualSize = Number(headRes?.ContentLength ?? asset.size_bytes);
+    }
+    if (actualSize > 10 * 1024 * 1024) {
+      await this.deleteFile(asset.key);
+      await this.prisma.mediaAsset.update({
+        where: { id: asset.id },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+      throw new PayloadTooLargeException({
+        statusCode: 413,
+        code: 'AUDIO_FILE_TOO_LARGE',
+        message: 'El archivo de audio supera 10 MB',
+      });
     }
 
     // Measure duration
     const duration =
       forcedDurationSeconds !== undefined
         ? forcedDurationSeconds
-        : await this.probeDuration(asset.key, Number(asset.size_bytes));
+        : await this.probeDuration(asset.key, actualSize);
 
     if (duration < 2) {
       await this.prisma.mediaAsset.update({
@@ -362,22 +358,7 @@ export class MediaService implements OnModuleInit {
     });
 
     const expiresSeconds = 300; // 5 minutes (SPEC-05 RF-15)
-    let url: string;
-    if (this.isMock) {
-      const apiUrl =
-        this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
-        `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
-      url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
-    } else {
-      try {
-        url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
-      } catch {
-        const apiUrl =
-          this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
-          `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
-        url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
-      }
-    }
+    const url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
 
     return {
       url,
@@ -420,22 +401,7 @@ export class MediaService implements OnModuleInit {
     });
 
     const expiresSeconds = 300;
-    let url: string;
-    if (this.isMock) {
-      const apiUrl =
-        this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
-        `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
-      url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
-    } else {
-      try {
-        url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
-      } catch {
-        const apiUrl =
-          this.configService.get<string>('NEXT_PUBLIC_API_URL') ||
-          `http://localhost:${this.configService.get<number>('PORT', 3001)}`;
-        url = `${apiUrl}/api/v1/media/mock-stream/${asset.id}`;
-      }
-    }
+    const url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresSeconds });
 
     return {
       url,
@@ -481,7 +447,7 @@ export class MediaService implements OnModuleInit {
       if (!assetId) continue;
 
       try {
-        await this.transcodeAsset(assetId);
+        await TenantContext.runBypass(() => this.transcodeAsset(assetId));
       } catch (err: unknown) {
         this.logger.error(`Error transcodificando asset ${assetId}: ${(err as Error)?.message || String(err)}`);
       }
@@ -497,10 +463,6 @@ export class MediaService implements OnModuleInit {
     });
 
     if (!asset || asset.status !== MediaAssetStatus.ready || asset.converted_key || asset.transcode_failed_at) {
-      return;
-    }
-
-    if (this.isMock) {
       return;
     }
 
@@ -531,7 +493,7 @@ export class MediaService implements OnModuleInit {
     const convertedLocalPath = path.join(tmpDir, `conv_${asset.id}.mp4`);
 
     try {
-      // Download raw file from R2
+      // Download raw file from R2 via streaming pipeline (Rule G-C07, Brecha 6)
       const getRes = await this.s3Client.send(
         new GetObjectCommand({
           Bucket: this.bucketName,
@@ -539,16 +501,23 @@ export class MediaService implements OnModuleInit {
         }),
       );
 
-      let rawBuffer: Buffer;
-      if (getRes.Body && typeof (getRes.Body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray === 'function') {
-        const bytes = await (getRes.Body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
-        rawBuffer = Buffer.from(bytes);
+      if (getRes.Body) {
+        if (typeof (getRes.Body as { pipe?: unknown }).pipe === 'function') {
+          await pipeline(getRes.Body as NodeJS.ReadableStream, fs.createWriteStream(rawLocalPath));
+        } else if (
+          typeof (getRes.Body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray ===
+          'function'
+        ) {
+          const bytes = await (getRes.Body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+          fs.writeFileSync(rawLocalPath, Buffer.from(bytes));
+        } else {
+          fs.writeFileSync(rawLocalPath, Buffer.from([]));
+        }
       } else {
-        rawBuffer = Buffer.from([]);
+        fs.writeFileSync(rawLocalPath, Buffer.from([]));
       }
-      fs.writeFileSync(rawLocalPath, rawBuffer);
 
-      // Run ffmpeg structured without shell (Rule G-C07)
+      // Run ffmpeg structured without shell with 60s timeout (Rule G-C07, SPEC-11 RF-5)
       await new Promise<void>((resolve, reject) => {
         const proc = spawn('ffmpeg', [
           '-y',
@@ -563,12 +532,21 @@ export class MediaService implements OnModuleInit {
           convertedLocalPath,
         ], { shell: false });
 
+        const timer = setTimeout(() => {
+          proc.kill();
+          reject(new Error('ffmpeg timed out after 60s'));
+        }, 60000);
+
         proc.on('close', (code) => {
+          clearTimeout(timer);
           if (code === 0) resolve();
           else reject(new Error(`ffmpeg exited with code ${code}`));
         });
 
-        proc.on('error', reject);
+        proc.on('error', (err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
       });
 
       // Upload converted mp4 to R2
@@ -625,13 +603,94 @@ export class MediaService implements OnModuleInit {
     });
   }
 
-  private async probeDuration(_key: string, sizeBytes: number): Promise<number> {
-    // If size implies very small file (< 8000 bytes ~ < 1 sec at 64kbps)
+  private async probeDuration(key: string, sizeBytes: number): Promise<number> {
+    const tmpDir = os.tmpdir();
+    const tempFile = path.join(tmpDir, `probe_${randomUUID()}.tmp`);
+
+    try {
+      const getRes = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        }),
+      );
+
+      if (getRes.Body) {
+        if (typeof (getRes.Body as { pipe?: unknown }).pipe === 'function') {
+          await pipeline(getRes.Body as NodeJS.ReadableStream, fs.createWriteStream(tempFile));
+        } else if (
+          typeof (getRes.Body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray ===
+          'function'
+        ) {
+          const bytes = await (getRes.Body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+          fs.writeFileSync(tempFile, Buffer.from(bytes));
+        }
+      }
+
+      if (fs.existsSync(tempFile) && fs.statSync(tempFile).size > 0) {
+        const duration = await new Promise<number>((resolve, reject) => {
+          const proc = spawn(
+            'ffprobe',
+            [
+              '-v',
+              'error',
+              '-show_entries',
+              'format=duration',
+              '-of',
+              'default=noprint_wrappers=1:nokey=1',
+              tempFile,
+            ],
+            { shell: false },
+          );
+
+          let output = '';
+          proc.stdout.on('data', (d) => {
+            output += d.toString();
+          });
+
+          const timer = setTimeout(() => {
+            proc.kill();
+            reject(new Error('ffprobe timed out after 10s'));
+          }, 10000);
+
+          proc.on('close', (code) => {
+            clearTimeout(timer);
+            if (code === 0) {
+              const parsed = parseFloat(output.trim());
+              if (!isNaN(parsed) && parsed > 0) {
+                resolve(parsed);
+                return;
+              }
+            }
+            reject(new Error(`ffprobe failed with code ${code}`));
+          });
+
+          proc.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+          });
+        });
+
+        return duration;
+      }
+    } catch (err: unknown) {
+      this.logger.warn(
+        `ffprobe no pudo medir duración del asset (${(err as Error)?.message}). Usando fallback de tamaño.`,
+      );
+    } finally {
+      if (fs.existsSync(tempFile)) {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // Fallback based on size if ffprobe is unavailable in current runtime
     if (sizeBytes < 8000) {
       return 1.0;
     }
-    // Estimated average: 64kbps = 8000 bytes/sec
-    const est = sizeBytes / 8000;
-    return Math.min(300, Math.max(3, est));
+    return Math.min(300, Math.max(3, sizeBytes / 8000));
   }
 }

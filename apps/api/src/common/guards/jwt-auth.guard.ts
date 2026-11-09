@@ -22,6 +22,7 @@ interface JwtPayload {
   sid: string;
   student_id?: string;
   age_segment?: string;
+  typ?: string;
 }
 
 @Injectable()
@@ -66,6 +67,14 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: this.jwtSecret,
       });
+
+      if (payload.typ && payload.typ !== 'access') {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'Tu sesión terminó. Inicia sesión de nuevo',
+        });
+      }
 
       // Query session by sid to ensure session is active and not revoked (Decision 68)
       const session = await this.prisma.authSession.findFirst({
@@ -138,10 +147,7 @@ export class JwtAuthGuard implements CanActivate {
 
   private extractToken(request: Request): string | undefined {
     const cookieName = `${this.cookiePrefix}access_token`;
-    const fromCookie =
-      request.cookies?.[cookieName] ||
-      request.cookies?.['access_token'] ||
-      request.cookies?.['englove_access_token'];
+    const fromCookie = request.cookies?.[cookieName];
 
     if (fromCookie && typeof fromCookie === 'string') {
       return fromCookie;

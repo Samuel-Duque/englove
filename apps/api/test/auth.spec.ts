@@ -1628,7 +1628,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         },
       } as unknown as PrismaService;
 
-      const maintenance = new MaintenanceService(mockPrisma);
+      const maintenance = new MaintenanceService(mockPrisma, {} as any, {} as any, {} as any, {} as any, {} as any);
       await maintenance.runIdentityMaintenance('2026-10-21');
 
       expect(mockPrisma.scheduledJobRun.create).toHaveBeenCalledWith(
@@ -1685,7 +1685,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         },
       } as unknown as PrismaService;
 
-      const maintenance = new MaintenanceService(mockPrisma);
+      const maintenance = new MaintenanceService(mockPrisma, {} as any, {} as any, {} as any, {} as any, {} as any);
       await expect(maintenance.runIdentityMaintenance('2026-10-21')).resolves.not.toThrow();
       expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
     });

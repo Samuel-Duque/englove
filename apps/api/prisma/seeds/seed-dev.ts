@@ -644,30 +644,37 @@ export async function seedDev() {
     },
   });
 
-  // Open microgame assignments for groupKids
-  for (let idx = 0; idx < gameDefinitions.length; idx++) {
-    const def = gameDefinitions[idx]!;
-    const assignId = `30000000-0000-4000-8000-00000000001${idx + 1}`;
-    await prisma.assignment.upsert({
-      where: { id: assignId },
-      update: {
-        opens_at: pastOpens,
-        due_at: futureDue,
-      },
-      create: {
-        id: assignId,
-        organization_id: org.id,
-        activity_id: def.actId,
-        group_id: groupKids.id,
-        opens_at: pastOpens,
-        due_at: futureDue,
-      },
-    });
-  }
-
   const firstStudent = students[0]!;
   const secondStudent = students[1]!;
   const thirdStudent = students[2]!;
+
+  // Autonomous microgame practice attempts (Decision 130, 137)
+  for (let idx = 0; idx < gameDefinitions.length; idx++) {
+    const def = gameDefinitions[idx]!;
+    const attemptId = `40000000-0000-4000-8000-00000000002${idx + 1}`;
+    await prisma.attempt.upsert({
+      where: { id: attemptId },
+      update: {
+        score: 5.0,
+        status: AttemptStatus.graded,
+        graded_at: pastOpens,
+      },
+      create: {
+        id: attemptId,
+        organization_id: org.id,
+        assignment_id: null,
+        activity_id: def.actId,
+        student_id: firstStudent.id,
+        attempt_number: 1,
+        status: AttemptStatus.graded,
+        score: 5.0,
+        graded_at: pastOpens,
+        started_at: pastOpens,
+        finished_at: pastOpens,
+        payload: { answers: {} },
+      },
+    });
+  }
 
   // Attempts: graded, pending_review, abandoned
   // 1. Graded attempt

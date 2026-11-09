@@ -92,6 +92,9 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       mockPrisma as unknown as PrismaService,
       mockGamificationService as unknown as GamificationService,
       mockMediaService as unknown as MediaService,
+      {} as any,
+      {} as any,
+      {} as any,
     );
   });
 

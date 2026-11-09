@@ -2,8 +2,6 @@ import {
   Controller,
   Post,
   Get,
-  Put,
-  Res,
   Param,
   Body,
   HttpCode,
@@ -12,10 +10,8 @@ import {
   ParseUUIDPipe,
   BadRequestException,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { MediaService } from './media.service';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
 import { MediaUploadUrlDto } from './dto/media.dto';
@@ -80,21 +76,5 @@ export class MediaController {
     @Param('id', uuidPipe) id: string,
   ): Promise<MediaPlaybackUrlResponse> {
     return this.mediaService.getDownloadUrl(user.organizationId, id);
-  }
-
-  @Public()
-  @Put('mock-upload/:id')
-  @HttpCode(HttpStatus.OK)
-  async handleMockUpload(@Param('id') id: string) {
-    return { ok: true, id };
-  }
-
-  @Public()
-  @Get('mock-stream/:id')
-  async handleMockStream(@Param('id') _id: string, @Res() res: Response) {
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Content-Type', 'audio/webm');
-    res.setHeader('Content-Length', '0');
-    res.status(HttpStatus.OK).end();
   }
 }

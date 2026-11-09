@@ -121,7 +121,9 @@ export class ReviewsService {
       }),
     ]);
 
-    const items = attempts.map((att) => this.mapToReviewListItem(att));
+    const items = attempts
+      .filter((att): att is typeof att & { assignment: NonNullable<typeof att.assignment> } => Boolean(att.assignment))
+      .map((att) => this.mapToReviewListItem(att));
 
     return {
       items,
@@ -201,7 +203,9 @@ export class ReviewsService {
       }),
     ]);
 
-    const items = attempts.map((att) => this.mapToReviewListItem(att));
+    const items = attempts
+      .filter((att): att is typeof att & { assignment: NonNullable<typeof att.assignment> } => Boolean(att.assignment))
+      .map((att) => this.mapToReviewListItem(att));
 
     return {
       items,
@@ -230,10 +234,16 @@ export class ReviewsService {
             group: true,
             activity: {
               include: {
-                fill_blank_detail: true,
+                fill_blank_detail: {
+                  // guardrails-ignore G-C04: lectura controlada de answer_key para evaluacion docente en getReviewDetail
+                  select: { id: true, config: true, answer_key: true },
+                },
                 open_question_detail: true,
                 speaking_detail: true,
-                exam_detail: true,
+                exam_detail: {
+                  // guardrails-ignore G-C04: lectura controlada de answer_key para evaluacion docente en getReviewDetail
+                  select: { id: true, config: true, answer_key: true },
+                },
               },
             },
           },
@@ -371,7 +381,10 @@ export class ReviewsService {
         : null,
     }));
 
-    const baseItem = this.mapToReviewListItem(attempt);
+    const baseItem = this.mapToReviewListItem({
+      ...attempt,
+      assignment: attempt.assignment,
+    });
 
     return {
       ...baseItem,
@@ -428,6 +441,14 @@ export class ReviewsService {
     const now = new Date();
     let isFirstReview = false;
 
+    if (dto.score !== undefined && (typeof dto.score !== 'number' || dto.score < 0 || dto.score > 5)) {
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        code: 'SCORE_OUT_OF_RANGE',
+        message: 'La calificación debe estar entre 0.0 y 5.0',
+      });
+    }
+
     if (attempt.status === AttemptStatus.pending_review) {
       // Manual initial grading (RF-4)
       if (dto.score === undefined || dto.score === null) {
@@ -435,14 +456,6 @@ export class ReviewsService {
           statusCode: 400,
           code: 'SCORE_REQUIRED',
           message: 'El puntaje es obligatorio para calificar un intento pendiente',
-        });
-      }
-
-      if (typeof dto.score !== 'number' || dto.score < 0 || dto.score > 5) {
-        throw new UnprocessableEntityException({
-          statusCode: 422,
-          code: 'SCORE_OUT_OF_RANGE',
-          message: 'La calificación debe estar entre 0.0 y 5.0',
         });
       }
 
@@ -469,6 +482,28 @@ export class ReviewsService {
       const retentionUntil = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
 
       await this.prisma.$transaction(async (tx) => {
+        // Concurrency lock (ENG-152)
+        let locked: { id: string; status: AttemptStatus } | undefined;
+        if (typeof tx.$queryRaw === 'function') {
+          const lockedRows = await tx.$queryRaw<Array<{ id: string; status: AttemptStatus }>>`
+            SELECT id, status
+            FROM attempts
+            WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+            FOR UPDATE
+          `;
+          locked = lockedRows?.[0];
+        }
+        if (!locked) {
+          locked = { id: attempt.id, status: attempt.status };
+        }
+        if (locked.status === AttemptStatus.graded && dto.score !== undefined) {
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            code: 'SCORE_NOT_EDITABLE',
+            message: 'El puntaje ya no es editable una vez calificado el intento',
+          });
+        }
+
         // Update attempt
         await tx.attempt.update({
           where: { id: attempt.id },
@@ -680,13 +715,15 @@ export class ReviewsService {
     });
 
     // 1. Validation: must exist, have assignment and not be game (Decision 111)
-    if (!attempt || !attempt.assignment || attempt.assignment.activity.type === ActivityType.game) {
+    if (!attempt || !attempt.assignment || !attempt.assignment_id || attempt.assignment.activity.type === ActivityType.game) {
       throw new ConflictException({
         statusCode: 409,
         code: 'RETRY_NOT_ALLOWED',
         message: 'Los microjuegos son de práctica autónoma 24/7 y no admiten nuevo intento asignado',
       });
     }
+
+    const assignmentId = attempt.assignment_id;
 
     // 2. Lock assignment and verify not cancelled (RF-7)
     let assignment: { id: string; due_at: Date; cancelled_at: Date | null } | null;
@@ -695,14 +732,14 @@ export class ReviewsService {
         const rows = await tx.$queryRaw<Array<{ id: string; due_at: Date; cancelled_at: Date | null }>>`
           SELECT id, due_at, cancelled_at
           FROM assignments
-          WHERE id = ${attempt.assignment_id}::uuid AND organization_id = ${organizationId}::uuid
+          WHERE id = ${assignmentId}::uuid AND organization_id = ${organizationId}::uuid
           FOR UPDATE
         `;
         assignment = rows[0] || null;
       } catch {
         assignment = await tx.assignment.findFirst({
           where: {
-            id: attempt.assignment_id,
+            id: assignmentId,
             organization_id: organizationId,
           },
         });
@@ -710,7 +747,7 @@ export class ReviewsService {
     } else {
       assignment = await tx.assignment.findFirst({
         where: {
-          id: attempt.assignment_id,
+          id: assignmentId,
           organization_id: organizationId,
         },
       });
@@ -736,7 +773,7 @@ export class ReviewsService {
     // Check if another attempt with higher attempt_number exists
     const higherAttempt = await tx.attempt.findFirst({
       where: {
-        assignment_id: attempt.assignment_id,
+        assignment_id: assignmentId,
         student_id: attempt.student_id,
         organization_id: organizationId,
         attempt_number: { gt: attempt.attempt_number },
@@ -846,6 +883,7 @@ export class ReviewsService {
     // Group by assignment_id
     const assignmentMap = new Map<string, typeof gradedAttempts>();
     for (const att of gradedAttempts) {
+      if (!att.assignment_id || !att.assignment) continue;
       const list = assignmentMap.get(att.assignment_id) || [];
       list.push(att);
       assignmentMap.set(att.assignment_id, list);
@@ -856,7 +894,7 @@ export class ReviewsService {
 
     for (const [, attempts] of assignmentMap) {
       const latest = attempts[attempts.length - 1];
-      if (!latest) {
+      if (!latest || !latest.assignment) {
         continue;
       }
       const assignment = latest.assignment;
@@ -930,7 +968,7 @@ export class ReviewsService {
     }
 
     const latest = gradedAttempts[gradedAttempts.length - 1];
-    if (!latest) {
+    if (!latest || !latest.assignment) {
       throw new NotFoundException({
         statusCode: 404,
         code: 'FEEDBACK_NOT_FOUND',

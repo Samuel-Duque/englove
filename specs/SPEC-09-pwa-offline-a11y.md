@@ -196,7 +196,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | Recursos estáticos versionados del build | Precaché | Sí, por versión |
 | Navegaciones (HTML) y cargas RSC | Red; sin red, pantalla sin conexión | No |
-| API `/api/v1/*` | Red siempre (lectura de `NetworkFirst` sin respaldo de respuestas autenticadas, architecture §3.8 y §10.2) | No |
+| API `/api/v1/*` | Red siempre (exclusión estricta de Cache Storage, decisiones 116 y 117; nunca cacheado) | No |
 | URLs firmadas de R2 | Red, sin intervención | No |
 
 **Rendimiento (RF-23).** Dispositivo: tablet Android de gama media o baja, con 4 GB de RAM o menos. Umbrales de referencia: LCP ≤ 2,5 s en `/inicio`, INP ≤ 200 ms en el renderizador y en cada mecánica de juego, CLS ≤ 0,1. Son control de higiene (CONTEXT §11.2), no puerta de CI.

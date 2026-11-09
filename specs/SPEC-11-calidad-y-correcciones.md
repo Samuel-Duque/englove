@@ -2,11 +2,11 @@
 
 | Campo                | Valor                                                                                                               |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Estado               | Borrador                                                                                                            |
+| Estado               | Verificada                                                                                                          |
 | Etapa                | 12 — Calidad y remediación                                                                                          |
 | Tareas               | ENG-143, ENG-150 a ENG-162, DOC-09                                                                                  |
 | Referencias          | CONTEXT §2.4, §4–§16 (decisiones 127 a 137) · architecture §3–§14 · sdd-process §5–§7 · pbp §3, §4 (Etapa 12)      |
-| Aprobada por / fecha | —                                                                                                                   |
+| Aprobada por / fecha | Sebastian Tunjuelo / 2026-11-08                                                                                     |
 
 ## 1. Contexto y objetivo
 
@@ -245,4 +245,5 @@ No existen preguntas abiertas que bloqueen la revisión ni la aprobación de `SP
 
 | Fecha | Cambio | Motivo |
 | --- | --- | --- |
+| 2026-11-08 | Aprobación de SPEC-11 por el líder del proyecto | Se cierra la revisión de la especificación y se habilita la implementación de la Etapa 12 |
 | 2026-11-08 | Redacción inicial de `SPEC-11` en estado `Borrador` | Formalizar los requisitos, contratos, modelo de datos, matriz de regresión y consideraciones previas de la Etapa 12 a partir de `AUDITORIA.md`, `testing-issues/` y las decisiones 127 a 137 de `CONTEXT §14` |

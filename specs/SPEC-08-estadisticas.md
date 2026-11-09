@@ -7,7 +7,7 @@
 | Tareas | ENG-100, ENG-101, ENG-102, ENG-103, ENG-104 |
 | Referencias | `.agents/CONTEXT.md` §5.1, §5.3, §5.4, §12.8, §14 (Decisiones 20, 23, 25, 34, 41, 61, 66, 71, 73, 74, 76, 79, 98, 100, 104, 110–115); `planning/architecture-overview.md` §6, §7.8, §9.3, §9.4; `planning/pbp-development.md` (Etapa 8); `specs/SPEC-01-scaffold.md` a `specs/SPEC-07-revision-y-feedback.md` |
 | Aprobada por / fecha | Líder del proyecto / 2026-10-27 |
-| Verificada por / fecha | Líder del proyecto / 2026-10-28 |
+| Verificada por / fecha | Líder del proyecto / 2026-10-28 (re-verificada 2026-11-08) |
 
 ## 1. Contexto y objetivo
 
@@ -49,65 +49,65 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
 
 ## 3. Requisitos funcionales
 
-1. **RF-1 — Separación de fuentes y regla del último intento calificado (`ENG-100`)**
+1. **RF-1 — Separación de fuentes y regla del último intento calificado (`ENG-100`, precisión Decisión 137)**
    - **Dado** un conjunto de estudiantes con registros en `Attempt` y `ProgressEvent` dentro de una organización,
    - **Cuando** el backend calcula métricas estadísticas de rendimiento y de constancia,
-   - **Entonces** obtiene las calificaciones exclusivamente de `Attempt` con `status = 'graded'` y `score IS NOT NULL`, obtiene las semanas activas, rachas e insignias de `ProgressEvent`, y en los promedios agregados toma únicamente el último intento calificado (`MAX(attempt_number)` con `status = 'graded'`) de cada par `(student_id, assignment_id)`.
+   - **Entonces** obtiene las calificaciones exclusivamente de `Attempt` asignados (`assignment_id IS NOT NULL`) con `status = 'graded'` y `score IS NOT NULL` (los microjuegos `game` están estrictamente excluidos de las notas según Decisión 137), obtiene las semanas activas, rachas e insignias de `ProgressEvent`, y en los promedios agregados toma únicamente el último intento calificado (`MAX(attempt_number)` con `status = 'graded'`) de cada par `(student_id, assignment_id)`.
 
-2. **RF-2 — Universo de cumplimiento, denominador congelado y exclusión de canceladas y microjuegos (`ENG-100`)**
+2. **RF-2 — Universo de cumplimiento, denominador congelado y exclusión de canceladas y microjuegos (`ENG-100`, Decisión 137)**
    - **Dado** un grupo con asignaciones de tipos asignables (`fill_blank`, `open_question`, `speaking`, `exam`), asignaciones canceladas (`cancelled_at IS NOT NULL`) e intentos autónomos en microjuegos (`ActivityType = 'game'`),
    - **Cuando** el backend calcula la tasa de finalización de asignaciones para un grupo, nivel o estudiante,
-   - **Entonces** evalúa únicamente asignaciones con `cancelled_at IS NULL` y `Activity.type != 'game'` donde `GroupMembership` se solapó con `[opens_at, due_at]` (`joined_at <= due_at AND (left_at IS NULL OR left_at >= opens_at)`), usa `Assignment.historical_student_count` como denominador en asignaciones cerradas (`due_at < now()`) cuando no es nulo, y conserva las notas y eventos de canceladas y microjuegos en rendimiento y constancia sin incluirlos en el porcentaje de cumplimiento.
+   - **Entonces** evalúa únicamente asignaciones con `cancelled_at IS NULL` y `Activity.type != 'game'` donde `GroupMembership` se solapó con `[opens_at, due_at]` (`joined_at <= due_at AND (left_at IS NULL OR left_at >= opens_at)`), usa `Assignment.historical_student_count` como denominador en asignaciones cerradas (`due_at < now()`) cuando no es nulo, y los microjuegos nunca entran en notas académicas ni en cumplimiento, alimentando la constancia y la sección «Práctica en juegos» (Decisión 137).
 
 3. **RF-3 — Cálculo de tiempo dedicado con recorte superior y marcas de duración (`ENG-100`)**
    - **Dado** un intento finalizado (`finished_at IS NOT NULL`) con `status IN ('pending_review', 'graded')` y una actividad con `expected_duration_seconds`,
    - **Cuando** el backend agrega el tiempo dedicado por día, semana ISO o mes en zona `America/Bogota`,
    - **Entonces** calcula la duración con reloj del servidor como `MAX(0, finished_at - started_at)`, la recorta a `MIN(rawSeconds, expected_duration_seconds * 3)` y expone si el intento contiene `'implausible_duration'` en `Attempt.flags`.
 
-4. **RF-4 — Presupuesto de latencia `< 500 ms` con volumen de 3 meses (`ENG-100`)**
+4. **RF-4 — Presupuesto de latencia `< 500 ms` con volumen de 3 meses (`ENG-100`, Decisión 137)**
    - **Dado** una base de datos poblada con `prisma/seeds/seed-volume.ts` (100 estudiantes en 4 grupos/niveles y 3 meses de actividad),
-   - **Cuando** la profesora consulta `/api/v1/stats/overview`, `/groups/:id`, `/leaderboard` o `/students/:id`,
+   - **Cuando** la profesora consulta `/api/v1/stats/overview`, `/groups/:id`, `/leaderboard`, `/games-leaderboard` o `/students/:id`,
    - **Entonces** cada endpoint responde en `< 500 ms` (p95) empleando los índices compuestos sobre `Attempt`, `ProgressEvent`, `Assignment` y `GroupMembership`.
 
-5. **RF-5 — Vista general por nivel MCER y por grupo con alertas de inactividad (`ENG-101`)**
+5. **RF-5 — Vista general por nivel MCER y por grupo con alertas de inactividad (`ENG-101`, Decisión 137)**
    - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/overview`,
    - **Cuando** el servidor procesa la consulta para su `organization_id` y ventana `[from, to]`,
-   - **Entonces** devuelve `200 OK` con el resumen organizacional, los agregados por nivel MCER (`A1`–`B2`) y por grupo (promedio `0,0–5,0`, tasa de finalización, alumnos activos y tiempo dedicado), y `inactiveAlerts` con los alumnos `approved` sin eventos `attempt_completed` ni `audio_submitted` en los últimos 14 días en `America/Bogota`.
+   - **Entonces** devuelve `200 OK` con el resumen organizacional, los agregados por nivel MCER (`A1`–`B2`) y por grupo basados exclusivamente en tipos asignables (sin `game`), tasa de finalización, alumnos activos y tiempo dedicado, y `inactiveAlerts` con los alumnos `approved` sin eventos `attempt_completed` ni `audio_submitted` en los últimos 14 días en `America/Bogota`.
 
-6. **RF-6 — Vista por grupo con tabla comparativa y tendencia cada 30 días y semanal (`ENG-101`)**
+6. **RF-6 — Vista por grupo con tabla comparativa y tendencia cada 30 días y semanal (`ENG-101`, Decisión 137)**
    - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/groups/:id` para un grupo de su organización,
    - **Cuando** el servidor evalúa la ventana `[from, to]` y calcula tanto la comparación **cada 30 días** (`trend30d`: últimos 30 días frente a los 30 días anteriores) como la comparación **semanal** (`trend7d`: últimos 7 días frente a los 7 días anteriores, con `trendMode = '30d' | '7d'`),
-   - **Entonces** devuelve `200 OK` con el resumen del grupo y una fila por alumno que incluye promedio del periodo (`0,0–5,0`), `trend30d` y `trend7d` (cada una con promedio actual, promedio previo, delta y dirección `'up'` si $\Delta \ge +0,2$, `'down'` si $\Delta \le -0,2$, `'stable'` si $|\Delta| < 0,2$, `'none'` si falta nota), semanas activas, racha vigente (`currentStreakWeeks` y `forgivenessAvailable`), tasa de finalización y tiempo dedicado, ordenable por cualquier columna.
+   - **Entonces** devuelve `200 OK` con el resumen del grupo y una fila por alumno que incluye promedio del periodo (`0,0–5,0`, excluyendo `game`), `trend30d` y `trend7d` (cada una con promedio actual, promedio previo, delta y dirección `'up'` si $\Delta \ge +0,2$, `'down'` si $\Delta \le -0,2$, `'stable'` si $|\Delta| < 0,2$, `'none'` si falta nota), semanas activas, racha vigente (`currentStreakWeeks` y `forgivenessAvailable`), tasa de finalización, tiempo dedicado, e incorpora el objeto `gamesPractice` con resumen de sesiones de microjuego (Decisión 137).
 
 7. **RF-7 — Polling automático de 30 segundos en el panel estadístico (`ENG-101`)**
    - **Dado** que la profesora visualiza `/estadisticas` o `/estadisticas/estudiantes/[id]` en una pestaña activa del navegador,
    - **Cuando** transcurren 30 segundos,
    - **Entonces** TanStack Query revalida automáticamente las consultas activas (`refetchInterval: 30_000`) preservando los filtros y el ordenamiento vigentes.
 
-8. **RF-8 — Leaderboard privado para la profesora con filtro por grupos (`A1`, `A2`, `B1`, `B2`) (`ENG-102`)**
-   - **Dado** una petición a `GET /api/v1/stats/leaderboard` con filtros opcionales por grupo (`groupId`), por grupos de nivel MCER (`level`: `A1`, `A2`, `B1` o `B2`) y por fechas (`from`, `to`),
+8. **RF-8 — Leaderboard privado para la profesora y Ranking privado de juegos (`ENG-102`, ENG-162, Decisiones 115 y 137)**
+   - **Dado** una petición a `GET /api/v1/stats/leaderboard` o `GET /api/v1/stats/games-leaderboard` con filtros opcionales por grupo (`groupId`), por grupos de nivel MCER (`level`: `A1`, `A2`, `B1` o `B2`) y por fechas (`from`, `to`),
    - **Cuando** el usuario autenticado tiene rol `teacher`,
-   - **Entonces** devuelve `200 OK` con el ranking de estudiantes aprobados que cumplan el filtro (`rank`, promedio `0,0–5,0`, actividades completadas, `currentStreakWeeks` y `badgesCount`); mientras que si el usuario tiene rol `student`, responde `403 FORBIDDEN` (`AUTH_FORBIDDEN`).
+   - **Entonces** `leaderboard` devuelve `200 OK` con el ranking académico de estudiantes aprobados que cumplan el filtro (`rank`, promedio `0,0–5,0` sin `game`, actividades completadas, `currentStreakWeeks` y `badgesCount`), mientras que `games-leaderboard` devuelve el ranking privado por `gamePoints` y estrellas acumuladas (máximo 5 mejores partidas por juego); en ambos endpoints, si el usuario tiene rol `student`, responde `403 FORBIDDEN` (`AUTH_FORBIDDEN`).
 
-9. **RF-9 — Vista individual por estudiante: eje de rendimiento (`ENG-103`)**
+9. **RF-9 — Vista individual por estudiante: eje de rendimiento (`ENG-103`, Decisión 137)**
    - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/students/:id` con filtros opcionales `from`, `to`, `type` y `level`,
    - **Cuando** el servidor genera el bloque `performance` del estudiante,
-   - **Entonces** devuelve la serie cronológica de intentos calificados (`scoreSeries`, con cada intento `attempt_number = 1..N` en `game` y banderas `usedExtendedDeadline` e `implausibleDuration`), el promedio del grupo del alumno (`groupAverageScore`), los promedios por `ActivityType`, `GameMechanic` y `Level`, y la distribución respecto a `passing_score = 3.0` (`>= 3.0` vs. `< 3.0`).
+   - **Entonces** devuelve la serie cronológica de intentos calificados de asignaciones (`scoreSeries`, excluyendo `game`), el promedio del grupo del alumno (`groupAverageScore`), los promedios por `ActivityType` asignable y `Level`, y la distribución respecto a `passing_score = 3.0` (`>= 3.0` vs. `< 3.0`), mientras que los microjuegos se reportan en `gamesPractice` con estrellas y puntos de juego (Decisión 137).
 
-10. **RF-10 — Vista individual por estudiante: eje de constancia (`ENG-103`)**
+10. **RF-10 — Vista individual por estudiante: eje de constancia y Práctica en juegos (`ENG-103`, ENG-162, Decisión 137)**
     - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/students/:id`,
-    - **Cuando** el servidor genera el bloque `consistency` del estudiante,
-    - **Entonces** devuelve el calendario de semanas ISO en `America/Bogota` (`weeklyCalendar`, últimas 12 semanas por defecto con estados `'active'`, `'forgiven'`, `'inactive'` o `'current_pending'`), `currentStreakWeeks`, `forgivenessAvailable`, `bestStreakWeeks`, tasa de finalización de asignaciones y tiempo dedicado recortado por día (`dailyTime`), semana ISO (`weeklyTime`) y mes (`monthlyTime`).
+    - **Cuando** el servidor genera los bloques `consistency` y `gamesPractice` del estudiante,
+    - **Entonces** devuelve el calendario de semanas ISO en `America/Bogota` (`weeklyCalendar`, últimas 12 semanas por defecto con estados `'active'`, `'forgiven'`, `'inactive'` o `'current_pending'`), `currentStreakWeeks`, `forgivenessAvailable`, `bestStreakWeeks`, tasa de finalización de asignaciones, tiempo dedicado recortado por día (`dailyTime`), semana ISO (`weeklyTime`) y mes (`monthlyTime`), e incorpora en `gamesPractice` las sesiones `1..N` de microjuegos con duración recortada a `expected_duration_seconds * 3` y estrellas por partida (Decisión 137).
 
 11. **RF-11 — Validación de filtros y aislamiento multi-tenant anti-IDOR (`ENG-101`, `ENG-102`, `ENG-103`)**
     - **Dado** cualquier petición a `/api/v1/stats/*`,
     - **Cuando** los parámetros de consulta son inválidos (`from > to`, UUID o enum inválido) o el `:id` de grupo/estudiante pertenece a otra organización o no existe,
     - **Entonces** el backend responde `400 VALIDATION_ERROR` ante parámetros mal formados y `404 NOT_FOUND` (`GROUP_NOT_FOUND` o `STUDENT_NOT_FOUND`) filtrando siempre por `organization_id` del JWT con `findFirst`.
 
-12. **RF-12 — Job cada 3 días de correo de pendientes a la profesora (`ENG-104`)**
+12. **RF-12 — Job cada 3 días de correo de pendientes a la profesora (`ENG-104`, Etapa 12)**
     - **Dado** el cron diario a las `08:00 America/Bogota` que verifica en `ScheduledJobRun` (`job_key = 'teacher_pending_summary'`) si han transcurrido $\ge 3$ días calendario en `America/Bogota` desde la última ejecución `done` de cada organización,
     - **Cuando** se cumple el ciclo de 3 días y consulta `PendingSummaryService.getReminders(organizationId)`,
-    - **Entonces** reclama de forma idempotente `(organization_id, 'teacher_pending_summary', period_key)` y, si `pendingApprovals > 0 || overdueReviews > 0`, envía la plantilla `'teacher-pending-summary'` de `MailService` a los usuarios `teacher` de la organización y marca el job como `done`; si ambos son `0`, no envía correo y marca el job como `done`.
+    - **Entonces** reclama de forma idempotente `(organization_id, 'teacher_pending_summary', period_key)` y, si `pendingApprovals > 0 || overdueReviews > 0`, envía la plantilla `'teacher-pending-summary'` de `MailService` a los usuarios `teacher` de la organización y marca el job como `done`; si ambos son `0`, no envía correo y no actualiza el timestamp de bloqueo de 3 días para no demorar alertas de nuevas entregas.
 
 ## 4. Reglas de negocio
 
@@ -448,3 +448,4 @@ No quedan preguntas abiertas bloqueantes. Las cuatro preguntas iniciales (`Q-01`
 | 2026-10-27 | Agente IA | Redacción inicial de `SPEC-08` en estado `Borrador` cubriendo `ENG-100` a `ENG-104` y documentando `Q-01` a `Q-04`. |
 | 2026-10-27 | Líder del proyecto / Agente IA | Cierre de `Q-01` a `Q-04` (Decisiones 112 a 115 de `CONTEXT.md` §14: tendencia a 30 días y semanal en grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtro por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado) y aprobación de `SPEC-08` (`Estado: Aprobada`). |
 | 2026-10-28 | Líder del proyecto / Agente IA | Verificación exhaustiva de la implementación de `SPEC-08` (`ENG-100` a `ENG-104`). Contratos compartidos (`@englove/shared`), índices en `Attempt` y `ProgressEvent`, `StatsService` y `StatsController`, cron cada 3 días de pendientes (`teacher_pending_summary`), vistas en Next.js (`/estadisticas` y `/estadisticas/estudiantes/[id]`), suites de pruebas completas (33 pruebas estadísticas en API + suite E2E de 7 pasos en PostgreSQL real Docker + 11 en web + presupuesto `< 500 ms`, 451/451 tests en monorepo) y guardrails validados con 0 errores (`Estado: Verificada`). |
+| 2026-11-08 | Líder del proyecto / Agente IA | Alineación de RF-1, RF-2, RF-4, RF-5, RF-6, RF-8, RF-9, RF-10 y RF-12 con la Decisión 137 (Etapa 12): exclusión de microjuegos de la nota académica, métricas de práctica autónoma («Práctica en juegos»), ranking privado de juegos (`GET /api/v1/stats/games-leaderboard`), omisión idempotente del cron de recordatorios cuando no hay pendientes y ajuste en el presupuesto de latencia; paso por revisión y re-verificación (`Estado: Verificada`). |

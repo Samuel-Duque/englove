@@ -24,7 +24,7 @@ Las Etapas 3 y 5 entregaron los esquemas Zod y el editor docente de las cinco me
   - Microjuego `memory` (parejas de tarjetas) con barajado determinista por intento y reconstrucción en servidor de volteos (`ENG-083`).
   - Microjuego `timed_choice` (opción múltiple con cuenta regresiva), avance automático al vencer el tiempo y reinicio desde la primera pregunta y del temporizador al recargar un intento `in_progress` (decisión 106; `ENG-084`).
   - Scorers en `ScoringService` para las 5 mecánicas de `GameMechanic` (`0..1` → `0.0–5.0`), creación en `AttemptsService` de un `Attempt` individual (`attempt_number` incremental, `assignment_id = null`, `activity_id` directo) con `graded` aparte por cada partida autónoma 24/7 de `game` sin límite de intentos (decisiones 104 y 111) y `flags: ['implausible_duration']` cuando `durationSeconds < min_plausible_seconds` (`ENG-085`).
-  - Sonido con `Howler.js` (activo en `kids`, silenciado en `teens`), celebración con `canvas-confetti` y carga diferida (`next/dynamic`) de `lib/motion/kids.ts` y `lib/motion/teens.ts` (`ENG-086`).
+  - Sonido nativo con Web Audio API (activo en `kids`, silenciado en `teens`; decisión 107), celebración con `canvas-confetti` y carga diferida (`next/dynamic`) de `lib/motion/kids.ts` y `lib/motion/teens.ts` (`ENG-086`).
   - Zona «Juegos» (`/juegos`) abierta 24/7 detrás del flag `games`, a máximo 3 clics desde `/inicio`, con microjuegos publicados (`status = 'published'`) para práctica autónoma sin `Assignment` e inicio de intentos ilimitados («Jugar de nuevo», decisión 111) validada en tablet Android real (`ENG-087`).
 - **No incluye:** motor **Phaser** o física 2D (Fase 2, `CONTEXT §2.4`, decisión 5); mecánicas fuera de `GameMechanic`; formularios docentes (`SPEC-03`); revisión manual y reintentos docentes de otros tipos (`SPEC-07`); vistas de analíticas y leaderboard (`SPEC-08`, que consumen los intentos individuales generados aquí); Service Worker offline (`SPEC-09`).
 
@@ -184,17 +184,17 @@ Se completa el soporte de `ActivityType.game` en las rutas existentes bajo `/api
 | Método y ruta | Rol | Entrada / Cabeceras | Respuesta y comportamiento para `ActivityType.game` |
 | --- | --- | --- | --- |
 | `GET /api/v1/feature-flags` | `student`, `teacher` | Cookie `access_token` | `200 { flags: { games, extra_content }, config }` para gobernar `/juegos`. |
-| `GET /api/v1/me/assignments` | `student` | `scope?`, `offset?`, `limit?` | `200 AssignmentCardListResponse`. En `available` incluye `game` si `flags.games === true`, fijando `canStart = true` también cuando el último intento está `graded`/`abandoned` y la ventana sigue abierta (decisión 104). |
-| `POST /api/v1/assignments/:assignmentId/attempts` | `student` | Cookie `access_token`, `Origin` | `201 RuntimeView` con `GamePublicConfig`. Con `flags.games === false`, `409 ACTIVITY_NOT_AVAILABLE`. En `game`, si el último intento finalizó y la ventana sigue abierta, crea un nuevo `Attempt` con `attempt_number = anterior + 1` y `previous_attempt_id` (decisión 104); si hay uno `in_progress`, `409 ATTEMPT_ALREADY_EXISTS`. |
+| `GET /api/v1/me/games` | `student` | `offset?`, `limit?` | `200 ActivityListResponse`. Devuelve todos los microjuegos publicados para todos los estudiantes de la organización activa sin distinción de nivel ni asignación (Decisión 130). |
+| `POST /api/v1/activities/:id/attempts` | `student` | Cookie `access_token`, `Origin` | `201 RuntimeView` con `GamePublicConfig` y `Attempt.activity_id = id` (`assignment_id = null`, Decisión 130). Con `flags.games === false`, `409 ACTIVITY_NOT_AVAILABLE`. Crea un nuevo `Attempt` secuencial con `attempt_number = anterior + 1` y `previous_attempt_id`; si hay uno `in_progress`, `409 ATTEMPT_ALREADY_EXISTS`. |
 | `GET /api/v1/attempts/:id` | `student` | Cookie `access_token` | `200 RuntimeView` con `game_detail` filtrado por `organization_id`. |
 | `POST /api/v1/attempts/:id/events` | `student` | `{ events }`, `x-attempt-token`, `Origin` | `200 { acceptedEventIds }`. Idempotente por `clientEventId`; reemplaza `payload.answers[itemId]`. |
 | `POST /api/v1/attempts/:id/complete` | `student` | `CompleteAttemptDto`, `x-attempt-token`, `Origin` | `200 CompletionView` con `attempt` (`status = 'graded'`, `score` `0.0–5.0`, `flags`), `correction` y `newBadges`. |
 
-**Códigos de error:** `400 VALIDATION_ERROR`, `401 AUTH_UNAUTHORIZED`, `403 FORBIDDEN` (`NO_ACTIVE_GROUP`), `404 ATTEMPT_NOT_FOUND` / `ASSIGNMENT_NOT_FOUND`, `409 ACTIVITY_NOT_AVAILABLE` / `ATTEMPT_ALREADY_EXISTS` / `ATTEMPT_NOT_IN_PROGRESS` / `ATTEMPT_CLOSED`, y `500 SCORE_OUT_OF_RANGE`.
+**Códigos de error:** `400 VALIDATION_ERROR`, `401 AUTH_UNAUTHORIZED`, `403 FORBIDDEN`, `404 ATTEMPT_NOT_FOUND` / `ACTIVITY_NOT_FOUND`, `409 ACTIVITY_NOT_AVAILABLE` / `ATTEMPT_ALREADY_EXISTS` / `ATTEMPT_NOT_IN_PROGRESS`, `422 GAME_ASSIGNMENT_NOT_ALLOWED`, y `500 SCORE_OUT_OF_RANGE`.
 
 ## 6. Modelo de datos
 
-Se reutilizan sin migraciones DDL las tablas `Activity`, `GameDetail`, `Assignment`, `Attempt` y `FeatureFlag` de `apps/api/prisma/schema.prisma` (`SPEC-01`). El índice único `@@unique([assignment_id, student_id, attempt_number])` y `previous_attempt_id` (`@unique`) en `Attempt` soportan nativamente la secuencia de intentos individuales (`attempt_number = 1..N`) de la decisión 104.
+Se reutilizan las tablas `Activity`, `GameDetail`, `Attempt` y `FeatureFlag` de `apps/api/prisma/schema.prisma`. Conforme a las decisiones 130 y 136 (Etapa 12 / ENG-150), los microjuegos operan de manera autónoma sin requerir `Assignment`: el esquema define `Attempt.assignment_id` como nullable, agrega `Attempt.activity_id` y el índice único `@@unique([activity_id, student_id, attempt_number])` con `previous_attempt_id` (`@unique`) en `Attempt` para soportar la secuencia ilimitada de intentos individuales (`attempt_number = 1..N`).
 
 Contratos en `packages/shared`:
 
@@ -206,8 +206,8 @@ Contratos en `packages/shared`:
 
 | Ruta / Componente | Contenido y estados |
 | --- | --- |
-| `(student)/juegos/page.tsx` (`/juegos`) | Cabecera temática (`kids` / `teens`), filtros (`Todos`, `Por jugar`, `Completados`) y tarjetas `game` con mecánica en español, nivel CEFR, `Intento #N`, estrellas del último intento y botón en 1 clic (`Empezar juego`, `Continuar juego` o `Jugar de nuevo` + `Ver último resultado`). Vacío: «Aún no tienes juegos asignados». Flag inactivo: «La zona de juegos no está habilitada en este momento» + enlace a `/inicio`. |
-| `actividad/[attemptId]/page.tsx` | Monta `GameRenderer` para `activity.type === 'game'`, botón `🔊 Escuchar` (`speechSynthesis`), interruptor de sonido (`Howler.js`, activo en `kids`, silenciado en `teens`) y cierre con nota `0.0–5.0`, estrellas, `canvas-confetti`, insignias y «Jugar de nuevo» si la ventana sigue abierta. |
+| `(student)/juegos/page.tsx` (`/juegos`) | Cabecera temática (`kids` / `teens`), filtros (`Todos`, `Por jugar`, `Completados`) y tarjetas `game` con mecánica en español, nivel CEFR, `Intento #N`, estrellas del último intento y botón en 1 clic (`Empezar juego`, `Continuar juego` o `Jugar de nuevo` + `Ver último resultado`). Vacío: «No hay juegos disponibles en este momento». Flag inactivo: «La zona de juegos no está habilitada en este momento» + enlace a `/inicio`. |
+| `actividad/[attemptId]/page.tsx` | Monta `GameRenderer` para `activity.type === 'game'`, botón `🔊 Escuchar` (`speechSynthesis`), interruptor de sonido (Web Audio API nativo, activo en `kids`, silenciado en `teens`) y cierre con nota interna `0.0–5.0`, estrellas (0 a 3, Decisión 132), `canvas-confetti`, insignias y «Jugar de nuevo». |
 | `(teacher)/actividades/activity-editor.tsx` | Modal de previsualización (`previewMode = true`) que monta `GameRenderer` con aviso «Vista previa: no se guardan respuestas» y selector `Kids` / `Teens`. |
 
 **Accesibilidad y ergonomía táctil (`CONTEXT §3.2`, `§10.3`, decisión 105):**
@@ -265,4 +265,5 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (`CONTEXT §15`). `Q-01`, 
 | 2026-10-24 | `Borrador` → `En revisión`; cierre de `Q-01`, `Q-02` y `Q-03` mediante las Decisiones 104, 105 y 106 de `CONTEXT §14` | Decisiones tomadas por el líder del proyecto sobre `Q-01` a `Q-03` |
 | 2026-10-25 | `En revisión` → `Aprobada` → `Verificada`; aprobación del líder del proyecto e implementación completa de ENG-080 a ENG-087 (scorers deterministas 0.0–5.0 en ScoringService, Attempt individual secuencial según Decisión 104, flag implausible_duration, 5 componentes de microjuegos bajo ActivityRuntimeProps, GameRenderer con simulación in-memory, audio Web Audio API, confeti, chunks diferidos kids/teens, zona /juegos) con 370/370 pruebas en verde en monorepo (58 shared, 236 api, 76 web) | Aprobación formal e implementación integral de la Etapa 6 de SDD |
 | 2026-10-26 | Actualización de dominio por **Decisión 111** (`Q-04` de `SPEC-07`): los microjuegos (`game`) nunca son un `Assignment`, sino un espacio de práctica autónoma abierto 24/7 en `/juegos` con intentos secuenciales ilimitados (`assignment_id = null`, `activity_id` directo) | Decisión 111 del líder del proyecto al aprobar `SPEC-07` |
+| 2026-11-08 | Alineación con Decisiones 130 y 136 de SPEC-11 (Etapa 12 / ENG-150): eliminación formal de endpoints con `Assignment` para juegos (`GET /me/games`, `POST /activities/:id/attempts`), esquema migrado `Attempt.activity_id` y descarte transaccional de intentos de prueba | Formalización e implementación en Etapa 12 |
 

@@ -115,7 +115,7 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
    - **Rendimiento:** solo considera `Attempt` con `status = 'graded'` y `score IS NOT NULL`.
    - **Constancia:** considera `ProgressEvent` con `type IN ('attempt_completed', 'audio_submitted')` para semanas activas, rachas, actividades completadas y alertas de inactividad, más `Attempt.finished_at - Attempt.started_at` para el tiempo dedicado. Una entrega en `pending_review` suma de inmediato en constancia (Decisión 100).
 2. **Escala `0,0–5,0`, redondeo y umbral de aprobación (Decisiones 20, 23 y 34 §5):**
-   - Todos los promedios se calculan en el servidor y se redondean a 1 decimal (`Math.round(val * 10) / 10`). El umbral de aprobación es `Organization.config.passing_score` (`3.0`): `score >= 3.0` es aprobada (`passed = true`).
+   - Todos los promedios se calculan en el servidor y se redondean a 1 decimal (`Math.round(val * 10) / 10`). El umbral de aprobación es constante en el servidor en `3.0` (Decisiones 20 y 101): `score >= 3.0` es aprobada (`passed = true`).
 3. **Último intento calificado frente a serie individual en microjuegos (Decisiones 25, 74 y 104):**
    - En los promedios agregados, cada par `(student_id, assignment_id)` aporta únicamente su intento con mayor `attempt_number` en `status = 'graded'`.
    - En `scoreSeries` del estudiante (`RF-9`), se incluyen todos los intentos calificados (`attempt_number = 1..N`) de microjuegos (`game`) y el intento calificado vigente de asignaciones (con `usedExtendedDeadline = previous_attempt.retry_extend_until IS NOT NULL`).

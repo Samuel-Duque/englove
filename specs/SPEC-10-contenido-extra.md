@@ -5,7 +5,7 @@
 | Estado               | Verificada                                                                                                                                                                                                     |
 | Etapa                | 10 — Contenido extra                                                                                                                                                                                           |
 | Tareas               | ENG-120, ENG-121                                                                                                                                                                                               |
-| Referencias          | CONTEXT §2.4, §4.2, §5.1, §5.2, §12.10, §14 (decisiones 17, 20, 29, 34, 41, 50, 51, 59, 66, 67, 75, 79, 83, 89, 120, 122, 124–126), §16; architecture §3.1–§3.6, §4.1, §4.2, §6.1, §6.2, §8.3; pbp Etapa 10 |
+| Referencias          | CONTEXT §2.4, §4, §5.1, §5.2, §12.10, §14 (decisiones 17, 20, 29, 34, 41, 50, 51, 59, 66, 67, 75, 79, 83, 89, 120, 122, 124–126), §16; architecture §3.1–§3.6, §4.1, §4.2, §6.1, §6.2, §8.3; pbp Etapa 10 |
 | Aprobada por / fecha | Líder del proyecto / 2026-11-04                                                                                                                                                                                   |
 
 ## 1. Contexto y objetivo
@@ -24,7 +24,7 @@ Esta especificación define el módulo `resources` en `apps/api`, la gestión do
 - Segmentación por nivel MCER (decisión 125): recursos generales para todos los niveles (`level = null`) y recursos exclusivos de un curso/nivel (`A1`, `A2`, `B1`, `B2`), filtrados en servidor para el alumno y filtrables en el panel docente.
 - Pantalla docente `/contenido-extra` con TanStack Query (`T-04`), creación/edición, filtro por nivel MCER, reordenamiento accesible y confirmación de borrado (`ENG-120`).
 - Pantalla del estudiante `/extra` adaptada por segmento (`kids` / `teens`), integrada en `StudentNav` respetando el tope de 5 entradas y el techo de 3 clics desde `/inicio`, abriendo cada recurso en pestaña nueva sin `iframe` (`ENG-121`).
-- Ajuste de `proxy.ts` para `/contenido-extra` (`teacher`) y `/extra` (`student`) (`T-01`), síntesis de voz en `kids`, aviso sin conexión y cobertura en la puerta `axe` (WCAG 2.1 AA) (`T-05`).
+- Ajuste de `proxy.ts` para `/contenido-extra` (`teacher`) y `/extra` (`student`) (`T-01`), síntesis de voz en `kids`, aviso sin conexión y cobertura en la puerta `axe` (WCAG 2.2 AA) (`T-05`).
 
 **No incluye:**
 
@@ -88,7 +88,7 @@ El panel incorpora `(teacher)/contenido-extra/page.tsx` y la entrada «Contenido
 
 ### RF-5 — Sección «Contenido extra» en `/extra` en máximo 3 clics y filtrado por nivel
 
-Tarea: `ENG-121`. Referencias: Decisiones 29, 79 y 125, `CONTEXT §4.2`, `§5.2`, `architecture §3.1`.
+Tarea: `ENG-121`. Referencias: Decisiones 29, 79 y 125, `CONTEXT §4`, `§5.2`, `architecture §3.1`.
 
 Con `flags.extra_content === true`, `StudentNav` muestra «Extra» (`/extra`, `aria-label="Contenido extra"`), manteniendo un máximo de 5 entradas (`Inicio`, `Juegos`, `Progreso`, `Feedback`, `Extra`). El alumno abre cualquier enlace en **máximo 3 clics** desde `/inicio` y solo recibe recursos generales para todos los niveles (`level = null`) más los recursos específicos de su `Student.level` vigente (decisión 125).
 
@@ -131,7 +131,7 @@ Tareas: `ENG-120`, `ENG-121`. Referencias: Decisiones 50, 51, 89, `CONTEXT §16`
 - **Dado** un recurso de `orgA`, **Cuando** un usuario de `orgB` intenta leerlo, editarlo, reordenarlo o borrarlo, **Entonces** no figura en `GET /api/v1/resources` y las rutas por `:id` devuelven `404 RESOURCE_NOT_FOUND` filtrando por `{ id, organization_id }`.
 - **Dado** una tablet compartida, **Cuando** el usuario cierra sesión o queda sin red, **Entonces** `clearSharedDeviceSession` vacía TanStack Query, el Service Worker no guarda `/api/v1/resources` en `Cache Storage` y, sin conexión, `/extra` muestra «Necesitas conexión a internet para abrir enlaces externos.» sin escribir en IndexedDB (`T-05`).
 
-### RF-9 — Adaptación temática (`kids` / `teens`), síntesis de voz y accesibilidad WCAG 2.1 AA
+### RF-9 — Adaptación temática (`kids` / `teens`), síntesis de voz y accesibilidad WCAG 2.2 AA
 
 Tareas: `ENG-120`, `ENG-121`. Referencias: Decisiones 120 y 122, `CONTEXT §5.2`, `SPEC-05 RF-27`, `SPEC-09 RF-19`–`RF-22`.
 

@@ -74,7 +74,7 @@ El objetivo de esta especificación (**Etapa 7 — Calificación, feedback y nue
    El correo `'grading-notification'` debe enviarse exclusivamente la primera vez que se registra un `Review` sobre el intento, omitiendo notas y comentarios.
    - **Dado** que `POST /api/v1/attempts/:id/review` confirma una revisión en base de datos,
    - **Cuando** es la primera revisión del intento (`isFirstReview === true`),
-   - **Entonces** tras el commit invoca asíncronamente `'grading-notification'` de `MailService` hacia `User.email` del alumno con `{ activityTitle, feedbackUrl: '${APP_PUBLIC_URL}/feedback' }` y 1 reintento en fallo, sin incluir en asunto ni cuerpo `Attempt.score`, estrellas, `Review.comment`, `Review.stickers` ni el nombre del menor; y cuando es una edición posterior de `comment` o `stickers` (`isFirstReview === false`), **no** reenvía el correo.
+   - **Entonces** tras el commit invoca asíncronamente `'grading-notification'` de `MailService` hacia `User.email` del alumno con `{ activityTitle, feedbackUrl: '${WEB_BASE_URL}/feedback' }` y 1 reintento en fallo, sin incluir en asunto ni cuerpo `Attempt.score`, estrellas, `Review.comment`, `Review.stickers` ni el nombre del menor; y cuando es una edición posterior de `comment` o `stickers` (`isFirstReview === false`), **no** reenvía el correo.
 
 7. **RF-7 — Habilitación de nuevo intento sobre actividades asignadas (`ENG-092`, `ENG-096`, Decisiones 61, 98 y 111).**
    El profesor puede habilitar un único nuevo intento sobre el último intento calificado de una actividad asignada (`fill_blank`, `open_question`, `speaking`, `exam`) vía `POST /api/v1/attempts/:id/grant-retry { retryExtendUntil? }` o `allowRetry: true` en `review`.

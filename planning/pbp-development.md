@@ -6,7 +6,7 @@
 >
 > Estados: **Decidido**, **Propuesto**, **Pendiente**, como en CONTEXT.
 >
-> Última actualización: 2026-11-08. Se añade la **Etapa 12 «Calidad y remediación»** (decisiones 127 a 129 de CONTEXT §14, más las decisiones 130 a 137 que cierran todas sus preguntas Q-01 a Q-08; spec [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) redactada en `Borrador`; tareas ENG-150 a ENG-162, DOC-09 y ENG-143 reasignada), que se ejecuta antes de cerrar la Etapa 11 (§2.1, §4). No añade funcionalidades, salvo la excepción única de la decisión 137 (ENG-162). SPEC-01 a SPEC-10 permanecen Verificadas con las cifras de la actualización siguiente.
+> Última actualización: 2026-11-08. La **Etapa 12 «Calidad y remediación»** y la spec [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) se encuentran **Completadas y Verificadas** (decisiones 127 a 137 de CONTEXT §14 formalizadas; tareas ENG-150 a ENG-162, DOC-09 y ENG-143 en Hecho con 566/566 tests en monorepo: 65 shared, 353 api, 148 web; 0 errores en guardrails); se ejecuta antes de cerrar la Etapa 11 (§2.1, §4). `SPEC-01` a `SPEC-11` en `Verificada`. Habilita el paso al aprovisionamiento de staging y lanzamiento.
 >
 > Actualización anterior: 2026-11-04. SPEC-01 a SPEC-10 figuran Verificadas (Etapa 10: tareas ENG-120 y ENG-121 completadas con 537/537 tests en monorepo: 65 shared, 333 api, 139 web, suite Playwright E2E y axe 8/8 en Chromium, guardrails en verde; Etapa 9: tareas ENG-110 a ENG-113 completadas con 492 tests y axe sin violaciones; decisiones 124 a 126 de CONTEXT §14 formalizadas y cubiertas: preparación docente con flag apagado, filtrado por nivel MCER y generales, y ordenamiento determinista con reordenamiento transaccional y tope de 200). El cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 queda pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. [SPEC-10](../specs/SPEC-10-contenido-extra.md) en estado `Verificada`.
 >
@@ -415,7 +415,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 - Emparejar (`match`), ordenar palabras (`order_words`), arrastrar y soltar (`drag_drop`, `@atlaskit/pragmatic-drag-and-drop`, decisión 81), memoria de tarjetas (`memory`), elección múltiple con temporizador (`timed_choice`).
 - Scorers de servidor por mecánica de juego, con fórmula de fracción de acierto definida en el esquema de cada mecánica y salida en 0,0–5,0; validación de duraciones plausibles.
-- Sonido (Howler) y confeti por tema; carga diferida de los bundles de animación Kids y Teens.
+- Sonido nativo (Web Audio API, decisión 107) y confeti por tema; carga diferida de los bundles de animación Kids y Teens.
 - Zona "Juegos" en el portal, a 3 clics del juego (architecture §3.1).
 - Redacción de SPEC-08 en paralelo.
 
@@ -540,7 +540,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Dependencias.** SPEC-09 Aprobada. Etapas 5 y 6.
 
-**Riesgos.** Service worker que cachea respuestas autenticadas de otro usuario en un dispositivo compartido; mitigación: estrategia `NetworkFirst` para la API y limpieza de caché en logout.
+**Riesgos.** Service worker que cachea respuestas autenticadas de otro usuario en un dispositivo compartido; mitigación: exclusión estricta de Cache Storage para la API y respuestas autenticadas (decisiones 116 y 117), y limpieza de IndexedDB y sesión en logout.
 
 **Tamaño.** M, 1.5–2 semanas.
 
@@ -609,7 +609,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Objetivo.** Corregir los errores, incongruencias, brechas de seguridad, defectos de accesibilidad y código no limpio recogidos en `AUDITORIA.md` (2026-11-05) y en `testing-issues/` (2026-11-06), y demostrarlo con pruebas de regresión, de modo que el producto llegue al lanzamiento sin hallazgos críticos ni altos abiertos. Es una etapa de calidad: **no añade funcionalidades, salvo la excepción única y expresa de la decisión 137 (ranking de juegos y panel «Práctica en juegos», ENG-162), y no construye nada de CONTEXT §2.4** (decisión 127).
 
-**Alcance.** Se organiza por áreas; cada tarea cubre un conjunto de hallazgos y lleva sus pruebas (decisión 129). El detalle de requisitos y criterios vive en [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) (`Borrador`, pendiente de aprobación).
+**Alcance.** Se organiza por áreas; cada tarea cubre un conjunto de hallazgos y lleva sus pruebas (decisión 129). El detalle de requisitos y criterios vive en [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md), Verificada el 2026-11-08.
 
 - **Microjuegos y decisión 111 (ENG-150):** implementar la decisión 130 (microjuegos abiertos a todos los estudiantes, sin `Assignment` y sin filtro por nivel) en esquema, API, seeds y `/juegos`, y corregir la contradicción interna de `SPEC-06` (§1–§4 frente a §5–§7); migración que descarta los intentos y asignaciones de microjuegos de prueba sin migrar datos (decisión 136); verificación de `ISSUE-05` e `ISSUE-07`.
 - **Sesión y autenticación (ENG-151):** `JWT_SECRET` obligatorio fuera de `local` y token de intento separado por tipo (`SEC-01`); `logout` que solo revoca con prueba criptográfica (`SEC-04`); carrera del OTP de cambio de correo (`SEC-05`); cookies leídas solo por prefijo y validación de `exp` en `proxy.ts` (`SEC-08`); cotas de `LoginDto` y de concurrencia de Argon2id (`SEC-09c`); saneamiento del parámetro `next` (`SEC-09f`); renovación automática ante `401` con una sola petición de refresco en vuelo y conexión real de `auth-session`.

@@ -20,7 +20,7 @@ const VAGUE_RESULT = /funciona(?:rá)? (?:correctamente|bien)|como se espera|de 
 const RED_FLAGS = [
   [/\bGuardian\b/, 'no existe la entidad Guardian; solo Student.guardian_name y guardian_contact', 'decisión 35'],
   [/Consent(Record|Status|Method)|consentimiento/i, 'ningún módulo ni campo de consentimiento legal de menores', 'decisión 36, CONTEXT §9'],
-  [/Supabase\s+(Storage|Auth|Realtime)|\bRLS\b/, 'Supabase solo como Postgres; los archivos van a Cloudflare R2', 'decisiones 1 y 55, CONTEXT §6'],
+  [/Supabase|\bRLS\b/, 'la base de datos es Neon (Postgres); los archivos van a Cloudflare R2', 'decisiones 1, 55 y 121, CONTEXT §6'],
   [/WebSocket|socket\.io|Server-Sent Events|\bSSE\b/i, 'sin tiempo real en el piloto; polling cada 30 s', 'CONTEXT §2.4, decisión 9'],
   [/heartbeat/i, 'sin heartbeat; solo inicio y fin de cada actividad', 'CONTEXT §2.4, decisión 10'],
   [/\bPhaser\b/, 'Phaser es Fase 2; los microjuegos van en React puro', 'CONTEXT §2.4, decisión 17'],

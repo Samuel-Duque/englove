@@ -21,7 +21,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Lo último que este script conoce de la planeación. Si CONTEXT avanza, el script avisa.
-const KNOWN_MAX_DECISION = 126;
+const KNOWN_MAX_DECISION = 137;
 const KNOWN_OUT_OF_SCOPE_ROWS = 9; // filas de la tabla de CONTEXT §2.4
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -420,7 +420,7 @@ const LINE_RULES = [
     id: 'G-C06',
     sev: 'ERROR',
     files: notDoc,
-    skip: (line) => /(?:min|umbral|m[ií]nimo|duraci[oó]n)_?\s*plausible|minPlausible/i.test(line),
+    skip: (line) => /(?:min|umbral|m[ií]nimo|duraci[oó]n)_?\s*plausible|minPlausible|implausible/i.test(line),
     re: /googletagmanager|google-analytics|\bgtag\(|@vercel\/analytics|mixpanel|@segment\/|hotjar|\bfbq\(|connect\.facebook\.net|posthog|plausible|@amplitude\//i,
     msg: 'analítica de terceros o píxeles; prohibidos en el portal del estudiante (CONTEXT §9)',
   },

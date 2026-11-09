@@ -156,7 +156,7 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 - Tokens de diseño por tema (`data-theme="kids"` / `"teens"`) y cómo los bundles de animación se cargan dinámicamente con `next/dynamic` según el tema activo.
 - Reglas por edad: Kids (7–10) bloqueado en su interfaz lúdica; Teens (11+) puede alternar tema desde el perfil si `can_switch_interface = true`.
 - Ergonomía táctil: zonas táctiles grandes, nivel de lectura adaptado, mensajes breves, retroalimentación positiva e inmediata.
-- Celebraciones (`canvas-confetti`), efectos de sonido (Howler.js), animación con Framer Motion y respeto riguroso de `prefers-reduced-motion`.
+- Celebraciones (`canvas-confetti`), efectos de sonido nativos (Web Audio API / sound.ts, decisión 107), animación CSS y respeto riguroso de `prefers-reduced-motion`.
 - Microjuegos de arrastrar y soltar con `@atlaskit/pragmatic-drag-and-drop` optimizados para tablets táctiles.
 - Contraste WCAG 2.2 nivel AA (auditado con axe-core en CI).
 - Síntesis de voz con Web Speech API (`en-US` y `es-CO`).

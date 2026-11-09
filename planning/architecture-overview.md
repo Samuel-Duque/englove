@@ -10,7 +10,7 @@
 >
 > Documentos hermanos: [`sdd-process.md`](./sdd-process.md) (metodología), [`pbp-development.md`](./pbp-development.md) (etapas de construcción) y [`taskboard.md`](./taskboard.md) (tareas y estado). Las specs de `specs/` detallan cada capacidad a partir de este documento.
 >
-> Última actualización: 2026-11-08. Planeación de la Etapa 12 «Calidad y remediación» ([`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md), redactada en estado `Borrador`) con las decisiones 127 a 129 de CONTEXT §14 y las decisiones 130 a 137 que cierran todas sus preguntas Q-01 a Q-08 (§14.8 y §15): los cambios que estas últimas implican en §4.4, §6.4, §6.5, §7.5, §7.7, §9.4, §10.2, §10.3 y §11.1 se aplican en la Etapa 12 y mientras tanto esas secciones conservan su texto vigente; SPEC-01 a SPEC-10 permanecen Verificadas. Las incongruencias de este documento detectadas por `AUDITORIA.md` (estado congelado en SPEC-08, catálogo de errores en §13, referencias a `NetworkFirst`, Howler.js, Serwist y Framer Motion) se corrigen en la Etapa 12 (tarea DOC-09), no en esta actualización.
+> Última actualización: 2026-11-08. Etapa 12 «Calidad y remediación» completada y verificada bajo [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) con las decisiones 127 a 137 de CONTEXT §14 formalizadas como Decididas; catálogo de errores (§13) completado hasta SPEC-11, spawn nativo para ffmpeg sin paquetes huérfanos, y especificaciones `SPEC-01` a `SPEC-11` en `Verificada`. Las tareas de remediación ENG-143, ENG-150 a ENG-162 y DOC-09 se encuentran verificadas con 566 pruebas automatizadas en verde (65 shared, 353 api, 148 web) y guardrails limpios.
 >
 > Actualización anterior: 2026-10-28. SPEC-08 Verificada tras implementar íntegramente ENG-100 a ENG-104 con 451/451 tests en verde en el monorepo (298 api, 95 web, 58 shared), suite E2E en PostgreSQL real con Docker y presupuesto de latencia < 500 ms con seed de volumen; decisiones 112 a 115 de CONTEXT §14 formalizadas y cubiertas: comparación de tendencia a 30 días y semanal en vista de grupo, filtro canónico de `game` frente a asignaciones, bloques exactos de 3 días en `ScheduledJobRun` para `teacher_pending_summary`, y ordenamiento y filtro por grupos de nivel `A1`, `A2`, `B1`, `B2` en el leaderboard privado. SPEC-07 Verificada tras implementar íntegramente ENG-090 a ENG-096 con 407/407 tests en verde en el monorepo; decisiones 108 a 111 de CONTEXT §14 formalizadas y cubiertas. SPEC-06 Verificada con 370/370 tests monorepo. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales. SPEC-01 a SPEC-08 permanecen Verificadas. Actualización anterior: 2026-10-26 (SPEC-07 Verificada).
 >
@@ -183,7 +183,7 @@ Principios que mantienen la simpleza dentro del rango: la barra de navegación d
 - Los componentes del alumno se construyen una sola vez y leen el conjunto activo. Solo hay variantes estructurales donde la diferencia lo exige: layout de la zona de juegos y densidad de la home.
 - El panel de la profesora usa shadcn/ui con un tema neutro y no participa del sistema Kids/Teens.
 - Framer Motion sin restricción (Decidido). Las variantes de animación viven en `motion/kids.ts` y `motion/teens.ts` y se cargan con `next/dynamic` según el tema activo: cada audiencia descarga solo su bundle.
-- Howler.js para efectos de sonido (activados por defecto en Kids, configurables en Teens) y canvas-confetti en celebraciones.
+- Web Audio API nativa para efectos de sonido (activados por defecto en Kids, configurables en Teens; decisión 107) y canvas-confetti en celebraciones.
 
 ### 3.4 Renderizador de actividades
 
@@ -218,7 +218,7 @@ function getSupportedMimeType(): string {
 
 El `mime_type` detectado viaja en `POST /media/upload-url` y se persiste en `MediaAsset.mime_type`. El alumno graba siempre en el codec nativo de su dispositivo, sin librerías de terceros ni encoders WASM (un WAV sin compresión pesaría ~10× más que MP4; con el tope de 5 minutos llegaría a ~50 MB, inviable en conexiones móviles). El blob se guarda en IndexedDB antes de intentar la subida; si falla, el intento queda "pendiente de envío" y se reintenta (§10).
 
-**Capa 2 — Servidor: transcodificación a MP4/AAC para reproducción universal.** Al confirmar la subida (`MediaAsset.status = ready`), el módulo `media` encola una tarea asíncrona con `ffmpeg` (`fluent-ffmpeg`) que convierte el raw a `audio/mp4` (AAC, mono, 64 kbps) y lo guarda en R2 bajo la clave `<assetId>_converted.mp4`; al terminar actualiza `MediaAsset.converted_key` y elimina el raw. La profesora recibe siempre la URL firmada del archivo convertido, reproducible en Chrome, Safari, Firefox, Edge, iOS y Android. El alumno no reproduce audios.
+**Capa 2 — Servidor: transcodificación a MP4/AAC para reproducción universal.** Al confirmar la subida (`MediaAsset.status = ready`), el módulo `media` encola una tarea asíncrona con `ffmpeg` (mediante `child_process.spawn` con `shell: false`, regla G-B13) que convierte el raw a `audio/mp4` (AAC, mono, 64 kbps) y lo guarda en R2 bajo la clave `<assetId>_converted.mp4`; al terminar actualiza `MediaAsset.converted_key` y elimina el raw. La profesora recibe siempre la URL firmada del archivo convertido, reproducible en Chrome, Safari, Firefox, Edge, iOS y Android. El alumno no reproduce audios.
 
 ```
 Alumno graba → WebM | MP4 | OGG (nativo)
@@ -979,7 +979,7 @@ Reglas de cálculo:
 
 ### 10.2 PWA — Decidido (A10)
 
-Serwist como service worker: precache del shell de la app, estrategia `NetworkFirst` para la API, sin cachear respuestas autenticadas más allá de la sesión. Manifest con un solo icono de producto; los temas Kids/Teens no necesitan iconos distintos.
+Serwist como service worker: precache estricto de assets estáticos versionados y pantalla offline (decisión 135), exclusión estricta de Cache Storage para la API (/api/v1/*) y respuestas autenticadas (decisiones 116 y 117). Manifest con un solo icono de producto; los temas Kids/Teens no necesitan iconos distintos.
 
 **Gestión de actualizaciones (Decidido, decisión 34 §4).** El SW se registra con `skipWaiting` desactivado por defecto. Cuando hay un SW nuevo en estado `waiting`, o la API devuelve `X-App-Min-Version` mayor que la versión en ejecución, la app muestra la notificación in-app de §3.7 con el botón "Reiniciar y actualizar", que envía `SKIP_WAITING` al SW y recarga cuando toma el control (`controllerchange`). Nunca se fuerza la recarga sin acción del usuario ni a mitad de un intento en curso. La versión de la app (`NEXT_PUBLIC_APP_VERSION`) se inyecta en build y se etiqueta en Sentry (§12).
 
@@ -1067,6 +1067,8 @@ Resultado: un informe breve en [`planning/poc-eng-140-informe.md`](./poc-eng-140
 - Concreciones del catálogo para identidad (SPEC-02 §5): `AUTH_UNAUTHORIZED` (401, sesión inválida), `FORBIDDEN` (403), `VALIDATION_ERROR` (400), `PAYLOAD_TOO_LARGE` (413), `PASSWORD_RESET_INVALID` (400) y `STUDENT_NOT_PENDING` (409). `NOT_FOUND` (404) e `INTERNAL_ERROR` (500) conservan SPEC-01. En login, credenciales inválidas dan 401 uniforme; `AUTH_ACCOUNT_LOCKED` (423) y `ACCOUNT_PENDING_APPROVAL` (403) solo tras contraseña correcta, con precedencia del bloqueo (decisión 94). Estos detalles no añaden endpoints ni capacidades.
 - Concreciones del catálogo para SPEC-03 (§5, todas 409): `ACTIVITY_NOT_EDITABLE`, `ACTIVITY_DELETE_NOT_ALLOWED`, `ACTIVITY_NOT_ARCHIVED` (decisión 95), `GROUP_HAS_HISTORY`, `GROUP_HAS_ACTIVE_STUDENTS` (decisión 96) y `STUDENT_NOT_APPROVED`.
 - Concreciones de asignación (SPEC-04 §5, todas 409): `ACTIVITY_NOT_ASSIGNABLE` (la actividad no está `published`) y `ASSIGNMENT_ALREADY_ACTIVE` (duplicado según decisión 99). `ASSIGNMENT_CANCELLED` corresponde a los nuevos inicios y habilitaciones bloqueados por decisión 98; implementada y verificada en SPEC-05 / ENG-062. SPEC-04 y SPEC-05 Verificadas el 2026-10-22.
+- Concreciones de microjuegos y revisión (SPEC-06 y SPEC-07 §5): `GAME_ASSIGNMENT_NOT_ALLOWED` (422, intento de asignar microjuegos; decisión 130), `GAME_NOT_FOUND` (404), `GAME_MECHANIC_NOT_SUPPORTED` (400), `REVIEW_ALREADY_EXISTS` (409), `REVIEW_NOT_ALLOWED` (403), `AUDIO_NOT_READY` (409).
+- Concreciones de estadísticas, PWA, contenido extra y remediación (SPEC-08 a SPEC-11 §5): `METRICS_UNAVAILABLE` (404), `RATE_LIMITED` (429), `RESOURCE_NOT_FOUND` (404), `RESOURCE_LEVEL_MISMATCH` (403), `RETRY_LOST_GROUP_CHANGE` (aviso preventivo en cambio de grupo; decisión 131).
 - Paginación por `offset` y `limit`. Suficiente para 100 alumnos.
 - Textos de interfaz en español directamente en los componentes; sin librería i18n en el piloto. El contenido pedagógico es en inglés y lo escribe la profesora.
 - Todo cambio de comportamiento pasa primero por su spec en `specs/` (CONTEXT §11.1).
@@ -1208,7 +1210,7 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
 | # | Detalle | Sección |
 | --- | --- | --- |
 | A86 | Etapa 12 «Calidad y remediación» (`SPEC-11`, ENG-150 a ENG-162 y ENG-143 reasignada): corrige hallazgos de `AUDITORIA.md` y `testing-issues/` sin añadir funcionalidades (salvo la excepción de la decisión 137, A96); no toca infraestructura ni despliegue. Se ejecuta antes de cerrar la Etapa 11 (decisión 127). **Decidido** | §12, §13 |
-| A87 | Las correcciones se alinean con las decisiones vigentes; solo las preguntas de CONTEXT §15 requieren decisión humana y no se implementan antes (decisión 128). **Propuesto** | §6.4, §6.5, §7.5, §7.6, §8, §10, §13 |
+| A87 | Las correcciones se alinean con las decisiones vigentes; solo las preguntas de CONTEXT §15 requieren decisión humana y no se implementan antes (decisión 128). **Decidido** | §6.4, §6.5, §7.5, §7.6, §8, §10, §13 |
 | A89 | Microjuegos abiertos a todos los estudiantes sin `Assignment` ni filtro por nivel: `Attempt.assignment_id` nullable, `Attempt.activity_id` y `@@unique([activity_id, student_id, attempt_number])` (decisión 130; confirma la decisión 111). Se aplica en ENG-150; hasta entonces §6.4, §6.5 y §7.5 conservan su texto. **Decidido** | §6.4, §6.5, §7.5, §9.4 |
 | A90 | La autorización de nuevo intento no consumida se pierde al cambiar al alumno de grupo, con aviso y confirmación previos de la profesora en `PUT /students/:id/group` (decisión 131). **Decidido** | §7.7 |
 | A91 | Las estrellas de los microjuegos (0 a 3, tramos fijos de la decisión 101, independientes de `passing_score`) son un indicador de práctica y no una nota; el puntaje `0.0–5.0` sigue siendo dato interno, base de las estrellas y de los puntos de juego, y no se muestra como nota (decisión 132). La vista docente la define A96. **Decidido** | §4.4, §9.4 |

@@ -14,7 +14,7 @@
 
 *(Nota: Este diagnóstico describe el estado detectado al inicio del plan, el cual fue completamente resuelto y verificado según se certifica en la Sección 5 y en `informe-etapa-12.md`)*
 
-El proyecto compila (`pnpm build`), supera el chequeo estático de tipos (`pnpm typecheck` en los 4 paquetes), pasa el linter (`pnpm lint`) y aprueba **562 pruebas automatizadas**.
+El proyecto compila (`pnpm build`), supera el chequeo estático de tipos (`pnpm typecheck` en los 4 paquetes), pasa el linter (`pnpm lint`) y aprueba **566 pruebas automatizadas** tras la remediación integral.
 
 Sin embargo, **la Etapa 12 («Calidad y remediación») no está terminada**. El documento `planning/informe-etapa-12.md` declaró falsamente un cumplimiento del `100%` en tareas como `ENG-143`, `ENG-155`, `ENG-159` y `DOC-09`. Persisten **6 brechas técnicas críticas en código**, **7 defectos de accesibilidad** y una **desincronización documental masiva** en todos los archivos rectores (`README.md`, `CONTEXT.md`, `taskboard.md`, `architecture-overview.md` y `specs/SPEC-08`).
 

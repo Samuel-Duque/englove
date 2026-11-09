@@ -36,7 +36,7 @@
 ### Comprobación 2 — `proxy.ts` y Cookies Compartidas
 
 - **Objetivo:** Comprobar que `proxy.ts` intercepta rutas protegidas basándose en cookies compartidas con `Domain=.englove.org`.
-- **Implementación de prueba:** [`scratch/poc-eng-140/test-proxy.ts`](file:///c:/Users/sebas/OneDrive/Desktop/englove/scratch/poc-eng-140/test-proxy.ts).
+- **Implementación de prueba:** `scratch/poc-eng-140/test-proxy.ts`.
 - **Resultados:**
   - Petición sin cookie a `/dashboard`: respondió `HTTP 307 Temporary Redirect` con cabecera `Location: /login?next=%2Fdashboard`.
   - Petición con cookie `englove_session=valid_jwt_token` a `/dashboard`: respondió `HTTP 200 OK` con cabecera `x-middleware-next: 1`.
@@ -54,7 +54,7 @@
 ### Comprobación 4 — `ffmpeg` en Render Free (512 MB RAM)
 
 - **Objetivo:** Verificar si un proceso de transcodificación de audio de 300 segundos (5 minutos) satura la memoria o causa OOM (Out Of Memory) en una máquina con 512 MB de RAM.
-- **Implementación de prueba:** [`scratch/poc-eng-140/test-ffmpeg.ts`](file:///c:/Users/sebas/OneDrive/Desktop/englove/scratch/poc-eng-140/test-ffmpeg.ts) ejecutando FFmpeg 9.0.2.
+- **Implementación de prueba:** `scratch/poc-eng-140/test-ffmpeg.ts` ejecutando FFmpeg 9.0.2.
 - **Datos de prueba:** Audio sintético de 300 s (5 min) en formato WebM Opus (3.03 MB).
 - **Comando ejecutado:**
   `ffmpeg -y -i input_300s.webm -vn -acodec aac -b:a 128k -ar 44100 -movflags +faststart output_300s.mp4`
@@ -70,7 +70,7 @@
 ### Comprobación 5 — 30 Conexiones Concurrentes en Pooler Neon (PgBouncer)
 
 - **Objetivo:** Descartar el error PostgreSQL `FATAL: remaining connection slots are reserved for non-replication superuser connections` o `too many clients` al recibir un pico de logins.
-- **Implementación de prueba:** [`scratch/poc-eng-140/test-neon-concurrency.ts`](file:///c:/Users/sebas/OneDrive/Desktop/englove/scratch/poc-eng-140/test-neon-concurrency.ts) disparando 30 clientes simultáneos vía `Promise.all` contra el host con pooler `ep-divine-rain-b4szdkmf-pooler.c-6.us-east-2.aws.neon.tech`.
+- **Implementación de prueba:** `scratch/poc-eng-140/test-neon-concurrency.ts` disparando 30 clientes simultáneos vía `Promise.all` contra el host con pooler `ep-divine-rain-b4szdkmf-pooler.c-6.us-east-2.aws.neon.tech`.
 - **Resultados:**
   - Total solicitudes: 30.
   - Exitosas: 30 (100%).
@@ -82,7 +82,7 @@
 ### Comprobación 6 — Latencia de Despertar y Query en Neon Free
 
 - **Objetivo:** Medir tiempos de conexión y latencia en queries frías y calientes.
-- **Implementación de prueba:** [`scratch/poc-eng-140/test-neon-latency.ts`](file:///c:/Users/sebas/OneDrive/Desktop/englove/scratch/poc-eng-140/test-neon-latency.ts).
+- **Implementación de prueba:** `scratch/poc-eng-140/test-neon-latency.ts`.
 - **Resultados:**
   - **Pooler (PgBouncer):** Establecimiento de conexión (TCP + TLS + Auth) = 564 ms. Query inicial = 93 ms. Queries calientes promedio = 89.2 ms.
   - **Directo (para migraciones Prisma):** Establecimiento de conexión = 738 ms. Query inicial = 87 ms. Queries calientes promedio = 86.8 ms.
@@ -94,7 +94,7 @@
 ### Comprobación 7 — Respaldo y Restauración con `pg_dump` y Neon
 
 - **Objetivo:** Comprobar la viabilidad de la estrategia de respaldo y restauración de base de datos ante fallos.
-- **Implementación de prueba:** [`scratch/poc-eng-140/test-backup-restore.ts`](file:///c:/Users/sebas/OneDrive/Desktop/englove/scratch/poc-eng-140/test-backup-restore.ts) ejecutando `pg_dump` 18.4 y `psql` 18.4 contra Neon (PostgreSQL 18.6).
+- **Implementación de prueba:** `scratch/poc-eng-140/test-backup-restore.ts` ejecutando `pg_dump` 18.4 y `psql` 18.4 contra Neon (PostgreSQL 18.6).
 - **Resultados:**
   1. Se creó la tabla `poc_backup_sample` con 5 registros sintéticos con IDs, calificaciones y timestamps.
   2. `pg_dump.exe` generó un volcado DDL + DML de 2389 bytes.

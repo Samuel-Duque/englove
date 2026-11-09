@@ -387,7 +387,7 @@ Siguiendo la metodología de `security-review` (solo vulnerabilidades verificada
 3. **Fase 3 — Cierre de Hitos `H1`, `H2` y `H3` en `staging`:**
    - Publicar `/terminos` con el texto legal definitivo; ejecutar prueba cronometrada `< 10 min` con la profesora (`H1`), prueba de audio E2E en iPad Safari + Android Chrome (`H3`) y validación de `/estadisticas` (`ENG-103`).
 4. **Fase 4 — Etapa 11 y Lanzamiento (`H4`):**
-   - Completar `ENG-143`, `ENG-130`, `ENG-131` (Sentry/GlitchTip), `ENG-132` (backup + restore), `DOC-06`, `ENG-135` (carga docente), `ENG-138` (planes pagos + monitor `/health`), `ENG-137` (Go/No-Go) y `ENG-139` (onboarding de alumnos).
+   - Completar `ENG-130`, `ENG-131` (Sentry/GlitchTip), `ENG-132` (backup + restore), `DOC-06`, `ENG-135` (carga docente), `ENG-138` (planes pagos + monitor `/health`), `ENG-137` (Go/No-Go) y `ENG-139` (onboarding de alumnos) (`ENG-143` completada en Etapa 12).
 
 ---
 

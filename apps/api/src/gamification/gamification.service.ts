@@ -14,6 +14,13 @@ export interface StreakState {
   forgivenWeekKeys: string[];
 }
 
+const bogotaDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 @Injectable()
 export class GamificationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -317,12 +324,7 @@ export class GamificationService {
   }
 
   getBogotaIsoWeekKey(date: Date): string {
-    const bogotaDateStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    const bogotaDateStr = bogotaDateFormatter.format(date);
 
     const [yearStr, monthStr, dayStr] = bogotaDateStr.split('-');
     const bogotaDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));

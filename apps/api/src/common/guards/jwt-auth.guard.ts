@@ -127,7 +127,7 @@ export class JwtAuthGuard implements CanActivate {
         if (!student || student.approval_status === ApprovalStatus.pending_approval) {
           throw new ForbiddenException({
             statusCode: 403,
-            code: 'FORBIDDEN',
+            code: 'AUTH_FORBIDDEN',
             message: 'No tienes acceso a esta sección',
           });
         }

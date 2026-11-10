@@ -41,6 +41,13 @@ import {
   StatsStudentQueryDto,
 } from './dto/stats-query.dto';
 
+const bogotaDayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 @Injectable()
 export class StatsService {
   private readonly defaultPassingScore = 3.0;
@@ -156,12 +163,7 @@ export class StatsService {
    * Formats a date into YYYY-MM-DD in America/Bogota timezone.
    */
   private formatBogotaDay(date: Date): string {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    return bogotaDayFormatter.format(date);
   }
 
   /**
@@ -176,12 +178,7 @@ export class StatsService {
    * Returns the Monday (start date, YYYY-MM-DD) of the ISO week containing the given date in America/Bogota timezone.
    */
   private getBogotaIsoWeekMonday(date: Date): string {
-    const bogotaDateStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    const bogotaDateStr = bogotaDayFormatter.format(date);
 
     const [yearStr, monthStr, dayStr] = bogotaDateStr.split('-');
     const bogotaDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));
@@ -425,7 +422,10 @@ export class StatsService {
       let levelTime = 0;
       for (const att of finishedAttempts) {
         if (levelStudentIds.has(att.student_id)) {
-          const expected = att.assignment?.activity?.expected_duration_seconds ?? 300;
+          const expected =
+            att.activity?.expected_duration_seconds ??
+            att.assignment?.activity?.expected_duration_seconds ??
+            300;
           levelTime += this.calculateEffectiveDuration(att.started_at, att.finished_at, expected);
         }
       }
@@ -1221,8 +1221,11 @@ export class StatsService {
       });
       const gMap = new Map<string, number>();
       for (const a of groupGradedAttempts) {
-        if (a.assignment_id && !gMap.has(a.assignment_id) && a.score !== null) {
-          gMap.set(a.assignment_id, Number(a.score));
+        if (a.assignment_id && a.score !== null) {
+          const key = `${a.student_id}:${a.assignment_id}`;
+          if (!gMap.has(key)) {
+            gMap.set(key, Number(a.score));
+          }
         }
       }
       const gVals = Array.from(gMap.values());
@@ -1578,6 +1581,7 @@ export class StatsService {
         totalPracticeTimeSeconds: 0,
         byMechanic: [
           { mechanic: GameMechanic.match, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
+          { mechanic: GameMechanic.order_words, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
           { mechanic: GameMechanic.drag_drop, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
           { mechanic: GameMechanic.memory, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
           { mechanic: GameMechanic.timed_choice, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
@@ -1623,7 +1627,13 @@ export class StatsService {
       GameMechanic,
       { sessionsCount: number; uniqueGames: Set<string>; practiceTimeSeconds: number }
     >();
-    for (const m of [GameMechanic.match, GameMechanic.drag_drop, GameMechanic.memory, GameMechanic.timed_choice]) {
+    for (const m of [
+      GameMechanic.match,
+      GameMechanic.order_words,
+      GameMechanic.drag_drop,
+      GameMechanic.memory,
+      GameMechanic.timed_choice,
+    ]) {
       mechanicMap.set(m, { sessionsCount: 0, uniqueGames: new Set(), practiceTimeSeconds: 0 });
     }
 
@@ -1803,6 +1813,7 @@ export class StatsService {
     >();
 
     for (const att of gameAttempts) {
+      if (att.flags && att.flags.includes('implausible_duration')) continue;
       const act = att.activity ?? att.assignment?.activity;
       if (!act) continue;
 

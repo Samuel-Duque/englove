@@ -477,9 +477,11 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
         const completion = await attemptsService.completeAttempt(orgId, studentId, attempt1Id, attempt1Token, {});
 
         expect(completion.attempt.status).toBe(AttemptStatus.graded);
-        expect(completion.attempt.score).toBe(5.0);
+        expect(completion.attempt.score).toBeNull();
+        expect(completion.attempt.stars).toBe(3);
+        expect(completion.attempt.motivationMessage).toBeDefined();
         expect(completion.attempt.flags).toEqual([]);
-        expect(completion.newBadges).toEqual([]);
+        expect(completion.newBadges.some((b) => b.key === 'first_activity')).toBe(true);
 
         // Verify in real PostgreSQL database
         const gradedInDb = await prisma!.attempt.findFirst({
@@ -519,10 +521,11 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
         expect(att2InDb?.previous_attempt_id).toBe(attempt1Id);
         expect(att2InDb?.status).toBe(AttemptStatus.in_progress);
 
-        // Attempting to start a 3rd attempt while attempt 2 is in_progress must fail with 409
-        await expect(
-          attemptsService.startGameAttempt(orgId, studentId, activityId),
-        ).rejects.toThrow(ConflictException);
+        // T4.1 / SPEC-11 §5.1: Iniciar otro intento mientras attempt 2 está in_progress elimina el intento in_progress previo sin lanzar 409
+        const runtime3 = await attemptsService.startGameAttempt(orgId, studentId, activityId);
+        expect(runtime3.attempt.id).toBeDefined();
+        expect(runtime3.attempt.id).not.toBe(attempt2Id);
+        attempt2Id = runtime3.attempt.id;
       },
     );
   });
@@ -559,7 +562,8 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
 
         const completion2 = await attemptsService.completeAttempt(orgId, studentId, attempt2Id, token2, {});
 
-        expect(completion2.attempt.score).toBe(5.0);
+        expect(completion2.attempt.score).toBeNull();
+        expect(completion2.attempt.stars).toBe(3);
         // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
         expect(completion2.attempt.flags).toContain('implausible_duration');
 
@@ -586,6 +590,8 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
         expect(game).toBeDefined();
         expect(game?.attemptsCount).toBe(2);
         expect(game?.bestStars).toBe(3);
+        expect(game?.bestScore).toBeNull();
+        expect(game?.bestMaxScore).toBeNull();
         expect(game?.status).toBe('completed');
       },
     );

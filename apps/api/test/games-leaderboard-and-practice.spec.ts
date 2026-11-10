@@ -5,13 +5,19 @@ import {
   Level,
   AttemptStatus,
   ApprovalStatus,
+  Role,
+  GameMechanic,
+  AgeSegment,
 } from '@englove/shared';
 import { StatsService } from '../src/stats/stats.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { StudentsService } from '../src/students/students.service';
+import { RolesGuard } from '../src/common/guards/roles.guard';
+import { Reflector } from '@nestjs/core';
 import {
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -64,6 +70,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
 
     mockPrisma = {
       $transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(mockPrisma)),
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 'mock-id', archived_at: null, status: 'in_progress', score: null, finished_at: null }]),
       group: {
         findFirst: vi.fn(),
         findMany: vi.fn(),
@@ -99,6 +106,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
         findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        deleteMany: vi.fn(),
       },
       progressEvent: {
         create: vi.fn(),
@@ -619,6 +627,530 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
         expect(err).toBeInstanceOf(NotFoundException);
         const response = err.getResponse() as any;
         expect(response.code).toBe('ACTIVITY_NOT_FOUND');
+      }
+    });
+  });
+
+  describe('T4.1 & T4.3: startGameAttempt deletes prior in_progress attempt, bounds token to 24h, and hides scores', () => {
+    let attemptsService: AttemptsService;
+    let mockJwtService: any;
+
+    beforeEach(() => {
+      mockJwtService = {
+        sign: vi.fn().mockReturnValue('mock-jwt-token-24h'),
+        verify: vi.fn(),
+      };
+
+      attemptsService = new AttemptsService(
+        mockPrisma,
+        mockConfigService,
+        mockJwtService,
+        { calculateFillBlank: vi.fn(), calculateExam: vi.fn(), scoreToStars: vi.fn() } as any,
+        mockGamificationService,
+        {} as any,
+        { isFeatureEnabled: vi.fn().mockResolvedValue(true) } as any,
+      );
+    });
+
+    it('deletes in_progress attempt without 409, signs token for 24h, and returns null score', async () => {
+      mockPrisma.student.findFirst.mockResolvedValue({
+        id: student1Id,
+        organization_id: orgId,
+        age_segment: AgeSegment.kids,
+      });
+
+      const publishedGame = {
+        id: gameActivityId,
+        organization_id: orgId,
+        type: ActivityType.game,
+        title: 'Word Search',
+        status: ActivityStatus.published,
+        level: Level.A1,
+        game_detail: {
+          mechanic: GameMechanic.timed_choice,
+          config: { questions: [] },
+        },
+      };
+      mockPrisma.activity.findFirst.mockResolvedValue(publishedGame);
+      mockPrisma.attempt.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.attempt.findFirst.mockResolvedValue(null);
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+
+      const createdAttempt = {
+        id: 'new-game-attempt-id',
+        organization_id: orgId,
+        student_id: student1Id,
+        activity_id: gameActivityId,
+        assignment_id: null,
+        attempt_number: 1,
+        status: AttemptStatus.in_progress,
+        started_at: new Date('2026-11-10T10:00:00.000Z'),
+        finished_at: null,
+        graded_at: null,
+        score: null,
+        flags: [],
+        previous_attempt_id: null,
+        activity: publishedGame,
+      };
+      mockPrisma.attempt.create.mockResolvedValue(createdAttempt);
+
+      const runtime = await attemptsService.startGameAttempt(orgId, student1Id, gameActivityId);
+
+      // 1. Prior in_progress attempts deleted cleanly
+      expect(mockPrisma.attempt.deleteMany).toHaveBeenCalledWith({
+        where: {
+          organization_id: orgId,
+          student_id: student1Id,
+          activity_id: gameActivityId,
+          status: AttemptStatus.in_progress,
+        },
+      });
+
+      // 2. Token bounded to 24h
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attemptId: 'new-game-attempt-id',
+          studentId: student1Id,
+          organizationId: orgId,
+          typ: 'attempt',
+        }),
+        expect.objectContaining({
+          expiresIn: expect.stringMatching(/^8639\ds|86400s$/),
+        }),
+      );
+
+      // 3. effectiveDueAt / completeUntil bounded to 24h from now
+      const completeUntilMs = new Date(runtime.attempt.completeUntil!).getTime();
+      const effectiveDueAtMs = new Date(runtime.attempt.effectiveDueAt!).getTime();
+      const expected24hMs = Date.now() + 24 * 60 * 60 * 1000;
+      expect(Math.abs(completeUntilMs - expected24hMs)).toBeLessThan(5000);
+      expect(Math.abs(effectiveDueAtMs - expected24hMs)).toBeLessThan(5000);
+
+      // 4. Score is null (never exposed for games)
+      expect(runtime.attempt.score).toBeNull();
+    });
+  });
+
+  describe('T4.2 & P0-10: completeAttempt restores ProgressEvent via recordAttemptCompleted with score = null', () => {
+    let attemptsService: AttemptsService;
+    let mockJwtService: any;
+
+    beforeEach(() => {
+      mockJwtService = {
+        sign: vi.fn(),
+        verify: vi.fn().mockReturnValue({
+          attemptId: 'game-attempt-to-complete',
+          studentId: student1Id,
+          organizationId: orgId,
+          typ: 'attempt',
+        }),
+      };
+
+      attemptsService = new AttemptsService(
+        mockPrisma,
+        mockConfigService,
+        mockJwtService,
+        {
+          calculateGame: vi.fn().mockReturnValue({
+            score: 5.0,
+            feedback: { correctCount: 5, totalCount: 5 },
+            flags: [],
+          }),
+        } as any,
+        mockGamificationService,
+        {} as any,
+        { isFeatureEnabled: vi.fn().mockResolvedValue(true) } as any,
+      );
+    });
+
+    const publishedGame = {
+      id: gameActivityId,
+      organization_id: orgId,
+      type: ActivityType.game,
+      title: 'Quiz Game',
+      status: ActivityStatus.published,
+      level: Level.A1,
+      expected_duration_seconds: 60,
+      game_detail: {
+        mechanic: GameMechanic.timed_choice,
+        config: {
+          questions: [{ id: 'q1', text: 'Q1' }],
+          answerKey: { solution: {} },
+        },
+      },
+    };
+
+    it('records progress event with null score for autonomous games and returns stars + motivation message', async () => {
+      const attemptId = 'game-attempt-to-complete';
+
+      const inProgressAttempt = {
+        id: attemptId,
+        organization_id: orgId,
+        student_id: student1Id,
+        activity_id: gameActivityId,
+        assignment_id: null,
+        attempt_number: 1,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 30000),
+        finished_at: null,
+        graded_at: null,
+        score: null,
+        flags: [],
+        previous_attempt_id: null,
+        activity: publishedGame,
+        assignment: null,
+        student: { age_segment: AgeSegment.kids },
+      };
+
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { id: attemptId, status: AttemptStatus.in_progress, score: null, finished_at: null },
+      ]);
+      mockPrisma.attempt.findFirst.mockResolvedValue(inProgressAttempt);
+      mockPrisma.attempt.update.mockResolvedValue({
+        ...inProgressAttempt,
+        status: AttemptStatus.graded,
+        score: 5.0,
+        finished_at: new Date(),
+        graded_at: new Date(),
+      });
+
+      const completion = await attemptsService.completeAttempt(
+        orgId,
+        student1Id,
+        attemptId,
+        'token-game',
+        {},
+      );
+
+      // P0-10: recordAttemptCompleted is invoked with score = null
+      expect(mockGamificationService.recordAttemptCompleted).toHaveBeenCalledWith(
+        orgId,
+        student1Id,
+        attemptId,
+        null,
+      );
+
+      // Student view hides numeric score, shows stars and normative motivation message
+      expect(completion.attempt.score).toBeNull();
+      expect(completion.attempt.stars).toBe(3);
+      expect(completion.attempt.motivationMessage).toBe('¡Increíble! Acertaste todo en esta partida.');
+
+      // T4.1 / SPEC-11: effectiveDueAt and completeUntil bounded to 24h from started_at (not 365 days)
+      const expected24h = new Date(inProgressAttempt.started_at.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      expect(completion.attempt.effectiveDueAt).toBe(expected24h);
+      expect(completion.attempt.completeUntil).toBe(expected24h);
+    });
+
+    it('returns teens motivation message when student age_segment is teens', async () => {
+      const attemptId = 'att-test-game-teens';
+      mockJwtService.verify.mockReturnValue({
+        attemptId,
+        studentId: student1Id,
+        organizationId: orgId,
+        typ: 'attempt',
+      });
+      const inProgressAttempt = {
+        id: attemptId,
+        organization_id: orgId,
+        student_id: student1Id,
+        activity_id: gameActivityId,
+        assignment_id: null,
+        attempt_number: 1,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 30000),
+        finished_at: null,
+        graded_at: null,
+        score: null,
+        flags: [],
+        previous_attempt_id: null,
+        activity: publishedGame,
+        assignment: null,
+        student: { age_segment: AgeSegment.teens },
+      };
+
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { id: attemptId, status: AttemptStatus.in_progress, score: null, finished_at: null },
+      ]);
+      mockPrisma.attempt.findFirst.mockResolvedValue(inProgressAttempt);
+      mockPrisma.attempt.update.mockResolvedValue({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: student1Id,
+        activity_id: gameActivityId,
+        assignment_id: null,
+        attempt_number: 1,
+        status: AttemptStatus.graded,
+        started_at: inProgressAttempt.started_at,
+        score: 5.0,
+        finished_at: new Date(),
+        graded_at: new Date(),
+        flags: [],
+        payload: { answers: {} },
+      });
+
+      const completion = await attemptsService.completeAttempt(
+        orgId,
+        student1Id,
+        attemptId,
+        'token-game',
+        {},
+      );
+
+      expect(completion.attempt.score).toBeNull();
+      expect(completion.attempt.stars).toBe(3);
+      expect(completion.attempt.motivationMessage).toBe('¡Partida impecable! Acertaste todos los retos.');
+    });
+  });
+
+  describe('T4.3 & RF-10: listStudentGames never exposes score or bestScore', () => {
+    let attemptsService: AttemptsService;
+
+    beforeEach(() => {
+      attemptsService = new AttemptsService(
+        mockPrisma,
+        mockConfigService,
+        { sign: vi.fn(), verify: vi.fn() } as any,
+        {} as any,
+        mockGamificationService,
+        {} as any,
+        { isFeatureEnabled: vi.fn().mockResolvedValue(true) } as any,
+      );
+    });
+
+    it('returns bestScore: null and bestMaxScore: null on all student game cards', async () => {
+      mockPrisma.student.findFirst.mockResolvedValue({
+        id: student1Id,
+        organization_id: orgId,
+        level: Level.A1,
+      });
+
+      mockPrisma.activity.findMany.mockResolvedValue([
+        {
+          id: gameActivityId,
+          title: 'Memory Animals',
+          type: ActivityType.game,
+          level: Level.A1,
+          game_detail: { mechanic: GameMechanic.match, config: {} },
+        },
+      ]);
+
+      mockPrisma.attempt.findMany.mockResolvedValue([
+        {
+          id: 'att-past-1',
+          activity_id: gameActivityId,
+          student_id: student1Id,
+          score: 5.0,
+          status: AttemptStatus.graded,
+          flags: [],
+        },
+      ]);
+
+      const list = await attemptsService.listStudentGames(orgId, student1Id);
+      expect(list.items.length).toBe(1);
+      const card = list.items[0]!;
+      expect(card.bestScore).toBeNull();
+      expect(card.bestMaxScore).toBeNull();
+      expect(card.bestStars).toBe(3);
+    });
+  });
+
+  describe('QA-06: getGamesLeaderboard completely excludes attempts with implausible_duration flag', () => {
+    let statsService: StatsService;
+
+    beforeEach(() => {
+      statsService = new StatsService(mockPrisma, mockGamificationService);
+    });
+
+    it('excludes flagged attempts from points, stars, count, and practice duration', async () => {
+      mockPrisma.student.findMany.mockResolvedValue([
+        {
+          id: student1Id,
+          user: { name: 'Alice' },
+          level: Level.A1,
+          memberships: [{ group_id: groupId, group: { id: groupId, name: 'Grupo A' } }],
+        },
+      ]);
+
+      const baseTime = new Date('2026-11-01T10:00:00Z');
+      mockPrisma.attempt.findMany.mockResolvedValue([
+        // Valid attempt: 60s, score 5.0 -> 3 stars, 50 points
+        {
+          id: 'att-valid',
+          student_id: student1Id,
+          activity_id: gameActivityId,
+          score: 5.0,
+          flags: [],
+          started_at: baseTime,
+          finished_at: new Date(baseTime.getTime() + 60000),
+          graded_at: new Date(baseTime.getTime() + 60000),
+          activity: { id: gameActivityId, title: 'Memory Animals', expected_duration_seconds: 60 },
+        },
+        // Fraudulent / rushed attempt: 2s, score 5.0, flag implausible_duration
+        {
+          id: 'att-fraudulent',
+          student_id: student1Id,
+          activity_id: gameActivityId,
+          score: 5.0,
+          flags: ['implausible_duration'],
+          started_at: new Date(baseTime.getTime() + 120000),
+          finished_at: new Date(baseTime.getTime() + 122000),
+          graded_at: new Date(baseTime.getTime() + 122000),
+          activity: { id: gameActivityId, title: 'Memory Animals', expected_duration_seconds: 60 },
+        },
+      ]);
+
+      const result = await statsService.getGamesLeaderboard(orgId, {});
+      expect(result.items.length).toBe(1);
+      const studentRow = result.items[0]!;
+
+      // Only the valid attempt should be counted
+      expect(studentRow.gamePoints).toBe(50);
+      expect(studentRow.totalStars).toBe(3);
+      expect(studentRow.gamesPlayedCount).toBe(1);
+      expect(studentRow.uniqueGamesPlayed).toBe(1);
+      expect(studentRow.practiceTimeSeconds).toBe(60);
+    });
+  });
+
+  describe('P1-11: groupAverageScore and computeGamesPractice with order_words', () => {
+    let statsService: StatsService;
+
+    beforeEach(() => {
+      statsService = new StatsService(mockPrisma, mockGamificationService);
+    });
+
+    it('groupAverageScore averages multiple students correctly and computeGamesPractice includes order_words', async () => {
+      mockPrisma.student.findFirst.mockResolvedValue({
+        id: student1Id,
+        organization_id: orgId,
+        approval_status: ApprovalStatus.approved,
+        level: Level.A1,
+        created_at: new Date('2026-10-01T00:00:00Z'),
+        user: { name: 'Alice', email: 'alice@englove.org', is_active: true },
+        memberships: [{ group: { id: groupId, name: 'Grupo A' } }],
+      });
+
+      const asgId = 'assignment-multi-student';
+      mockPrisma.assignment.findMany.mockResolvedValue([]);
+      // 2 students took the assignment: Alice scored 4.0, Bob scored 5.0
+      // Average must be 4.5
+      mockPrisma.attempt.findMany.mockResolvedValue([
+        // Alice attempt (student1Id)
+        {
+          id: 'att-alice',
+          student_id: student1Id,
+          assignment_id: asgId,
+          activity_id: null,
+          score: 4.0,
+          status: AttemptStatus.graded,
+          attempt_number: 1,
+          started_at: new Date('2026-11-01T10:00:00Z'),
+          finished_at: new Date('2026-11-01T10:15:00Z'),
+          graded_at: new Date('2026-11-01T10:15:00Z'),
+          flags: [],
+          payload: {},
+          assignment: {
+            id: asgId,
+            activity: {
+              id: 'act-quiz',
+              title: 'Grammar Quiz',
+              type: ActivityType.fill_blank,
+              level: Level.A1,
+            },
+          },
+        },
+        // Bob attempt (student2Id)
+        {
+          id: 'att-bob',
+          student_id: student2Id,
+          assignment_id: asgId,
+          activity_id: null,
+          score: 5.0,
+          status: AttemptStatus.graded,
+          attempt_number: 1,
+          started_at: new Date('2026-11-01T10:00:00Z'),
+          finished_at: new Date('2026-11-01T10:15:00Z'),
+          graded_at: new Date('2026-11-01T10:15:00Z'),
+          flags: [],
+          payload: {},
+          assignment: {
+            id: asgId,
+            activity: {
+              id: 'act-quiz',
+              title: 'Grammar Quiz',
+              type: ActivityType.fill_blank,
+              level: Level.A1,
+            },
+          },
+        },
+        // Autonomous game with order_words mechanic
+        {
+          id: 'att-order-words',
+          student_id: student1Id,
+          assignment_id: null,
+          activity_id: 'act-order-words',
+          score: 5.0,
+          status: AttemptStatus.graded,
+          attempt_number: 1,
+          started_at: new Date('2026-11-02T10:00:00Z'),
+          finished_at: new Date('2026-11-02T10:10:00Z'),
+          graded_at: new Date('2026-11-02T10:10:00Z'),
+          flags: [],
+          payload: { practiceStars: 3 },
+          activity: {
+            id: 'act-order-words',
+            title: 'Sentence Builder',
+            type: ActivityType.game,
+            level: Level.A1,
+            game_detail: { mechanic: 'order_words' },
+          },
+        },
+      ]);
+
+      const result = await statsService.getStudentStats(orgId, student1Id, {});
+
+      // Performance verifies groupAverageScore = 4.5
+      expect(result.performance.scoreSeries.length).toBe(1);
+      expect(result.performance.groupAverageScore).toBe(4.5);
+
+      // gamesPractice includes order_words mechanic
+      expect(result.gamesPractice).toBeDefined();
+      const orderWordsBreakdown = result.gamesPractice?.byMechanic.find(
+        (m) => m.mechanic === ('order_words' as any),
+      );
+      expect(orderWordsBreakdown).toBeDefined();
+      expect(orderWordsBreakdown?.sessionsCount).toBe(1);
+    });
+  });
+
+  describe('T4.7 / RF-12.4: RolesGuard returns 403 AUTH_FORBIDDEN on student unauthorized access', () => {
+    it('throws ForbiddenException with AUTH_FORBIDDEN code when role is student but endpoint requires teacher', () => {
+      const reflector = new Reflector();
+      vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([Role.teacher]);
+
+      const guard = new RolesGuard(reflector);
+      const mockContext = {
+        getHandler: vi.fn(),
+        getClass: vi.fn(),
+        switchToHttp: vi.fn().mockReturnValue({
+          getRequest: vi.fn().mockReturnValue({
+            user: {
+              id: 'user-std',
+              role: Role.student,
+              organizationId: orgId,
+            },
+          }),
+        }),
+      } as any;
+
+      try {
+        guard.canActivate(mockContext);
+        expect.fail('Should have thrown ForbiddenException');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ForbiddenException);
+        const res = err.getResponse() as any;
+        expect(res.statusCode).toBe(403);
+        expect(res.code).toBe('AUTH_FORBIDDEN');
       }
     });
   });

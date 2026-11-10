@@ -24,7 +24,7 @@ export class RolesGuard implements CanActivate {
     if (!user || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException({
         statusCode: 403,
-        code: 'FORBIDDEN',
+        code: 'AUTH_FORBIDDEN',
         message: 'No tienes acceso a esta sección',
       });
     }

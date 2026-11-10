@@ -60,7 +60,7 @@ export class ActivitiesController {
     if (!user.studentId) {
       throw new ForbiddenException({
         statusCode: 403,
-        code: 'FORBIDDEN',
+        code: 'AUTH_FORBIDDEN',
         message: 'Solo accesible para estudiantes',
       });
     }

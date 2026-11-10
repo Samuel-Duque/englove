@@ -41,6 +41,8 @@ import {
   GameAnswerKey,
   GameMechanic,
   scoreToGameStars,
+  getGameMotivationMessage,
+  AgeSegment,
   toPublicConfig,
   StudentGameCard,
   StudentGamesListResponse,
@@ -95,6 +97,9 @@ interface AttemptEntityLike {
     activity: ActivityEntityLike;
   } | null;
   activity?: ActivityEntityLike | null;
+  student?: {
+    age_segment?: AgeSegment;
+  } | null;
   previous_attempt?: {
     retry_extend_until?: Date | null;
   } | null;
@@ -393,7 +398,6 @@ export class AttemptsService {
         }
       }
       const bestStars = bestScore !== null ? scoreToGameStars(bestScore) : null;
-      const bestMaxScore = bestScore !== null ? 5.0 : null;
 
       const inProgressAttempt = actAttempts.find((a) => a.status === AttemptStatus.in_progress);
       let status: 'not_started' | 'in_progress' | 'completed' = 'not_started';
@@ -412,8 +416,8 @@ export class AttemptsService {
         minPlausibleSeconds: act.min_plausible_seconds,
         bestStars,
         lastStars,
-        bestScore,
-        bestMaxScore,
+        bestScore: null,
+        bestMaxScore: null,
         attemptsCount,
         lastPlayedAt: latest?.started_at ? latest.started_at.toISOString() : null,
         status,
@@ -473,6 +477,16 @@ export class AttemptsService {
       });
     }
 
+    // SPEC-11 §5.1 / T4.1: Eliminar intentos previos in_progress sin lanzar 409 para permitir reinicios limpios
+    await this.prisma.attempt.deleteMany({
+      where: {
+        activity_id: activityId,
+        student_id: studentId,
+        organization_id: organizationId,
+        status: AttemptStatus.in_progress,
+      },
+    });
+
     const existingAttempts = await this.prisma.attempt.findMany({
       where: {
         activity_id: activityId,
@@ -483,13 +497,6 @@ export class AttemptsService {
     });
 
     const latest = existingAttempts[0];
-    if (latest && latest.status === AttemptStatus.in_progress) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'ATTEMPT_ALREADY_EXISTS',
-        message: 'Ya existe una partida en curso para este microjuego',
-      });
-    }
 
     const now = new Date();
     const attemptNumber = (latest?.attempt_number ?? 0) + 1;
@@ -522,7 +529,8 @@ export class AttemptsService {
       throw err;
     }
 
-    const effectiveDueAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    // T4.1 / Decisión 60: Acotar la duración de attemptToken a 24 horas (en lugar de 365 días)
+    const effectiveDueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const completeUntil = effectiveDueAt;
     const token = this.generateAttemptToken(attempt.id, studentId, organizationId, completeUntil);
 
@@ -590,6 +598,11 @@ export class AttemptsService {
           },
         },
         previous_attempt: true,
+        student: {
+          select: {
+            age_segment: true,
+          },
+        },
       },
     });
 
@@ -613,8 +626,13 @@ export class AttemptsService {
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ??
       attempt.assignment?.due_at ??
-      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+      new Date(
+        (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).getTime() +
+          24 * 60 * 60 * 1000,
+      );
+    const completeUntil = attempt.assignment
+      ? new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000)
+      : effectiveDueAt;
 
     const isContinuable =
       attempt.status === AttemptStatus.in_progress && new Date() <= completeUntil;
@@ -791,8 +809,13 @@ export class AttemptsService {
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ??
       attempt.assignment?.due_at ??
-      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+      new Date(
+        (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).getTime() +
+          24 * 60 * 60 * 1000,
+      );
+    const completeUntil = attempt.assignment
+      ? new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000)
+      : effectiveDueAt;
 
     // Verify token authentic (signature and claims)
     this.verifyAttemptTokenSignature(token, attempt.id, studentId, organizationId);
@@ -913,6 +936,11 @@ export class AttemptsService {
           },
         },
         previous_attempt: true,
+        student: {
+          select: {
+            age_segment: true,
+          },
+        },
       },
     });
 
@@ -936,8 +964,13 @@ export class AttemptsService {
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ??
       attempt.assignment?.due_at ??
-      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+      new Date(
+        (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).getTime() +
+          24 * 60 * 60 * 1000,
+      );
+    const completeUntil = attempt.assignment
+      ? new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000)
+      : effectiveDueAt;
 
     // Verify token authentic (signature and claims)
     this.verifyAttemptTokenSignature(token, attempt.id, studentId, organizationId);
@@ -1285,7 +1318,15 @@ export class AttemptsService {
         studentId,
         attempt.id,
       );
-    } else if (!txResult.isGame && txResult.scoreForEvent !== undefined) {
+    } else if (txResult.isGame) {
+      // P0-10: Restaurar ProgressEvent en microjuegos autónomos pasando score=null para alimentar rachas e insignias sin alterar notas
+      newBadges = await this.gamificationService.recordAttemptCompleted(
+        organizationId,
+        studentId,
+        attempt.id,
+        null,
+      );
+    } else if (txResult.scoreForEvent !== undefined) {
       newBadges = await this.gamificationService.recordAttemptCompleted(
         organizationId,
         studentId,
@@ -1295,7 +1336,16 @@ export class AttemptsService {
     }
 
     return {
-      attempt: this.mapAttemptView(txResult.updatedAttempt!, effectiveDueAt, completeUntil),
+      attempt: this.mapAttemptView(
+        {
+          ...txResult.updatedAttempt!,
+          student: attempt.student,
+          activity: attempt.activity,
+          assignment: attempt.assignment,
+        },
+        effectiveDueAt,
+        completeUntil,
+      ),
       correction: txResult.correction ?? null,
       newBadges,
     };
@@ -1587,7 +1637,7 @@ export class AttemptsService {
     completeUntil: Date,
   ): string {
     const now = Date.now();
-    const remainingSeconds = Math.max(1, Math.floor((completeUntil.getTime() - now) / 1000));
+    const remainingSeconds = Math.max(1, Math.round((completeUntil.getTime() - now) / 1000));
 
     return this.jwtService.sign(
       {
@@ -1740,8 +1790,13 @@ export class AttemptsService {
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ??
       attempt.assignment?.due_at ??
-      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+      new Date(
+        (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).getTime() +
+          24 * 60 * 60 * 1000,
+      );
+    const completeUntil = attempt.assignment
+      ? new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000)
+      : effectiveDueAt;
 
     let correction: Record<string, unknown> | null = null;
     if (activity && attempt.status === AttemptStatus.graded) {
@@ -1831,6 +1886,19 @@ export class AttemptsService {
       return (d instanceof Date ? d : new Date(d)).toISOString();
     };
 
+    const isGame = Boolean(
+      attempt.activity_id ||
+        attempt.activity?.type === ActivityType.game ||
+        attempt.assignment?.activity?.type === ActivityType.game,
+    );
+    const numericScore = attempt.score !== null ? Number(attempt.score) : null;
+    const stars = isGame && numericScore !== null ? scoreToGameStars(numericScore) : undefined;
+    const studentAgeSegment = attempt.student?.age_segment;
+    const motivationMessage =
+      isGame && numericScore !== null
+        ? getGameMotivationMessage(numericScore, studentAgeSegment)
+        : undefined;
+
     return {
       id: attempt.id,
       assignmentId: attempt.assignment_id ?? null,
@@ -1841,7 +1909,9 @@ export class AttemptsService {
       startedAt: (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).toISOString(),
       finishedAt: toIso(attempt.finished_at),
       gradedAt: toIso(attempt.graded_at),
-      score: attempt.score !== null ? Number(attempt.score) : null,
+      score: isGame ? null : numericScore,
+      stars,
+      motivationMessage,
       flags: attempt.flags || [],
       effectiveDueAt: (effectiveDueAt instanceof Date ? effectiveDueAt : new Date(effectiveDueAt)).toISOString(),
       completeUntil: (completeUntil instanceof Date ? completeUntil : new Date(completeUntil)).toISOString(),

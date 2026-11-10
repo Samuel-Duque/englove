@@ -24,6 +24,10 @@ import {
   calculateDragDropScore,
   calculateMemoryScore,
   calculateTimedChoiceScore,
+  scoreToGameStars,
+  gamePercentToStars,
+  getGameMotivationMessage,
+  AgeSegment,
   resolveActivityDurations,
   toPublicConfig,
   validateActivityPayload,
@@ -419,6 +423,80 @@ describe('ENG-030 / SPEC-03: Activity schemas, scoring, weights and durations', 
 
     it('order_words: handles empty or missing expected tokens gracefully', () => {
       expect(calculateOrderWordsScore([], [], [])).toBe(0.0);
+    });
+  });
+
+  describe('SPEC-11 §4.2 / P1-05: scoreToGameStars, gamePercentToStars and getGameMotivationMessage', () => {
+    it('scoreToGameStars maps intervals correctly: 0.0 -> 0, 0.1-2.9 -> 1, 3.0-4.4 -> 2, 4.5-5.0 -> 3', () => {
+      expect(scoreToGameStars(null)).toBe(0);
+      expect(scoreToGameStars(undefined)).toBe(0);
+      expect(scoreToGameStars(0.0)).toBe(0);
+      expect(scoreToGameStars(0.05)).toBe(0);
+      expect(scoreToGameStars(-1)).toBe(0);
+
+      expect(scoreToGameStars(0.1)).toBe(1);
+      expect(scoreToGameStars(1.5)).toBe(1);
+      expect(scoreToGameStars(2.9)).toBe(1);
+
+      expect(scoreToGameStars(3.0)).toBe(2);
+      expect(scoreToGameStars(3.7)).toBe(2);
+      expect(scoreToGameStars(4.4)).toBe(2);
+
+      expect(scoreToGameStars(4.5)).toBe(3);
+      expect(scoreToGameStars(4.9)).toBe(3);
+      expect(scoreToGameStars(5.0)).toBe(3);
+    });
+
+    it('gamePercentToStars maps percentage intervals: 0 -> 0, 1-59 -> 1, 60-89 -> 2, >=90 -> 3', () => {
+      expect(gamePercentToStars(0)).toBe(0);
+      expect(gamePercentToStars(50)).toBe(1);
+      expect(gamePercentToStars(59)).toBe(1);
+      expect(gamePercentToStars(60)).toBe(2);
+      expect(gamePercentToStars(89)).toBe(2);
+      expect(gamePercentToStars(90)).toBe(3);
+      expect(gamePercentToStars(100)).toBe(3);
+    });
+
+    it('getGameMotivationMessage returns exact 10 normative messages for kids and teens', () => {
+      // 3 stars without errors (score === 5.0)
+      expect(getGameMotivationMessage(5.0, AgeSegment.kids)).toBe(
+        '¡Increíble! Acertaste todo en esta partida.',
+      );
+      expect(getGameMotivationMessage(5.0, AgeSegment.teens)).toBe(
+        '¡Partida impecable! Acertaste todos los retos.',
+      );
+
+      // 3 stars with errors (4.5 <= score < 5.0)
+      expect(getGameMotivationMessage(4.5, AgeSegment.kids)).toBe(
+        '¡Súper bien! Conseguiste las 3 estrellas; juega otra vez si quieres acertar todas.',
+      );
+      expect(getGameMotivationMessage(4.8, AgeSegment.teens)).toBe(
+        '¡Excelente práctica! Lograste 3 estrellas; estás a un paso de una ronda sin fallos.',
+      );
+
+      // 2 stars (3.0 <= score <= 4.4)
+      expect(getGameMotivationMessage(3.0, AgeSegment.kids)).toBe(
+        '¡Buen trabajo! Ganaste 2 estrellas; prueba otra ronda para llegar a 3.',
+      );
+      expect(getGameMotivationMessage(4.4, AgeSegment.teens)).toBe(
+        '¡Buen ritmo! Sumaste 2 estrellas; intenta otra partida para alcanzar las 3.',
+      );
+
+      // 1 star (0.1 <= score <= 2.9)
+      expect(getGameMotivationMessage(0.1, AgeSegment.kids)).toBe(
+        '¡Ya tienes 1 estrella! Cada partida te ayuda a mejorar.',
+      );
+      expect(getGameMotivationMessage(2.5, AgeSegment.teens)).toBe(
+        '¡Sumaste 1 estrella! Repasa las pistas e inténtalo de nuevo.',
+      );
+
+      // 0 stars (score === 0.0)
+      expect(getGameMotivationMessage(0.0, AgeSegment.kids)).toBe(
+        '¡Sigue intentando! Juega otra vez para ganar tu primera estrella.',
+      );
+      expect(getGameMotivationMessage(0.0, AgeSegment.teens)).toBe(
+        '¡No pasa nada! Vuelve a intentarlo para desbloquear tus estrellas.',
+      );
     });
   });
 

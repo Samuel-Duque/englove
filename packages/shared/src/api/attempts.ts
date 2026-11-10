@@ -15,6 +15,8 @@ export interface AttemptView {
   gradedAt: string | null;
   // guardrails-ignore G-C02: campo de solo lectura en respuesta devuelta por el servidor
   score: number | null;
+  stars?: number | null;
+  motivationMessage?: string | null;
   flags: string[];
   effectiveDueAt: string;
   completeUntil: string;
@@ -29,8 +31,8 @@ export interface StudentGameCard {
   minPlausibleSeconds: number | null;
   bestStars: number | null;
   lastStars: number | null;
-  bestScore: number | null;
-  bestMaxScore: number | null;
+  bestScore?: number | null;
+  bestMaxScore?: number | null;
   attemptsCount: number;
   lastPlayedAt: string | null;
   status: 'not_started' | 'in_progress' | 'completed';

@@ -44,7 +44,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         } else if (statusCode === HttpStatus.UNAUTHORIZED) {
           code = 'AUTH_UNAUTHORIZED';
         } else if (statusCode === HttpStatus.FORBIDDEN) {
-          code = 'FORBIDDEN';
+          code = 'AUTH_FORBIDDEN';
         } else if (statusCode === HttpStatus.PAYLOAD_TOO_LARGE) {
           code = 'PAYLOAD_TOO_LARGE';
         } else if (statusCode === HttpStatus.TOO_MANY_REQUESTS) {

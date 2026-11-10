@@ -548,17 +548,16 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
   };
 
-  // Play again for microgames (Decision 104, RF-4)
+  // Play again for microgames (Decision 104, RF-4, Decisión 130)
   const handlePlayAgain = async () => {
-    if (!runtime?.attempt?.assignmentId) return;
     setIsSubmitting(true);
     try {
-      const res = await apiFetch<RuntimeView>(
-        `/api/v1/assignments/${runtime.attempt.assignmentId}/attempts`,
-        {
-          method: 'POST',
-        },
-      );
+      const url = runtime?.attempt?.assignmentId
+        ? `/api/v1/assignments/${runtime.attempt.assignmentId}/attempts`
+        : `/api/v1/activities/${activity.id}/attempts`;
+      const res = await apiFetch<RuntimeView>(url, {
+        method: 'POST',
+      });
       router.push(`/actividad/${res.attempt.id}`);
       router.refresh();
     } catch (err: unknown) {
@@ -640,13 +639,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   // Render Completion Modal/Card
   if (completion) {
+    const isGame = activity.type === ActivityType.game;
     const score = completion.attempt.score;
-    let starsCount = 0;
-    if (score !== null && score !== undefined) {
-      if (score >= 4.5) starsCount = 3;
-      else if (score >= 3.0) starsCount = 2;
-      else if (score > 0) starsCount = 1;
-    }
+    const starsCount = isGame
+      ? (completion.attempt.stars ?? 0)
+      : (score !== null && score !== undefined
+          ? (score >= 4.5 ? 3 : score >= 3.0 ? 2 : score > 0 ? 1 : 0)
+          : 0);
 
     return (
       <div className="max-w-2xl mx-auto py-8">
@@ -662,10 +661,30 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           <h2 className="text-2xl sm:text-3xl font-black text-amber-950">
             {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
               ? '¡Actividad entregada con éxito!'
-              : '¡Misión completada!'}
+              : isGame
+                ? '¡Partida completada!'
+                : '¡Misión completada!'}
           </h2>
 
-          {score !== null && score !== undefined ? (
+          {isGame ? (
+            <div className="mt-4">
+              <div className="flex justify-center gap-1.5 text-3xl my-2">
+                {[1, 2, 3].map((starIdx) => (
+                  <span
+                    key={starIdx}
+                    className={starIdx <= starsCount ? 'text-amber-400 drop-shadow-sm' : 'text-zinc-200'}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+              {completion.attempt.motivationMessage && (
+                <p className="text-base sm:text-lg font-bold text-amber-900 mt-2 max-w-md mx-auto">
+                  {completion.attempt.motivationMessage}
+                </p>
+              )}
+            </div>
+          ) : score !== null && score !== undefined ? (
             <div className="mt-4">
               <div className="flex justify-center gap-1.5 text-3xl my-2">
                 {[1, 2, 3].map((starIdx) => (
@@ -706,7 +725,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           )}
 
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-            {activity.type === ActivityType.game && runtime?.attempt?.assignmentId && (
+            {activity.type === ActivityType.game && (
               <button
                 type="button"
                 onClick={handlePlayAgain}

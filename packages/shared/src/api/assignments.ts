@@ -80,15 +80,17 @@ export function getExtendedDueAt(dueAt: Date | string): Date {
   return new Date(d.getTime() + 24 * 60 * 60 * 1000);
 }
 
+const bogotaDateTimeFormatter = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
 export function formatBogotaDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(d);
+  return bogotaDateTimeFormatter.format(d);
 }

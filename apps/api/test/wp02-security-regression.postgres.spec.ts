@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as net from 'net';
+import { execFileSync } from 'node:child_process';
 import { Response, Request } from 'express';
 import {
   Role,
@@ -62,25 +62,37 @@ function getPostgresPort(): number {
   }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(getPostgresPort(), '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
+
+function checkPostgresRunning(): boolean {
+  const configuredPort = getPostgresPort();
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
+  return false;
+}
+
+const isPostgresAvailable = checkPostgresRunning();
 
 function createMockResponse(): {
   res: Response;
@@ -104,8 +116,7 @@ function createMockResponse(): {
   return { res, cookies, clearedCookies };
 }
 
-describe('WP-02 / Fase F2: Seguridad, Identidad, Sesión y Multi-Tenant (PostgreSQL real)', () => {
-  let isPostgresAvailable = false;
+describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Sesión y Multi-Tenant (PostgreSQL real)', () => {
   let prisma: PrismaService;
   let authService: AuthService;
   let jwtService: JwtService;
@@ -124,12 +135,6 @@ describe('WP-02 / Fase F2: Seguridad, Identidad, Sesión y Multi-Tenant (Postgre
   const jwtSecret = 'wp02-test-jwt-secret-min-32-characters-long!';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn(`PostgreSQL no está disponible en puerto ${getPostgresPort()}; omitiendo pruebas contra DB real.`);
-      return;
-    }
-
     prisma = new PrismaService();
     await prisma.$connect();
 

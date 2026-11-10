@@ -31,7 +31,25 @@ import {
   StudentFeedbackListResponse,
   StudentFeedbackItemView,
   StudentFeedbackAttemptView,
+  FillBlankConfigSchema,
+  FillBlankAnswerKeySchema,
+  ExamConfigSchema,
+  ExamAnswerKeySchema,
+  getOpenQuestionItems,
 } from '@englove/shared';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function isStickerCode(val: unknown): val is StickerCode {
+  return typeof val === 'string' && val in STICKERS;
+}
+
+function parseStickers(stickers: unknown): StickerCode[] {
+  if (!Array.isArray(stickers)) return [];
+  return stickers.filter(isStickerCode);
+}
 
 @Injectable()
 export class ReviewsService {
@@ -46,7 +64,6 @@ export class ReviewsService {
     private readonly configService: ConfigService,
   ) {
     this.appPublicUrl =
-      this.configService.get<string>('APP_PUBLIC_URL') ||
       this.configService.get<string>('WEB_BASE_URL') ||
       'http://localhost:3000';
   }
@@ -58,22 +75,14 @@ export class ReviewsService {
     organizationId: string,
     query: ReviewQueryDto,
   ): Promise<ReviewListResponse> {
-    const where: Prisma.AttemptWhereInput = {
-      organization_id: organizationId,
-      status: AttemptStatus.pending_review,
-      assignment_id: { not: undefined },
-      assignment: {
-        activity: {
-          type: { not: ActivityType.game },
-        },
+    const assignmentWhere: Prisma.AssignmentWhereInput = {
+      activity: {
+        type: { not: ActivityType.game },
       },
     };
 
     if (query.groupId) {
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        group_id: query.groupId,
-      };
+      assignmentWhere.group_id = query.groupId;
     }
 
     if (query.type) {
@@ -85,13 +94,17 @@ export class ReviewsService {
           limit: query.limit || 20,
         };
       }
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        activity: {
-          type: query.type,
-        },
+      assignmentWhere.activity = {
+        type: query.type,
       };
     }
+
+    const where: Prisma.AttemptWhereInput = {
+      organization_id: organizationId,
+      status: AttemptStatus.pending_review,
+      assignment_id: { not: null },
+      assignment: assignmentWhere,
+    };
 
     if (query.from || query.to) {
       where.finished_at = {};
@@ -140,22 +153,14 @@ export class ReviewsService {
     organizationId: string,
     query: ReviewQueryDto,
   ): Promise<ReviewListResponse> {
-    const where: Prisma.AttemptWhereInput = {
-      organization_id: organizationId,
-      status: AttemptStatus.graded,
-      assignment_id: { not: undefined },
-      assignment: {
-        activity: {
-          type: { not: ActivityType.game },
-        },
+    const assignmentWhere: Prisma.AssignmentWhereInput = {
+      activity: {
+        type: { not: ActivityType.game },
       },
     };
 
     if (query.groupId) {
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        group_id: query.groupId,
-      };
+      assignmentWhere.group_id = query.groupId;
     }
 
     if (query.type) {
@@ -167,13 +172,17 @@ export class ReviewsService {
           limit: query.limit || 20,
         };
       }
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        activity: {
-          type: query.type,
-        },
+      assignmentWhere.activity = {
+        type: query.type,
       };
     }
+
+    const where: Prisma.AttemptWhereInput = {
+      organization_id: organizationId,
+      status: AttemptStatus.graded,
+      assignment_id: { not: null },
+      assignment: assignmentWhere,
+    };
 
     if (query.from || query.to) {
       where.graded_at = {};
@@ -268,44 +277,55 @@ export class ReviewsService {
     const act = attempt.assignment.activity;
 
     if (act.type === ActivityType.fill_blank && act.fill_blank_detail) {
-      const config = act.fill_blank_detail.config as {
-        items?: Array<{ id: string; prompt?: string; blanks?: unknown[]; rubricText?: string }>;
-      };
-      const answerKey = act.fill_blank_detail.answer_key as {
-        items?: Record<string, Record<string, string>>;
-      };
-      for (const it of config.items || []) {
+      const fbConfig = FillBlankConfigSchema.safeParse(act.fill_blank_detail.config);
+      const fbKey = FillBlankAnswerKeySchema.safeParse(act.fill_blank_detail.answer_key);
+      const itemsList = fbConfig.success ? fbConfig.data.items : [];
+      const keyItems = fbKey.success ? fbKey.data.items : {};
+      for (const it of itemsList) {
         items.push({
           id: it.id,
           prompt: it.prompt,
-          correctAnswer: answerKey?.items?.[it.id] ?? null,
-          rubricText: it.rubricText ?? null,
+          correctAnswer: keyItems[it.id] ?? null,
+          rubricText: null,
         });
       }
     } else if (act.type === ActivityType.open_question && act.open_question_detail) {
-      const config = act.open_question_detail.config as {
-        prompt?: string;
-        rubric?: string;
-        rubric_text?: string;
-        rubricText?: string;
-        sample_answer?: string;
-        items?: Array<{ id: string; prompt?: string; rubric?: string; rubricText?: string }>;
-      };
-      if (Array.isArray(config.items) && config.items.length > 0) {
-        for (const it of config.items) {
-          items.push({
-            id: it.id,
-            prompt: it.prompt,
-            rubricText: it.rubric || it.rubricText || null,
-            correctAnswer: null,
-          });
+      const cfg = isRecord(act.open_question_detail.config) ? act.open_question_detail.config : {};
+      const rawItems = 'items' in cfg && Array.isArray(cfg.items) ? cfg.items : [];
+      if (rawItems.length > 0) {
+        for (const it of rawItems) {
+          if (isRecord(it) && typeof it.id === 'string') {
+            const prompt = typeof it.prompt === 'string' ? it.prompt : undefined;
+            const rubric =
+              typeof it.rubric === 'string'
+                ? it.rubric
+                : typeof it.rubricText === 'string'
+                  ? it.rubricText
+                  : null;
+            items.push({
+              id: it.id,
+              prompt,
+              rubricText: rubric,
+              correctAnswer: null,
+            });
+          }
         }
       } else {
+        const prompt = typeof cfg.prompt === 'string' ? cfg.prompt : undefined;
+        const rubricText =
+          typeof cfg.rubric === 'string'
+            ? cfg.rubric
+            : typeof cfg.rubricText === 'string'
+              ? cfg.rubricText
+              : typeof cfg.rubric_text === 'string'
+                ? cfg.rubric_text
+                : null;
+        const sampleAnswer = typeof cfg.sample_answer === 'string' ? cfg.sample_answer : null;
         items.push({
           id: act.id,
-          prompt: config.prompt,
-          rubricText: config.rubric || config.rubricText || config.rubric_text || null,
-          correctAnswer: config.sample_answer || null,
+          prompt,
+          rubricText,
+          correctAnswer: sampleAnswer,
         });
       }
     } else if (act.type === ActivityType.speaking && act.speaking_detail) {
@@ -315,44 +335,35 @@ export class ReviewsService {
         maxDurationSeconds: act.speaking_detail.max_duration_seconds,
       });
     } else if (act.type === ActivityType.exam && act.exam_detail) {
-      const config = act.exam_detail.config as {
-        items?: Array<{ id: string; prompt?: string; weight?: number; rubricText?: string }>;
-      };
-      const answerKey = act.exam_detail.answer_key as {
-        items?: Record<string, Record<string, string>>;
-      };
-      for (const it of config.items || []) {
+      const exConfig = ExamConfigSchema.safeParse(act.exam_detail.config);
+      const exKey = ExamAnswerKeySchema.safeParse(act.exam_detail.answer_key);
+      const itemsList = exConfig.success ? exConfig.data.items : [];
+      const keyItems = exKey.success ? exKey.data.items : {};
+      for (const it of itemsList) {
         items.push({
           id: it.id,
           prompt: it.prompt,
           weight: it.weight,
-          correctAnswer: answerKey?.items?.[it.id] ?? null,
-          rubricText: it.rubricText ?? null,
+          correctAnswer: keyItems[it.id] ?? null,
+          rubricText: null,
         });
       }
     }
 
-    const payloadObj = (attempt.payload as { answers?: Record<string, unknown> }) || {};
-    let rawAnswers = payloadObj.answers || {};
-    if (
-      rawAnswers &&
-      typeof rawAnswers === 'object' &&
-      'items' in rawAnswers &&
-      typeof (rawAnswers as { items: unknown }).items === 'object'
-    ) {
-      rawAnswers = { ...rawAnswers, ...(rawAnswers as { items: Record<string, unknown> }).items };
+    const payloadObj = isRecord(attempt.payload) ? attempt.payload : {};
+    const rawAnswers = isRecord(payloadObj.answers) ? payloadObj.answers : {};
+    let flattenedAnswers: Record<string, unknown> = { ...rawAnswers };
+    if ('items' in rawAnswers && isRecord(rawAnswers.items)) {
+      flattenedAnswers = { ...flattenedAnswers, ...rawAnswers.items };
     }
-    const answers = { ...rawAnswers };
+    const answers = { ...flattenedAnswers };
 
     // If open_question, bridge answers['text'] with answers[act.id] and answers[item.id] ONLY for single-item activity (P1-07, RFC-01)
     if (act.type === ActivityType.open_question) {
-      const config = act.open_question_detail?.config as { items?: Array<{ id: string }> } | undefined;
-      const isMultiItem = Array.isArray(config?.items) && config.items.length > 1;
+      const oqItems = getOpenQuestionItems(act.open_question_detail?.config, act.id);
+      const isMultiItem = oqItems.length > 1;
       if (!isMultiItem) {
-        const singleItemId =
-          Array.isArray(config?.items) && config.items.length === 1 && config.items[0]?.id
-            ? config.items[0].id
-            : act.id;
+        const singleItemId = oqItems.length === 1 && oqItems[0] ? oqItems[0].id : act.id;
 
         if (answers['text'] !== undefined && answers[singleItemId] === undefined) {
           answers[singleItemId] = answers['text'];
@@ -393,7 +404,7 @@ export class ReviewsService {
       review: h.review
         ? {
             comment: h.review.comment,
-            stickers: (h.review.stickers as StickerCode[]) || [],
+            stickers: parseStickers(h.review.stickers),
           }
         : null,
     }));
@@ -914,7 +925,7 @@ export class ReviewsService {
         organization_id: organizationId,
         student_id: studentId,
         status: AttemptStatus.graded,
-        assignment_id: { not: undefined },
+        assignment_id: { not: null },
         assignment: {
           activity: {
             type: { not: ActivityType.game },
@@ -1139,7 +1150,7 @@ export class ReviewsService {
         ? {
             id: att.review.id,
             comment: att.review.comment,
-            stickers: (att.review.stickers as StickerCode[]) || [],
+            stickers: parseStickers(att.review.stickers),
             reviewerId: att.review.reviewer_id,
             createdAt: att.review.created_at?.toISOString?.() ?? new Date().toISOString(),
             updatedAt: att.review.updated_at?.toISOString?.() ?? new Date().toISOString(),
@@ -1168,8 +1179,8 @@ export class ReviewsService {
     } | null;
   }): StudentFeedbackAttemptView {
     const rawScore = att.score !== null ? Number(att.score) : 0;
-    const stickerDefs = (att.review?.stickers || [])
-      .map((code) => STICKERS[code as StickerCode])
+    const stickerDefs = parseStickers(att.review?.stickers)
+      .map((code) => STICKERS[code])
       .filter((s): s is NonNullable<typeof s> => Boolean(s));
 
     return {

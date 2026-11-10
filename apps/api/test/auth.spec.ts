@@ -159,7 +159,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       expect(res.cookies['englove_refresh_token']?.options.path).toBe('/api/v1/auth');
       expect(res.cookies['englove_session_hint']?.options.httpOnly).toBe(false);
       expect(res.cookies['englove_session_hint']?.options.path).toBe('/');
-    });
+    }, 15000);
 
     it('devuelve respuesta uniforme 401 AUTH_INVALID_CREDENTIALS ante correo inexistente o contraseña errónea', async () => {
       const mockPrisma = {

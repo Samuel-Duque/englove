@@ -16,6 +16,27 @@ import {
 } from '@englove/shared';
 import { TenantContext } from '../common/tenant/tenant.context';
 
+function getErrorCode(err: unknown): string | undefined {
+  if (typeof err === 'object' && err !== null && 'code' in err && typeof err.code === 'string') {
+    return err.code;
+  }
+  return undefined;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return String(err);
+}
+
+const BOGOTA_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 @Injectable()
 export class MaintenanceService {
   private readonly logger = new Logger(MaintenanceService.name);
@@ -31,12 +52,7 @@ export class MaintenanceService {
 
   @Cron('0 0 0 * * *', { timeZone: 'America/Bogota' })
   async handleNightlyMaintenance(): Promise<void> {
-    const periodKey = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    const periodKey = BOGOTA_DATE_FORMATTER.format(new Date());
 
     await this.runIdentityMaintenance(periodKey);
   }
@@ -107,7 +123,7 @@ export class MaintenanceService {
             },
           });
         } catch (createErr: unknown) {
-          if ((createErr as { code?: string })?.code === 'P2002') {
+          if (getErrorCode(createErr) === 'P2002') {
             // Concurrent execution already started by another worker (RF-21, §4.5)
             return;
           }
@@ -168,9 +184,14 @@ export class MaintenanceService {
           });
 
           for (const att of inProgressAttempts) {
-            if (!att.assignment) continue;
-            const effectiveDueAt = att.previous_attempt?.retry_extend_until ?? att.assignment.due_at;
-            const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+            let completeUntil: Date;
+            if (att.assignment) {
+              const effectiveDueAt = att.previous_attempt?.retry_extend_until ?? att.assignment.due_at;
+              completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+            } else {
+              // Microgame autonomous attempt without assignment (P2-05 / Decisión 60): token is valid for 24h
+              completeUntil = new Date(att.started_at.getTime() + 24 * 60 * 60 * 1000);
+            }
             if (now > completeUntil) {
               await this.prisma.attempt.update({
                 where: { id: att.id },
@@ -220,7 +241,7 @@ export class MaintenanceService {
         });
       } catch (err: unknown) {
         this.logger.error(
-          `Error en mantenimiento nocturno para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+          `Error en mantenimiento nocturno para organización ${org.id}: ${getErrorMessage(err)}`,
         );
         await this.prisma.scheduledJobRun.updateMany({
           where: {
@@ -325,7 +346,7 @@ export class MaintenanceService {
           });
         } catch (err: unknown) {
           this.logger.error(
-            `Error en cálculo de rachas para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+            `Error en cálculo de rachas para organización ${org.id}: ${getErrorMessage(err)}`,
           );
           await this.prisma.scheduledJobRun.updateMany({
             where: {
@@ -381,15 +402,18 @@ export class MaintenanceService {
             where: { organization_id: org.id },
           });
 
+          const [nowYear, nowMonth, nowDay] = BOGOTA_DATE_FORMATTER.format(now).split('-').map(Number);
+
           for (const st of students) {
-            const birthDate = new Date(st.birth_date);
-            const age =
-              now.getFullYear() -
-              birthDate.getFullYear() -
-              (now.getMonth() < birthDate.getMonth() ||
-              (now.getMonth() === birthDate.getMonth() && now.getDate() < birthDate.getDate())
-                ? 1
-                : 0);
+            const birthD = new Date(st.birth_date);
+            // Civil date from Postgres @db.Date (UTC midnight) or local Date instance
+            const bYear = birthD.getUTCFullYear();
+            const bMonth = birthD.getUTCMonth() + 1;
+            const bDay = birthD.getUTCDate();
+            let age = (nowYear ?? 2026) - bYear;
+            if ((nowMonth ?? 1) < bMonth || ((nowMonth ?? 1) === bMonth && (nowDay ?? 1) < bDay)) {
+              age--;
+            }
 
             if (age >= 11 && !st.can_switch_interface) {
               // RF-24: Activa permiso sin cambiar tema (age_segment intacto)
@@ -414,7 +438,7 @@ export class MaintenanceService {
           });
         } catch (err: unknown) {
           this.logger.error(
-            `Error en revisión de edad para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+            `Error en revisión de edad para organización ${org.id}: ${getErrorMessage(err)}`,
           );
           await this.prisma.scheduledJobRun.updateMany({
             where: {
@@ -431,12 +455,7 @@ export class MaintenanceService {
 
   @Cron('0 0 2 * * *', { timeZone: 'America/Bogota' })
   async handleAudioRetention(): Promise<void> {
-    const periodKey = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    const periodKey = BOGOTA_DATE_FORMATTER.format(new Date());
 
     await this.runAudioRetention(periodKey);
   }
@@ -499,7 +518,7 @@ export class MaintenanceService {
               },
             });
           } catch (createErr: unknown) {
-            if ((createErr as { code?: string })?.code === 'P2002') {
+            if (getErrorCode(createErr) === 'P2002') {
               return;
             }
             throw createErr;
@@ -545,7 +564,7 @@ export class MaintenanceService {
                 });
               } catch (err: unknown) {
                 this.logger.error(
-                  `[MaintenanceService:audio_retention] Fallo al borrar asset ${media.id} de R2: ${(err as Error)?.message || String(err)}`,
+                  `[MaintenanceService:audio_retention] Fallo al borrar asset ${media.id} de R2: ${getErrorMessage(err)}`,
                 );
                 try {
                   await this.prisma.mediaAsset.update({
@@ -569,7 +588,7 @@ export class MaintenanceService {
           });
         } catch (err: unknown) {
           this.logger.error(
-            `[MaintenanceService:audio_retention] Error en retención de audios para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+            `[MaintenanceService:audio_retention] Error en retención de audios para organización ${org.id}: ${getErrorMessage(err)}`,
           );
           await this.prisma.scheduledJobRun.updateMany({
             where: {
@@ -586,12 +605,7 @@ export class MaintenanceService {
 
   @Cron('0 0 8 * * *', { timeZone: 'America/Bogota' })
   async handleTeacherPendingSummary(): Promise<void> {
-    const periodKey = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    const periodKey = BOGOTA_DATE_FORMATTER.format(new Date());
 
     await this.runTeacherPendingSummary(periodKey);
   }
@@ -611,12 +625,7 @@ export class MaintenanceService {
     });
     const now = asOfDate || new Date();
 
-    const nowBogotaDay = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(now);
+    const nowBogotaDay = BOGOTA_DATE_FORMATTER.format(now);
 
     for (const org of orgs) {
       await TenantContext.run({ organizationId: org.id }, async () => {
@@ -632,12 +641,7 @@ export class MaintenanceService {
           });
 
           if (lastDoneJob && lastDoneJob.finished_at) {
-            const lastBogotaDay = new Intl.DateTimeFormat('en-CA', {
-              timeZone: 'America/Bogota',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-            }).format(lastDoneJob.finished_at);
+            const lastBogotaDay = BOGOTA_DATE_FORMATTER.format(lastDoneJob.finished_at);
 
             const diffMs = new Date(nowBogotaDay).getTime() - new Date(lastBogotaDay).getTime();
             const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
@@ -681,7 +685,7 @@ export class MaintenanceService {
                 },
               });
             } catch (createErr: unknown) {
-              const code = (createErr as { code?: string })?.code;
+              const code = getErrorCode(createErr);
               if (code === 'P2002' || code === 'P2003') {
                 return;
               }
@@ -703,8 +707,9 @@ export class MaintenanceService {
                 },
               });
 
+              let anyEmailFailed = false;
               for (const teacher of teachers) {
-                await this.mailService.sendMail({
+                const mailRes = await this.mailService.sendMail({
                   template: 'teacher-pending-summary',
                   to: teacher.email,
                   variables: {
@@ -713,16 +718,33 @@ export class MaintenanceService {
                   },
                   idempotencyKey: `teacher-pending-summary-${org.id}-${teacher.id}-${periodKey}`,
                 });
+                if (mailRes.status === 'failed') {
+                  anyEmailFailed = true;
+                }
               }
 
-              await this.prisma.scheduledJobRun.updateMany({
-                where: {
-                  organization_id: org.id,
-                  job_key: 'teacher_pending_summary',
-                  period_key: periodKey,
-                },
-                data: { status: JobRunStatus.done, finished_at: new Date() },
-              });
+              if (anyEmailFailed) {
+                this.logger.warn(
+                  `[MaintenanceService:teacher_pending_summary] Uno o más correos fallaron para la organización ${org.id}; marcando ScheduledJobRun como failed`,
+                );
+                await this.prisma.scheduledJobRun.updateMany({
+                  where: {
+                    organization_id: org.id,
+                    job_key: 'teacher_pending_summary',
+                    period_key: periodKey,
+                  },
+                  data: { status: JobRunStatus.failed, finished_at: new Date() },
+                });
+              } else {
+                await this.prisma.scheduledJobRun.updateMany({
+                  where: {
+                    organization_id: org.id,
+                    job_key: 'teacher_pending_summary',
+                    period_key: periodKey,
+                  },
+                  data: { status: JobRunStatus.done, finished_at: new Date() },
+                });
+              }
             } else {
               // When 0 pending items, do NOT mark as done with finished_at
               // Clean up the running job record so future executions are not blocked for 3 days (SPEC-11 RF-12, Brecha 5)
@@ -736,12 +758,12 @@ export class MaintenanceService {
             }
           }
         } catch (err: unknown) {
-          const code = (err as { code?: string })?.code;
+          const code = getErrorCode(err);
           if (code === 'P2003') {
             return; // Organization deleted concurrently
           }
           this.logger.error(
-            `[MaintenanceService:teacher_pending_summary] Error en resumen de pendientes para organización ${org.id}: ${(err as Error)?.message || String(err)}`,
+            `[MaintenanceService:teacher_pending_summary] Error en resumen de pendientes para organización ${org.id}: ${getErrorMessage(err)}`,
           );
           try {
             await this.prisma.scheduledJobRun.updateMany({

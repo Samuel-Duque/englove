@@ -33,6 +33,10 @@ import { Prisma } from '@prisma/client';
 import { MediaService } from '../media/media.service';
 import { TenantContext } from '../common/tenant/tenant.context';
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
 @Injectable()
 export class StudentsService {
   private readonly webBaseUrl: string;
@@ -387,7 +391,7 @@ export class StudentsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      const groupDelegate = (tx as unknown as { group?: PrismaService['group'] }).group ?? this.prisma.group;
+      const groupDelegate = 'group' in tx && tx.group ? tx.group : this.prisma.group;
       const group = await groupDelegate.findFirst({
         where: {
           id: dto.groupId,
@@ -947,7 +951,7 @@ export class StudentsService {
         });
       });
     } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'P2002') {
+      if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'P2002') {
         throw new ConflictException({
           statusCode: 409,
           code: 'EMAIL_TAKEN',
@@ -1065,12 +1069,12 @@ export class StudentsService {
       });
 
       for (const log of logs) {
-        const details = (log.details as Record<string, unknown>) || {};
-        const redactedDetails: Record<string, unknown> = {};
+        const details = isRecord(log.details) ? log.details : {};
+        const redactedDetails: Record<string, string | number | boolean> = {};
         for (const [k, v] of Object.entries(details)) {
-          if (typeof v === 'string' && v.includes('@')) {
-            redactedDetails[k] = '[REDACTADO]';
-          } else {
+          if (typeof v === 'string') {
+            redactedDetails[k] = v.includes('@') ? '[REDACTADO]' : v;
+          } else if (typeof v === 'number' || typeof v === 'boolean') {
             redactedDetails[k] = v;
           }
         }
@@ -1079,7 +1083,7 @@ export class StudentsService {
           where: { id: log.id },
           data: {
             target_student_id: null,
-            details: redactedDetails as Prisma.InputJsonObject,
+            details: redactedDetails,
           },
         });
       }

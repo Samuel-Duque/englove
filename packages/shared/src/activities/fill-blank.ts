@@ -90,13 +90,16 @@ export const FillBlankAnswersSchema = z.object({
 
 export type FillBlankAnswers = z.infer<typeof FillBlankAnswersSchema>;
 
+declare const crypto: {
+  randomUUID?: () => string;
+};
+
 /**
  * Helper to parse syntax `[correct|distractor1|distractor2]` into FillBlankItem components.
  */
 function defaultUuid(): string {
-  const globalObj = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
-  if (globalObj.crypto && typeof globalObj.crypto.randomUUID === 'function') {
-    return globalObj.crypto.randomUUID();
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
   }
   return '00000000-0000-4000-8000-' + Math.random().toString(16).substring(2, 14).padStart(12, '0');
 }

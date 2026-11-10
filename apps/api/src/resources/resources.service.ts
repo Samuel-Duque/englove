@@ -19,6 +19,15 @@ import {
 } from './dto/resources.dto';
 import { ExternalResource, Prisma } from '@prisma/client';
 
+function isLevel(val: unknown): val is Level {
+  return (
+    val === Level.A1 ||
+    val === Level.A2 ||
+    val === Level.B1 ||
+    val === Level.B2
+  );
+}
+
 @Injectable()
 export class ResourcesService {
   constructor(
@@ -32,7 +41,7 @@ export class ResourcesService {
       title: resource.title,
       url: resource.url,
       description: resource.description,
-      level: resource.level ? (resource.level as Level) : null,
+      level: isLevel(resource.level) ? resource.level : null,
       position: resource.position,
       createdBy: resource.created_by,
       // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
@@ -52,8 +61,8 @@ export class ResourcesService {
 
     if (query?.level === 'general') {
       where.level = null;
-    } else if (query?.level) {
-      where.level = query.level as Level;
+    } else if (query?.level && isLevel(query.level)) {
+      where.level = query.level;
     }
 
     const [total, items] = await Promise.all([

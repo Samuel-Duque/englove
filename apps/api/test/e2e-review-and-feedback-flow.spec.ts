@@ -23,42 +23,53 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UnprocessableEntityException, NotFoundException, ConflictException } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
-import * as net from 'net';
+import { execFileSync } from 'node:child_process';
 
 function getPostgresPort(): number {
   const url = process.env.DATABASE_URL;
-  if (!url) return 5432;
+  if (!url) return 5433;
   try {
     const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5432;
+    return parsed.port ? parseInt(parsed.port, 10) : 5433;
   } catch {
-    return 5432;
+    return 5433;
   }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(getPostgresPort(), '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo único y nuevo intento en PostgreSQL real (ENG-094)', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+function checkPostgresRunning(): boolean {
+  const configuredPort = getPostgresPort();
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
+  return false;
+}
+
+const isPostgresAvailable = checkPostgresRunning();
+
+describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo único y nuevo intento en PostgreSQL real (ENG-094)', () => {
+  let prisma: PrismaService;
   let attemptsService: AttemptsService;
   let reviewsService: ReviewsService;
   let pendingSummaryService: PendingSummaryService;
@@ -76,15 +87,8 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   let attemptId = '';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost:5432; saltando pruebas E2E contra DB real.');
-      return;
-    }
-
-    try {
-      prisma = new PrismaService();
-      await prisma.$connect();
+    prisma = new PrismaService();
+    await prisma.$connect();
 
       const configService = new ConfigService({
         JWT_SECRET: 'e2e-review-flow-test-jwt-secret-min-32-chars-long!',
@@ -270,14 +274,10 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
           due_at: new Date(Date.now() + 2 * 86400 * 1000),
         },
       });
-    } catch (err) {
-      console.error('Error inicializando DB real para E2E Flujo 3:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       await prisma.scheduledJobRun.deleteMany({ where: { organization_id: { in: [orgId, otherOrgId] } } }).catch(() => {});
       await prisma.review.deleteMany({ where: { organization_id: { in: [orgId, otherOrgId] } } }).catch(() => {});
       await prisma.mediaAsset.deleteMany({ where: { organization_id: { in: [orgId, otherOrgId] } } }).catch(() => {});
@@ -297,8 +297,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 1: El alumno inicia la actividad de speaking y completa el intento quedando en pending_review', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -340,8 +338,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 2: La profesora consulta la cola de pendientes y obtiene el detalle para evaluación', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: teacherId, role: Role.teacher },
       async () => {
@@ -366,8 +362,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 3: La profesora califica con nota, comentario y stickers; se emite ProgressEvent y correo único', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: teacherId, role: Role.teacher },
       async () => {
@@ -417,8 +411,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 4: La nota es inmutable en intentos graded (422 SCORE_NOT_EDITABLE); solo se edita feedback', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: teacherId, role: Role.teacher },
       async () => {
@@ -454,8 +446,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 5: La profesora concede un nuevo intento con extensión de plazo opcional', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: teacherId, role: Role.teacher },
       async () => {
@@ -495,8 +485,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 6: El alumno consume la autorización creando el intento #2 enlazado por previous_attempt_id', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -516,8 +504,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 7: El alumno consulta /feedback y ve el historial cronológico y su retroalimentación sin fugas de audio', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -543,8 +529,6 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   });
 
   it('Paso 8: Aislamiento anti-IDOR: intentar leer intento desde otra organización responde 404', async () => {
-    if (!isPostgresAvailable) return;
-
     await expect(
       reviewsService.getReviewDetail(otherOrgId, attemptId),
     ).rejects.toThrow(NotFoundException);

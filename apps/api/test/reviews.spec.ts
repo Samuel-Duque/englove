@@ -369,6 +369,38 @@ describe('SPEC-07: ReviewsService — Calificación, feedback, retención y nuev
       expect(mockMail.sendMail).not.toHaveBeenCalled();
     });
 
+    it('rechaza notas menores a 0 o mayores a 5 con 422 SCORE_OUT_OF_RANGE (T5.4 / P3-02)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValue({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        status: AttemptStatus.pending_review,
+        assignment_id: assignmentId,
+        student: { id: studentId, age_segment: AgeSegment.kids, user: { name: 'Juan', email: 'j@test.com' } },
+        assignment: {
+          id: assignmentId,
+          cancelled_at: null,
+          activity: { id: 'a-1', title: 'Act', type: ActivityType.speaking },
+        },
+      });
+
+      try {
+        await service.submitReview(orgId, teacherId, attemptId, { score: 5.5, comment: 'Test' });
+        expect.unreachable('Should throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(UnprocessableEntityException);
+        expect(err.getResponse()).toMatchObject({ statusCode: 422, code: 'SCORE_OUT_OF_RANGE' });
+      }
+
+      try {
+        await service.submitReview(orgId, teacherId, attemptId, { score: -0.5, comment: 'Test' });
+        expect.unreachable('Should throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(UnprocessableEntityException);
+        expect(err.getResponse()).toMatchObject({ statusCode: 422, code: 'SCORE_OUT_OF_RANGE' });
+      }
+    });
+
     it('rechaza más de 3 stickers o stickers duplicados (RF-4, Decision 108)', async () => {
       mockPrisma.attempt.findFirst.mockResolvedValue({
         id: attemptId,

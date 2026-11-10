@@ -131,7 +131,12 @@ export function renderTemplate(template: MailTemplate, variables: Record<string,
       const ungradedActivities = Number(variables.ungradedActivities || 0);
       const subject = 'Tienes pendientes en Englove';
       const text = `Tienes pendientes en Englove:\n- Solicitudes de registro por revisar: ${pendingRequests}\n- Actividades sin calificar hace más de 3 días: ${ungradedActivities}\n\nIngresa al panel para gestionarlos.`;
-        const webBaseUrl = (variables.webBaseUrl as string) || process.env.WEB_BASE_URL || 'http://localhost:3000';
+        const webBaseUrl =
+          (typeof variables.webBaseUrl === 'string' && variables.webBaseUrl.length > 0
+            ? variables.webBaseUrl
+            : undefined) ||
+          process.env.WEB_BASE_URL ||
+          'http://localhost:3000';
         const html = `<!DOCTYPE html><html><body>
         <h2>Tienes pendientes en Englove</h2>
         <p>Resumen de tareas pendientes en la plataforma:</p>

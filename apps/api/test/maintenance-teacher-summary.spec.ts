@@ -177,4 +177,38 @@ describe('SPEC-08 RF-12: Job teacher_pending_summary cada 3 días (ENG-104)', ()
     expect(mockPendingSummary.getReminders).not.toHaveBeenCalled();
     expect(mockMail.sendMail).not.toHaveBeenCalled();
   });
+
+  it('no marca ScheduledJobRun como done y lo registra como failed si sendMail devuelve status failed (P2-05)', async () => {
+    const threeDaysAgo = new Date('2026-10-25T13:00:00Z');
+    const today = new Date('2026-10-28T13:00:00Z');
+
+    mockPrisma.scheduledJobRun.findFirst.mockResolvedValueOnce({
+      id: 'job-prev',
+      job_key: 'teacher_pending_summary',
+      status: JobRunStatus.done,
+      finished_at: threeDaysAgo,
+    });
+    mockPrisma.scheduledJobRun.findFirst.mockResolvedValueOnce(null);
+
+    mockPendingSummary.getReminders.mockResolvedValue({
+      pendingApprovals: 1,
+      overdueReviews: 0,
+    });
+
+    mockMail.sendMail.mockResolvedValueOnce({ status: 'failed', error: 'SMTP timeout' });
+
+    await service.runTeacherPendingSummary('2026-10-28', today);
+
+    expect(mockMail.sendMail).toHaveBeenCalled();
+    expect(mockPrisma.scheduledJobRun.updateMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: orgId,
+        job_key: 'teacher_pending_summary',
+        period_key: '2026-10-28',
+      },
+      data: expect.objectContaining({
+        status: JobRunStatus.failed,
+      }),
+    });
+  });
 });

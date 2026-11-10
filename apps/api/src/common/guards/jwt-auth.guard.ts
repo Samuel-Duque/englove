@@ -12,16 +12,16 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
-import { ApprovalStatus } from '@englove/shared';
+import { ApprovalStatus, Role, AgeSegment } from '@englove/shared';
 
 interface JwtPayload {
   sub: string;
   email: string;
-  role: string;
+  role: Role;
   org: string;
   sid: string;
   student_id?: string;
-  age_segment?: string;
+  age_segment?: AgeSegment;
   typ?: string;
 }
 
@@ -99,7 +99,10 @@ export class JwtAuthGuard implements CanActivate {
       }
 
       // Check user locked_until to sever active sessions for locked accounts (P1-12)
-      let lockedUntil = (session as { user?: { locked_until?: Date | null } }).user?.locked_until;
+      let lockedUntil: Date | null | undefined =
+        typeof session === 'object' && session !== null && 'user' in session && session.user && typeof session.user === 'object' && 'locked_until' in session.user
+          ? (session.user.locked_until instanceof Date ? session.user.locked_until : null)
+          : undefined;
       if (lockedUntil === undefined && this.prisma.user) {
         const u = await this.prisma.user.findFirst({
           where: { id: payload.sub, organization_id: payload.org },
@@ -139,14 +142,14 @@ export class JwtAuthGuard implements CanActivate {
       const authUser: AuthenticatedUser = {
         id: payload.sub,
         email: payload.email,
-        role: payload.role as AuthenticatedUser['role'],
+        role: payload.role,
         organizationId: payload.org,
         studentId,
-        ageSegment: ageSegment as AuthenticatedUser['ageSegment'],
+        ageSegment,
         sessionId: payload.sid,
       };
 
-      (request as unknown as { user: AuthenticatedUser }).user = authUser;
+      Object.assign(request, { user: authUser });
       return true;
     } catch (err) {
       if (isPublic) {

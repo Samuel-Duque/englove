@@ -797,5 +797,76 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
       expect(completion.attempt.startedAt).toBe('2026-11-09T20:00:00.000Z');
       expect(completion.attempt.finishedAt).toBe('2026-11-09T20:05:00.000Z');
     });
+
+    it('T5.1 Edge Case: degrada predeciblemente y preserva valores null y anidados sin fallar al serializar payload', async () => {
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: attemptId,
+          status: AttemptStatus.in_progress,
+          payload: 'corrupted-non-object-payload',
+          started_at: new Date(),
+          finished_at: null,
+          graded_at: null,
+          score: null,
+          flags: [],
+          attempt_number: 1,
+          assignment_id: assignmentId,
+          activity_id: activityId,
+          previous_attempt_id: null,
+        },
+      ]);
+
+      mockPrisma.assignment.findFirst.mockResolvedValueOnce({
+        id: assignmentId,
+        due_at: new Date(Date.now() + 3600 * 1000),
+        activity: {
+          id: activityId,
+          type: ActivityType.open_question,
+          title: 'Essay',
+          open_question_detail: {
+            config: {
+              prompt: 'Write essay',
+            },
+          },
+        },
+      });
+
+      mockPrisma.attempt.update.mockResolvedValueOnce({
+        id: attemptId,
+        status: AttemptStatus.pending_review,
+        payload: { answers: { q1: null, q2: 'hello' }, processedEventIds: [] },
+        started_at: new Date(),
+        finished_at: new Date(),
+        graded_at: null,
+        score: null,
+        flags: [],
+        attempt_number: 1,
+        assignment_id: assignmentId,
+        activity_id: activityId,
+        previous_attempt_id: null,
+      });
+
+      const res = await service.completeAttempt(orgId, studentId, attemptId, validToken, {
+        answers: {
+          q1: null,
+          q2: 'hello',
+          metadata: { subKey: null, validNum: 42 },
+        },
+      });
+
+      expect(res.attempt.status).toBe(AttemptStatus.pending_review);
+      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payload: expect.objectContaining({
+              answers: expect.objectContaining({
+                q1: null,
+                q2: 'hello',
+              }),
+            }),
+          }),
+        }),
+      );
+    });
   });
 });

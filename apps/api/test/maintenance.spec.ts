@@ -137,6 +137,47 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
     });
+
+    it('marca como abandoned los intentos in_progress de microjuegos autónomos (sin assignment) tras 24h (P2-05)', async () => {
+      // Microgame started 25h ago -> expired
+      const started25hAgo = new Date(Date.now() - 25 * 3600 * 1000);
+      mockPrisma.attempt.findMany.mockResolvedValueOnce([
+        {
+          id: 'game-attempt-expired',
+          status: AttemptStatus.in_progress,
+          assignment: null,
+          started_at: started25hAgo,
+          previous_attempt: null,
+        },
+      ]);
+
+      await service.runIdentityMaintenance(periodKey);
+
+      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'game-attempt-expired' },
+          data: { status: AttemptStatus.abandoned },
+        }),
+      );
+    });
+
+    it('no modifica intentos in_progress de microjuegos autónomos dentro de las 24h (P2-05)', async () => {
+      // Microgame started 10h ago -> not expired
+      const started10hAgo = new Date(Date.now() - 10 * 3600 * 1000);
+      mockPrisma.attempt.findMany.mockResolvedValueOnce([
+        {
+          id: 'game-attempt-active',
+          status: AttemptStatus.in_progress,
+          assignment: null,
+          started_at: started10hAgo,
+          previous_attempt: null,
+        },
+      ]);
+
+      await service.runIdentityMaintenance(periodKey);
+
+      expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('RF-13 & RF-14: Purga de archivos multimedia en mantenimiento nocturno', () => {
@@ -205,6 +246,36 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       await service.runMonthlyAgeReview(periodKey);
 
       expect(mockPrisma.student.update).not.toHaveBeenCalled();
+    });
+
+    it('evalúa fecha civil de Postgres @db.Date (UTC midnight) en America/Bogota sin desfase de un día (P2-05)', async () => {
+      // Student born on exactly 11 years ago today in UTC
+      const nowBogota = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+      const [nowY, nowM, nowD] = nowBogota.split('-').map(Number);
+      const exactBirthDate = new Date(Date.UTC((nowY ?? 2026) - 11, (nowM ?? 1) - 1, nowD ?? 1));
+
+      mockPrisma.student.findMany.mockResolvedValueOnce([
+        {
+          id: studentId,
+          birth_date: exactBirthDate,
+          can_switch_interface: false,
+          age_segment: 'kids',
+        },
+      ]);
+
+      await service.runMonthlyAgeReview(periodKey);
+
+      expect(mockPrisma.student.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: studentId },
+          data: { can_switch_interface: true },
+        }),
+      );
     });
   });
 });

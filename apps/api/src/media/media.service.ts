@@ -27,6 +27,7 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn } from 'child_process';
 import { PrismaService } from '../prisma/prisma.service';
+import { AttemptStatus } from '@prisma/client';
 import { TenantContext } from '../common/tenant/tenant.context';
 import { MediaUploadUrlDto } from './dto/media.dto';
 import {
@@ -36,6 +37,24 @@ import {
   MediaConfirmResponse,
   ActivityType,
 } from '@englove/shared';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function isReadableStream(val: unknown): val is NodeJS.ReadableStream {
+  if (typeof val !== 'object' || val === null) return false;
+  return 'pipe' in val && typeof val.pipe === 'function';
+}
+
+interface ByteArrayTransformable {
+  transformToByteArray: () => Promise<Uint8Array>;
+}
+
+function isByteArrayTransformable(val: unknown): val is ByteArrayTransformable {
+  if (typeof val !== 'object' || val === null) return false;
+  return 'transformToByteArray' in val && typeof val.transformToByteArray === 'function';
+}
 
 @Injectable()
 export class MediaService implements OnModuleInit {
@@ -206,8 +225,8 @@ export class MediaService implements OnModuleInit {
 
     if (new Date() > completeUntil) {
       if (
-        attempt.status === 'in_progress' ||
-        attempt.status === ('abandoned' as import('@englove/shared').AttemptStatus)
+        attempt.status === AttemptStatus.in_progress ||
+        attempt.status === AttemptStatus.abandoned
       ) {
         const currentFlags = attempt.flags || [];
         const newFlags = currentFlags.includes('offline_sync')
@@ -353,8 +372,8 @@ export class MediaService implements OnModuleInit {
       const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
       if (new Date() > completeUntil) {
         if (
-          attempt.status === 'in_progress' ||
-          attempt.status === ('abandoned' as import('@englove/shared').AttemptStatus)
+          attempt.status === AttemptStatus.in_progress ||
+          attempt.status === AttemptStatus.abandoned
         ) {
           const currentFlags = attempt.flags || [];
           const newFlags = currentFlags.includes('offline_sync')
@@ -472,10 +491,12 @@ export class MediaService implements OnModuleInit {
           }),
         );
       } catch (err: unknown) {
+        const errObj = isRecord(err) ? err : undefined;
+        const metadata = isRecord(errObj?.$metadata) ? errObj.$metadata : undefined;
         const isNotFound =
-          (err as { name?: string })?.name === 'NotFound' ||
-          (err as { name?: string })?.name === 'NoSuchKey' ||
-          (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode === 404;
+          errObj?.name === 'NotFound' ||
+          errObj?.name === 'NoSuchKey' ||
+          metadata?.httpStatusCode === 404;
 
         if (isNotFound) {
           throw new ConflictException({
@@ -700,7 +721,8 @@ export class MediaService implements OnModuleInit {
         // guardrails-ignore G-A06: procesamiento serial de transcodificación en background worker sin contexto HTTP
         await TenantContext.runBypass(() => this.transcodeAsset(assetId));
       } catch (err: unknown) {
-        this.logger.error(`Error transcodificando asset ${assetId}: ${(err as Error)?.message || String(err)}`);
+        const errMessage = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Error transcodificando asset ${assetId}: ${errMessage}`);
         // Re-enqueue if transcode_attempts < 3 (P1-03)
         try {
           // guardrails-ignore G-A11: consulta de intentos de transcodificación por ID interno de asset
@@ -766,13 +788,10 @@ export class MediaService implements OnModuleInit {
       );
 
       if (getRes.Body) {
-        if (typeof (getRes.Body as { pipe?: unknown }).pipe === 'function') {
-          await pipeline(getRes.Body as NodeJS.ReadableStream, fs.createWriteStream(rawLocalPath));
-        } else if (
-          typeof (getRes.Body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray ===
-          'function'
-        ) {
-          const bytes = await (getRes.Body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+        if (isReadableStream(getRes.Body)) {
+          await pipeline(getRes.Body, fs.createWriteStream(rawLocalPath));
+        } else if (isByteArrayTransformable(getRes.Body)) {
+          const bytes = await getRes.Body.transformToByteArray();
           fs.writeFileSync(rawLocalPath, Buffer.from(bytes));
         } else {
           fs.writeFileSync(rawLocalPath, Buffer.from([]));
@@ -923,13 +942,10 @@ export class MediaService implements OnModuleInit {
       });
 
       if (getRes.Body) {
-        if (typeof (getRes.Body as { pipe?: unknown }).pipe === 'function') {
-          await pipeline(getRes.Body as NodeJS.ReadableStream, byteCounter, fs.createWriteStream(tempFile));
-        } else if (
-          typeof (getRes.Body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray ===
-          'function'
-        ) {
-          const bytes = await (getRes.Body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+        if (isReadableStream(getRes.Body)) {
+          await pipeline(getRes.Body, byteCounter, fs.createWriteStream(tempFile));
+        } else if (isByteArrayTransformable(getRes.Body)) {
+          const bytes = await getRes.Body.transformToByteArray();
           if (bytes.length > MAX_BYTES) {
             throw new PayloadTooLargeException({
               statusCode: 413,
@@ -1054,8 +1070,9 @@ export class MediaService implements OnModuleInit {
       if (err instanceof PayloadTooLargeException) {
         throw err;
       }
+      const errMessage = err instanceof Error ? err.message : String(err);
       this.logger.warn(
-        `ffprobe no pudo medir duración del asset (${(err as Error)?.message}). Rechazando con AUDIO_IMPLAUSIBLE_DURATION`,
+        `ffprobe no pudo medir duración del asset (${errMessage}). Rechazando con AUDIO_IMPLAUSIBLE_DURATION`,
       );
       throw new UnprocessableEntityException({
         statusCode: 422,

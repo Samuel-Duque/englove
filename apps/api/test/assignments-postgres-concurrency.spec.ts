@@ -11,42 +11,54 @@ import { AssignmentsService } from '../src/assignments/assignments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
-import * as net from 'net';
+
+import { execFileSync } from 'node:child_process';
 
 function getPostgresPort(): number {
   const url = process.env.DATABASE_URL;
-  if (!url) return 5432;
+  if (!url) return 5433;
   try {
     const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5432;
+    return parsed.port ? parseInt(parsed.port, 10) : 5433;
   } catch {
-    return 5432;
+    return 5433;
   }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(getPostgresPort(), '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaClient | null = null;
+function checkPostgresRunning(): boolean {
+  const configuredPort = getPostgresPort();
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
+  return false;
+}
+
+const isPostgresAvailable = checkPostgresRunning();
+
+describe.skipIf(!isPostgresAvailable)('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)', () => {
+  let prisma: PrismaClient;
   let service: AssignmentsService;
 
   const testOrgId = 'a1111111-1111-4111-8111-111111111111';
@@ -56,17 +68,10 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   const testGroupId2 = 'a4444444-4444-4444-8444-444444444442';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost:5432; saltando pruebas de Docker PostgreSQL.');
-      return;
-    }
-
-    try {
-      const prismaService = new PrismaService();
-      await prismaService.$connect();
-      prisma = prismaService;
-      service = new AssignmentsService(prismaService);
+    const prismaService = new PrismaService();
+    await prismaService.$connect();
+    prisma = prismaService;
+    service = new AssignmentsService(prismaService);
 
       // Limpiar fixtures de pruebas anteriores si existen
       await prisma.assignment.deleteMany({
@@ -144,14 +149,9 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
           },
         },
       });
-    } catch (err) {
-      console.warn('Error conectando a PostgreSQL real:', err);
-      isPostgresAvailable = false;
-    }
-  });
-
+    });
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       try {
         await prisma.assignment.deleteMany({
           where: { organization_id: testOrgId },
@@ -179,7 +179,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   beforeEach(async () => {
-    if (!isPostgresAvailable || !prisma) return;
     await prisma.assignment.deleteMany({
       where: { organization_id: testOrgId },
     });
@@ -191,7 +190,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   it('SPEC-04 RF-2: crea asignaciones multigrupo atómicamente y persisten en PostgreSQL', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     const { opensAt, dueAt } = getActiveDates();
 
@@ -226,7 +224,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   it('SPEC-04 RF-5: carrera de dos conexiones concurrentes para el mismo par deja una sola ganadora con 409', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     const { opensAt, dueAt } = getActiveDates();
 
@@ -278,7 +275,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   it('SPEC-04 RF-11: cancela en PostgreSQL real, es idempotente y permite nueva asignación con ID distinto', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     const { opensAt, dueAt } = getActiveDates();
 
@@ -328,7 +324,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   it('SPEC-04 RF-2: rollback íntegro si un grupo del lote no existe, sin filas huérfanas en PostgreSQL', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     const nonExistentGroupId = 'b5555555-5555-4555-8555-555555555555';
 
@@ -351,7 +346,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   it('SPEC-04 RF-3: rechaza actividad archivada y grupo archivado en PostgreSQL real', async () => {
-    if (!isPostgresAvailable || !prisma) return;
     const activePrisma = prisma;
 
     return TenantContext.run({ organizationId: testOrgId }, async () => {
@@ -404,7 +398,6 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
   });
 
   it('SPEC-04 RF-4 & RF-10: ventana completamente pasada y historicalStudentCount null en PostgreSQL', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     const pastOpensAt = '2026-09-01T10:00:00.000Z';
     const pastDueAt = '2026-09-05T18:00:00.000Z';

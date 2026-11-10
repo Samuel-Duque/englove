@@ -52,11 +52,11 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 
 ### G-A06 — Toda consulta de tenant filtra por `organization_id`
 
-- **Regla:** doble filtro deliberado: extensión de Prisma Client que añade `where: { organization_id }` **y** filtro explícito en el servicio.
+- **Regla:** doble filtro deliberado: extensión de Prisma Client que añade `where: { organization_id }` **y** filtro explícito en el servicio. Todo uso de `TenantContext.runBypass` debe estar auditado y justificado con comentario `guardrails-ignore G-A06: <motivo>`. Las mutaciones `.update`, `.delete` y `.upsert` por `{ id }` sobre tablas con `organization_id` deben incluir `organization_id` explícito para prevenir mutaciones cross-tenant si la extensión no las intercepta.
 - **Fuente:** CONTEXT §16; architecture §4.3 y §8.1.
-- **Verificación:** Heurística — `AVISO` en llamadas `findMany`, `findFirst`, `updateMany`, `deleteMany`, `count`, `aggregate` y `groupBy` dentro de `apps/api/src` sin `organization_id`/`organizationId` en las líneas siguientes.
+- **Verificación:** Heurística — `AVISO` en llamadas `findMany`, `findFirst`, `updateMany`, `deleteMany`, `count`, `aggregate` y `groupBy` dentro de `apps/api/src` sin `organization_id`/`organizationId` en las líneas siguientes; `AVISO` en todo `TenantContext.runBypass` no suprimido; `AVISO` en `.update/.delete/.upsert({ where: { id } })` sin `organization_id`.
 - **Revisión manual:** que exista la extensión de tenant y que el test de esquema la cubra; que `findUnique` por id no permita leer otro tenant (compara el `organization_id` del resultado o usa `findFirst` con ambos filtros).
-- **Excepciones:** `User` por correo en login y signup (el correo es globalmente único, decisión 59); `Organization`; seeds y tareas que reciben un tenant confiable explícito (SPEC-01 §8).
+- **Excepciones:** `User` por correo en login y signup (el correo es globalmente único, decisión 59); `Organization`; seeds y tareas que reciben un tenant confiable explícito (SPEC-01 §8); bypasses documentados con `// guardrails-ignore G-A06:`.
 
 ### G-A07 — SQL crudo seguro y con tenant
 
@@ -164,9 +164,9 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 
 ### G-B10 — Archivos en R2 privado con URL prefirmada; nunca a través de la API
 
-- **Regla:** buckets privados de R2 vía S3 API (`@aws-sdk/client-s3`), subida directa con URL prefirmada de corta duración emitida tras verificar derechos. Los audios no pasan por la API ni se guardan en disco del servidor como almacenamiento.
+- **Regla:** buckets privados de R2 vía S3 API (`@aws-sdk/client-s3`), subida directa con URL prefirmada de corta duración emitida tras verificar derechos. Los audios no pasan por la API ni se guardan en disco del servidor como almacenamiento. Prohibido habilitar acceso anónimo o lectura pública (`mc anonymous set download` o similar) en local o nube.
 - **Fuente:** decisión 55 (34 §21); CONTEXT §6 y §16; architecture §8.3 y §11.3.
-- **Verificación:** Automática — `ERROR` por `FileInterceptor`, `@UploadedFile`, `multer`, `busboy` o `ACL: 'public-read'`. Heurística — `AVISO` por SDKs de otro almacenamiento (`@google-cloud/storage`, `firebase/storage`, `aws-sdk` v2).
+- **Verificación:** Automática — `ERROR` por `FileInterceptor`, `@UploadedFile`, `multer`, `busboy`, `ACL: 'public-read'` o `mc anonymous/policy set download/public`. Heurística — `AVISO` por SDKs de otro almacenamiento (`@google-cloud/storage`, `firebase/storage`, `aws-sdk` v2).
 - **Excepciones:** archivos temporales de `ffmpeg` en `os.tmpdir()` que se borran al terminar.
 
 ### G-B11 — Cookies de sesión, tokens y CORS
@@ -261,9 +261,9 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 
 ### G-C10 — Sin datos personales en logs ni en errores
 
-- **Regla:** ningún log ni reporte de error incluye nombre, correo, respuestas, audio, contraseña ni tokens; solo identificadores. Los errores al cliente son `{ statusCode, code, message }` sin detalles técnicos. Sentry con `sendDefaultPii: false`. La auditoría va a `AuditLog`, no al log.
+- **Regla:** ningún log ni reporte de error incluye nombre, correo, respuestas, audio, contraseña ni tokens (`x-attempt-token` en headers ni query strings); solo identificadores. Los logs estructurados de `pinoHttp` deben redactar obligatoriamente `req.headers["x-attempt-token"]` y sanear URLs eliminando query strings con `sanitizePinoReq`. Los errores al cliente son `{ statusCode, code, message }` sin detalles técnicos. Sentry con `sendDefaultPii: false`. La auditoría va a `AuditLog`, no al log.
 - **Fuente:** CONTEXT §9; architecture §4.6, §8.5, §12 y §13; decisión 51 (34 §17).
-- **Verificación:** Heurística — `AVISO` por llamadas de log con `email`, `password`, `token`, `body` o `answers`; `AVISO` por `console.log` en `apps/api/src`; `ERROR` por `sendDefaultPii: true`; `AVISO` si una respuesta de error incluye `stack`.
+- **Verificación:** Automática / Heurística — `ERROR` en `apps/api/src/app.module.ts` si `pinoHttp` no redacta `x-attempt-token` o no sanea query strings; `AVISO` por llamadas de log con `email`, `password`, `token`, `body` o `answers`; `AVISO` por `console.log` en `apps/api/src`; `ERROR` por `sendDefaultPii: true`; `AVISO` si una respuesta de error incluye `stack`.
 - **Excepciones:** nombres de variable que contienen la palabra sin registrar su valor (confírmalo leyendo la línea).
 
 ### G-C11 — Secretos solo en variables de entorno

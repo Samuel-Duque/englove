@@ -26,6 +26,72 @@ import {
   scoreToStars,
 } from '@englove/shared';
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function isMatchSettings(val: unknown): val is MatchSettings {
+  return isRecord(val) && Array.isArray(val.left) && Array.isArray(val.right);
+}
+
+function isMatchSolution(val: unknown): val is MatchSolution {
+  return isRecord(val) && isRecord(val.pairs);
+}
+
+function isOrderWordsSettings(val: unknown): val is OrderWordsSettings {
+  return isRecord(val) && Array.isArray(val.tokens);
+}
+
+function isOrderWordsSolution(val: unknown): val is OrderWordsSolution {
+  return isRecord(val) && Array.isArray(val.tokenIds);
+}
+
+function isDragDropSettings(val: unknown): val is DragDropSettings {
+  return isRecord(val) && Array.isArray(val.objects);
+}
+
+function isDragDropSolution(val: unknown): val is DragDropSolution {
+  return isRecord(val) && isRecord(val.placements);
+}
+
+function isMemorySettings(val: unknown): val is MemorySettings {
+  return isRecord(val) && Array.isArray(val.cards);
+}
+
+function isMemorySolution(val: unknown): val is MemorySolution {
+  return isRecord(val) && Array.isArray(val.pairs);
+}
+
+function isTimedChoiceSettings(val: unknown): val is TimedChoiceSettings {
+  return isRecord(val) && Array.isArray(val.questions);
+}
+
+function isTimedChoiceSolution(val: unknown): val is TimedChoiceSolution {
+  return isRecord(val) && isRecord(val.choices);
+}
+
+function toStringRecord(val: unknown): Record<string, string> {
+  if (!isRecord(val)) return {};
+  const res: Record<string, string> = {};
+  for (const [k, v] of Object.entries(val)) {
+    if (typeof v === 'string') {
+      res[k] = v;
+    }
+  }
+  return res;
+}
+
+function toNullableStringRecord(val: unknown): Record<string, string | null> {
+  if (!isRecord(val)) return {};
+  const res: Record<string, string | null> = {};
+  for (const [k, v] of Object.entries(val)) {
+    if (typeof v === 'string' || v === null) {
+      res[k] = v;
+    }
+  }
+  return res;
+}
+
 export interface ScoreCalculationResult {
   score: number;
   fraction: number;
@@ -57,12 +123,14 @@ export class ScoringService {
       const itemMap: Record<string, { correct: boolean }> = {};
       correction[item.id] = itemMap;
       const itemKey = answerKey.items[item.id] || {};
-      const itemAnswers = (userAnswers[item.id] as Record<string, string> | undefined) || {};
+      const rawItemAns = userAnswers[item.id];
+      const itemAnswers = isRecord(rawItemAns) ? toStringRecord(rawItemAns) : {};
 
       for (const blank of item.blanks) {
         totalBlanks++;
         const expected = itemKey[blank.id];
-        const submitted = itemAnswers[blank.id] ?? (userAnswers[blank.id] as string | undefined);
+        const rawBlankAns = userAnswers[blank.id];
+        const submitted = itemAnswers[blank.id] ?? (typeof rawBlankAns === 'string' ? rawBlankAns : undefined);
 
         const isCorrect = submitted !== undefined && expected !== undefined && submitted === expected;
         if (isCorrect) {
@@ -157,14 +225,13 @@ export class ScoringService {
 
     switch (mechanic) {
       case GameMechanic.match: {
-        const settings = config.settings as MatchSettings;
-        const solution = answerKey.solution as MatchSolution;
-        const userPairs =
-          userAnswers.pairs && typeof userAnswers.pairs === 'object'
-            ? (userAnswers.pairs as Record<string, string>)
-            : typeof userAnswers === 'object' && userAnswers !== null && !Array.isArray(userAnswers)
-              ? (userAnswers as Record<string, string>)
-              : {};
+        const settings = isMatchSettings(config.settings) ? config.settings : undefined;
+        const solution = isMatchSolution(answerKey.solution) ? answerKey.solution : undefined;
+        const userPairs = isRecord(userAnswers.pairs)
+          ? toStringRecord(userAnswers.pairs)
+          : isRecord(userAnswers)
+            ? toStringRecord(userAnswers)
+            : {};
         fraction = calculateMatchScore(solution?.pairs || {}, userPairs);
 
         const leftItems = settings?.left || [];
@@ -187,15 +254,14 @@ export class ScoringService {
       }
 
       case GameMechanic.order_words: {
-        const settings = config.settings as OrderWordsSettings;
-        const solution = answerKey.solution as OrderWordsSolution;
-        const userTokenIds = (
-          Array.isArray(userAnswers.tokenIds)
-            ? userAnswers.tokenIds
-            : Array.isArray(userAnswers)
-              ? (userAnswers as unknown as string[])
-              : []
-        ) as string[];
+        const settings = isOrderWordsSettings(config.settings) ? config.settings : undefined;
+        const solution = isOrderWordsSolution(answerKey.solution) ? answerKey.solution : undefined;
+        const rawTokens = Array.isArray(userAnswers.tokenIds)
+          ? userAnswers.tokenIds
+          : Array.isArray(userAnswers)
+            ? userAnswers
+            : [];
+        const userTokenIds = rawTokens.filter((t): t is string => typeof t === 'string');
         fraction = calculateOrderWordsScore(
           settings?.tokens || [],
           solution?.tokenIds || [],
@@ -231,14 +297,13 @@ export class ScoringService {
       }
 
       case GameMechanic.drag_drop: {
-        const settings = config.settings as DragDropSettings;
-        const solution = answerKey.solution as DragDropSolution;
-        const userPlacements =
-          userAnswers.placements && typeof userAnswers.placements === 'object'
-            ? (userAnswers.placements as Record<string, string>)
-            : typeof userAnswers === 'object' && userAnswers !== null && !Array.isArray(userAnswers)
-              ? (userAnswers as Record<string, string>)
-              : {};
+        const settings = isDragDropSettings(config.settings) ? config.settings : undefined;
+        const solution = isDragDropSolution(answerKey.solution) ? answerKey.solution : undefined;
+        const userPlacements = isRecord(userAnswers.placements)
+          ? toStringRecord(userAnswers.placements)
+          : isRecord(userAnswers)
+            ? toStringRecord(userAnswers)
+            : {};
         fraction = calculateDragDropScore(solution?.placements || {}, userPlacements);
 
         const objects = settings?.objects || [];
@@ -257,12 +322,22 @@ export class ScoringService {
       }
 
       case GameMechanic.memory: {
-        const settings = config.settings as MemorySettings;
-        const solution = answerKey.solution as MemorySolution;
+        const settings = isMemorySettings(config.settings) ? config.settings : undefined;
+        const solution = isMemorySolution(answerKey.solution) ? answerKey.solution : undefined;
         const rawSelections = userAnswers.selections || userAnswers;
-        const userSelections = Array.isArray(rawSelections)
-          ? (rawSelections as Array<[string, string]>)
-          : [];
+        const userSelections: Array<[string, string]> = [];
+        if (Array.isArray(rawSelections)) {
+          for (const item of rawSelections) {
+            if (
+              Array.isArray(item) &&
+              item.length === 2 &&
+              typeof item[0] === 'string' &&
+              typeof item[1] === 'string'
+            ) {
+              userSelections.push([item[0], item[1]]);
+            }
+          }
+        }
         const recon = reconstructMemoryPlays(
           settings?.cards || [],
           solution?.pairs || [],
@@ -281,14 +356,13 @@ export class ScoringService {
       }
 
       case GameMechanic.timed_choice: {
-        const settings = config.settings as TimedChoiceSettings;
-        const solution = answerKey.solution as TimedChoiceSolution;
-        const userChoices =
-          userAnswers.choices && typeof userAnswers.choices === 'object'
-            ? (userAnswers.choices as Record<string, string | null>)
-            : typeof userAnswers === 'object' && userAnswers !== null && !Array.isArray(userAnswers)
-              ? (userAnswers as Record<string, string | null>)
-              : {};
+        const settings = isTimedChoiceSettings(config.settings) ? config.settings : undefined;
+        const solution = isTimedChoiceSolution(answerKey.solution) ? answerKey.solution : undefined;
+        const userChoices = isRecord(userAnswers.choices)
+          ? toNullableStringRecord(userAnswers.choices)
+          : isRecord(userAnswers)
+            ? toNullableStringRecord(userAnswers)
+            : {};
         fraction = calculateTimedChoiceScore(solution?.choices || {}, userChoices);
 
         const questions = settings?.questions || [];

@@ -1,23 +1,26 @@
 import { Prisma } from '@prisma/client';
 import { TenantContext } from './tenant.context';
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
 function isValidExplicitTenantFilter(filter: unknown): boolean {
   if (typeof filter === 'string') {
     return filter.trim().length > 0;
   }
-  if (filter && typeof filter === 'object') {
-    const obj = filter as Record<string, unknown>;
-    if ('not' in obj || 'notIn' in obj) {
+  if (isRecord(filter)) {
+    if ('not' in filter || 'notIn' in filter) {
       return false;
     }
-    if ('in' in obj && Array.isArray(obj.in)) {
+    if ('in' in filter && Array.isArray(filter.in)) {
       return (
-        obj.in.length > 0 &&
-        obj.in.every((item) => typeof item === 'string' && item.trim().length > 0)
+        filter.in.length > 0 &&
+        filter.in.every((item) => typeof item === 'string' && item.trim().length > 0)
       );
     }
-    if ('equals' in obj && typeof obj.equals === 'string') {
-      return obj.equals.trim().length > 0;
+    if ('equals' in filter && typeof filter.equals === 'string') {
+      return filter.equals.trim().length > 0;
     }
   }
   return false;
@@ -45,15 +48,15 @@ function collectOrgIdOccurrences(
     const branchIsUnsafe = inOrOrNot || branchIsOr || branchIsNot;
     if (Array.isArray(val)) {
       for (const item of val) {
-        if (item && typeof item === 'object') {
+        if (isRecord(item)) {
           occurrences.push(
-            ...collectOrgIdOccurrences(item as Record<string, unknown>, branchIsUnsafe, branchIsNot),
+            ...collectOrgIdOccurrences(item, branchIsUnsafe, branchIsNot),
           );
         }
       }
-    } else if (val && typeof val === 'object') {
+    } else if (isRecord(val)) {
       occurrences.push(
-        ...collectOrgIdOccurrences(val as Record<string, unknown>, branchIsUnsafe, branchIsNot),
+        ...collectOrgIdOccurrences(val, branchIsUnsafe, branchIsNot),
       );
     }
   }
@@ -62,14 +65,13 @@ function collectOrgIdOccurrences(
 
 function matchesOrgId(explicitOrgId: unknown, expectedOrgId: string): boolean {
   if (explicitOrgId === expectedOrgId) return true;
-  if (explicitOrgId && typeof explicitOrgId === 'object') {
-    const obj = explicitOrgId as Record<string, unknown>;
-    if ('equals' in obj && obj.equals === expectedOrgId) return true;
+  if (isRecord(explicitOrgId)) {
+    if ('equals' in explicitOrgId && explicitOrgId.equals === expectedOrgId) return true;
     if (
-      'in' in obj &&
-      Array.isArray(obj.in) &&
-      obj.in.length === 1 &&
-      obj.in[0] === expectedOrgId
+      'in' in explicitOrgId &&
+      Array.isArray(explicitOrgId.in) &&
+      explicitOrgId.in.length === 1 &&
+      explicitOrgId.in[0] === expectedOrgId
     ) {
       return true;
     }
@@ -77,7 +79,11 @@ function matchesOrgId(explicitOrgId: unknown, expectedOrgId: string): boolean {
   return false;
 }
 
-function applyTenantFilter<T extends { where?: unknown } | undefined>(
+interface WithWhere {
+  where?: unknown;
+}
+
+function applyTenantFilter<T extends WithWhere | undefined>(
   model: string,
   args: T,
   isMutation = false,
@@ -86,8 +92,8 @@ function applyTenantFilter<T extends { where?: unknown } | undefined>(
     return args;
   }
 
-  const effectiveArgs = (args ? { ...args } : {}) as Record<string, unknown>;
-  const currentWhere = (effectiveArgs.where as Record<string, unknown> | undefined) || {};
+  const effectiveArgs: Record<string, unknown> = isRecord(args) ? { ...args } : {};
+  const currentWhere = isRecord(effectiveArgs.where) ? { ...effectiveArgs.where } : {};
   const orgId = TenantContext.getOrganizationId();
   const occurrences = collectOrgIdOccurrences(currentWhere);
 
@@ -106,9 +112,11 @@ function applyTenantFilter<T extends { where?: unknown } | undefined>(
       }
     }
     if (currentWhere.organization_id === undefined) {
-      effectiveArgs.where = { ...currentWhere, organization_id: orgId };
+      currentWhere.organization_id = orgId;
+      effectiveArgs.where = currentWhere;
     }
-    return effectiveArgs as T;
+    // guardrails-ignore G-C12: la extensión Prisma inyecta argumentos de tenant sobre tipo genérico T
+    return (args ? Object.assign(args, effectiveArgs) : effectiveArgs) as unknown as T;
   }
 
   // When orgId is not set in TenantContext, allow ONLY if safe explicit organization_id was passed
@@ -133,30 +141,34 @@ function applyTenantFilter<T extends { where?: unknown } | undefined>(
     );
   }
 
-  return effectiveArgs as T;
+  // guardrails-ignore G-C12: la extensión Prisma inyecta argumentos de tenant sobre tipo genérico T
+  return (args ? Object.assign(args, effectiveArgs) : effectiveArgs) as unknown as T;
 }
 
-function applyTenantFilterForMutation<T extends { where?: unknown } | undefined>(
+function applyTenantFilterForMutation<T extends WithWhere | undefined>(
   model: string,
   args: T,
 ): T {
   return applyTenantFilter(model, args, true);
 }
 
-function applyTenantCreate<T extends { data?: unknown } | undefined>(
+interface WithData {
+  data?: unknown;
+}
+
+function applyTenantCreate<T extends WithData | undefined>(
   model: string,
   args: T,
 ): T {
-  if (model === 'Organization' || TenantContext.isBypassed()) {
+  if (model === 'Organization' || TenantContext.isBypassed() || !args) {
     return args;
   }
 
-  const effectiveArgs = (args ? { ...args } : {}) as Record<string, unknown>;
   const orgId = TenantContext.getOrganizationId();
 
-  if (Array.isArray(effectiveArgs.data)) {
-    const dataList = effectiveArgs.data.map((item) => {
-      const itemRecord = (item && typeof item === 'object' ? { ...item } : {}) as Record<string, unknown>;
+  if (Array.isArray(args.data)) {
+    const dataList = args.data.map((item) => {
+      const itemRecord = isRecord(item) ? { ...item } : {};
       if (orgId) {
         if (
           itemRecord.organization_id !== undefined &&
@@ -179,13 +191,11 @@ function applyTenantCreate<T extends { data?: unknown } | undefined>(
       }
       return itemRecord;
     });
-    effectiveArgs.data = dataList;
-    return effectiveArgs as T;
+    Object.assign(args, { data: dataList });
+    return args;
   }
 
-  const currentData = (effectiveArgs.data && typeof effectiveArgs.data === 'object'
-    ? { ...effectiveArgs.data }
-    : {}) as Record<string, unknown>;
+  const currentData = isRecord(args.data) ? { ...args.data } : {};
 
   if (orgId) {
     if (
@@ -197,8 +207,8 @@ function applyTenantCreate<T extends { data?: unknown } | undefined>(
       );
     }
     currentData.organization_id = orgId;
-    effectiveArgs.data = currentData;
-    return effectiveArgs as T;
+    Object.assign(args, { data: currentData });
+    return args;
   }
 
   if (
@@ -210,8 +220,21 @@ function applyTenantCreate<T extends { data?: unknown } | undefined>(
     );
   }
 
-  effectiveArgs.data = currentData;
-  return effectiveArgs as T;
+  Object.assign(args, { data: currentData });
+  return args;
+}
+
+function extractSqlString(args: unknown): string {
+  if (Array.isArray(args) && args.length > 0) {
+    const first = args[0];
+    if (Array.isArray(first)) {
+      return first.filter((part): part is string => typeof part === 'string').join(' ');
+    }
+  }
+  if (isRecord(args) && Array.isArray(args.strings)) {
+    return args.strings.filter((part): part is string => typeof part === 'string').join(' ');
+  }
+  return '';
 }
 
 export function createTenantPrismaExtension() {
@@ -220,9 +243,7 @@ export function createTenantPrismaExtension() {
       query: {
         async $queryRaw({ args, query }) {
           if (!TenantContext.isBypassed() && !TenantContext.getOrganizationId()) {
-            const sqlStrings = Array.isArray(args)
-              ? (args[0] as TemplateStringsArray)?.join?.(' ') ?? ''
-              : (args as { strings?: string[] })?.strings?.join?.(' ') ?? '';
+            const sqlStrings = extractSqlString(args);
             const isSystemQuery = /SELECT\s+1\b|pg_advisory|NOW\(\)|current_database\(\)/i.test(sqlStrings);
             if (!isSystemQuery && !/organization_id/i.test(sqlStrings)) {
               throw new Error(
@@ -234,9 +255,7 @@ export function createTenantPrismaExtension() {
         },
         async $executeRaw({ args, query }) {
           if (!TenantContext.isBypassed() && !TenantContext.getOrganizationId()) {
-            const sqlStrings = Array.isArray(args)
-              ? (args[0] as TemplateStringsArray)?.join?.(' ') ?? ''
-              : (args as { strings?: string[] })?.strings?.join?.(' ') ?? '';
+            const sqlStrings = extractSqlString(args);
             const isSystemQuery = /pg_advisory|SELECT\s+1\b/i.test(sqlStrings);
             if (!isSystemQuery && !/organization_id/i.test(sqlStrings)) {
               throw new Error(
@@ -287,27 +306,27 @@ export function createTenantPrismaExtension() {
             if (model === 'Organization' || TenantContext.isBypassed()) {
               return query(args);
             }
-            const filteredWhere = applyTenantFilterForMutation(model, { where: args.where });
-            const filteredCreate = applyTenantCreate(model, { data: args.create });
+            applyTenantFilterForMutation(model, args);
+            if (isRecord(args.create)) {
+              const createWrapper = { data: args.create };
+              applyTenantCreate(model, createWrapper);
+              args.create = createWrapper.data;
+            }
             const orgId = TenantContext.getOrganizationId();
-            const updateData = (args.update && typeof args.update === 'object' ? { ...args.update } : {}) as Record<string, unknown>;
-            if (orgId) {
-              if (updateData.organization_id !== undefined && !matchesOrgId(updateData.organization_id, orgId)) {
+            if (isRecord(args.update)) {
+              if (orgId) {
+                if (args.update.organization_id !== undefined && !matchesOrgId(args.update.organization_id, orgId)) {
+                  throw new Error(
+                    `Violación de aislamiento tenant en ${model}: organization_id discordante (${args.update.organization_id} !== ${orgId})`,
+                  );
+                }
+              } else if (args.update.organization_id !== undefined && !isValidExplicitTenantFilter(args.update.organization_id)) {
                 throw new Error(
-                  `Violación de aislamiento tenant en ${model}: organization_id discordante (${updateData.organization_id} !== ${orgId})`,
+                  `Operación multi-tenant rechazada: organization_id inválido en TenantContext para modelo ${model}`,
                 );
               }
-            } else if (updateData.organization_id !== undefined && !isValidExplicitTenantFilter(updateData.organization_id)) {
-              throw new Error(
-                `Operación multi-tenant rechazada: organization_id inválido en TenantContext para modelo ${model}`,
-              );
             }
-            return query({
-              ...args,
-              where: filteredWhere.where,
-              create: filteredCreate.data,
-              update: updateData,
-            } as typeof args);
+            return query(args);
           },
           async findUnique({ model, args, query }) {
             if (model !== 'Organization' && !TenantContext.isBypassed()) {

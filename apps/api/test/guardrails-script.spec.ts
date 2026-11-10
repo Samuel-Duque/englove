@@ -1,0 +1,242 @@
+import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+
+const repoRoot = path.resolve(__dirname, '../../..');
+const scriptPath = path.resolve(repoRoot, '.agents/skills/englove-guardrails/scripts/check-guardrails.mjs');
+
+interface GuardrailFinding {
+  id: string;
+  severity: string;
+  file: string;
+  line: number;
+  message: string;
+}
+
+interface GuardrailJsonOutput {
+  findings: GuardrailFinding[];
+  suppressed: Array<{ id: string; file: string; line: number; reason: string }>;
+  stats: {
+    errors: number;
+    warnings: number;
+    suppressed: number;
+  };
+}
+
+function createTempRoot(): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'englove-guardrail-root-'));
+  fs.mkdirSync(path.join(tempDir, '.agents'), { recursive: true });
+  fs.mkdirSync(path.join(tempDir, 'planning'), { recursive: true });
+
+  fs.copyFileSync(path.join(repoRoot, '.agents/CONTEXT.md'), path.join(tempDir, '.agents/CONTEXT.md'));
+  fs.copyFileSync(path.join(repoRoot, 'planning/architecture-overview.md'), path.join(tempDir, 'planning/architecture-overview.md'));
+  return tempDir;
+}
+
+function runGuardrailsJson(tempRoot: string, targetRelPath?: string): { data: GuardrailJsonOutput; exitCode: number } {
+  try {
+    const args = ['--json', '--root', tempRoot];
+    if (targetRelPath) {
+      args.push(targetRelPath);
+    } else {
+      args.push('--all');
+    }
+
+    const stdout = execFileSync('node', [scriptPath, ...args], {
+      cwd: tempRoot,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return { data: JSON.parse(stdout), exitCode: 0 };
+  } catch (err: unknown) {
+    const error = err as { stdout?: string; status?: number };
+    const parsed = error.stdout ? JSON.parse(error.stdout) : { findings: [], suppressed: [], stats: { errors: 0, warnings: 0, suppressed: 0 } };
+    return { data: parsed, exitCode: error.status ?? 1 };
+  }
+}
+
+describe('T6.1 / T6.2: Automatización y regresión de check-guardrails.mjs', () => {
+  it('Self-check: el catálogo references/reglas.md y el script están 100% sincronizados', () => {
+    const stdout = execFileSync('node', [scriptPath, '--self-check'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    expect(stdout).toContain('Self-check: catálogo y script sincronizados');
+  });
+
+  describe('G-A06: Auditoría de TenantContext.runBypass y mutaciones de tenant', () => {
+    it('detecta AVISO [G-A06] ante uso de TenantContext.runBypass no suprimido', () => {
+      const tempRoot = createTempRoot();
+      const fakeSrcDir = path.join(tempRoot, 'apps', 'api', 'src');
+      fs.mkdirSync(fakeSrcDir, { recursive: true });
+      const testFile = path.join(fakeSrcDir, 'test-service.ts');
+
+      fs.writeFileSync(
+        testFile,
+        `
+import { TenantContext } from './common/tenant/tenant.context';
+export class TestService {
+  async run() {
+    return TenantContext.runBypass(() => {
+      return 42;
+    });
+  }
+}
+`,
+      );
+
+      try {
+        const { data } = runGuardrailsJson(tempRoot, 'apps/api/src/test-service.ts');
+        const a06Findings = data.findings.filter((f) => f.id === 'G-A06');
+        expect(a06Findings.length).toBeGreaterThanOrEqual(1);
+        expect(a06Findings.some((f) => f.message.includes('TenantContext.runBypass'))).toBe(true);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('acepta y suprime TenantContext.runBypass cuando tiene comentario guardrails-ignore G-A06:', () => {
+      const tempRoot = createTempRoot();
+      const fakeSrcDir = path.join(tempRoot, 'apps', 'api', 'src');
+      fs.mkdirSync(fakeSrcDir, { recursive: true });
+      const testFile = path.join(fakeSrcDir, 'test-service.ts');
+
+      fs.writeFileSync(
+        testFile,
+        `
+import { TenantContext } from './common/tenant/tenant.context';
+export class TestService {
+  async run() {
+    // guardrails-ignore G-A06: consulta previa al establecimiento de tenant
+    return TenantContext.runBypass(() => {
+      return 42;
+    });
+  }
+}
+`,
+      );
+
+      try {
+        const { data } = runGuardrailsJson(tempRoot, 'apps/api/src/test-service.ts');
+        const a06Findings = data.findings.filter((f) => f.id === 'G-A06' && f.message.includes('TenantContext.runBypass'));
+        expect(a06Findings.length).toBe(0);
+        expect(data.suppressed.some((s) => s.id === 'G-A06')).toBe(true);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('avisa ante mutaciones prisma.<modelo>.update por { id } sin organization_id visible', () => {
+      const tempRoot = createTempRoot();
+      const fakeSrcDir = path.join(tempRoot, 'apps', 'api', 'src');
+      fs.mkdirSync(fakeSrcDir, { recursive: true });
+      const testFile = path.join(fakeSrcDir, 'mutation-test.ts');
+
+      fs.writeFileSync(
+        testFile,
+        `
+export class MutationTest {
+  async updateAttempt(id: string, prisma: any) {
+    return prisma.attempt.update({
+      where: { id },
+      data: { status: 'graded' },
+    });
+  }
+}
+`,
+      );
+
+      try {
+        const { data } = runGuardrailsJson(tempRoot, 'apps/api/src/mutation-test.ts');
+        const mutFindings = data.findings.filter((f) => f.id === 'G-A06' && f.message.includes('mutación'));
+        expect(mutFindings.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('G-B10: Detección de mc anonymous set / acceso público en MinIO/R2', () => {
+    it('falla con ERROR [G-B10] ante mc anonymous set download o mc policy set download', () => {
+      const tempRoot = createTempRoot();
+      const fakeCompose = path.join(tempRoot, 'docker-compose.yml');
+
+      fs.writeFileSync(
+        fakeCompose,
+        `
+version: '3.8'
+services:
+  minio:
+    image: minio/minio
+  init:
+    command: /bin/sh -c "mc anonymous set download localminio/englove-dev"
+`,
+      );
+
+      try {
+        const { data, exitCode } = runGuardrailsJson(tempRoot, 'docker-compose.yml');
+        expect(exitCode).toBe(1);
+        const b10Errors = data.findings.filter((f) => f.id === 'G-B10' && f.severity === 'ERROR');
+        expect(b10Errors.length).toBeGreaterThanOrEqual(1);
+        expect(b10Errors.some((e) => e.message.includes('acceso anónimo o lectura pública'))).toBe(true);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('pasa limpio el docker-compose.yml oficial del repositorio', () => {
+      const { data, exitCode } = runGuardrailsJson(repoRoot, 'docker-compose.yml');
+      expect(exitCode).toBe(0);
+      const b10Findings = data.findings.filter((f) => f.id === 'G-B10');
+      expect(b10Findings.length).toBe(0);
+    });
+  });
+
+  describe('G-C10: Verificación de redacción x-attempt-token y saneamiento de query strings', () => {
+    it('pasa limpio apps/api/src/app.module.ts con redacción y sanitizePinoReq', () => {
+      const { data, exitCode } = runGuardrailsJson(repoRoot, 'apps/api/src/app.module.ts');
+      expect(exitCode).toBe(0);
+      const c10Errors = data.findings.filter((f) => f.id === 'G-C10' && f.severity === 'ERROR');
+      expect(c10Errors.length).toBe(0);
+    });
+
+    it('reporta ERROR [G-C10] si app.module.ts carece de x-attempt-token en redact', () => {
+      const tempRoot = createTempRoot();
+      const fakeSrcDir = path.join(tempRoot, 'apps', 'api', 'src');
+      fs.mkdirSync(fakeSrcDir, { recursive: true });
+      const fakeAppModule = path.join(fakeSrcDir, 'app.module.ts');
+
+      fs.writeFileSync(
+        fakeAppModule,
+        `
+import { Module } from '@nestjs/common';
+import { LoggerModule } from 'nestjs-pino';
+
+export function sanitizePinoReq(req: any) { return req; }
+
+@Module({
+  imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        redact: ['req.headers.authorization'],
+      },
+    }),
+  ],
+})
+export class AppModule {}
+`,
+      );
+
+      try {
+        const { data, exitCode } = runGuardrailsJson(tempRoot, 'apps/api/src/app.module.ts');
+        expect(exitCode).toBe(1);
+        const c10Errors = data.findings.filter((f) => f.id === 'G-C10' && f.severity === 'ERROR');
+        expect(c10Errors.some((e) => e.message.includes('x-attempt-token'))).toBe(true);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+  });
+});

@@ -18,7 +18,7 @@ import { MailService } from '../src/mail/mail.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
-import * as net from 'net';
+import { execFileSync } from 'node:child_process';
 
 function getPostgresPort(): number {
   const url = process.env.DATABASE_URL;
@@ -31,37 +31,40 @@ function getPostgresPort(): number {
   }
 }
 
-async function checkPortOpen(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(port, '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
+function checkPostgresRunning(): boolean {
   const configuredPort = getPostgresPort();
-  if (await checkPortOpen(configuredPort)) return true;
-  if (configuredPort !== 5433 && (await checkPortOpen(5433))) return true;
-  if (configuredPort !== 5432 && (await checkPortOpen(5432))) return true;
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
   return false;
 }
 
-describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — ENG-100 a ENG-104', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+const isPostgresAvailable = checkPostgresRunning();
+
+describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — ENG-100 a ENG-104', () => {
+  let prisma: PrismaService;
   let statsService: StatsService;
   let maintenanceService: MaintenanceService;
 
@@ -87,16 +90,9 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   const asgCancelledId = 'e2e80008-7777-4777-8777-777777777773';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost; saltando suite E2E de estadísticas en PostgreSQL.');
-      return;
+    if (!process.env.DATABASE_URL && checkPortOpenSync(5433)) {
+      process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/englove_dev?schema=public';
     }
-
-    try {
-      if (!process.env.DATABASE_URL && (await checkPortOpen(5433))) {
-        process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/englove_dev?schema=public';
-      }
 
       prisma = new PrismaService();
       await prisma.$connect();
@@ -460,10 +456,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
         occurred_at: new Date(now.getTime() - 25 * 24 * 3600 * 1000),
       },
     });
-    } catch (err) {
-      console.warn('Error conectando a Docker PostgreSQL para E2E de estadísticas:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
@@ -487,8 +479,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 1: GET /overview en PostgreSQL real verifica último intento calificado, alerta inactividad 14d y exclusión de game/canceladas', async () => {
-    if (!isPostgresAvailable) return;
-
     const overview = await statsService.getOverview(orgId, {});
 
     expect(overview.organizationSummary.totalApprovedStudents).toBe(3);
@@ -521,8 +511,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 2: GET /groups/:id en PostgreSQL real verifica tendencias 30d/7d simultáneas y ordenamiento de grupo', async () => {
-    if (!isPostgresAvailable) return;
-
     const groupStats = await statsService.getGroupStats(orgId, group1Id, {
       trendMode: '30d',
       sortBy: 'studentName',
@@ -545,8 +533,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 3: GET /leaderboard en PostgreSQL real verifica orden determinista y filtrado por groupId y level', async () => {
-    if (!isPostgresAvailable) return;
-
     // 1. Leaderboard without filters
     const allLb = await statsService.getLeaderboard(orgId, {});
     expect(allLb.entries.length).toBe(3);
@@ -571,8 +557,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 4: GET /students/:id en PostgreSQL real verifica scoreSeries (1..N en games), usedExtendedDeadline, banderas y calendario ISO', async () => {
-    if (!isPostgresAvailable) return;
-
     const studentStats = await statsService.getStudentStats(orgId, student1Id, {});
 
     expect(studentStats.student.id).toBe(student1Id);
@@ -609,8 +593,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 5: Presupuesto de latencia < 500 ms verificado directamente contra PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
-
     const t0 = performance.now();
     await statsService.getOverview(orgId, {});
     const tOverview = performance.now() - t0;
@@ -634,8 +616,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 6: Job teacher_pending_summary ejecuta y registra en ScheduledJobRun en PostgreSQL real', async () => {
-    if (!isPostgresAvailable || !prisma) return;
-
     // Set student3 to pending_approval so there is a pending registration for teacher_pending_summary (SPEC-11 RF-12)
     await prisma.student.update({
       where: { id: student3Id, organization_id: orgId } as unknown as Prisma.StudentWhereUniqueInput,
@@ -677,8 +657,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 7: Traslado de grupo y reincorporación en PostgreSQL real no produce duplicados y consolida cumplimiento', async () => {
-    if (!isPostgresAvailable || !prisma) return;
-
     // Simulate Student 2 transferring from Group 1 to Group 2, then re-enrolling in Group 1
     // 1. Set left_at on current Group 1 membership
     const m2 = await prisma.groupMembership.findFirst({

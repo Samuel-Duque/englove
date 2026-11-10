@@ -1,8 +1,11 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 import { RateLimiterService } from './rate-limiter.service';
-import { AuthenticatedUser } from '../decorators/current-user.decorator';
 import { extractClientIp } from '../utils/identity.utils';
+
+function isUserWithId(val: unknown): val is { id: string } {
+  return typeof val === 'object' && val !== null && 'id' in val && typeof val.id === 'string';
+}
 
 @Injectable()
 export class RateLimiterGuard implements CanActivate {
@@ -15,7 +18,7 @@ export class RateLimiterGuard implements CanActivate {
       return true;
     }
 
-    const user = (request as unknown as { user?: AuthenticatedUser }).user;
+    const user = 'user' in request && isUserWithId(request.user) ? request.user : undefined;
     const ip = extractClientIp(request);
 
     if (user?.id) {

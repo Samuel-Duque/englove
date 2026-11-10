@@ -46,12 +46,12 @@
     "englove-guardrails": {
       "source": "./.agents/skills/englove-guardrails",
       "sourceType": "local",
-      "computedHash": "599b3420eab58a190e7899ef5eb628b9adb3eaf6e7dcdd7de8385bac398119bc"
+      "computedHash": "85e7e020ce1adcfdb2e2457bf66de493e133ba647cbab1b42ee50f5c98759bf8"
     },
     "englove-spec": {
       "source": "./.agents/skills/englove-spec",
       "sourceType": "local",
-      "computedHash": "d54c6da7ae8f22bca7c02c9e7ec486289b0d4c57b7b9fad807cb8fbf1db92c60"
+      "computedHash": "4fa3b783fb77e8713e4fcdfd639b1d66558ef6a0f7a0573bde6a7ec272009b02"
     },
     "find-skills": {
       "source": "vercel-labs/skills",

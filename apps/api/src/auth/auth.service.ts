@@ -652,8 +652,8 @@ export class AuthService {
         try {
           const incomingHash = hashSha256(secret);
           // Look up session first to ensure we know user_id and organization_id (T2.3, P1-12)
+          // guardrails-ignore G-A06: busqueda de sesion opaca para revocar filtrando por id, user_id y organization_id
           const existingSession = await TenantContext.runBypass(() =>
-            // guardrails-ignore G-A06: busqueda de sesion opaca para revocar filtrando por id, user_id y organization_id
             this.prisma.authSession.findFirst({
               where: {
                 id: sid,
@@ -664,8 +664,8 @@ export class AuthService {
           );
 
           if (existingSession) {
+            // guardrails-ignore G-A06: revocacion de sesion por hash de token criptografico en logout
             await TenantContext.runBypass(async () => {
-              // guardrails-ignore G-A06: revocacion de sesion por hash de token criptografico en logout
               await this.prisma.authSession.updateMany({
                 where: {
                   id: existingSession.id,
@@ -696,8 +696,8 @@ export class AuthService {
           ignoreExpiration: true,
         });
         if (payload?.typ === 'access' && payload?.sid && payload?.sub && payload?.org) {
+          // guardrails-ignore G-A06: revocacion de sesion por token de acceso verificado en logout
           await TenantContext.runBypass(async () => {
-            // guardrails-ignore G-A06: revocacion de sesion por token de acceso verificado en logout
             await this.prisma.authSession
               .updateMany({
                 where: {
@@ -800,7 +800,7 @@ export class AuthService {
       });
     } catch (err: unknown) {
       // Race condition collision on unique User(email) is handled cleanly without enumeration
-      if ((err as { code?: string })?.code === 'P2002') {
+      if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'P2002') {
         await this.mailService.sendMail({
           template: 'signup-existing-account',
           to: normalizedEmail,
@@ -873,8 +873,8 @@ export class AuthService {
 
     // Verify token validity BEFORE computing expensive Argon2id hash to prevent DoS on argonSemaphore (P2-01)
     if (typeof this.prisma.passwordResetToken?.findFirst === 'function') {
+      // guardrails-ignore G-A06: validación previa de existencia de token de reset antes de Argon2id (P2-01)
       const preliminaryToken = await TenantContext.runBypass(() =>
-        // guardrails-ignore G-A06: validación previa de existencia de token de reset antes de Argon2id (P2-01)
         this.prisma.passwordResetToken.findFirst({
           where: {
             token_hash: tokenHash,
@@ -895,8 +895,8 @@ export class AuthService {
 
     const newPasswordHash = await this.hashPassword(dto.newPassword);
 
+    // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
     await TenantContext.runBypass(async () => {
-      // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
       await this.prisma.$transaction(async (tx) => {
         const resetToken = await tx.passwordResetToken.findFirst({
           where: {

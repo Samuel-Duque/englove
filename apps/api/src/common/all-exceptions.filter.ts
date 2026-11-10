@@ -15,6 +15,10 @@ interface StandardErrorResponse {
   details?: unknown;
 }
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -33,10 +37,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       const res = exception.getResponse();
 
-      if (typeof res === 'object' && res !== null) {
-        const resObj = res as Record<string, unknown>;
-        if (typeof resObj.code === 'string') {
-          code = resObj.code;
+      if (isRecord(res)) {
+        if (typeof res.code === 'string') {
+          code = res.code;
         } else if (statusCode === HttpStatus.NOT_FOUND) {
           code = 'NOT_FOUND';
         } else if (statusCode === HttpStatus.BAD_REQUEST) {
@@ -53,18 +56,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
           code = 'AUTH_ACCOUNT_LOCKED';
         }
 
-        if (typeof resObj.retryAfter === 'number' || typeof resObj.retryAfter === 'string') {
-          response.setHeader('Retry-After', String(resObj.retryAfter));
+        if (typeof res.retryAfter === 'number' || typeof res.retryAfter === 'string') {
+          response.setHeader('Retry-After', String(res.retryAfter));
         }
 
-        if (typeof resObj.message === 'string') {
-          message = resObj.message;
-        } else if (Array.isArray(resObj.message)) {
-          message = resObj.message.join(', ');
+        if (typeof res.message === 'string') {
+          message = res.message;
+        } else if (Array.isArray(res.message)) {
+          message = res.message.join(', ');
         }
 
-        if (resObj.details !== undefined) {
-          details = resObj.details;
+        if (res.details !== undefined) {
+          details = res.details;
         }
       } else if (typeof res === 'string') {
         message = res;

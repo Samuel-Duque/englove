@@ -12,42 +12,53 @@ import { ActivitiesService } from '../src/activities/activities.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
-import * as net from 'net';
+import { execFileSync } from 'node:child_process';
 
 function getPostgresPort(): number {
   const url = process.env.DATABASE_URL;
-  if (!url) return 5432;
+  if (!url) return 5433;
   try {
     const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5432;
+    return parsed.port ? parseInt(parsed.port, 10) : 5433;
   } catch {
-    return 5432;
+    return 5433;
   }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(getPostgresPort(), '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-053)', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+function checkPostgresRunning(): boolean {
+  const configuredPort = getPostgresPort();
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
+  return false;
+}
+
+const isPostgresAvailable = checkPostgresRunning();
+
+describe.skipIf(!isPostgresAvailable)('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-053)', () => {
+  let prisma: PrismaService;
   let assignmentsService: AssignmentsService;
   let activitiesService: ActivitiesService;
 
@@ -56,17 +67,10 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
   const groupId = 'e2e33333-3333-4333-8333-333333333333';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost:5432; saltando pruebas E2E contra DB real.');
-      return;
-    }
-
-    try {
-      prisma = new PrismaService();
-      await prisma.$connect();
-      activitiesService = new ActivitiesService(prisma);
-      assignmentsService = new AssignmentsService(prisma);
+    prisma = new PrismaService();
+    await prisma.$connect();
+    activitiesService = new ActivitiesService(prisma);
+    assignmentsService = new AssignmentsService(prisma);
 
       // Clean prior fixtures
       await prisma.assignment.deleteMany({ where: { organization_id: orgId } });
@@ -105,14 +109,10 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
           name: 'English Beginners A1 E2E',
         },
       });
-    } catch (err: unknown) {
-      console.warn('Error inicializando base de datos real para E2E:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       try {
         await prisma.assignment.deleteMany({ where: { organization_id: orgId } });
         await prisma.fillBlankDetail.deleteMany({ where: { organization_id: orgId } });
@@ -128,7 +128,6 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
   });
 
   it('SPEC-04 RF-16: flujo completo real login -> crear fill_blank -> publicar -> asignar -> verificar grupo y persistencia', async () => {
-    if (!isPostgresAvailable || !prisma) return;
     const activePrisma = prisma;
 
     return TenantContext.run({ organizationId: orgId, userId: teacherId, role: Role.teacher }, async () => {

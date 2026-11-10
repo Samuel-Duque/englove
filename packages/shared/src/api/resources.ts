@@ -1,15 +1,13 @@
 import type { Level } from '../enums';
 
-interface ParsedUrlLike {
-  protocol: string;
-  hostname: string;
-  username: string;
-  password: string;
-}
-
-interface UrlConstructorLike {
-  new (url: string): ParsedUrlLike;
-}
+declare const URL: {
+  new (url: string, base?: string): {
+    protocol: string;
+    hostname: string;
+    username: string;
+    password: string;
+  };
+};
 
 /**
  * Validador puro para URLs de recursos externos en https:// (decisión 79, G-C13).
@@ -21,9 +19,8 @@ export function isValidHttpsResourceUrl(raw: unknown): boolean {
   if (trimmed.length < 1 || trimmed.length > 2048) return false;
   if (/\s/.test(trimmed)) return false;
   try {
-    const UrlCtor = (globalThis as unknown as { URL?: UrlConstructorLike }).URL;
-    if (!UrlCtor) return false;
-    const parsed = new UrlCtor(trimmed);
+    if (typeof URL === 'undefined') return false;
+    const parsed = new URL(trimmed);
     if (parsed.protocol !== 'https:') return false;
     if (!parsed.hostname || parsed.hostname.trim() === '') return false;
     if (parsed.username !== '' || parsed.password !== '') return false;

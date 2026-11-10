@@ -21,6 +21,20 @@ const bogotaDateFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+interface BadgeRuleDef {
+  type?: string;
+  event?: string;
+  threshold?: number;
+}
+
+function parseBadgeRule(val: unknown): BadgeRuleDef | null {
+  if (typeof val !== 'object' || val === null || Array.isArray(val)) return null;
+  const type = 'type' in val && typeof val.type === 'string' ? val.type : undefined;
+  const event = 'event' in val && typeof val.event === 'string' ? val.event : undefined;
+  const threshold = 'threshold' in val && typeof val.threshold === 'number' ? val.threshold : undefined;
+  return { type, event, threshold };
+}
+
 @Injectable()
 export class GamificationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -239,7 +253,7 @@ export class GamificationService {
       if (awardedRuleIds.has(rule.id)) continue;
 
       let isEligible = false;
-      const ruleDef = rule.rule as { type?: string; event?: string; threshold?: number } | null;
+      const ruleDef = parseBadgeRule(rule.rule);
 
       if (ruleDef?.type === 'event_count') {
         if (ruleDef.event === 'attempt_completed') {

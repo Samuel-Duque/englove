@@ -34,11 +34,15 @@ import {
   FillBlankConfig,
   FillBlankConfigSchema,
   FillBlankAnswerKey,
+  FillBlankAnswerKeySchema,
   ExamConfig,
   ExamConfigSchema,
   ExamAnswerKey,
+  ExamAnswerKeySchema,
   GameConfig,
+  GameConfigSchema,
   GameAnswerKey,
+  GameAnswerKeySchema,
   GameMechanic,
   scoreToGameStars,
   getGameMotivationMessage,
@@ -48,6 +52,69 @@ import {
   StudentGamesListResponse,
   getOpenQuestionItems,
 } from '@englove/shared';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function getErrorCode(err: unknown): string | undefined {
+  if (isRecord(err) && typeof err.code === 'string') {
+    return err.code;
+  }
+  return undefined;
+}
+
+function toPrismaJson(val: unknown): Prisma.InputJsonValue {
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+    return val;
+  }
+  if (Array.isArray(val)) {
+    return val.map((item) => (item === null ? null : toPrismaJson(item)));
+  }
+  if (isRecord(val)) {
+    const obj: Record<string, Prisma.InputJsonValue | null> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        obj[k] = v === null ? null : toPrismaJson(v);
+      }
+    }
+    return obj;
+  }
+  return {};
+}
+
+const defaultGameConfig: GameConfig = {
+  mechanic: GameMechanic.match,
+  settings: { left: [], right: [] },
+};
+
+const defaultGameAnswerKey: GameAnswerKey = {
+  solution: { pairs: {} },
+};
+
+function isGameMechanic(val: unknown): val is GameMechanic {
+  return (
+    val === GameMechanic.match ||
+    val === GameMechanic.order_words ||
+    val === GameMechanic.drag_drop ||
+    val === GameMechanic.memory ||
+    val === GameMechanic.timed_choice
+  );
+}
+
+function parseAttemptPayload(payload: unknown): {
+  answers: Record<string, unknown>;
+  processedEventIds: string[];
+} {
+  if (!isRecord(payload)) {
+    return { answers: {}, processedEventIds: [] };
+  }
+  const answers = isRecord(payload.answers) ? { ...payload.answers } : {};
+  const processedEventIds = Array.isArray(payload.processedEventIds)
+    ? payload.processedEventIds.filter((id): id is string => typeof id === 'string')
+    : [];
+  return { answers, processedEventIds };
+}
 
 interface AttemptTokenPayload {
   attemptId: string;
@@ -297,7 +364,7 @@ export class AttemptsService {
         },
       });
     } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'P2002') {
+      if (getErrorCode(err) === 'P2002') {
         throw new ConflictException({
           statusCode: 409,
           code: 'ATTEMPT_ALREADY_EXISTS',
@@ -410,7 +477,7 @@ export class AttemptsService {
       return {
         id: act.id,
         title: act.title,
-        mechanic: (act.game_detail?.mechanic as GameMechanic) || GameMechanic.match,
+        mechanic: isGameMechanic(act.game_detail?.mechanic) ? act.game_detail.mechanic : GameMechanic.match,
         level: act.level,
         expectedDurationSeconds: act.expected_duration_seconds,
         minPlausibleSeconds: act.min_plausible_seconds,
@@ -519,7 +586,7 @@ export class AttemptsService {
         },
       });
     } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'P2002') {
+      if (getErrorCode(err) === 'P2002') {
         throw new ConflictException({
           statusCode: 409,
           code: 'ATTEMPT_ALREADY_EXISTS',
@@ -672,16 +739,16 @@ export class AttemptsService {
     dto: SubmitEventsDto,
   ): Promise<{ acceptedEventIds: string[] }> {
     const checkDangerousKeys = (obj: unknown, depth = 0) => {
-      if (!obj || typeof obj !== 'object' || depth > 5) return;
-      for (const k of Object.keys(obj)) {
-        if (['__proto__', 'constructor', 'prototype'].includes(k)) {
+      if (!isRecord(obj) || depth > 5) return;
+      for (const [k, val] of Object.entries(obj)) {
+        if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
           throw new UnprocessableEntityException({
             statusCode: 422,
             code: 'INVALID_ACTIVITY_PAYLOAD',
             message: 'Clave no permitida en el evento',
           });
         }
-        checkDangerousKeys((obj as Record<string, unknown>)[k], depth + 1);
+        checkDangerousKeys(val, depth + 1);
       }
     };
 
@@ -764,29 +831,37 @@ export class AttemptsService {
         }
       } else if (act.type === ActivityType.fill_blank && act.fill_blank_detail?.config) {
         const parsed = FillBlankConfigSchema.safeParse(act.fill_blank_detail.config);
-        const items = parsed.success
+        const rawItems = parsed.success
           ? parsed.data.items
-          : (act.fill_blank_detail.config as { items?: Array<{ id?: string; blanks?: Array<{ id?: string }> }> })?.items;
-        if (Array.isArray(items)) {
-          items.forEach((it) => {
-            if (it?.id) validItemIds.add(it.id);
-            if (Array.isArray(it?.blanks)) {
-              it.blanks.forEach((b) => b?.id && validItemIds.add(b.id));
+          : (isRecord(act.fill_blank_detail.config) && Array.isArray(act.fill_blank_detail.config.items)
+            ? act.fill_blank_detail.config.items
+            : []);
+        for (const it of rawItems) {
+          if (isRecord(it)) {
+            if (typeof it.id === 'string') validItemIds.add(it.id);
+            if (Array.isArray(it.blanks)) {
+              for (const b of it.blanks) {
+                if (isRecord(b) && typeof b.id === 'string') validItemIds.add(b.id);
+              }
             }
-          });
+          }
         }
       } else if (act.type === ActivityType.exam && act.exam_detail?.config) {
         const parsed = ExamConfigSchema.safeParse(act.exam_detail.config);
-        const items = parsed.success
+        const rawItems = parsed.success
           ? parsed.data.items
-          : (act.exam_detail.config as { items?: Array<{ id?: string; blanks?: Array<{ id?: string }> }> })?.items;
-        if (Array.isArray(items)) {
-          items.forEach((it) => {
-            if (it?.id) validItemIds.add(it.id);
-            if (Array.isArray(it?.blanks)) {
-              it.blanks.forEach((b) => b?.id && validItemIds.add(b.id));
+          : (isRecord(act.exam_detail.config) && Array.isArray(act.exam_detail.config.items)
+            ? act.exam_detail.config.items
+            : []);
+        for (const it of rawItems) {
+          if (isRecord(it)) {
+            if (typeof it.id === 'string') validItemIds.add(it.id);
+            if (Array.isArray(it.blanks)) {
+              for (const b of it.blanks) {
+                if (isRecord(b) && typeof b.id === 'string') validItemIds.add(b.id);
+              }
             }
-          });
+          }
         }
       } else if (act.type === ActivityType.speaking) {
         validItemIds.add(act.id);
@@ -849,13 +924,9 @@ export class AttemptsService {
         });
       }
 
-      const currentPayload = (locked.payload as {
-        answers?: Record<string, unknown>;
-        processedEventIds?: string[];
-      } | null) || {};
-
-      const answers = { ...(currentPayload.answers || {}) };
-      const processedSet = new Set<string>(currentPayload.processedEventIds || []);
+      const currentPayload = parseAttemptPayload(locked.payload);
+      const answers = currentPayload.answers;
+      const processedSet = new Set<string>(currentPayload.processedEventIds);
       const acceptedEventIds: string[] = [];
 
       for (const ev of dto.events) {
@@ -865,14 +936,10 @@ export class AttemptsService {
           const isGameMap = ['pairs', 'tokenIds', 'placements', 'selections', 'choices'].includes(
             ev.itemId,
           );
-          if (
-            !isGameMap &&
-            typeof ev.answer === 'object' &&
-            ev.answer !== null &&
-            !Array.isArray(ev.answer)
-          ) {
-            const existing = (answers[ev.itemId] as Record<string, unknown>) || {};
-            answers[ev.itemId] = { ...existing, ...(ev.answer as Record<string, unknown>) };
+          if (!isGameMap && isRecord(ev.answer)) {
+            const rawExisting = answers[ev.itemId];
+            const existing = isRecord(rawExisting) ? rawExisting : {};
+            answers[ev.itemId] = { ...existing, ...ev.answer };
           } else {
             answers[ev.itemId] = ev.answer;
           }
@@ -885,10 +952,10 @@ export class AttemptsService {
       await tx.attempt.update({
         where: { id: attempt.id },
         data: {
-          payload: {
+          payload: toPrismaJson({
             answers,
             processedEventIds: finalProcessedEventIds,
-          } as unknown as Prisma.InputJsonObject,
+          }),
         },
       });
 
@@ -999,16 +1066,16 @@ export class AttemptsService {
     // Validate dto.answers (P1-04, RF-4.2)
     if (dto.answers) {
       const checkDangerousKeys = (obj: unknown, depth = 0) => {
-        if (!obj || typeof obj !== 'object' || depth > 5) return;
-        for (const k of Object.keys(obj)) {
-          if (['__proto__', 'constructor', 'prototype'].includes(k)) {
+        if (!isRecord(obj) || depth > 5) return;
+        for (const [k, val] of Object.entries(obj)) {
+          if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
             throw new UnprocessableEntityException({
               statusCode: 422,
               code: 'INVALID_ACTIVITY_PAYLOAD',
               message: 'Clave de respuesta no permitida',
             });
           }
-          checkDangerousKeys((obj as Record<string, unknown>)[k], depth + 1);
+          checkDangerousKeys(val, depth + 1);
         }
       };
       checkDangerousKeys(dto.answers);
@@ -1112,31 +1179,23 @@ export class AttemptsService {
       const minPlausible =
         activity.min_plausible_seconds ?? (activity.type === ActivityType.game ? 15 : undefined);
 
-      const lockedPayload = (locked.payload as {
-        answers?: Record<string, unknown>;
-        processedEventIds?: string[];
-      } | null) || {};
-      const attemptPayload = (attempt.payload as {
-        answers?: Record<string, unknown>;
-        processedEventIds?: string[];
-      } | null) || {};
+      const lockedPayload = parseAttemptPayload(locked.payload);
+      const attemptPayload = parseAttemptPayload(attempt.payload);
 
       const payload = {
-        ...attemptPayload,
-        ...lockedPayload,
         answers: {
-          ...(attemptPayload.answers || {}),
-          ...(lockedPayload.answers || {}),
+          ...attemptPayload.answers,
+          ...lockedPayload.answers,
         },
         processedEventIds: Array.from(
           new Set([
-            ...(attemptPayload.processedEventIds || []),
-            ...(lockedPayload.processedEventIds || []),
+            ...attemptPayload.processedEventIds,
+            ...lockedPayload.processedEventIds,
           ]),
         ),
       };
       const answers = {
-        ...(payload.answers || {}),
+        ...payload.answers,
         ...(dto.answers || {}),
       };
       const updatedPayload = {
@@ -1153,7 +1212,7 @@ export class AttemptsService {
         updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
-            payload: updatedPayload as unknown as Prisma.InputJsonValue,
+            payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.pending_review,
             finished_at: now,
           },
@@ -1163,25 +1222,27 @@ export class AttemptsService {
         updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
-            payload: updatedPayload as unknown as Prisma.InputJsonValue,
+            payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.pending_review,
             finished_at: now,
           },
         });
         scoreForEvent = null;
       } else if (activity.type === ActivityType.fill_blank) {
-        const config = activity.fill_blank_detail?.config as unknown as FillBlankConfig;
+        const parsedCfg = FillBlankConfigSchema.safeParse(activity.fill_blank_detail?.config);
+        const config: FillBlankConfig = parsedCfg.success ? parsedCfg.data : { items: [] };
         const detailWithKey = await tx.fillBlankDetail.findFirst({
           where: { organization_id: organizationId, activity_id: activity.id },
           // guardrails-ignore G-C04: lectura exclusiva de answer_key en el servidor para autocalificacion de intento
           select: { answer_key: true },
         });
 
-        const answerKey = (detailWithKey?.answer_key as unknown as FillBlankAnswerKey) || { items: {} };
+        const parsedKey = FillBlankAnswerKeySchema.safeParse(detailWithKey?.answer_key);
+        const answerKey: FillBlankAnswerKey = parsedKey.success ? parsedKey.data : { items: {} };
         const scoreResult = this.scoringService.calculateFillBlank(
           config,
           answerKey,
-          answers as Record<string, string>,
+          answers,
           durationSeconds,
           minPlausible ?? undefined,
         );
@@ -1192,7 +1253,7 @@ export class AttemptsService {
         updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
-            payload: updatedPayload as unknown as Prisma.InputJsonValue,
+            payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.graded,
             score: new Prisma.Decimal(scoreResult.score),
             graded_at: now,
@@ -1201,18 +1262,30 @@ export class AttemptsService {
           },
         });
       } else if (activity.type === ActivityType.exam) {
-        const config = activity.exam_detail?.config as unknown as ExamConfig;
+        const parsedCfg = ExamConfigSchema.safeParse(activity.exam_detail?.config);
+        const config: ExamConfig = parsedCfg.success ? parsedCfg.data : { items: [] };
         const detailWithKey = await tx.examDetail.findFirst({
           where: { organization_id: organizationId, activity_id: activity.id },
           // guardrails-ignore G-C04: lectura exclusiva de answer_key en el servidor para autocalificacion de intento
           select: { answer_key: true },
         });
 
-        const answerKey = (detailWithKey?.answer_key as unknown as ExamAnswerKey) || { items: {} };
+        const parsedKey = ExamAnswerKeySchema.safeParse(detailWithKey?.answer_key);
+        const answerKey: ExamAnswerKey = parsedKey.success ? parsedKey.data : { items: {} };
+        const examAnswers: Record<string, Record<string, string>> = {};
+        for (const [k, v] of Object.entries(answers)) {
+          if (isRecord(v)) {
+            const inner: Record<string, string> = {};
+            for (const [ik, iv] of Object.entries(v)) {
+              if (typeof iv === 'string') inner[ik] = iv;
+            }
+            examAnswers[k] = inner;
+          }
+        }
         const scoreResult = this.scoringService.calculateExam(
           config,
           answerKey,
-          answers as Record<string, Record<string, string>>,
+          examAnswers,
           durationSeconds,
           minPlausible ?? undefined,
         );
@@ -1223,7 +1296,7 @@ export class AttemptsService {
         updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
-            payload: updatedPayload as unknown as Prisma.InputJsonValue,
+            payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.graded,
             score: new Prisma.Decimal(scoreResult.score),
             graded_at: now,
@@ -1250,13 +1323,12 @@ export class AttemptsService {
           select: { mechanic: true, config: true, answer_key: true },
         });
 
-        const config = (detailWithKey?.config as unknown as GameConfig) || {
-          mechanic: detailWithKey?.mechanic as GameMechanic,
-          settings: {},
-        };
-        const answerKey = (detailWithKey?.answer_key as unknown as GameAnswerKey) || {
-          solution: {},
-        };
+        const parsedGameCfg = GameConfigSchema.safeParse(detailWithKey?.config);
+        const config: GameConfig = parsedGameCfg.success
+          ? parsedGameCfg.data
+          : defaultGameConfig;
+        const parsedKey = GameAnswerKeySchema.safeParse(detailWithKey?.answer_key);
+        const answerKey: GameAnswerKey = parsedKey.success ? parsedKey.data : defaultGameAnswerKey;
 
         const scoreResult = this.scoringService.calculateGame(
           config,
@@ -1277,7 +1349,7 @@ export class AttemptsService {
         updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
-            payload: gamePayload as unknown as Prisma.InputJsonValue,
+            payload: toPrismaJson(gamePayload),
             status: AttemptStatus.graded,
             score: new Prisma.Decimal(scoreResult.score),
             graded_at: now,
@@ -1449,7 +1521,7 @@ export class AttemptsService {
               type: a.activity.type,
               level: a.activity.level,
               version: a.activity.version,
-              mechanic: (a.activity.game_detail?.mechanic as GameMechanic | undefined),
+              mechanic: isGameMechanic(a.activity.game_detail?.mechanic) ? a.activity.game_detail.mechanic : undefined,
             },
             opensAt: a.opens_at.toISOString(),
             dueAt: a.due_at.toISOString(),
@@ -1541,7 +1613,7 @@ export class AttemptsService {
             type: a.activity.type,
             level: a.activity.level,
             version: a.activity.version,
-            mechanic: (a.activity.game_detail?.mechanic as GameMechanic | undefined),
+            mechanic: isGameMechanic(a.activity.game_detail?.mechanic) ? a.activity.game_detail.mechanic : undefined,
           },
           opensAt: a.opens_at.toISOString(),
           dueAt: a.due_at.toISOString(),
@@ -1762,8 +1834,8 @@ export class AttemptsService {
 
     const config = toPublicConfig(activity.type, rawConfig, answerKey);
 
-    const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};
-    const answers = payload.answers || {};
+    const currentPayload = parseAttemptPayload(attempt.payload);
+    const answers = currentPayload.answers;
 
     return {
       attempt: this.mapAttemptView(attempt, effectiveDueAt, completeUntil),
@@ -1800,8 +1872,8 @@ export class AttemptsService {
 
     let correction: Record<string, unknown> | null = null;
     if (activity && attempt.status === AttemptStatus.graded) {
-      const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};
-      const answers = payload.answers || {};
+      const currentPayload = parseAttemptPayload(attempt.payload);
+      const answers = currentPayload.answers;
       const started = attempt.started_at ? new Date(attempt.started_at) : null;
       const finished = attempt.finished_at ? new Date(attempt.finished_at) : null;
       const durationSeconds =
@@ -1815,13 +1887,15 @@ export class AttemptsService {
           // guardrails-ignore G-C04: lectura de answer_key en el servidor para reconstruccion de correction
           select: { config: true, answer_key: true },
         });
-        const config = (detailWithKey?.config ?? activity.fill_blank_detail?.config) as unknown as FillBlankConfig;
-        if (config && detailWithKey?.answer_key) {
-          const ak = detailWithKey.answer_key as unknown as FillBlankAnswerKey;
+        if (detailWithKey?.answer_key) {
+          const parsedCfg = FillBlankConfigSchema.safeParse(detailWithKey.config ?? activity.fill_blank_detail?.config);
+          const config: FillBlankConfig = parsedCfg.success ? parsedCfg.data : { items: [] };
+          const parsedKey = FillBlankAnswerKeySchema.safeParse(detailWithKey.answer_key);
+          const ak: FillBlankAnswerKey = parsedKey.success ? parsedKey.data : { items: {} };
           const res = this.scoringService.calculateFillBlank(
             config,
             ak,
-            answers as Record<string, string>,
+            answers,
             durationSeconds,
             activity.min_plausible_seconds ?? undefined,
           );
@@ -1833,13 +1907,25 @@ export class AttemptsService {
           // guardrails-ignore G-C04: lectura de answer_key en el servidor para reconstruccion de correction
           select: { config: true, answer_key: true },
         });
-        const config = (detailWithKey?.config ?? activity.exam_detail?.config) as unknown as ExamConfig;
-        if (config && detailWithKey?.answer_key) {
-          const ak = detailWithKey.answer_key as unknown as ExamAnswerKey;
+        if (detailWithKey?.answer_key) {
+          const parsedCfg = ExamConfigSchema.safeParse(detailWithKey.config ?? activity.exam_detail?.config);
+          const config: ExamConfig = parsedCfg.success ? parsedCfg.data : { items: [] };
+          const parsedKey = ExamAnswerKeySchema.safeParse(detailWithKey.answer_key);
+          const ak: ExamAnswerKey = parsedKey.success ? parsedKey.data : { items: {} };
+          const examAnswers: Record<string, Record<string, string>> = {};
+          for (const [k, v] of Object.entries(answers)) {
+            if (isRecord(v)) {
+              const inner: Record<string, string> = {};
+              for (const [ik, iv] of Object.entries(v)) {
+                if (typeof iv === 'string') inner[ik] = iv;
+              }
+              examAnswers[k] = inner;
+            }
+          }
           const res = this.scoringService.calculateExam(
             config,
             ak,
-            answers as Record<string, Record<string, string>>,
+            examAnswers,
             durationSeconds,
             activity.min_plausible_seconds ?? undefined,
           );
@@ -1852,11 +1938,12 @@ export class AttemptsService {
           select: { mechanic: true, config: true, answer_key: true },
         });
         if (detailWithKey?.answer_key) {
-          const cfg = (detailWithKey.config as GameConfig) || {
-            mechanic: detailWithKey.mechanic as GameMechanic,
-            settings: {},
-          };
-          const ak = detailWithKey.answer_key as unknown as GameAnswerKey;
+          const parsedGameCfg = GameConfigSchema.safeParse(detailWithKey.config);
+          const cfg: GameConfig = parsedGameCfg.success
+            ? parsedGameCfg.data
+            : defaultGameConfig;
+          const parsedKey = GameAnswerKeySchema.safeParse(detailWithKey.answer_key);
+          const ak: GameAnswerKey = parsedKey.success ? parsedKey.data : defaultGameAnswerKey;
           const res = this.scoringService.calculateGame(
             cfg,
             ak,

@@ -21,7 +21,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Lo último que este script conoce de la planeación. Si CONTEXT avanza, el script avisa.
-const KNOWN_MAX_DECISION = 137;
+const KNOWN_MAX_DECISION = 145;
 const KNOWN_OUT_OF_SCOPE_ROWS = 9; // filas de la tabla de CONTEXT §2.4
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -326,6 +326,18 @@ const LINE_RULES = [
   { id: 'G-A03', sev: 'ERROR', files: (p) => (isApiSrc(p) || isWeb(p)) && !isTest(p), re: /MIGRATION_DATABASE_URL/, msg: 'MIGRATION_DATABASE_URL en código de runtime; solo la usa prisma migrate deploy en CI (el runtime usa DATABASE_URL por el pooler)' },
   { id: 'G-A04', sev: 'ERROR', files: (p) => isExecutable(p) && !isDoc(p), re: /\bdb\s+push\b/, msg: 'prisma db push en un archivo ejecutable versionado; fuera de local se usa siempre prisma migrate deploy' },
   {
+    id: 'G-A06', sev: 'AVISO', files: (p) => isApiSrc(p) && !isTest(p),
+    re: /\bTenantContext\.runBypass\s*\(/,
+    msg: 'uso de TenantContext.runBypass sin justificación; documenta el bypass con // guardrails-ignore G-A06: <motivo>',
+  },
+  {
+    id: 'G-A06', sev: 'AVISO', files: (p) => isApiSrc(p) && !isTest(p) && !isSeed(p),
+    re: /\b(?:this\.)?(?:prisma|tx|db|client|trx)\.(\w+)\.(update|delete|upsert)\(/,
+    skip: (line) => /\.(organization|user)\.\w+\(/.test(line),
+    when: ({ lines, i }) => windowHas(lines, i, /\bwhere\s*:\s*\{\s*id\b/, 4) && !windowHas(lines, i, /organization_?id|organizationId|\borgId\b/i, 8),
+    msg: 'mutación de tenant (.update/.delete/.upsert) por { id } sin organization_id visible en el where; arriesga mutar registros de otro tenant',
+  },
+  {
     id: 'G-A06', sev: 'AVISO', files: (p) => isApiSrc(p) && !isTest(p) && !isSeed(p),
     re: /\b(?:this\.)?(?:prisma|tx|db|client|trx)\.(\w+)\.(findMany|findFirst|findFirstOrThrow|updateMany|deleteMany|count|aggregate|groupBy)\(/,
     skip: (line) => /\.(organization|user)\.\w+\(/.test(line),
@@ -368,6 +380,7 @@ const LINE_RULES = [
   },
   { id: 'G-B10', sev: 'ERROR', files: (p) => isApi(p) && notDoc(p), re: /\bFiles?Interceptor\b|@UploadedFiles?\(|['"]multer['"]|['"]busboy['"]|['"]@fastify\/multipart['"]/, msg: 'subida de archivos a través de la API; los audios suben directo a R2 con URL prefirmada' },
   { id: 'G-B10', sev: 'ERROR', files: notDoc, re: /['"]public-read(-write)?['"]/, msg: 'objeto público en el bucket; R2 es privado y se accede con URLs firmadas de corta duración' },
+  { id: 'G-B10', sev: 'ERROR', files: (p) => notDoc(p) && !isTest(p), re: /\bmc\s+(anonymous|policy)\s+set\s+(download|public)\b/i, msg: 'acceso anónimo o lectura pública en el bucket MinIO/R2; el bucket es privado y usa URLs prefirmadas' },
   { id: 'G-B10', sev: 'AVISO', files: notDoc, re: /@google-cloud\/storage|firebase\/storage|['"]aws-sdk['"]/, msg: 'SDK de almacenamiento no decidido; R2 se usa con @aws-sdk/client-s3' },
   {
     id: 'G-B11', sev: 'ERROR', files: (p) => isApiSrc(p) && !isTest(p), re: /\.(cookie|setCookie)\(\s*[^)]/,
@@ -584,6 +597,14 @@ function fileRules(file, text, ctx) {
       if (/name\s*:\s*\S*prod/i.test(block) && /plan\s*:\s*free\b/i.test(block)) {
         add('G-B12', 'AVISO', firstLine(/plan\s*:\s*free/i), 'servicio de producción en plan free: producción usa Render Starter siempre activo');
       }
+    }
+  }
+  if (p === 'apps/api/src/app.module.ts') {
+    if (!text.includes('x-attempt-token')) {
+      add('G-C10', 'ERROR', firstLine(/redact|pinoHttp/), 'pinoHttp no redacta la cabecera req.headers["x-attempt-token"]');
+    }
+    if (!text.includes('sanitizePinoReq') && !text.includes('req.query')) {
+      add('G-C10', 'ERROR', firstLine(/pinoHttp/), 'pinoHttp no sanea query strings ni req.query en logs');
     }
   }
   if (p === 'apps/api/src/main.ts') {

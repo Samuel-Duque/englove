@@ -9,6 +9,7 @@ try {
 }
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, RequestMethod } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -19,7 +20,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true, bodyParser: false });
 
   const configService = app.get(ConfigService);
   const appEnv = configService.get<string>('APP_ENV', 'local');
@@ -27,8 +28,7 @@ async function bootstrap() {
   const webBaseUrl = configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
 
   // Trust reverse proxy for single hop (Render) to reliably determine client IP (SPEC-02 §4)
-  const expressInstance = app.getHttpAdapter().getInstance() as express.Application;
-  expressInstance.set('trust proxy', 1);
+  app.set('trust proxy', 1);
 
   // Security headers with Helmet (Rule G-C10, SPEC-02 RF-16, ISSUE-01)
   app.use(

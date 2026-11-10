@@ -15,9 +15,34 @@ import {
   resolveActivityDurations,
   validateActivityPayload,
   ActivityValidationError,
-  GameConfig,
+  SpeakingConfigSchema,
+  GameConfigSchema,
+  GameMechanic,
   Level,
 } from '@englove/shared';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function toPrismaJson(val: unknown): Prisma.InputJsonValue {
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+    return val;
+  }
+  if (Array.isArray(val)) {
+    return val.map((item) => (item === null ? null : toPrismaJson(item)));
+  }
+  if (isRecord(val)) {
+    const obj: Record<string, Prisma.InputJsonValue | null> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        obj[k] = v === null ? null : toPrismaJson(v);
+      }
+    }
+    return obj;
+  }
+  return {};
+}
 import {
   CreateActivityDto,
   UpdateActivityDto,
@@ -305,8 +330,8 @@ export class ActivitiesService {
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              config: validConfig as object,
-              answer_key: (validAnswerKey ?? {}) as object,
+              config: toPrismaJson(validConfig),
+              answer_key: toPrismaJson(validAnswerKey),
             },
           });
           break;
@@ -316,40 +341,40 @@ export class ActivitiesService {
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              config: validConfig as object,
+              config: toPrismaJson(validConfig),
             },
           });
           break;
 
         case ActivityType.speaking: {
-          const spkConfig = validConfig as {
-            prompt: string;
-            exampleUrl?: string;
-            minDurationSeconds: number;
-            maxDurationSeconds: number;
-          };
+          const parsedSpk = SpeakingConfigSchema.safeParse(validConfig);
+          const prompt = parsedSpk.success ? parsedSpk.data.prompt : '';
+          const exampleUrl = parsedSpk.success ? parsedSpk.data.exampleUrl : undefined;
+          const minDuration = parsedSpk.success ? parsedSpk.data.minDurationSeconds : 2;
+          const maxDuration = parsedSpk.success ? parsedSpk.data.maxDurationSeconds : 120;
           await tx.speakingDetail.create({
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              prompt: spkConfig.prompt,
-              example_url: spkConfig.exampleUrl ?? null,
-              min_duration_seconds: spkConfig.minDurationSeconds,
-              max_duration_seconds: spkConfig.maxDurationSeconds,
+              prompt,
+              example_url: exampleUrl ?? null,
+              min_duration_seconds: minDuration,
+              max_duration_seconds: maxDuration,
             },
           });
           break;
         }
 
         case ActivityType.game: {
-          const gameConfig = validConfig as GameConfig;
+          const parsedGame = GameConfigSchema.safeParse(validConfig);
+          const mechanic = parsedGame.success ? parsedGame.data.mechanic : GameMechanic.match;
           await tx.gameDetail.create({
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              mechanic: gameConfig.mechanic,
-              config: validConfig as object,
-              answer_key: (validAnswerKey ?? {}) as object,
+              mechanic,
+              config: toPrismaJson(validConfig),
+              answer_key: toPrismaJson(validAnswerKey),
             },
           });
           break;
@@ -360,8 +385,8 @@ export class ActivitiesService {
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              config: validConfig as object,
-              answer_key: (validAnswerKey ?? {}) as object,
+              config: toPrismaJson(validConfig),
+              answer_key: toPrismaJson(validAnswerKey),
             },
           });
           break;
@@ -458,7 +483,7 @@ export class ActivitiesService {
 
     if (activity.type === ActivityType.game && dto.config !== undefined) {
       const existingMechanic = activity.game_detail?.mechanic;
-      const newMechanic = (dto.config as Record<string, unknown>)?.['mechanic'];
+      const newMechanic = isRecord(dto.config) ? dto.config['mechanic'] : undefined;
       if (newMechanic && existingMechanic && newMechanic !== existingMechanic) {
         throw new BadRequestException({
           statusCode: 400,
@@ -551,8 +576,8 @@ export class ActivitiesService {
             await tx.fillBlankDetail.update({
               where: { activity_id: activity.id },
               data: {
-                config: validConfig as object,
-                answer_key: (validAnswerKey ?? {}) as object,
+                config: toPrismaJson(validConfig),
+                answer_key: toPrismaJson(validAnswerKey),
               },
             });
             break;
@@ -561,25 +586,24 @@ export class ActivitiesService {
             await tx.openQuestionDetail.update({
               where: { activity_id: activity.id },
               data: {
-                config: validConfig as object,
+                config: toPrismaJson(validConfig),
               },
             });
             break;
 
           case ActivityType.speaking: {
-            const spkConfig = validConfig as {
-              prompt: string;
-              exampleUrl?: string;
-              minDurationSeconds: number;
-              maxDurationSeconds: number;
-            };
+            const parsedSpk = SpeakingConfigSchema.safeParse(validConfig);
+            const prompt = parsedSpk.success ? parsedSpk.data.prompt : '';
+            const exampleUrl = parsedSpk.success ? parsedSpk.data.exampleUrl : undefined;
+            const minDuration = parsedSpk.success ? parsedSpk.data.minDurationSeconds : 2;
+            const maxDuration = parsedSpk.success ? parsedSpk.data.maxDurationSeconds : 120;
             await tx.speakingDetail.update({
               where: { activity_id: activity.id },
               data: {
-                prompt: spkConfig.prompt,
-                example_url: spkConfig.exampleUrl ?? null,
-                min_duration_seconds: spkConfig.minDurationSeconds,
-                max_duration_seconds: spkConfig.maxDurationSeconds,
+                prompt,
+                example_url: exampleUrl ?? null,
+                min_duration_seconds: minDuration,
+                max_duration_seconds: maxDuration,
               },
             });
             break;
@@ -589,8 +613,8 @@ export class ActivitiesService {
             await tx.gameDetail.update({
               where: { activity_id: activity.id },
               data: {
-                config: validConfig as object,
-                answer_key: (validAnswerKey ?? {}) as object,
+                config: toPrismaJson(validConfig),
+                answer_key: toPrismaJson(validAnswerKey),
               },
             });
             break;
@@ -599,8 +623,8 @@ export class ActivitiesService {
             await tx.examDetail.update({
               where: { activity_id: activity.id },
               data: {
-                config: validConfig as object,
-                answer_key: (validAnswerKey ?? {}) as object,
+                config: toPrismaJson(validConfig),
+                answer_key: toPrismaJson(validAnswerKey),
               },
             });
             break;
@@ -715,8 +739,8 @@ export class ActivitiesService {
               data: {
                 organization_id: organizationId,
                 activity_id: act.id,
-                config: source.fill_blank_detail.config as object,
-                answer_key: source.fill_blank_detail.answer_key as object,
+                config: toPrismaJson(source.fill_blank_detail.config),
+                answer_key: toPrismaJson(source.fill_blank_detail.answer_key),
               },
             });
           }
@@ -728,7 +752,7 @@ export class ActivitiesService {
               data: {
                 organization_id: organizationId,
                 activity_id: act.id,
-                config: source.open_question_detail.config as object,
+                config: toPrismaJson(source.open_question_detail.config),
               },
             });
           }
@@ -756,8 +780,8 @@ export class ActivitiesService {
                 organization_id: organizationId,
                 activity_id: act.id,
                 mechanic: source.game_detail.mechanic,
-                config: source.game_detail.config as object,
-                answer_key: source.game_detail.answer_key as object,
+                config: toPrismaJson(source.game_detail.config),
+                answer_key: toPrismaJson(source.game_detail.answer_key),
               },
             });
           }
@@ -769,8 +793,8 @@ export class ActivitiesService {
               data: {
                 organization_id: organizationId,
                 activity_id: act.id,
-                config: source.exam_detail.config as object,
-                answer_key: source.exam_detail.answer_key as object,
+                config: toPrismaJson(source.exam_detail.config),
+                answer_key: toPrismaJson(source.exam_detail.answer_key),
               },
             });
           }

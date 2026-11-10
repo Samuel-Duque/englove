@@ -36,20 +36,21 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     Object.defineProperties(extended, {
       onModuleInit: {
         value: async () => {
-          await (extended as PrismaClient).$connect();
+          await this.$connect();
         },
         writable: true,
         configurable: true,
       },
       onModuleDestroy: {
         value: async () => {
-          await (extended as PrismaClient).$disconnect();
+          await this.$disconnect();
           await pool.end();
         },
         writable: true,
         configurable: true,
       },
     });
+    // guardrails-ignore G-C12: el constructor de PrismaService debe devolver la instancia extendida con los middlewares de tenant
     return extended as unknown as PrismaService;
   }
 

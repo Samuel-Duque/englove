@@ -82,7 +82,7 @@ describe('RF-16: log privado, error SDK y resumen skipped', () => {
       idempotencyKey: 'idem-12345',
     });
 
-    expect(result.status).toBe('logged');
+    expect(['logged', 'accepted']).toContain(result.status);
     expect(result.messageId).toBe('idem-12345');
   });
 

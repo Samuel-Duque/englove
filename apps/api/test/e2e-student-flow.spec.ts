@@ -20,42 +20,53 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
-import * as net from 'net';
+import { execFileSync } from 'node:child_process';
 
 function getPostgresPort(): number {
   const url = process.env.DATABASE_URL;
-  if (!url) return 5432;
+  if (!url) return 5433;
   try {
     const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5432;
+    return parsed.port ? parseInt(parsed.port, 10) : 5433;
   } catch {
-    return 5432;
+    return 5433;
   }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(getPostgresPort(), '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072)', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+function checkPostgresRunning(): boolean {
+  const configuredPort = getPostgresPort();
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
+  return false;
+}
+
+const isPostgresAvailable = checkPostgresRunning();
+
+describe.skipIf(!isPostgresAvailable)('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072)', () => {
+  let prisma: PrismaService;
   let activitiesService: ActivitiesService;
   let assignmentsService: AssignmentsService;
   let attemptsService: AttemptsService;
@@ -76,15 +87,8 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   let attemptToken = '';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost:5432; saltando pruebas E2E contra DB real.');
-      return;
-    }
-
-    try {
-      prisma = new PrismaService();
-      await prisma.$connect();
+    prisma = new PrismaService();
+    await prisma.$connect();
 
       const configService = new ConfigService({
         JWT_SECRET: 'e2e-student-flow-test-jwt-secret-min-32-chars-long!',
@@ -231,14 +235,10 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
           assignmentId = assignResult.items[0]!.id;
         },
       );
-    } catch (err: unknown) {
-      console.warn('Error inicializando PostgreSQL para E2E student flow:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       try {
         await prisma.scheduledJobRun.deleteMany({ where: { organization_id: orgId } });
         await prisma.badgeAward.deleteMany({ where: { organization_id: orgId } });
@@ -263,7 +263,6 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   });
 
   it('Paso 1: Alumno inicia intento válidamente (RF-3)', async () => {
-    if (!isPostgresAvailable || !prisma) return;
     const activePrisma = prisma;
 
     return TenantContext.run(
@@ -294,7 +293,6 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   });
 
   it('Paso 2: Alumno envía eventos de respuesta con clientEventId idempotente (RF-7)', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
@@ -344,7 +342,6 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   });
 
   it('Paso 3: Alumno finaliza entrega, se autocalifica en servidor y registra eventos (RF-8, RF-9, RF-16)', async () => {
-    if (!isPostgresAvailable || !prisma) return;
     const activePrisma = prisma;
 
     return TenantContext.run(
@@ -393,7 +390,6 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   });
 
   it('Paso 4: Consulta de progreso propio refleja estrellas y racha actualizada (RF-22)', async () => {
-    if (!isPostgresAvailable || !prisma) return;
 
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
@@ -410,7 +406,6 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
   });
 
   it('Paso 5: Concurrencia real en PostgreSQL garantiza exactamente 1 intento creado y 1 conflicto 409 (RF-3, RF-4)', async () => {
-    if (!isPostgresAvailable || !prisma) return;
     const activePrisma = prisma;
 
     return TenantContext.run(

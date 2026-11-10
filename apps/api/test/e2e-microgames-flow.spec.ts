@@ -22,7 +22,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException, HttpException } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
-import * as net from 'net';
+import { execFileSync } from 'node:child_process';
 
 function getPostgresPort(): number {
   const url = process.env.DATABASE_URL;
@@ -35,37 +35,40 @@ function getPostgresPort(): number {
   }
 }
 
-async function checkPortOpen(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(port, '127.0.0.1');
-  });
+function checkPortOpenSync(port: number): boolean {
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const net = require('net');
+        const s = new net.Socket();
+        s.setTimeout(2500);
+        s.once('connect', () => { s.destroy(); process.exit(0); });
+        s.once('timeout', () => { s.destroy(); process.exit(1); });
+        s.once('error', () => { s.destroy(); process.exit(1); });
+        s.connect(${port}, '127.0.0.1');`,
+      ],
+      { stdio: 'ignore', timeout: 6000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-async function checkPostgresRunning(): Promise<boolean> {
+function checkPostgresRunning(): boolean {
   const configuredPort = getPostgresPort();
-  if (await checkPortOpen(configuredPort)) return true;
-  if (configuredPort !== 5433 && (await checkPortOpen(5433))) return true;
-  if (configuredPort !== 5432 && (await checkPortOpen(5432))) return true;
+  if (checkPortOpenSync(configuredPort)) return true;
+  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
+  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
   return false;
 }
 
-describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (ENG-080 a ENG-087)', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+const isPostgresAvailable = checkPostgresRunning();
+
+describe.skipIf(!isPostgresAvailable)('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (ENG-080 a ENG-087)', () => {
+  let prisma: PrismaService;
   let activitiesService: ActivitiesService;
   let assignmentsService: AssignmentsService;
   let attemptsService: AttemptsService;
@@ -86,15 +89,8 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   let attempt2Id = '';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost; saltando pruebas E2E de microjuegos en DB real.');
-      return;
-    }
-
-    try {
-      prisma = new PrismaService();
-      await prisma.$connect();
+    prisma = new PrismaService();
+    await prisma.$connect();
 
       const configService = new ConfigService({
         JWT_SECRET: 'e2e-microgames-flow-test-jwt-secret-min-32-chars-long!',
@@ -236,14 +232,10 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
           active: true,
         },
       });
-    } catch (err) {
-      console.warn('Error conectando a Docker PostgreSQL para E2E de microjuegos:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       try {
         await prisma.badgeAward.deleteMany({ where: { organization_id: orgId } });
         await prisma.badgeRule.deleteMany({ where: { organization_id: orgId } });
@@ -264,8 +256,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 1: Docente crea y publica actividad de tipo game (mechanic = match) en PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: teacherId, role: Role.teacher },
       async () => {
@@ -322,8 +312,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 2: Docente intenta asignar microjuego y es rechazado con 422 (Decisión 130, ENG-150)', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: teacherId, role: Role.teacher },
       async () => {
@@ -344,8 +332,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 3: Feature Flag gating (RF-11) — startGameAttempt falla con 409 si flags.games es false', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -357,8 +343,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 4: Habilitar feature flag games y listar microjuegos autónomos para alumno (Decisión 130)', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -384,8 +368,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 5: Alumno inicia Intento #1 (RF-1, RF-7, Decisión 130) — crea Attempt en PostgreSQL con attempt_number = 1 y entrega GamePublicConfig', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -417,8 +399,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 6: Transmisión de eventos de emparejamiento con idempotencia y reemplazo exacto (RF-8)', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -461,8 +441,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 7: Completar Intento #1 (RF-7) — calificación determinista 5.0 en servidor, insignias y finished_at en PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -496,8 +474,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 8: Decisión 104 y 130 — Jugar de nuevo como microjuego autónomo crea un Attempt individual (attempt_number = 2) sin sobrescribir el 1', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -532,8 +508,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
 
   // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
   it('Paso 9: RF-8 — Intento completado en < min_plausible_seconds recibe flag implausible_duration conservando puntaje en PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -580,8 +554,6 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 10: RF-11 — Consultar listStudentGames tras completar partidas devuelve estrellas y estado histórico correcto (Decisión 130)', async () => {
-    if (!isPostgresAvailable) return;
-
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {

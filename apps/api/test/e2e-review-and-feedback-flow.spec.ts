@@ -22,6 +22,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UnprocessableEntityException, NotFoundException, ConflictException } from '@nestjs/common';
+import { TenantContext } from '../src/common/tenant/tenant.context';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -298,212 +299,247 @@ describe('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo �
   it('Paso 1: El alumno inicia la actividad de speaking y completa el intento quedando en pending_review', async () => {
     if (!isPostgresAvailable) return;
 
-    // Start attempt
-    const runtime = await attemptsService.startAttempt(orgId, studentId, assignmentId);
-    expect(runtime.attempt).toBeDefined();
-    expect(runtime.attempt.attemptNumber).toBe(1);
-    expect(runtime.attempt.status).toBe(AttemptStatus.in_progress);
-    attemptId = runtime.attempt.id;
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        // Start attempt
+        const runtime = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+        expect(runtime.attempt).toBeDefined();
+        expect(runtime.attempt.attemptNumber).toBe(1);
+        expect(runtime.attempt.status).toBe(AttemptStatus.in_progress);
+        attemptId = runtime.attempt.id;
 
-    // Create a mock ready audio MediaAsset for this attempt
-    const mediaAsset = await prisma!.mediaAsset.create({
-      data: {
-        organization_id: orgId,
-        attempt_id: attemptId,
-        student_id: studentId,
-        key: `audios/${attemptId}/speaking_raw.webm`,
-        converted_key: `audios/${attemptId}/speaking_converted.mp4`,
-        mime_type: 'audio/webm',
-        size_bytes: BigInt(256000),
-        duration_seconds: 22,
-        status: MediaAssetStatus.ready,
+        // Create a mock ready audio MediaAsset for this attempt
+        const mediaAsset = await prisma!.mediaAsset.create({
+          data: {
+            organization_id: orgId,
+            attempt_id: attemptId,
+            student_id: studentId,
+            key: `audios/${attemptId}/speaking_raw.webm`,
+            converted_key: `audios/${attemptId}/speaking_converted.mp4`,
+            mime_type: 'audio/webm',
+            size_bytes: BigInt(256000),
+            duration_seconds: 22,
+            status: MediaAssetStatus.ready,
+          },
+        });
+
+        // Complete attempt
+        const completion = await attemptsService.completeAttempt(
+          orgId,
+          studentId,
+          attemptId,
+          runtime.attemptToken!,
+          { mediaId: mediaAsset.id },
+        );
+
+        expect(completion.attempt.status).toBe(AttemptStatus.pending_review);
+        expect(completion.attempt.score).toBeNull();
       },
-    });
-
-    // Complete attempt
-    const completion = await attemptsService.completeAttempt(
-      orgId,
-      studentId,
-      attemptId,
-      runtime.attemptToken!,
-      { mediaId: mediaAsset.id },
     );
-
-    expect(completion.attempt.status).toBe(AttemptStatus.pending_review);
-    expect(completion.attempt.score).toBeNull();
   });
 
   it('Paso 2: La profesora consulta la cola de pendientes y obtiene el detalle para evaluación', async () => {
     if (!isPostgresAvailable) return;
 
-    const reminders = await pendingSummaryService.getReminders(orgId);
-    expect(reminders.overdueReviews).toBe(0);
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        const reminders = await pendingSummaryService.getReminders(orgId);
+        expect(reminders.overdueReviews).toBe(0);
 
-    const queue = await reviewsService.getQueue(orgId, { offset: 0, limit: 10 });
-    expect(queue.total).toBe(1);
-    expect(queue.items[0]?.attempt.attemptId).toBe(attemptId);
-    expect(queue.items[0]?.student.displayName).toBe('Santiago Martinez');
-    expect(queue.items[0]?.mediaAsset?.isConverted).toBe(true);
-    expect(queue.items[0]?.attempt.canGrantRetry).toBe(false);
+        const queue = await reviewsService.getQueue(orgId, { offset: 0, limit: 10 });
+        expect(queue.total).toBe(1);
+        expect(queue.items[0]?.attempt.attemptId).toBe(attemptId);
+        expect(queue.items[0]?.student.displayName).toBe('Santiago Martinez');
+        expect(queue.items[0]?.mediaAsset?.isConverted).toBe(true);
+        expect(queue.items[0]?.attempt.canGrantRetry).toBe(false);
 
-    // Detail
-    const detail = await reviewsService.getReviewDetail(orgId, attemptId);
-    expect(detail.attempt.attemptId).toBe(attemptId);
-    expect(detail.activity.title).toBe('My Favorite Animal Speaking');
-    expect(detail.items.length).toBeGreaterThan(0);
-    expect(detail.items[0]?.prompt).toContain('Describe your favorite pet');
+        // Detail
+        const detail = await reviewsService.getReviewDetail(orgId, attemptId);
+        expect(detail.attempt.attemptId).toBe(attemptId);
+        expect(detail.activity.title).toBe('My Favorite Animal Speaking');
+        expect(detail.items.length).toBeGreaterThan(0);
+        expect(detail.items[0]?.prompt).toContain('Describe your favorite pet');
+      },
+    );
   });
 
   it('Paso 3: La profesora califica con nota, comentario y stickers; se emite ProgressEvent y correo único', async () => {
     if (!isPostgresAvailable) return;
 
-    const updated = await reviewsService.submitReview(orgId, teacherId, attemptId, {
-      score: 4.8,
-      comment: '¡Excelente pronunciación y fluidez! Usaste un vocabulario muy apropiado.',
-      stickers: ['great_job', 'good_pronunciation'],
-    });
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        const updated = await reviewsService.submitReview(orgId, teacherId, attemptId, {
+          score: 4.8,
+          comment: '¡Excelente pronunciación y fluidez! Usaste un vocabulario muy apropiado.',
+          stickers: ['great_job', 'good_pronunciation'],
+        });
 
-    expect(updated.review?.stickers).toEqual(['great_job', 'good_pronunciation']);
+        expect(updated.review?.stickers).toEqual(['great_job', 'good_pronunciation']);
 
-    // Verify DB Attempt
-    const dbAttempt = await prisma!.attempt.findFirst({
-      where: { id: attemptId, organization_id: orgId },
-    });
+        // Verify DB Attempt
+        const dbAttempt = await prisma!.attempt.findFirst({
+          where: { id: attemptId, organization_id: orgId },
+        });
 
-    expect(dbAttempt?.status).toBe(AttemptStatus.graded);
-    expect(Number(dbAttempt?.score)).toBe(4.8);
-    expect(dbAttempt?.graded_at).toBeDefined();
+        expect(dbAttempt?.status).toBe(AttemptStatus.graded);
+        expect(Number(dbAttempt?.score)).toBe(4.8);
+        expect(dbAttempt?.graded_at).toBeDefined();
 
-    // Verify DB Review
-    const dbReview = await prisma!.review.findFirst({
-      where: { attempt_id: attemptId, organization_id: orgId },
-    });
-    expect(dbReview?.comment).toContain('¡Excelente pronunciación');
-    expect(dbReview?.stickers).toEqual(['great_job', 'good_pronunciation']);
+        // Verify DB Review
+        const dbReview = await prisma!.review.findFirst({
+          where: { attempt_id: attemptId, organization_id: orgId },
+        });
+        expect(dbReview?.comment).toContain('¡Excelente pronunciación');
+        expect(dbReview?.stickers).toEqual(['great_job', 'good_pronunciation']);
 
-    // Verify MediaAsset retention_until is set to graded_at + 30 days
-    const dbMedia = await prisma!.mediaAsset.findFirst({
-      where: { attempt_id: attemptId, organization_id: orgId },
-    });
-    expect(dbMedia?.retention_until).toBeDefined();
-    expect(dbMedia!.retention_until!.getTime()).toBeGreaterThan(Date.now() + 25 * 86400 * 1000);
+        // Verify MediaAsset retention_until is set to graded_at + 30 days
+        const dbMedia = await prisma!.mediaAsset.findFirst({
+          where: { attempt_id: attemptId, organization_id: orgId },
+        });
+        expect(dbMedia?.retention_until).toBeDefined();
+        expect(dbMedia!.retention_until!.getTime()).toBeGreaterThan(Date.now() + 25 * 86400 * 1000);
 
-    // Verify ProgressEvent(review_received)
-    const event = await prisma!.progressEvent.findFirst({
-      where: {
-        attempt_id: attemptId,
-        type: ProgressEventType.review_received,
-        organization_id: orgId,
+        // Verify ProgressEvent(review_received)
+        const event = await prisma!.progressEvent.findFirst({
+          where: {
+            attempt_id: attemptId,
+            type: ProgressEventType.review_received,
+            organization_id: orgId,
+          },
+        });
+        expect(event).toBeDefined();
+        expect(Number(event?.value)).toBe(4.8);
       },
-    });
-    expect(event).toBeDefined();
-    expect(Number(event?.value)).toBe(4.8);
+    );
   });
 
   it('Paso 4: La nota es inmutable en intentos graded (422 SCORE_NOT_EDITABLE); solo se edita feedback', async () => {
     if (!isPostgresAvailable) return;
 
-    // Trying to modify score must be rejected with 422
-    await expect(
-      reviewsService.submitReview(orgId, teacherId, attemptId, {
-        score: 5.0,
-        comment: 'Intento cambiar nota',
-      }),
-    ).rejects.toThrow(UnprocessableEntityException);
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        // Trying to modify score must be rejected with 422
+        await expect(
+          reviewsService.submitReview(orgId, teacherId, attemptId, {
+            score: 5.0,
+            comment: 'Intento cambiar nota',
+          }),
+        ).rejects.toThrow(UnprocessableEntityException);
 
-    // Editing only comment and stickers succeeds
-    const updated = await reviewsService.submitReview(orgId, teacherId, attemptId, {
-      comment: 'Comentario editado con felicitación ampliada.',
-      stickers: ['great_job', 'good_pronunciation', 'super_effort'],
-    });
+        // Editing only comment and stickers succeeds
+        const updated = await reviewsService.submitReview(orgId, teacherId, attemptId, {
+          comment: 'Comentario editado con felicitación ampliada.',
+          stickers: ['great_job', 'good_pronunciation', 'super_effort'],
+        });
 
-    expect(updated.review?.stickers.length).toBe(3);
+        expect(updated.review?.stickers.length).toBe(3);
 
-    const dbReview = await prisma!.review.findFirst({
-      where: { attempt_id: attemptId, organization_id: orgId },
-    });
-    expect(dbReview?.comment).toContain('Comentario editado');
-    expect(dbReview?.stickers.length).toBe(3);
+        const dbReview = await prisma!.review.findFirst({
+          where: { attempt_id: attemptId, organization_id: orgId },
+        });
+        expect(dbReview?.comment).toContain('Comentario editado');
+        expect(dbReview?.stickers.length).toBe(3);
 
-    // Score remains completely untouched
-    const dbAttempt = await prisma!.attempt.findFirst({
-      where: { id: attemptId, organization_id: orgId },
-    });
-    expect(Number(dbAttempt?.score)).toBe(4.8);
+        // Score remains completely untouched
+        const dbAttempt = await prisma!.attempt.findFirst({
+          where: { id: attemptId, organization_id: orgId },
+        });
+        expect(Number(dbAttempt?.score)).toBe(4.8);
+      },
+    );
   });
 
   it('Paso 5: La profesora concede un nuevo intento con extensión de plazo opcional', async () => {
     if (!isPostgresAvailable) return;
 
-    const futureExtend = new Date(Date.now() + 5 * 86400 * 1000).toISOString();
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        const futureExtend = new Date(Date.now() + 5 * 86400 * 1000).toISOString();
 
-    const grantRes = await reviewsService.grantRetry(orgId, teacherId, attemptId, {
-      retryExtendUntil: futureExtend,
-    });
+        const grantRes = await reviewsService.grantRetry(orgId, teacherId, attemptId, {
+          retryExtendUntil: futureExtend,
+        });
 
-    expect(grantRes.attemptId).toBe(attemptId);
-    expect(grantRes.retryGrantedBy).toBe(teacherId);
-    expect(grantRes.retryExtendUntil).toBe(futureExtend);
+        expect(grantRes.attemptId).toBe(attemptId);
+        expect(grantRes.retryGrantedBy).toBe(teacherId);
+        expect(grantRes.retryExtendUntil).toBe(futureExtend);
 
-    // Verify DB Attempt
-    const dbAttempt = await prisma!.attempt.findFirst({
-      where: { id: attemptId, organization_id: orgId },
-    });
-    expect(dbAttempt?.retry_granted_at).toBeDefined();
-    expect(dbAttempt?.retry_extend_until).toBeDefined();
+        // Verify DB Attempt
+        const dbAttempt = await prisma!.attempt.findFirst({
+          where: { id: attemptId, organization_id: orgId },
+        });
+        expect(dbAttempt?.retry_granted_at).toBeDefined();
+        expect(dbAttempt?.retry_extend_until).toBeDefined();
 
-    // Verify ProgressEvent(retry_granted)
-    const event = await prisma!.progressEvent.findFirst({
-      where: {
-        attempt_id: attemptId,
-        type: ProgressEventType.retry_granted,
-        organization_id: orgId,
+        // Verify ProgressEvent(retry_granted)
+        const event = await prisma!.progressEvent.findFirst({
+          where: {
+            attempt_id: attemptId,
+            type: ProgressEventType.retry_granted,
+            organization_id: orgId,
+          },
+        });
+        expect(event).toBeDefined();
+
+        // Second grant on same attempt must fail with 409 RETRY_ALREADY_GRANTED
+        await expect(
+          reviewsService.grantRetry(orgId, teacherId, attemptId, {}),
+        ).rejects.toThrow(ConflictException);
       },
-    });
-    expect(event).toBeDefined();
-
-    // Second grant on same attempt must fail with 409 RETRY_ALREADY_GRANTED
-    await expect(
-      reviewsService.grantRetry(orgId, teacherId, attemptId, {}),
-    ).rejects.toThrow(ConflictException);
+    );
   });
 
   it('Paso 6: El alumno consume la autorización creando el intento #2 enlazado por previous_attempt_id', async () => {
     if (!isPostgresAvailable) return;
 
-    const retryRuntime = await attemptsService.startAttempt(orgId, studentId, assignmentId);
-    expect(retryRuntime.attempt.attemptNumber).toBe(2);
-    expect(retryRuntime.attempt.previousAttemptId).toBe(attemptId);
-    expect(retryRuntime.attempt.status).toBe(AttemptStatus.in_progress);
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const retryRuntime = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+        expect(retryRuntime.attempt.attemptNumber).toBe(2);
+        expect(retryRuntime.attempt.previousAttemptId).toBe(attemptId);
+        expect(retryRuntime.attempt.status).toBe(AttemptStatus.in_progress);
 
-    // Original attempt remains intact
-    const original = await prisma!.attempt.findFirst({
-      where: { id: attemptId, organization_id: orgId },
-    });
-    expect(Number(original?.score)).toBe(4.8);
-    expect(original?.status).toBe(AttemptStatus.graded);
+        // Original attempt remains intact
+        const original = await prisma!.attempt.findFirst({
+          where: { id: attemptId, organization_id: orgId },
+        });
+        expect(Number(original?.score)).toBe(4.8);
+        expect(original?.status).toBe(AttemptStatus.graded);
+      },
+    );
   });
 
   it('Paso 7: El alumno consulta /feedback y ve el historial cronológico y su retroalimentación sin fugas de audio', async () => {
     if (!isPostgresAvailable) return;
 
-    const feedback = await reviewsService.getStudentFeedback(orgId, studentId);
-    expect(feedback.items.length).toBe(1);
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const feedback = await reviewsService.getStudentFeedback(orgId, studentId);
+        expect(feedback.items.length).toBe(1);
 
-    const item = feedback.items[0];
-    expect(item?.activityTitle).toBe('My Favorite Animal Speaking');
-    expect(item?.latestAttempt.score).toBe(4.8);
-    expect(item?.latestAttempt.stars).toBe(3);
-    expect(item?.latestAttempt.stickers.length).toBe(3);
-    expect(item?.latestAttempt.stickers[0]?.emoji).toBe('🌟');
+        const item = feedback.items[0];
+        expect(item?.activityTitle).toBe('My Favorite Animal Speaking');
+        expect(item?.latestAttempt.score).toBe(4.8);
+        expect(item?.latestAttempt.stars).toBe(3);
+        expect(item?.latestAttempt.stickers.length).toBe(3);
+        expect(item?.latestAttempt.stickers[0]?.emoji).toBe('🌟');
 
-    // Attempt history has 1 graded attempt
-    expect(item?.attempts.length).toBe(1);
-    expect(item?.attempts[0]?.attemptNumber).toBe(1);
+        // Attempt history has 1 graded attempt
+        expect(item?.attempts.length).toBe(1);
+        expect(item?.attempts[0]?.attemptNumber).toBe(1);
 
-    // Anti-leak: no media urls or private keys in response
-    expect((item as any).url).toBeUndefined();
-    expect((item?.latestAttempt as any).key).toBeUndefined();
+        // Anti-leak: no media urls or private keys in response
+        expect((item as Record<string, unknown> | undefined)?.url).toBeUndefined();
+        expect((item?.latestAttempt as Record<string, unknown> | undefined)?.key).toBeUndefined();
+      },
+    );
   });
 
   it('Paso 8: Aislamiento anti-IDOR: intentar leer intento desde otra organización responde 404', async () => {

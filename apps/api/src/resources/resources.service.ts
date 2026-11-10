@@ -134,45 +134,56 @@ export class ResourcesService {
     userId: string,
     dto: CreateResourceDto,
   ): Promise<ExternalResourceItem> {
-    const currentCount = await this.prisma.externalResource.count({
-      where: { organization_id: organizationId },
-    });
+    return await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        // guardrails-ignore G-A06: Bloqueo transaccional de organización para cuota de recursos y posición atómica
+        await tx.$queryRaw`
+          SELECT id FROM organizations
+          WHERE id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+      }
 
-    if (currentCount >= 200) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'RESOURCE_LIMIT_REACHED',
-        message: 'Límite de 200 recursos alcanzado para la organización',
+      const currentCount = await tx.externalResource.count({
+        where: { organization_id: organizationId },
       });
-    }
 
-    const maxPositionResult = await this.prisma.externalResource.aggregate({
-      where: { organization_id: organizationId },
-      _max: { position: true },
+      if (currentCount >= 200) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'RESOURCE_LIMIT_REACHED',
+          message: 'Límite de 200 recursos alcanzado para la organización',
+        });
+      }
+
+      const maxPositionResult = await tx.externalResource.aggregate({
+        where: { organization_id: organizationId },
+        _max: { position: true },
+      });
+
+      const nextPosition =
+        maxPositionResult._max.position !== null &&
+        maxPositionResult._max.position !== undefined
+          ? maxPositionResult._max.position + 1
+          : 0;
+
+      const resource = await tx.externalResource.create({
+        data: {
+          organization_id: organizationId,
+          title: dto.title.trim(),
+          url: dto.url.trim(),
+          description:
+            dto.description !== undefined && dto.description !== null
+              ? dto.description.trim() || null
+              : null,
+          level: dto.level ?? null,
+          position: nextPosition,
+          created_by: userId,
+        },
+      });
+
+      return this.toItem(resource);
     });
-
-    const nextPosition =
-      maxPositionResult._max.position !== null &&
-      maxPositionResult._max.position !== undefined
-        ? maxPositionResult._max.position + 1
-        : 0;
-
-    const resource = await this.prisma.externalResource.create({
-      data: {
-        organization_id: organizationId,
-        title: dto.title.trim(),
-        url: dto.url.trim(),
-        description:
-          dto.description !== undefined && dto.description !== null
-            ? dto.description.trim() || null
-            : null,
-        level: dto.level ?? null,
-        position: nextPosition,
-        created_by: userId,
-      },
-    });
-
-    return this.toItem(resource);
   }
 
   async update(

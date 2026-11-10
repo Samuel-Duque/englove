@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { Readable } from 'node:stream';
 import { MediaService } from '../src/media/media.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
   PayloadTooLargeException,
   UnprocessableEntityException,
@@ -20,18 +23,25 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
   let service: MediaService;
   let mockPrisma: {
-    attempt: { findFirst: MockFn };
+    attempt: { findFirst: MockFn; update?: MockFn };
     mediaAsset: {
       create: MockFn;
       findFirst: MockFn;
       findUnique: MockFn;
       update: MockFn;
+      updateMany: MockFn;
       findMany: MockFn;
       delete: MockFn;
     };
+    $queryRaw: MockFn;
+    $transaction: MockFn;
   };
   let mockConfig: {
     get: MockFn;
+  };
+  let mockJwt: {
+    sign: MockFn;
+    verify: MockFn;
   };
 
   beforeEach(() => {
@@ -72,9 +82,12 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           status: data.status,
           duration_seconds: data.duration_seconds,
         })),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findMany: vi.fn().mockResolvedValue([]),
         delete: vi.fn().mockResolvedValue({ id: mediaId }),
       },
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma)),
     };
 
     mockConfig = {
@@ -87,7 +100,25 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       }),
     };
 
-    service = new MediaService(mockPrisma as unknown as PrismaService, mockConfig as unknown as ConfigService);
+    mockJwt = {
+      sign: vi.fn().mockReturnValue('valid.attempt.token'),
+      verify: vi.fn().mockReturnValue({
+        attemptId,
+        studentId,
+        organizationId: orgId,
+        typ: 'attempt',
+      }),
+    };
+
+    service = new MediaService(
+      mockPrisma as unknown as PrismaService,
+      mockConfig as unknown as ConfigService,
+      mockJwt as unknown as JwtService,
+    );
+
+    vi.spyOn(service['s3Client'], 'send').mockResolvedValue({
+      ContentLength: 50000,
+    } as never);
   });
 
   describe('createUploadUrl (RF-12, RF-13)', () => {
@@ -245,6 +276,239 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       await expect(
         service.deleteFile('org/student/attempt/rec.webm'),
       ).rejects.toThrow('R2 service unavailable');
+    });
+  });
+
+  describe('AUDIO-01: Pruebas de regresión de validación de audio (SPEC-11 §9, P1-02, QA-05)', () => {
+    it('rechaza binario no-audio con magic bytes OggS sin fallback de tamaño (P1-02, SPEC-11 §9)', async () => {
+      // 24 KB file starting with OggS magic bytes but containing non-audio garbage
+      const fakeOgg = Buffer.alloc(24 * 1024);
+      fakeOgg[0] = 0x4f; // 'O'
+      fakeOgg[1] = 0x67; // 'g'
+      fakeOgg[2] = 0x67; // 'g'
+      fakeOgg[3] = 0x53; // 'S'
+
+      vi.spyOn(service['s3Client'], 'send')
+        .mockResolvedValueOnce({ ContentLength: fakeOgg.length } as never) // HeadObject
+        .mockResolvedValueOnce({ Body: Readable.from(fakeOgg) } as never); // GetObject in probeDuration
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
+      ).rejects.toThrow(UnprocessableEntityException);
+
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mediaId },
+          data: { status: MediaAssetStatus.pending_delete },
+        }),
+      );
+    });
+
+    it('rechaza binario con magic bytes EBML corruptos sin fallback de tamaño (P1-02)', async () => {
+      const fakeEbml = Buffer.alloc(50 * 1024);
+      fakeEbml[0] = 0x1a;
+      fakeEbml[1] = 0x45;
+      fakeEbml[2] = 0xdf;
+      fakeEbml[3] = 0xa3;
+
+      vi.spyOn(service['s3Client'], 'send')
+        .mockResolvedValueOnce({ ContentLength: fakeEbml.length } as never)
+        .mockResolvedValueOnce({ Body: Readable.from(fakeEbml) } as never);
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
+      ).rejects.toThrow(UnprocessableEntityException);
+
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mediaId },
+          data: { status: MediaAssetStatus.pending_delete },
+        }),
+      );
+    });
+
+    it('corta streams mayores a 10 MiB con 413 PayloadTooLargeException (QA-05)', async () => {
+      const chunk = Buffer.alloc(1024 * 1024, 0); // 1 MiB chunk
+      async function* generate11Mb() {
+        for (let i = 0; i < 11; i++) {
+          yield chunk;
+        }
+      }
+
+      vi.spyOn(service['s3Client'], 'send')
+        .mockResolvedValueOnce({ ContentLength: 50000 } as never)
+        .mockResolvedValueOnce({ Body: Readable.from(generate11Mb()) } as never);
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
+      ).rejects.toThrow(PayloadTooLargeException);
+
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mediaId },
+          data: { status: MediaAssetStatus.pending_delete },
+        }),
+      );
+    });
+
+    it('rechaza en confirmUpload activos ya en ready cuya duración exceda maxDurationSeconds', async () => {
+      mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.ready,
+        duration_seconds: 45,
+      });
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 30),
+      ).rejects.toThrow(UnprocessableEntityException);
+
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mediaId },
+          data: { status: MediaAssetStatus.pending_delete },
+        }),
+      );
+    });
+
+    it('marca activos previos en ready como pending_delete bajo FOR UPDATE (QA-05)', async () => {
+      const oldReadyAssetId = '55555555-5555-5555-5555-555555555555';
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ id: oldReadyAssetId }]);
+
+      const result = await service.confirmUpload(orgId, studentId, attemptId, mediaId, 60, 10);
+      expect(result.id).toBe(mediaId);
+      expect(result.status).toBe(MediaAssetStatus.ready);
+
+      expect(mockPrisma.mediaAsset.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: [oldReadyAssetId] },
+          organization_id: orgId,
+        },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+    });
+
+    it('confirmUploadEndpoint valida x-attempt-token y retorna MediaConfirmResponse', async () => {
+      vi.spyOn(
+        service as unknown as { probeDuration: (...args: unknown[]) => Promise<number> },
+        'probeDuration',
+      ).mockResolvedValueOnce(15);
+
+      const response = await service.confirmUploadEndpoint(
+        orgId,
+        studentId,
+        mediaId,
+        'valid.attempt.token',
+      );
+
+      expect(response).toEqual({
+        mediaId,
+        status: MediaAssetStatus.ready,
+        durationSeconds: 15,
+      });
+      expect(mockJwt.verify).toHaveBeenCalled();
+    });
+
+    it('upload-url restringe la cuota a 5 pending_upload marcando las antiguas pending_delete', async () => {
+      const oldAssets = [
+        { id: 'p1' }, { id: 'p2' }, { id: 'p3' }, { id: 'p4' }, { id: 'p5' },
+      ];
+      mockPrisma.mediaAsset.findMany.mockResolvedValueOnce(oldAssets);
+
+      await service.createUploadUrl(
+        orgId,
+        studentId,
+        {
+          attemptId,
+          mimeType: 'audio/webm',
+          sizeBytes: 50000,
+        },
+        'valid.attempt.token',
+      );
+
+      expect(mockPrisma.mediaAsset.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['p1'] },
+          organization_id: orgId,
+        },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+    });
+
+    it('confirmUploadEndpoint rechaza con 404 si el intento no existe (QA-05)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.confirmUploadEndpoint(orgId, studentId, mediaId, 'valid.attempt.token'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('confirmUploadEndpoint rechaza con 400 si el intento no es speaking (QA-05)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        status: AttemptStatus.in_progress,
+        assignment: {
+          activity: { type: ActivityType.exam },
+        },
+      });
+
+      await expect(
+        service.confirmUploadEndpoint(orgId, studentId, mediaId, 'valid.attempt.token'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('confirmUploadEndpoint rechaza con 409 si el intento ya expiró (QA-05)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        status: AttemptStatus.in_progress,
+        assignment: {
+          due_at: new Date(Date.now() - 48 * 3600 * 1000),
+          activity: { type: ActivityType.speaking },
+        },
+      });
+      mockPrisma.attempt.update = vi.fn().mockResolvedValueOnce({});
+
+      await expect(
+        service.confirmUploadEndpoint(orgId, studentId, mediaId, 'valid.attempt.token'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('confirmUploadEndpoint rechaza con 409 si el intento no está in_progress (QA-05)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        status: AttemptStatus.graded,
+        assignment: {
+          due_at: new Date(Date.now() + 24 * 3600 * 1000),
+          activity: { type: ActivityType.speaking },
+        },
+      });
+
+      await expect(
+        service.confirmUploadEndpoint(orgId, studentId, mediaId, 'valid.attempt.token'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('processQueue reencola assets con transcode_attempts < 3 ante fallos (P1-03)', async () => {
+      vi.spyOn(service as any, 'transcodeAsset').mockRejectedValueOnce(new Error('transcode failed'));
+      mockPrisma.mediaAsset.findUnique = vi.fn().mockResolvedValueOnce({
+        transcode_attempts: 1,
+        transcode_failed_at: null,
+      });
+
+      (service as any).transcodeQueue = ['asset-retry-1'];
+      const pushSpy = vi.spyOn(service['transcodeQueue'], 'push');
+
+      await service['processQueue']();
+
+      expect(pushSpy).toHaveBeenCalledWith('asset-retry-1');
     });
   });
 });

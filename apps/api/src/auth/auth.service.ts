@@ -95,6 +95,7 @@ export class AuthService {
   private readonly cookieDomain: string;
   private readonly jwtSecret: string;
   private readonly webBaseUrl: string;
+  private readonly appEnv: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -110,6 +111,11 @@ export class AuthService {
       'englove-dev-jwt-secret-min-32-chars-long-local-secret!',
     );
     this.webBaseUrl = this.configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
+    this.appEnv = this.configService.get<string>('APP_ENV', 'local');
+  }
+
+  private isCookieSecure(): boolean {
+    return this.appEnv !== 'local' || this.webBaseUrl.startsWith('https://');
   }
 
   private async hashPassword(password: string): Promise<string> {
@@ -131,6 +137,7 @@ export class AuthService {
       this.cookieDomain && this.cookieDomain.trim() !== ''
         ? { domain: this.cookieDomain }
         : {};
+    const isSecure = this.isCookieSecure();
 
     const accessToken = this.jwtService.sign(
       {
@@ -152,20 +159,30 @@ export class AuthService {
     // Access token cookie: 15 minutes, path /
     res.cookie(`${this.cookiePrefix}access_token`, accessToken, {
       httpOnly: true,
-      secure: true,
+      secure: isSecure,
       sameSite: 'lax',
       path: '/',
       maxAge: 15 * 60 * 1000,
       ...domainOption,
     });
 
-    // Refresh token cookie: remaining session time, path /api/v1/auth/refresh
+    // Refresh token cookie: remaining session time, path /api/v1/auth (QA-02)
     const remainingRefreshMs = Math.max(0, session.expires_at.getTime() - Date.now());
     res.cookie(`${this.cookiePrefix}refresh_token`, `${session.id}.${secret}`, {
       httpOnly: true,
-      secure: true,
+      secure: isSecure,
       sameSite: 'lax',
-      path: '/api/v1/auth/refresh',
+      path: '/api/v1/auth',
+      maxAge: remainingRefreshMs,
+      ...domainOption,
+    });
+
+    // guardrails-ignore G-B11: session_hint es indicador no sensible para cliente JavaScript (QA-02, P0-02)
+    res.cookie(`${this.cookiePrefix}session_hint`, '1', {
+      httpOnly: false,
+      secure: isSecure,
+      sameSite: 'lax',
+      path: '/',
       maxAge: remainingRefreshMs,
       ...domainOption,
     });
@@ -181,6 +198,7 @@ export class AuthService {
       this.cookieDomain && this.cookieDomain.trim() !== ''
         ? { domain: this.cookieDomain }
         : {};
+    const isSecure = this.isCookieSecure();
 
     const accessToken = this.jwtService.sign(
       {
@@ -201,7 +219,7 @@ export class AuthService {
 
     res.cookie(`${this.cookiePrefix}access_token`, accessToken, {
       httpOnly: true,
-      secure: true,
+      secure: isSecure,
       sameSite: 'lax',
       path: '/',
       maxAge: 15 * 60 * 1000,
@@ -214,10 +232,11 @@ export class AuthService {
       this.cookieDomain && this.cookieDomain.trim() !== ''
         ? { domain: this.cookieDomain }
         : {};
+    const isSecure = this.isCookieSecure();
 
     res.clearCookie(`${this.cookiePrefix}access_token`, {
       httpOnly: true,
-      secure: true,
+      secure: isSecure,
       sameSite: 'lax',
       path: '/',
       ...domainOption,
@@ -225,9 +244,25 @@ export class AuthService {
 
     res.clearCookie(`${this.cookiePrefix}refresh_token`, {
       httpOnly: true,
-      secure: true,
+      secure: isSecure,
       sameSite: 'lax',
       path: '/api/v1/auth/refresh',
+      ...domainOption,
+    });
+
+    res.clearCookie(`${this.cookiePrefix}refresh_token`, {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax',
+      path: '/api/v1/auth',
+      ...domainOption,
+    });
+
+    res.clearCookie(`${this.cookiePrefix}session_hint`, {
+      httpOnly: false,
+      secure: isSecure,
+      sameSite: 'lax',
+      path: '/',
       ...domainOption,
     });
   }
@@ -237,6 +272,7 @@ export class AuthService {
     this.rateLimiterService.check(`login:ip:${ip}`, 10, 15 * 60 * 1000);
 
     const normalizedEmail = normalizeEmail(dto.email);
+    // guardrails-ignore G-A06: resolución de usuario por correo para identificar tenant en login público
     const user = await TenantContext.runBypass(() =>
       this.prisma.user.findUnique({
         where: { email: normalizedEmail },
@@ -258,24 +294,104 @@ export class AuthService {
       });
     }
 
-    // Check if expired lock needs resetting before evaluating login (RF-4, Decision 94)
-    let currentLockedUntil = user.locked_until;
-    let currentFailedCount = user.failed_login_count;
+    return TenantContext.run({ organizationId: user.organization_id }, async () => {
+      // Check if expired lock needs resetting before evaluating login (RF-4, Decision 94)
+      let currentLockedUntil = user.locked_until;
+      let currentFailedCount = user.failed_login_count;
 
-    if (currentLockedUntil && currentLockedUntil <= new Date()) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { failed_login_count: 0, locked_until: null },
-      });
-      currentLockedUntil = null;
-      currentFailedCount = 0;
-    }
+      if (currentLockedUntil && currentLockedUntil <= new Date()) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { failed_login_count: 0, locked_until: null },
+        });
+        currentLockedUntil = null;
+        currentFailedCount = 0;
+      }
 
-    const passwordValid = await this.verifyPassword(user.password_hash, dto.password);
+      const passwordValid = await this.verifyPassword(user.password_hash, dto.password);
 
-    if (!passwordValid) {
-      // Under active lock: neither counter nor deadline changes (RF-4)
-      if (currentLockedUntil && currentLockedUntil > new Date()) {
+      if (!passwordValid) {
+        // Under active lock: neither counter nor deadline changes (RF-4)
+        if (currentLockedUntil && currentLockedUntil > new Date()) {
+          throw new UnauthorizedException({
+            statusCode: 401,
+            code: 'AUTH_INVALID_CREDENTIALS',
+            message: 'El correo o la contraseña no son correctos',
+          });
+        }
+
+        // Not under lock: lock user row with FOR UPDATE to serialize failed_login_count (RF-3)
+        if (typeof this.prisma.$transaction === 'function') {
+          await this.prisma.$transaction(async (tx) => {
+            if (typeof tx.$queryRaw === 'function') {
+              const rows = await tx.$queryRaw<Array<{ id: string; failed_login_count: number; locked_until: Date | null }>>`
+                SELECT id, failed_login_count, locked_until
+                FROM users
+                WHERE id = ${user.id}::uuid AND organization_id = ${user.organization_id}::uuid
+                FOR UPDATE
+              `;
+              const lockedUser = rows[0];
+              if (!lockedUser) return;
+
+              if (lockedUser.locked_until && lockedUser.locked_until > new Date()) {
+                return;
+              }
+
+              const baseCount =
+                lockedUser.locked_until && lockedUser.locked_until <= new Date()
+                  ? 0
+                  : lockedUser.failed_login_count;
+              const newFailedCount = baseCount + 1;
+              if (newFailedCount >= 10) {
+                await tx.user.update({
+                  where: { id: user.id },
+                  data: {
+                    failed_login_count: 10,
+                    locked_until: new Date(Date.now() + 10 * 60 * 1000),
+                  },
+                });
+              } else {
+                await tx.user.update({
+                  where: { id: user.id },
+                  data: { failed_login_count: newFailedCount, locked_until: null },
+                });
+              }
+            } else if (tx.user?.update) {
+              const newFailedCount = (user.failed_login_count ?? 0) + 1;
+              if (newFailedCount >= 10) {
+                await tx.user.update({
+                  where: { id: user.id },
+                  data: {
+                    failed_login_count: 10,
+                    locked_until: new Date(Date.now() + 10 * 60 * 1000),
+                  },
+                });
+              } else {
+                await tx.user.update({
+                  where: { id: user.id },
+                  data: { failed_login_count: newFailedCount, locked_until: null },
+                });
+              }
+            }
+          });
+        } else if (this.prisma.user?.update) {
+          const newFailedCount = (user.failed_login_count ?? 0) + 1;
+          if (newFailedCount >= 10) {
+            await this.prisma.user.update({
+              where: { id: user.id },
+              data: {
+                failed_login_count: 10,
+                locked_until: new Date(Date.now() + 10 * 60 * 1000),
+              },
+            });
+          } else {
+            await this.prisma.user.update({
+              where: { id: user.id },
+              data: { failed_login_count: newFailedCount, locked_until: null },
+            });
+          }
+        }
+
         throw new UnauthorizedException({
           statusCode: 401,
           code: 'AUTH_INVALID_CREDENTIALS',
@@ -283,166 +399,88 @@ export class AuthService {
         });
       }
 
-      // Not under lock: lock user row with FOR UPDATE to serialize failed_login_count (RF-3)
-      if (typeof this.prisma.$transaction === 'function') {
-        await this.prisma.$transaction(async (tx) => {
-          if (typeof tx.$queryRaw === 'function') {
-            const rows = await tx.$queryRaw<Array<{ id: string; failed_login_count: number; locked_until: Date | null }>>`
-              SELECT id, failed_login_count, locked_until
-              FROM users
-              WHERE id = ${user.id}::uuid
-              FOR UPDATE
-            `;
-            const lockedUser = rows[0];
-            if (!lockedUser) return;
+      // Password is valid!
+      // If account has active lock, communicate 423 before checking approval (RF-4, Decision 94)
+      if (currentLockedUntil && currentLockedUntil > new Date()) {
+        const remainingSec = Math.max(
+          1,
+          Math.ceil((currentLockedUntil.getTime() - Date.now()) / 1000),
+        );
+        throw new HttpException(
+          {
+            statusCode: 423,
+            code: 'AUTH_ACCOUNT_LOCKED',
+            message: 'Demasiados intentos. Intenta de nuevo en unos minutos',
+            retryAfter: remainingSec,
+          },
+          423,
+        );
+      }
 
-            if (lockedUser.locked_until && lockedUser.locked_until > new Date()) {
-              return;
-            }
-
-            const baseCount =
-              lockedUser.locked_until && lockedUser.locked_until <= new Date()
-                ? 0
-                : lockedUser.failed_login_count;
-            const newFailedCount = baseCount + 1;
-            if (newFailedCount >= 10) {
-              await tx.user.update({
-                where: { id: user.id },
-                data: {
-                  failed_login_count: 10,
-                  locked_until: new Date(Date.now() + 10 * 60 * 1000),
-                },
-              });
-            } else {
-              await tx.user.update({
-                where: { id: user.id },
-                data: { failed_login_count: newFailedCount, locked_until: null },
-              });
-            }
-          } else if (tx.user?.update) {
-            const newFailedCount = (user.failed_login_count ?? 0) + 1;
-            if (newFailedCount >= 10) {
-              await tx.user.update({
-                where: { id: user.id },
-                data: {
-                  failed_login_count: 10,
-                  locked_until: new Date(Date.now() + 10 * 60 * 1000),
-                },
-              });
-            } else {
-              await tx.user.update({
-                where: { id: user.id },
-                data: { failed_login_count: newFailedCount, locked_until: null },
-              });
-            }
-          }
+      // Password valid and unlocked: reset lock & failure counter to zero
+      if (currentFailedCount > 0 || currentLockedUntil !== null) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { failed_login_count: 0, locked_until: null },
         });
-      } else if (this.prisma.user?.update) {
-        const newFailedCount = (user.failed_login_count ?? 0) + 1;
-        if (newFailedCount >= 10) {
-          await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-              failed_login_count: 10,
-              locked_until: new Date(Date.now() + 10 * 60 * 1000),
-            },
-          });
-        } else {
-          await this.prisma.user.update({
-            where: { id: user.id },
-            data: { failed_login_count: newFailedCount, locked_until: null },
+      }
+
+      // Check student approval status
+      let student: {
+        id: string;
+        age_segment: AgeSegment;
+        can_switch_interface: boolean;
+        approval_status: ApprovalStatus;
+      } | null = null;
+
+      if (user.role === Role.student) {
+        student = await this.prisma.student.findFirst({
+          where: { user_id: user.id, organization_id: user.organization_id },
+        });
+
+        if (!student || student.approval_status === ApprovalStatus.pending_approval) {
+          throw new ForbiddenException({
+            statusCode: 403,
+            code: 'ACCOUNT_PENDING_APPROVAL',
+            message: 'Tu cuenta está pendiente de aprobación por tu profesora',
           });
         }
       }
 
-      throw new UnauthorizedException({
-        statusCode: 401,
-        code: 'AUTH_INVALID_CREDENTIALS',
-        message: 'El correo o la contraseña no son correctos',
-      });
-    }
+      // Create session (RF-1, Decision 68)
+      const sessionDays = user.role === Role.teacher ? 30 : 90;
+      const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
+      const secret = generateRandomSecret(32);
+      const secretHash = hashSha256(secret);
 
-    // Password is valid!
-    // If account has active lock, communicate 423 before checking approval (RF-4, Decision 94)
-    if (currentLockedUntil && currentLockedUntil > new Date()) {
-      const remainingSec = Math.max(
-        1,
-        Math.ceil((currentLockedUntil.getTime() - Date.now()) / 1000),
-      );
-      throw new HttpException(
-        {
-          statusCode: 423,
-          code: 'AUTH_ACCOUNT_LOCKED',
-          message: 'Demasiados intentos. Intenta de nuevo en unos minutos',
-          retryAfter: remainingSec,
+      const session = await this.prisma.authSession.create({
+        data: {
+          organization_id: user.organization_id,
+          user_id: user.id,
+          refresh_token_hash: secretHash,
+          expires_at: expiresAt,
         },
-        423,
-      );
-    }
-
-    // Password valid and unlocked: reset lock & failure counter to zero
-    if (currentFailedCount > 0 || currentLockedUntil !== null) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { failed_login_count: 0, locked_until: null },
-      });
-    }
-
-    // Check student approval status
-    let student: {
-      id: string;
-      age_segment: AgeSegment;
-      can_switch_interface: boolean;
-      approval_status: ApprovalStatus;
-    } | null = null;
-
-    if (user.role === Role.student) {
-      student = await this.prisma.student.findFirst({
-        where: { user_id: user.id, organization_id: user.organization_id },
       });
 
-      if (!student || student.approval_status === ApprovalStatus.pending_approval) {
-        throw new ForbiddenException({
-          statusCode: 403,
-          code: 'ACCOUNT_PENDING_APPROVAL',
-          message: 'Tu cuenta está pendiente de aprobación por tu profesora',
-        });
-      }
-    }
+      this.setSessionCookies(res, user, student, session, secret);
 
-    // Create session (RF-1, Decision 68)
-    const sessionDays = user.role === Role.teacher ? 30 : 90;
-    const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
-    const secret = generateRandomSecret(32);
-    const secretHash = hashSha256(secret);
-
-    const session = await this.prisma.authSession.create({
-      data: {
-        organization_id: user.organization_id,
-        user_id: user.id,
-        refresh_token_hash: secretHash,
-        expires_at: expiresAt,
-      },
+      return {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+        student:
+          user.role === Role.student && student
+            ? {
+                id: student.id,
+                ageSegment: student.age_segment,
+                canSwitchInterface: student.can_switch_interface,
+              }
+            : null,
+      };
     });
-
-    this.setSessionCookies(res, user, student, session, secret);
-
-    return {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      student:
-        user.role === Role.student && student
-          ? {
-              id: student.id,
-              ageSegment: student.age_segment,
-              canSwitchInterface: student.can_switch_interface,
-            }
-          : null,
-    };
   }
 
   async refresh(refreshTokenValue: string | undefined, res: Response): Promise<SessionView> {
@@ -485,6 +523,7 @@ export class AuthService {
 
     if (incomingHash !== session.refresh_token_hash) {
       // Reuse detected! Revoke the entire session family (RF-3, Decision 68)
+      // guardrails-ignore G-A06: revocación de familia de sesiones por detección de reuso de token (RF-3)
       await TenantContext.runBypass(() =>
         this.prisma.authSession.update({
           where: { id: sid },
@@ -499,6 +538,7 @@ export class AuthService {
       });
     }
 
+    // guardrails-ignore G-A06: lectura de usuario para validar concordancia con sesión y locked_until
     const user = await TenantContext.runBypass(() =>
       this.prisma.user.findUnique({
         where: { id: session.user_id },
@@ -511,6 +551,15 @@ export class AuthService {
         statusCode: 401,
         code: 'AUTH_UNAUTHORIZED',
         message: 'Tu sesión terminó. Inicia sesión de nuevo',
+      });
+    }
+
+    if (user.locked_until && user.locked_until > new Date()) {
+      this.clearSessionCookies(res);
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'AUTH_UNAUTHORIZED',
+        message: 'Tu cuenta se encuentra bloqueada temporalmente',
       });
     }
 
@@ -594,43 +643,74 @@ export class AuthService {
     accessTokenValue: string | undefined,
     res: Response,
   ): Promise<void> {
+    let sessionRevoked = false;
+
     if (refreshTokenValue && refreshTokenValue.includes('.')) {
       const [sid, secret] = refreshTokenValue.split('.');
-      if (sid && secret) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid ?? '');
+      if (sid && secret && isUuid) {
         try {
           const incomingHash = hashSha256(secret);
-          // Revoke ONLY if cryptographic verification succeeds (SEC-05)
-          await TenantContext.runBypass(async () => {
-            // guardrails-ignore G-A06: revocacion de sesion por hash de token criptografico en logout
-            await this.prisma.authSession.updateMany({
+          // Look up session first to ensure we know user_id and organization_id (T2.3, P1-12)
+          const existingSession = await TenantContext.runBypass(() =>
+            // guardrails-ignore G-A06: busqueda de sesion opaca para revocar filtrando por id, user_id y organization_id
+            this.prisma.authSession.findFirst({
               where: {
                 id: sid,
                 refresh_token_hash: incomingHash,
                 revoked_at: null,
               },
-              data: { revoked_at: new Date() },
+            }),
+          );
+
+          if (existingSession) {
+            await TenantContext.runBypass(async () => {
+              // guardrails-ignore G-A06: revocacion de sesion por hash de token criptografico en logout
+              await this.prisma.authSession.updateMany({
+                where: {
+                  id: existingSession.id,
+                  user_id: existingSession.user_id,
+                  organization_id: existingSession.organization_id,
+                  revoked_at: null,
+                },
+                data: { revoked_at: new Date() },
+              });
             });
-          });
+            sessionRevoked = true;
+          }
         } catch {
           // Cryptographic or DB lookup error: do NOT revoke arbitrary session
         }
       }
-    } else if (accessTokenValue) {
+    }
+
+    if (!sessionRevoked && accessTokenValue) {
       try {
-        const payload = await this.jwtService.verifyAsync<{ sid?: string; typ?: string }>(
-          accessTokenValue,
-          { secret: this.jwtSecret },
-        );
-        if (payload?.typ === 'access' && payload?.sid) {
+        const payload = await this.jwtService.verifyAsync<{
+          sid?: string;
+          sub?: string;
+          org?: string;
+          typ?: string;
+        }>(accessTokenValue, {
+          secret: this.jwtSecret,
+          ignoreExpiration: true,
+        });
+        if (payload?.typ === 'access' && payload?.sid && payload?.sub && payload?.org) {
           await TenantContext.runBypass(async () => {
             // guardrails-ignore G-A06: revocacion de sesion por token de acceso verificado en logout
             await this.prisma.authSession
               .updateMany({
-                where: { id: payload.sid, revoked_at: null },
+                where: {
+                  id: payload.sid,
+                  user_id: payload.sub,
+                  organization_id: payload.org,
+                  revoked_at: null,
+                },
                 data: { revoked_at: new Date() },
               })
               .catch(() => {});
           });
+          sessionRevoked = true;
         }
       } catch {
         // Token verification failed: do NOT revoke DB session
@@ -666,6 +746,7 @@ export class AuthService {
     }
 
     // Check if email is already taken anywhere (RF-7, Decision 59)
+    // guardrails-ignore G-A06: verificación de unicidad global de correo antes de registro
     const existingUser = await TenantContext.runBypass(() =>
       this.prisma.user.findUnique({
         where: { email: normalizedEmail },
@@ -673,6 +754,8 @@ export class AuthService {
     );
 
     if (existingUser) {
+      // Dummy hash to eliminate timing oracle between existing and non-existing accounts (P2-01)
+      await this.hashPassword(dto.password).catch(() => '');
       await this.mailService.sendMail({
         template: 'signup-existing-account',
         to: normalizedEmail,
@@ -747,6 +830,7 @@ export class AuthService {
     this.rateLimiterService.check(`forgot:ip:${ip}`, 5, 60 * 60 * 1000);
     this.rateLimiterService.check(`forgot:email:${normalizedEmail}`, 5, 60 * 60 * 1000);
 
+    // guardrails-ignore G-A06: búsqueda de usuario por correo en endpoint público de recuperación
     const user = await TenantContext.runBypass(() =>
       this.prisma.user.findUnique({
         where: { email: normalizedEmail },
@@ -787,11 +871,33 @@ export class AuthService {
 
     const tokenHash = hashSha256(dto.token);
 
+    // Verify token validity BEFORE computing expensive Argon2id hash to prevent DoS on argonSemaphore (P2-01)
+    if (typeof this.prisma.passwordResetToken?.findFirst === 'function') {
+      const preliminaryToken = await TenantContext.runBypass(() =>
+        // guardrails-ignore G-A06: validación previa de existencia de token de reset antes de Argon2id (P2-01)
+        this.prisma.passwordResetToken.findFirst({
+          where: {
+            token_hash: tokenHash,
+            used_at: null,
+            expires_at: { gt: new Date() },
+          },
+        }),
+      );
+
+      if (!preliminaryToken) {
+        throw new BadRequestException({
+          statusCode: 400,
+          code: 'PASSWORD_RESET_INVALID',
+          message: 'El enlace no es válido o ya venció. Solicita uno nuevo',
+        });
+      }
+    }
+
     const newPasswordHash = await this.hashPassword(dto.newPassword);
 
     await TenantContext.runBypass(async () => {
+      // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
       await this.prisma.$transaction(async (tx) => {
-        // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
         const resetToken = await tx.passwordResetToken.findFirst({
           where: {
             token_hash: tokenHash,
@@ -872,6 +978,7 @@ export class AuthService {
       60 * 60 * 1000,
     );
 
+    // guardrails-ignore G-A06: resolución de usuario autenticado para validar contraseña
     const user = await TenantContext.runBypass(() =>
       this.prisma.user.findUnique({
         where: { id: currentUser.id },
@@ -904,6 +1011,7 @@ export class AuthService {
       });
     }
 
+    // guardrails-ignore G-A06: validación global de unicidad de nuevo correo antes de enviar OTP
     const existingUser = await TenantContext.runBypass(() =>
       this.prisma.user.findUnique({
         where: { email: normalizedNewEmail },
@@ -961,7 +1069,7 @@ export class AuthService {
       10 * 60 * 1000,
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    const txResult = await this.prisma.$transaction(async (tx) => {
       let activeRequest: {
         id: string;
         user_id: string;
@@ -1028,11 +1136,11 @@ export class AuthService {
       }
 
       if (!activeRequest || activeRequest.failed_attempts >= 3) {
-        throw new UnprocessableEntityException({
-          statusCode: 422,
+        return {
+          status: 'failed' as const,
           code: 'OTP_MAX_ATTEMPTS',
           message: 'Has alcanzado el límite de intentos o el código ya venció. Solicita uno nuevo',
-        });
+        };
       }
 
       const inputHash = hashSha256(dto.otp);
@@ -1041,30 +1149,30 @@ export class AuthService {
         const nextFailed = activeRequest.failed_attempts + 1;
         if (nextFailed >= 3) {
           await tx.emailChangeRequest.update({
-            where: { id: activeRequest.id },
+            where: { id: activeRequest.id, organization_id: activeRequest.organization_id },
             data: { failed_attempts: nextFailed, used_at: new Date() },
           });
-          throw new UnprocessableEntityException({
-            statusCode: 422,
+          return {
+            status: 'failed' as const,
             code: 'OTP_MAX_ATTEMPTS',
             message: 'Has alcanzado el límite de intentos. Solicita un nuevo código',
-          });
+          };
         } else {
           await tx.emailChangeRequest.update({
-            where: { id: activeRequest.id },
+            where: { id: activeRequest.id, organization_id: activeRequest.organization_id },
             data: { failed_attempts: nextFailed },
           });
-          throw new UnprocessableEntityException({
-            statusCode: 422,
+          return {
+            status: 'failed' as const,
             code: 'OTP_INVALID',
             message: 'El código no es válido o ya venció. Solicita uno nuevo',
-          });
+          };
         }
       }
 
       // OTP matches! Consume and apply change atomically (RF-14: concurrency defenses)
       const consumed = await tx.emailChangeRequest.updateMany({
-        where: { id: activeRequest.id, used_at: null },
+        where: { id: activeRequest.id, organization_id: activeRequest.organization_id, used_at: null },
         data: { used_at: new Date() },
       });
 
@@ -1077,6 +1185,7 @@ export class AuthService {
       }
 
       if (tx.user?.findUnique) {
+        // guardrails-ignore G-A06: verificación final de unicidad de nuevo correo en confirmación de cambio
         const conflict = await TenantContext.runBypass(() =>
           tx.user.findUnique({
             where: { email: activeRequest.new_email },
@@ -1093,7 +1202,7 @@ export class AuthService {
       }
 
       await tx.user.update({
-        where: { id: currentUser.id },
+        where: { id: currentUser.id, organization_id: currentUser.organizationId },
         data: { email: activeRequest.new_email },
       });
 
@@ -1116,7 +1225,17 @@ export class AuthService {
         },
         data: { revoked_at: new Date() },
       });
+
+      return { status: 'success' as const };
     });
+
+    if (txResult.status === 'failed') {
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        code: txResult.code,
+        message: txResult.message,
+      });
+    }
 
     // Notify previous email (RF-14)
     await this.mailService.sendMail({
@@ -1126,5 +1245,47 @@ export class AuthService {
     });
 
     return { message: 'Tu correo fue actualizado.' };
+  }
+
+  async getSession(currentUser: AuthenticatedUser): Promise<SessionView> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: currentUser.id, organization_id: currentUser.organizationId },
+    });
+    if (!user) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'AUTH_UNAUTHORIZED',
+        message: 'Usuario no encontrado',
+      });
+    }
+
+    let student: {
+      id: string;
+      ageSegment: AgeSegment;
+      canSwitchInterface: boolean;
+    } | null = null;
+
+    if (user.role === Role.student) {
+      const dbStudent = await this.prisma.student.findFirst({
+        where: { user_id: user.id, organization_id: currentUser.organizationId },
+      });
+      if (dbStudent) {
+        student = {
+          id: dbStudent.id,
+          ageSegment: dbStudent.age_segment,
+          canSwitchInterface: dbStudent.can_switch_interface,
+        };
+      }
+    }
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      student,
+    };
   }
 }

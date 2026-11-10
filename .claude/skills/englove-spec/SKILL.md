@@ -1,6 +1,6 @@
 ---
 name: englove-spec
-description: "Redacta, revisa o actualiza las especificaciones SPEC-NN de Englove en specs/ siguiendo el proceso Spec-Driven Development del proyecto (planning/sdd-process.md): plantilla de 12 secciones, ciclo de vida, calendario de redacción, criterios Dado/Cuando/Entonces y validación contra las decisiones de CONTEXT §14, el fuera de alcance del piloto (§2.4) y los pendientes P-n de §15. Úsala siempre que haya que crear la carpeta specs/ (tarea SPEC-00), redactar o revisar cualquier spec de SPEC-01 a SPEC-10 (o con sufijo, como SPEC-05a), cambiar el estado de una spec, añadir o corregir requisitos RF, o comprobar si una tarea ENG puede empezar porque su spec está Aprobada, aunque el usuario no diga literalmente la palabra spec."
+description: "Redacta, revisa o actualiza las especificaciones SPEC-NN de Englove en specs/ siguiendo el proceso Spec-Driven Development del proyecto (planning/sdd-process.md): plantilla de 12 secciones, ciclo de vida, calendario de redacción, criterios Dado/Cuando/Entonces y validación contra las decisiones de CONTEXT §14, el fuera de alcance del piloto (§2.4) y los pendientes P-n de §15. Úsala siempre que haya que crear la carpeta specs/ (tarea SPEC-00), redactar o revisar cualquier spec de SPEC-01 a SPEC-11 (o con sufijo, como SPEC-05a), Etapa 12 («Calidad y remediación»), cambiar el estado de una spec, añadir o corregir requisitos RF, o comprobar si una tarea ENG puede empezar porque su spec está Aprobada, aunque el usuario no diga literalmente la palabra spec."
 ---
 
 # englove-spec — Especificaciones SDD de Englove
@@ -23,14 +23,14 @@ Léelas cada vez; no trabajes de memoria, porque los documentos cambian entre ro
 | Fuente | Para qué |
 |---|---|
 | `planning/sdd-process.md` §3–§10 | Qué es una spec (§3), carpeta y nombres de archivo (§4), **plantilla obligatoria** (§5), ciclo de vida (§6), calendario y pendientes por spec (§7), relación con taskboard, pruebas y código (§8), **reglas para agentes** (§9), **anti-patrones** (§10) |
-| `.agents/CONTEXT.md` §14 | Todas las decisiones, incluidas las rondas añadidas después de crear esta skill. Lee la columna Estado: una decisión Sustituida, Retirada o Modificada solo se aplica en su forma vigente; sigue la cadena hasta la última |
+| `.agents/CONTEXT.md` §14 | Todas las decisiones (1 a 145), incluidas las de Etapa 12 (decisiones 127 a 137 y QA-01 a QA-08). Lee la columna Estado: una decisión Sustituida, Retirada o Modificada solo se aplica en su forma vigente; sigue la cadena hasta la última |
 | `.agents/CONTEXT.md` §2.4 | Lo que no se construye en el piloto, aunque parezca fácil o rápido |
 | `.agents/CONTEXT.md` §15 | Pendientes P-n, su propuesta vigente y la spec que debe cerrar cada uno |
 | `.agents/CONTEXT.md` §16 y §17 | Convenciones obligatorias para agentes y glosario |
 | `planning/taskboard.md` | La fila de la tarea `SPEC-NN` (alcance mínimo que la spec debe cubrir) y las tareas `ENG` cuya columna Spec es esa spec |
-| `planning/pbp-development.md` §3 y §4 | Definición de Hecho y la etapa de la spec: objetivo, alcance, fuera de alcance, entregables, criterios de salida y riesgos |
+| `planning/pbp-development.md` §3 y §4 | Definición de Hecho y la etapa de la spec: objetivo, alcance, fuera de alcance, entregables, criterios de salida y riesgos (Etapas 0 a 12) |
 | `planning/architecture-overview.md` | Las secciones de la capacidad: rutas y navegación (§3.1), estados de error (§3.6), guards (§4.3), scoring (§4.4), modelo de datos (§6), flujos (§7), seguridad (§8), convenciones y catálogo de `code` (§13) |
-| `specs/README.md` y specs anteriores | Estado de las demás specs y contratos ya aprobados de los que depende la nueva |
+| `specs/README.md` y specs anteriores | Estado de las demás specs (SPEC-01 a SPEC-11) y contratos ya aprobados de los que depende la nueva |
 
 Los documentos de cada ronda (`planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-para-correccion-de-planeacion.md`, `planning/decisiones-modelo-de-datos.md`) son vinculantes en lo decidido (decisiones 34, 57 y 67) y sirven para buscar detalle, pero ya están volcados en CONTEXT y architecture: la spec enlaza a estos dos.
 

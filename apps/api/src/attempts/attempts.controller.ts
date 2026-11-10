@@ -16,7 +16,6 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
 import { SubmitEventsDto, CompleteAttemptDto } from './dto/attempts.dto';
-import { Optional } from '@nestjs/common';
 import { ReviewsService } from '../reviews/reviews.service';
 import { SubmitReviewDto, GrantRetryDto } from '../reviews/dto/reviews.dto';
 import {
@@ -43,7 +42,7 @@ const uuidPipe = new ParseUUIDPipe({
 export class AttemptsController {
   constructor(
     private readonly attemptsService: AttemptsService,
-    @Optional() private readonly reviewsService?: ReviewsService,
+    private readonly reviewsService: ReviewsService,
   ) {}
 
   @Get(':id')

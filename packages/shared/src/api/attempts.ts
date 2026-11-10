@@ -194,3 +194,9 @@ export interface MediaPlaybackUrlResponse {
   format: 'converted' | 'raw';
   compatibilityWarning: boolean;
 }
+
+export interface MediaConfirmResponse {
+  mediaId: string;
+  status: string;
+  durationSeconds: number;
+}

@@ -12,6 +12,7 @@ interface StandardErrorResponse {
   statusCode: number;
   code: string;
   message: string;
+  details?: unknown;
 }
 
 @Catch()
@@ -26,6 +27,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let code = 'INTERNAL_ERROR';
     let message = 'Ocurrió un error inesperado';
+    let details: unknown = undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -60,12 +62,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
         } else if (Array.isArray(resObj.message)) {
           message = resObj.message.join(', ');
         }
+
+        if (resObj.details !== undefined) {
+          details = resObj.details;
+        }
       } else if (typeof res === 'string') {
         message = res;
       }
     } else {
-      // Unexpected exception: log operational metadata without sensitive PII (Rule G-C10)
-      this.logger.error(`Error no controlado procesando ${request.method} ${request.url}`);
+      // Unexpected exception: log operational metadata without sensitive PII (Rule G-C10, P1-01)
+      const rawUrl = request.originalUrl || request.url || '';
+      const sanitizedUrl = rawUrl ? rawUrl.split('?')[0] : '';
+      this.logger.error(`Error no controlado procesando ${request.method} ${sanitizedUrl}`);
     }
 
     const appMinVersion = process.env.APP_MIN_VERSION;
@@ -77,6 +85,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode,
       code,
       message,
+      ...(details !== undefined ? { details } : {}),
     };
 
     // Client response NEVER contains stack traces, queries or internal technical details (RF-5, Rule G-C10)

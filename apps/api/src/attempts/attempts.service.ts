@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   UnprocessableEntityException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -31,8 +32,10 @@ import {
   AssignmentCardListResponse,
   StudentProgressView,
   FillBlankConfig,
+  FillBlankConfigSchema,
   FillBlankAnswerKey,
   ExamConfig,
+  ExamConfigSchema,
   ExamAnswerKey,
   GameConfig,
   GameAnswerKey,
@@ -650,6 +653,20 @@ export class AttemptsService {
     token: string,
     dto: SubmitEventsDto,
   ): Promise<{ acceptedEventIds: string[] }> {
+    const checkDangerousKeys = (obj: unknown, depth = 0) => {
+      if (!obj || typeof obj !== 'object' || depth > 5) return;
+      for (const k of Object.keys(obj)) {
+        if (['__proto__', 'constructor', 'prototype'].includes(k)) {
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            code: 'INVALID_ACTIVITY_PAYLOAD',
+            message: 'Clave no permitida en el evento',
+          });
+        }
+        checkDangerousKeys((obj as Record<string, unknown>)[k], depth + 1);
+      }
+    };
+
     for (const ev of dto.events) {
       if (['__proto__', 'constructor', 'prototype'].includes(ev.itemId)) {
         throw new UnprocessableEntityException({
@@ -657,6 +674,17 @@ export class AttemptsService {
           code: 'INVALID_ACTIVITY_PAYLOAD',
           message: 'Clave de evento no permitida',
         });
+      }
+      if (ev.answer !== undefined && ev.answer !== null) {
+        checkDangerousKeys(ev.answer);
+        const answerStr = typeof ev.answer === 'string' ? ev.answer : JSON.stringify(ev.answer);
+        if (answerStr && answerStr.length > 10000) {
+          throw new PayloadTooLargeException({
+            statusCode: 413,
+            code: 'PAYLOAD_TOO_LARGE',
+            message: 'La respuesta del evento supera el tamaño máximo permitido (10 KB)',
+          });
+        }
       }
     }
 
@@ -701,7 +729,7 @@ export class AttemptsService {
       });
     }
 
-    // Validate itemId membership against activity items (RF-4, SPEC-11 §5.2)
+    // Validate itemId membership against activity items (RF-4, SPEC-11 §5.2, P1-04)
     const act = attempt.activity ?? attempt.assignment?.activity;
     if (act) {
       const validItemIds = new Set<string>();
@@ -713,12 +741,16 @@ export class AttemptsService {
         validItemIds.add(act.id);
         const openItems = getOpenQuestionItems(act.open_question_detail?.config, act.id);
         openItems.forEach((item) => validItemIds.add(item.id));
+        if (openItems.length <= 1) {
+          validItemIds.add('text');
+        }
       } else if (act.type === ActivityType.fill_blank && act.fill_blank_detail?.config) {
-        const cfg = act.fill_blank_detail.config as {
-          items?: Array<{ id?: string; blanks?: Array<{ id?: string }> }>;
-        };
-        if (Array.isArray(cfg?.items)) {
-          cfg.items.forEach((it) => {
+        const parsed = FillBlankConfigSchema.safeParse(act.fill_blank_detail.config);
+        const items = parsed.success
+          ? parsed.data.items
+          : (act.fill_blank_detail.config as { items?: Array<{ id?: string; blanks?: Array<{ id?: string }> }> })?.items;
+        if (Array.isArray(items)) {
+          items.forEach((it) => {
             if (it?.id) validItemIds.add(it.id);
             if (Array.isArray(it?.blanks)) {
               it.blanks.forEach((b) => b?.id && validItemIds.add(b.id));
@@ -726,9 +758,17 @@ export class AttemptsService {
           });
         }
       } else if (act.type === ActivityType.exam && act.exam_detail?.config) {
-        const cfg = act.exam_detail.config as { questions?: Array<{ id?: string }> };
-        if (Array.isArray(cfg?.questions)) {
-          cfg.questions.forEach((q) => q?.id && validItemIds.add(q.id));
+        const parsed = ExamConfigSchema.safeParse(act.exam_detail.config);
+        const items = parsed.success
+          ? parsed.data.items
+          : (act.exam_detail.config as { items?: Array<{ id?: string; blanks?: Array<{ id?: string }> }> })?.items;
+        if (Array.isArray(items)) {
+          items.forEach((it) => {
+            if (it?.id) validItemIds.add(it.id);
+            if (Array.isArray(it?.blanks)) {
+              it.blanks.forEach((b) => b?.id && validItemIds.add(b.id));
+            }
+          });
         }
       } else if (act.type === ActivityType.speaking) {
         validItemIds.add(act.id);
@@ -758,7 +798,7 @@ export class AttemptsService {
     this.verifyAttemptTokenSignature(token, attempt.id, studentId, organizationId);
 
     // Check expiration and mark offline_sync if late (SPEC-09 RF-16)
-    await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil);
+    await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil, organizationId);
 
     if (attempt.status !== AttemptStatus.in_progress) {
       throw new ConflictException({
@@ -902,20 +942,127 @@ export class AttemptsService {
     // Verify token authentic (signature and claims)
     this.verifyAttemptTokenSignature(token, attempt.id, studentId, organizationId);
 
-    // If already finished and within tolerance: idempotent return of completion receipt (RF-8)
+    // If already finished and within tolerance: idempotent return of completion receipt (RF-8, P2-04)
     if (
       attempt.status === AttemptStatus.graded ||
       attempt.status === AttemptStatus.pending_review
     ) {
-        return this.buildExistingCompletionView(attempt, activity);
+      return await this.buildExistingCompletionView(organizationId, attempt, activity);
+    }
+
+    // Check expiration and mark offline_sync if late (SPEC-09 RF-16)
+    if (attempt.assignment_id !== null) {
+      await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil, organizationId);
+    }
+
+    if (attempt.status !== AttemptStatus.in_progress) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ATTEMPT_NOT_IN_PROGRESS',
+        message: 'El intento ya no admite cambios',
+      });
+    }
+
+    // Validate dto.answers (P1-04, RF-4.2)
+    if (dto.answers) {
+      const checkDangerousKeys = (obj: unknown, depth = 0) => {
+        if (!obj || typeof obj !== 'object' || depth > 5) return;
+        for (const k of Object.keys(obj)) {
+          if (['__proto__', 'constructor', 'prototype'].includes(k)) {
+            throw new UnprocessableEntityException({
+              statusCode: 422,
+              code: 'INVALID_ACTIVITY_PAYLOAD',
+              message: 'Clave de respuesta no permitida',
+            });
+          }
+          checkDangerousKeys((obj as Record<string, unknown>)[k], depth + 1);
+        }
+      };
+      checkDangerousKeys(dto.answers);
+      if (Object.keys(dto.answers).length > 100) {
+        throw new PayloadTooLargeException({
+          statusCode: 413,
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Demasiadas respuestas enviadas (máximo 100)',
+        });
+      }
+      const answersJson = JSON.stringify(dto.answers);
+      if (answersJson.length > 65536) {
+        throw new PayloadTooLargeException({
+          statusCode: 413,
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Las respuestas superan el tamaño máximo permitido (64 KB)',
+        });
+      }
+    }
+
+    // Speaking activity pre-validation & upload confirmation
+    if (activity.type === ActivityType.speaking) {
+      if (!dto.mediaId) {
+        throw new BadRequestException({
+          statusCode: 400,
+          code: 'MEDIA_REQUIRED',
+          message: 'Se requiere mediaId para completar una actividad de speaking',
+        });
       }
 
-      // Check expiration and mark offline_sync if late (SPEC-09 RF-16)
-      if (attempt.assignment_id !== null) {
-        await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil);
+      const maxDur = activity.speaking_detail?.max_duration_seconds ?? 120;
+      await this.mediaService.confirmUpload(
+        organizationId,
+        studentId,
+        attempt.id,
+        dto.mediaId,
+        maxDur,
+      );
+    }
+
+    // Atomic transaction with SELECT ... FOR UPDATE (P1-06, SEC-09d)
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      // guardrails-ignore G-A06: Bloqueo transaccional anti-carrera P1-06 para completeAttempt
+      const lockedRows = await tx.$queryRaw<Array<{
+        id: string;
+        status: AttemptStatus;
+        payload: unknown;
+        started_at: Date;
+        finished_at: Date | null;
+        graded_at: Date | null;
+        score: Prisma.Decimal | null;
+        flags: string[];
+        attempt_number: number;
+        assignment_id: string | null;
+        activity_id: string | null;
+        previous_attempt_id: string | null;
+      }>>`
+        SELECT id, status, payload, started_at, finished_at, graded_at, score, flags, attempt_number, assignment_id, activity_id, previous_attempt_id
+        FROM attempts
+        WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+        FOR UPDATE
+      `;
+      const locked = lockedRows[0];
+      if (!locked) {
+        throw new NotFoundException({
+          statusCode: 404,
+          code: 'ATTEMPT_NOT_FOUND',
+          message: 'Intento no encontrado',
+        });
       }
 
-      if (attempt.status !== AttemptStatus.in_progress) {
+      // Check if another concurrent request completed this attempt while waiting for the lock
+      if (
+        locked.status === AttemptStatus.graded ||
+        locked.status === AttemptStatus.pending_review
+      ) {
+        const mergedAttempt = { ...attempt, ...locked };
+        const view = await this.buildExistingCompletionView(
+          organizationId,
+          mergedAttempt,
+          activity,
+          tx,
+        );
+        return { isExisting: true, view, updatedAttempt: null, correction: null, scoreForEvent: null, isAudioSubmitted: false, isGame: false };
+      }
+
+      if (locked.status !== AttemptStatus.in_progress) {
         throw new ConflictException({
           statusCode: 409,
           code: 'ATTEMPT_NOT_IN_PROGRESS',
@@ -924,14 +1071,37 @@ export class AttemptsService {
       }
 
       const now = new Date();
-      const durationSeconds = Math.max(0, Math.round((now.getTime() - attempt.started_at.getTime()) / 1000));
+      const startedAt = locked.started_at ? new Date(locked.started_at) : attempt.started_at;
+      const durationSeconds = Math.max(
+        0,
+        Math.round((now.getTime() - startedAt.getTime()) / 1000),
+      );
       const minPlausible =
         activity.min_plausible_seconds ?? (activity.type === ActivityType.game ? 15 : undefined);
 
-      const payload = (attempt.payload as {
+      const lockedPayload = (locked.payload as {
         answers?: Record<string, unknown>;
         processedEventIds?: string[];
       } | null) || {};
+      const attemptPayload = (attempt.payload as {
+        answers?: Record<string, unknown>;
+        processedEventIds?: string[];
+      } | null) || {};
+
+      const payload = {
+        ...attemptPayload,
+        ...lockedPayload,
+        answers: {
+          ...(attemptPayload.answers || {}),
+          ...(lockedPayload.answers || {}),
+        },
+        processedEventIds: Array.from(
+          new Set([
+            ...(attemptPayload.processedEventIds || []),
+            ...(lockedPayload.processedEventIds || []),
+          ]),
+        ),
+      };
       const answers = {
         ...(payload.answers || {}),
         ...(dto.answers || {}),
@@ -943,27 +1113,11 @@ export class AttemptsService {
 
       let updatedAttempt;
       let correction: Record<string, unknown> | null = null;
-      let newBadges: import('@englove/shared').BadgeAwardView[] = [];
+      let scoreForEvent: number | null = null;
+      let isAudioSubmitted = false;
 
       if (activity.type === ActivityType.speaking) {
-        if (!dto.mediaId) {
-          throw new BadRequestException({
-            statusCode: 400,
-            code: 'MEDIA_REQUIRED',
-            message: 'Se requiere mediaId para completar una actividad de speaking',
-          });
-        }
-
-        const maxDur = activity.speaking_detail?.max_duration_seconds ?? 120;
-        await this.mediaService.confirmUpload(
-          organizationId,
-          studentId,
-          attempt.id,
-          dto.mediaId,
-          maxDur,
-        );
-
-        updatedAttempt = await this.prisma.attempt.update({
+        updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
             payload: updatedPayload as unknown as Prisma.InputJsonValue,
@@ -971,14 +1125,9 @@ export class AttemptsService {
             finished_at: now,
           },
         });
-
-        newBadges = await this.gamificationService.recordAudioSubmitted(
-          organizationId,
-          studentId,
-          attempt.id,
-        );
+        isAudioSubmitted = true;
       } else if (activity.type === ActivityType.open_question) {
-        updatedAttempt = await this.prisma.attempt.update({
+        updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
             payload: updatedPayload as unknown as Prisma.InputJsonValue,
@@ -986,16 +1135,10 @@ export class AttemptsService {
             finished_at: now,
           },
         });
-
-        newBadges = await this.gamificationService.recordAttemptCompleted(
-          organizationId,
-          studentId,
-          attempt.id,
-          null,
-        );
+        scoreForEvent = null;
       } else if (activity.type === ActivityType.fill_blank) {
         const config = activity.fill_blank_detail?.config as unknown as FillBlankConfig;
-        const detailWithKey = await this.prisma.fillBlankDetail.findFirst({
+        const detailWithKey = await tx.fillBlankDetail.findFirst({
           where: { organization_id: organizationId, activity_id: activity.id },
           // guardrails-ignore G-C04: lectura exclusiva de answer_key en el servidor para autocalificacion de intento
           select: { answer_key: true },
@@ -1011,8 +1154,9 @@ export class AttemptsService {
         );
 
         correction = scoreResult.correction;
+        scoreForEvent = scoreResult.score;
 
-        updatedAttempt = await this.prisma.attempt.update({
+        updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
             payload: updatedPayload as unknown as Prisma.InputJsonValue,
@@ -1023,16 +1167,9 @@ export class AttemptsService {
             flags: scoreResult.flags,
           },
         });
-
-        newBadges = await this.gamificationService.recordAttemptCompleted(
-          organizationId,
-          studentId,
-          attempt.id,
-          scoreResult.score,
-        );
       } else if (activity.type === ActivityType.exam) {
         const config = activity.exam_detail?.config as unknown as ExamConfig;
-        const detailWithKey = await this.prisma.examDetail.findFirst({
+        const detailWithKey = await tx.examDetail.findFirst({
           where: { organization_id: organizationId, activity_id: activity.id },
           // guardrails-ignore G-C04: lectura exclusiva de answer_key en el servidor para autocalificacion de intento
           select: { answer_key: true },
@@ -1048,8 +1185,9 @@ export class AttemptsService {
         );
 
         correction = scoreResult.correction;
+        scoreForEvent = scoreResult.score;
 
-        updatedAttempt = await this.prisma.attempt.update({
+        updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
             payload: updatedPayload as unknown as Prisma.InputJsonValue,
@@ -1060,13 +1198,6 @@ export class AttemptsService {
             flags: scoreResult.flags,
           },
         });
-
-        newBadges = await this.gamificationService.recordAttemptCompleted(
-          organizationId,
-          studentId,
-          attempt.id,
-          scoreResult.score,
-        );
       } else if (activity.type === ActivityType.game) {
         const gamesEnabled = await this.featureFlagsService.isFeatureEnabled(
           organizationId,
@@ -1080,7 +1211,7 @@ export class AttemptsService {
           });
         }
 
-        const detailWithKey = await this.prisma.gameDetail.findFirst({
+        const detailWithKey = await tx.gameDetail.findFirst({
           where: { organization_id: organizationId, activity_id: activity.id },
           // guardrails-ignore G-C04: lectura exclusiva de answer_key en el servidor para autocalificacion de intento
           select: { mechanic: true, config: true, answer_key: true },
@@ -1110,7 +1241,7 @@ export class AttemptsService {
           score: scoreResult.score,
         };
 
-        updatedAttempt = await this.prisma.attempt.update({
+        updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
             payload: gamePayload as unknown as Prisma.InputJsonValue,
@@ -1121,12 +1252,9 @@ export class AttemptsService {
             flags: scoreResult.flags,
           },
         });
-
-        // Decision 130/137: Autonomous microgames do not count towards academic streaks, badges or progress_events
-        newBadges = [];
       } else {
         // Default / fallback
-        updatedAttempt = await this.prisma.attempt.update({
+        updatedAttempt = await tx.attempt.update({
           where: { id: attempt.id },
           data: {
             status: AttemptStatus.pending_review,
@@ -1136,10 +1264,41 @@ export class AttemptsService {
       }
 
       return {
-        attempt: this.mapAttemptView(updatedAttempt, effectiveDueAt, completeUntil),
+        isExisting: false,
+        view: null,
+        updatedAttempt,
         correction,
-        newBadges,
+        scoreForEvent,
+        isAudioSubmitted,
+        isGame: activity.type === ActivityType.game,
       };
+    });
+
+    if (txResult.isExisting && txResult.view) {
+      return txResult.view;
+    }
+
+    let newBadges: import('@englove/shared').BadgeAwardView[] = [];
+    if (txResult.isAudioSubmitted) {
+      newBadges = await this.gamificationService.recordAudioSubmitted(
+        organizationId,
+        studentId,
+        attempt.id,
+      );
+    } else if (!txResult.isGame && txResult.scoreForEvent !== undefined) {
+      newBadges = await this.gamificationService.recordAttemptCompleted(
+        organizationId,
+        studentId,
+        attempt.id,
+        txResult.scoreForEvent,
+      );
+    }
+
+    return {
+      attempt: this.mapAttemptView(txResult.updatedAttempt!, effectiveDueAt, completeUntil),
+      correction: txResult.correction ?? null,
+      newBadges,
+    };
   }
 
   /**
@@ -1444,7 +1603,7 @@ export class AttemptsService {
     );
   }
 
-  private verifyAttemptTokenSignature(
+  public verifyAttemptTokenSignature(
     token: string,
     attemptId: string,
     studentId: string,
@@ -1476,7 +1635,7 @@ export class AttemptsService {
       payload.attemptId !== attemptId ||
       payload.studentId !== studentId ||
       payload.organizationId !== organizationId ||
-      Boolean(payload.typ && payload.typ !== 'attempt')
+      payload.typ !== 'attempt'
     ) {
       throw new UnauthorizedException({
         statusCode: 401,
@@ -1492,6 +1651,7 @@ export class AttemptsService {
   private async checkLateSubmissionAndMarkOfflineSync(
     attempt: { id: string; status: AttemptStatus; flags: string[] },
     completeUntil: Date,
+    _organizationId: string,
   ): Promise<void> {
     if (new Date() > completeUntil) {
       if (
@@ -1571,10 +1731,12 @@ export class AttemptsService {
     };
   }
 
-  private buildExistingCompletionView(
+  private async buildExistingCompletionView(
+    organizationId: string,
     attempt: AttemptEntityLike,
     activity?: ActivityEntityLike,
-  ): CompletionView {
+    prismaClient: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<CompletionView> {
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ??
       attempt.assignment?.due_at ??
@@ -1585,15 +1747,70 @@ export class AttemptsService {
     if (activity && attempt.status === AttemptStatus.graded) {
       const payload = (attempt.payload as { answers?: Record<string, unknown> }) || {};
       const answers = payload.answers || {};
+      const started = attempt.started_at ? new Date(attempt.started_at) : null;
+      const finished = attempt.finished_at ? new Date(attempt.finished_at) : null;
+      const durationSeconds =
+        finished && started
+          ? Math.max(0, Math.round((finished.getTime() - started.getTime()) / 1000))
+          : 0;
 
-      if (activity.type === ActivityType.game && activity.game_detail?.answer_key) {
-        const cfg = (activity.game_detail.config as GameConfig) || {
-          mechanic: activity.game_detail.mechanic as GameMechanic,
-          settings: {},
-        };
-        const ak = activity.game_detail.answer_key as GameAnswerKey;
-        const res = this.scoringService.calculateGame(cfg, ak, answers);
-        correction = res.correction;
+      if (activity.type === ActivityType.fill_blank) {
+        const detailWithKey = await prismaClient.fillBlankDetail.findFirst({
+          where: { organization_id: organizationId, activity_id: activity.id },
+          // guardrails-ignore G-C04: lectura de answer_key en el servidor para reconstruccion de correction
+          select: { config: true, answer_key: true },
+        });
+        const config = (detailWithKey?.config ?? activity.fill_blank_detail?.config) as unknown as FillBlankConfig;
+        if (config && detailWithKey?.answer_key) {
+          const ak = detailWithKey.answer_key as unknown as FillBlankAnswerKey;
+          const res = this.scoringService.calculateFillBlank(
+            config,
+            ak,
+            answers as Record<string, string>,
+            durationSeconds,
+            activity.min_plausible_seconds ?? undefined,
+          );
+          correction = res.correction;
+        }
+      } else if (activity.type === ActivityType.exam) {
+        const detailWithKey = await prismaClient.examDetail.findFirst({
+          where: { organization_id: organizationId, activity_id: activity.id },
+          // guardrails-ignore G-C04: lectura de answer_key en el servidor para reconstruccion de correction
+          select: { config: true, answer_key: true },
+        });
+        const config = (detailWithKey?.config ?? activity.exam_detail?.config) as unknown as ExamConfig;
+        if (config && detailWithKey?.answer_key) {
+          const ak = detailWithKey.answer_key as unknown as ExamAnswerKey;
+          const res = this.scoringService.calculateExam(
+            config,
+            ak,
+            answers as Record<string, Record<string, string>>,
+            durationSeconds,
+            activity.min_plausible_seconds ?? undefined,
+          );
+          correction = res.correction;
+        }
+      } else if (activity.type === ActivityType.game) {
+        const detailWithKey = await prismaClient.gameDetail.findFirst({
+          where: { organization_id: organizationId, activity_id: activity.id },
+          // guardrails-ignore G-C04: lectura de answer_key en el servidor para reconstruccion de correction
+          select: { mechanic: true, config: true, answer_key: true },
+        });
+        if (detailWithKey?.answer_key) {
+          const cfg = (detailWithKey.config as GameConfig) || {
+            mechanic: detailWithKey.mechanic as GameMechanic,
+            settings: {},
+          };
+          const ak = detailWithKey.answer_key as unknown as GameAnswerKey;
+          const res = this.scoringService.calculateGame(
+            cfg,
+            ak,
+            answers,
+            durationSeconds,
+            activity.min_plausible_seconds ?? 15,
+          );
+          correction = res.correction;
+        }
       }
     }
 
@@ -1609,6 +1826,11 @@ export class AttemptsService {
     effectiveDueAt: Date,
     completeUntil: Date,
   ): AttemptView {
+    const toIso = (d: Date | string | null | undefined): string | null => {
+      if (!d) return null;
+      return (d instanceof Date ? d : new Date(d)).toISOString();
+    };
+
     return {
       id: attempt.id,
       assignmentId: attempt.assignment_id ?? null,
@@ -1616,13 +1838,13 @@ export class AttemptsService {
       attemptNumber: attempt.attempt_number,
       previousAttemptId: attempt.previous_attempt_id ?? null,
       status: attempt.status,
-      startedAt: attempt.started_at.toISOString(),
-      finishedAt: attempt.finished_at ? attempt.finished_at.toISOString() : null,
-      gradedAt: attempt.graded_at ? attempt.graded_at.toISOString() : null,
+      startedAt: (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).toISOString(),
+      finishedAt: toIso(attempt.finished_at),
+      gradedAt: toIso(attempt.graded_at),
       score: attempt.score !== null ? Number(attempt.score) : null,
       flags: attempt.flags || [],
-      effectiveDueAt: effectiveDueAt.toISOString(),
-      completeUntil: completeUntil.toISOString(),
+      effectiveDueAt: (effectiveDueAt instanceof Date ? effectiveDueAt : new Date(effectiveDueAt)).toISOString(),
+      completeUntil: (completeUntil instanceof Date ? completeUntil : new Date(completeUntil)).toISOString(),
     };
   }
 }

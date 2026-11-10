@@ -145,23 +145,32 @@ export async function seedVolume() {
     },
   });
 
-  const assignment = await prisma.assignment.upsert({
-    where: { id: '30000000-0000-4000-9000-000000000001' },
-    update: {},
-    create: {
-      id: '30000000-0000-4000-9000-000000000001',
-      organization_id: org.id,
-      activity_id: act.id,
-      group_id: groups[Level.A1]!,
-      opens_at: new Date('2026-01-01T00:00:00Z'),
-      due_at: new Date('2026-04-01T00:00:00Z'),
-    },
-  });
+  const assignmentsByGroup: Record<string, string> = {};
+  for (let idx = 0; idx < levels.length; idx++) {
+    const lvl = levels[idx]!;
+    const asgId = `30000000-0000-4000-9000-${(idx + 1).toString().padStart(12, '0')}`;
+    const asg = await prisma.assignment.upsert({
+      where: { id: asgId },
+      update: {},
+      create: {
+        id: asgId,
+        organization_id: org.id,
+        activity_id: act.id,
+        group_id: groups[lvl]!,
+        opens_at: new Date('2026-01-01T00:00:00Z'),
+        due_at: new Date('2026-04-01T00:00:00Z'),
+      },
+    });
+    assignmentsByGroup[groups[lvl]!] = asg.id;
+  }
 
-  // 3 months of attempts
+  // 3 months of attempts distributed across the student's respective group assignments (P1-09)
   const now = Date.now();
   for (let i = 0; i < createdStudents.length; i++) {
     const s = createdStudents[i]!;
+    const studentLvl = s.level ?? Level.A1;
+    const studentGroupId = groups[studentLvl]!;
+    const assignmentId = assignmentsByGroup[studentGroupId]!;
     const attemptId = `40000000-0000-4000-9000-${(i + 1).toString().padStart(12, '0')}`;
     // Distribute attempts across 90 days
     const daysAgo = (i % 90) + 1;
@@ -173,7 +182,7 @@ export async function seedVolume() {
       create: {
         id: attemptId,
         organization_id: org.id,
-        assignment_id: assignment.id,
+        assignment_id: assignmentId,
         student_id: s.id,
         attempt_number: 1,
         status: AttemptStatus.graded,

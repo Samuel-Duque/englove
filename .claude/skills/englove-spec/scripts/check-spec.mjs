@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// Verificación estructural de una spec de Englove (skill englove-spec).
+// Verificación estructural de una o varias specs de Englove (skill englove-spec).
 //
-// Uso:  node .agents/skills/englove-spec/scripts/check-spec.mjs specs/SPEC-NN-nombre.md [--root RUTA]
+// Uso:  node .agents/skills/englove-spec/scripts/check-spec.mjs [specs/SPEC-NN-nombre.md ...] [--root RUTA] [--check-git]
 //
+// Sin argumentos de archivo, verifica automáticamente todas las specs presentes en specs/.
 // No duplica la planeación: lee en cada ejecución la plantilla de planning/sdd-process.md §5,
 // los pendientes de .agents/CONTEXT.md §15 y las tareas de planning/taskboard.md.
 // Sale con código 0 sin errores, 1 con errores y 2 si no puede leer sus insumos.
 // La validación semántica (decisiones de §14, fuera de alcance de §2.4) sigue siendo manual:
 // ver references/validacion.md.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const READING_WORDS_PER_MINUTE = 200;
 const MAX_READING_MINUTES = 20; // sdd-process §3
@@ -38,32 +40,28 @@ const RED_FLAGS = [
   [/tipos? de ítem|cuatro tipos/i, 'terminología: cinco tipos de actividad y cinco mecánicas de juego', 'decisión 66'],
 ];
 
-const errors = [];
-const warnings = [];
-const error = (where, msg) => errors.push(`[${where}] ${msg}`);
-const warn = (where, msg) => warnings.push(`[${where}] ${msg}`);
-
 function fatal(msg) {
   console.error(`check-spec: ${msg}`);
   process.exit(2);
 }
 
 function parseArgs(argv) {
-  const opts = { spec: null, root: null };
+  const opts = { specs: [], root: null, checkGit: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') {
-      console.log('Uso: node check-spec.mjs specs/SPEC-NN-nombre.md [--root RUTA_DEL_REPO]');
+      console.log('Uso: node check-spec.mjs [specs/SPEC-NN-nombre.md ...] [--root RUTA_DEL_REPO] [--check-git]');
       process.exit(0);
     } else if (arg === '--root') {
       opts.root = argv[++i];
-    } else if (!opts.spec) {
-      opts.spec = arg;
+    } else if (arg === '--check-git') {
+      opts.checkGit = true;
+    } else if (!arg.startsWith('-')) {
+      opts.specs.push(arg);
     } else {
       fatal(`argumento inesperado: ${arg}`);
     }
   }
-  if (!opts.spec) fatal('falta la ruta de la spec. Uso: node check-spec.mjs specs/SPEC-NN-nombre.md');
   return opts;
 }
 
@@ -182,17 +180,11 @@ function expandIds(text, prefix, pad, known) {
   return found;
 }
 
-function main() {
-  const opts = parseArgs(process.argv.slice(2));
-  const specPath = resolve(opts.spec);
-  if (!existsSync(specPath)) fatal(`no existe ${opts.spec}`);
-  const root = opts.root ? resolve(opts.root) : findRoot(dirname(specPath)) || findRoot(process.cwd());
-  if (!root) fatal('no se encontró la raíz del repositorio (.agents/CONTEXT.md); usa --root');
-
-  const template = parseTemplate(readText(join(root, 'planning', 'sdd-process.md')));
-  const pendings = parsePendings(readText(join(root, '.agents', 'CONTEXT.md')));
-  const taskboardPath = join(root, 'planning', 'taskboard.md');
-  const taskboard = existsSync(taskboardPath) ? parseTaskboard(readText(taskboardPath)) : null;
+function checkOneSpec(specPath, opts, root, template, pendings, taskboard) {
+  const errors = [];
+  const warnings = [];
+  const error = (where, msg) => errors.push(`[${where}] ${msg}`);
+  const warn = (where, msg) => warnings.push(`[${where}] ${msg}`);
 
   const spec = readText(specPath);
   const lines = spec.split('\n');
@@ -389,6 +381,35 @@ function main() {
     if (dataRows.length === 0) error(`§${N.changelog}`, 'el registro de cambios no tiene ninguna fila');
   }
 
+  // En specs aprobadas o verificadas no deben quedar marcas residuales de "(Propuesto)".
+  if (approvedLike.includes(state)) {
+    for (const s of sections.values()) {
+      if (s.n === N.changelog) continue; // Excluir §12 de menciones retrospectivas
+      const secLines = s.body.split('\n');
+      for (let i = 0; i < secLines.length; i++) {
+        if (/\(Propuesto\)/i.test(secLines[i])) {
+          error(`§${s.n}`, `spec en estado "${state}" conserva "(Propuesto)" residual: "${secLines[i].trim().slice(0, 80)}"`);
+        }
+      }
+    }
+  }
+
+  // Verificación de git (--check-git): specs Verificadas modificadas exigen fila en §12 (Decisión 128).
+  if (opts.checkGit && state === 'Verificada') {
+    try {
+      const gitStatus = execFileSync('git', ['status', '--porcelain', '--', specPath], { cwd: root, encoding: 'utf8' }).trim();
+      if (gitStatus) {
+        const gitDiff = execFileSync('git', ['diff', 'HEAD', '--', specPath], { cwd: root, encoding: 'utf8' });
+        const hasNewRow = gitDiff.split('\n').some((l) => /^\+[|]\s*\d{4}-\d{2}-\d{2}\s*[|]/.test(l));
+        if (!hasNewRow) {
+          error(`§${N.changelog || 12}`, 'spec en estado Verificada modificada en git sin fila nueva en §12 Registro de cambios (Decisión 128)');
+        }
+      }
+    } catch (err) {
+      warn('git', `no se pudo verificar el diff de git: ${err.message}`);
+    }
+  }
+
   // Señales de alarma fuera de las secciones de exclusiones.
   const exempt = new Set([N.scope, N.outOfScope, N.questions, N.changelog]);
   for (const s of sections.values()) {
@@ -417,7 +438,44 @@ function main() {
   for (const e of errors) console.log(`ERROR  ${e}`);
   for (const w of warnings) console.log(`AVISO  ${w}`);
   console.log(`Resultado: ${errors.length} error(es), ${warnings.length} aviso(s).${errors.length ? '' : ' Estructura válida; falta la validación semántica (references/validacion.md).'}`);
-  process.exit(errors.length ? 1 : 0);
+
+  return { errors, warnings };
+}
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const root = opts.root ? resolve(opts.root) : findRoot(process.cwd());
+  if (!root) fatal('no se encontró la raíz del repositorio (.agents/CONTEXT.md); usa --root');
+
+  const template = parseTemplate(readText(join(root, 'planning', 'sdd-process.md')));
+  const pendings = parsePendings(readText(join(root, '.agents', 'CONTEXT.md')));
+  const taskboardPath = join(root, 'planning', 'taskboard.md');
+  const taskboard = existsSync(taskboardPath) ? parseTaskboard(readText(taskboardPath)) : null;
+
+  let specPaths = opts.specs.map((s) => resolve(s));
+  if (specPaths.length === 0) {
+    const specsDir = join(root, 'specs');
+    if (!existsSync(specsDir)) fatal('no existe el directorio specs/');
+    const allFiles = readdirSync(specsDir).filter((f) => /^SPEC-\d{2}[a-z]?.*\.md$/.test(f));
+    allFiles.sort();
+    specPaths = allFiles.map((f) => join(specsDir, f));
+  }
+
+  let totalErrors = 0;
+  let totalWarnings = 0;
+
+  for (const specPath of specPaths) {
+    if (!existsSync(specPath)) fatal(`no existe ${specPath}`);
+    const res = checkOneSpec(specPath, opts, root, template, pendings, taskboard);
+    totalErrors += res.errors.length;
+    totalWarnings += res.warnings.length;
+  }
+
+  if (specPaths.length > 1) {
+    console.log(`\nResumen check-spec: ${specPaths.length} spec(s) analizada(s), ${totalErrors} error(es), ${totalWarnings} aviso(s).`);
+  }
+
+  process.exit(totalErrors ? 1 : 0);
 }
 
 main();

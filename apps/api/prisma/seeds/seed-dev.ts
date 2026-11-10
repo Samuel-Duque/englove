@@ -520,9 +520,69 @@ export async function seedDev() {
   }
 
   // 5. exam (fill_blank items only, decision 70)
+  const examConfig = {
+    instructions: 'Selecciona la opción correcta para cada espacio.',
+    items: [
+      {
+        id: '11111111-1111-4111-8111-111111111601',
+        weight: 50,
+        prompt: 'I {{22222222-2222-4222-8222-222222222601}} happy.',
+        blanks: [
+          {
+            id: '22222222-2222-4222-8222-222222222601',
+            options: [
+              { id: '33333333-3333-4333-8333-333333333601', text: 'am' },
+              { id: '33333333-3333-4333-8333-333333333602', text: 'is' },
+            ],
+          },
+        ],
+      },
+      {
+        id: '11111111-1111-4111-8111-111111111602',
+        weight: 50,
+        prompt: 'They {{22222222-2222-4222-8222-222222222602}} students.',
+        blanks: [
+          {
+            id: '22222222-2222-4222-8222-222222222602',
+            options: [
+              { id: '33333333-3333-4333-8333-333333333603', text: 'are' },
+              { id: '33333333-3333-4333-8333-333333333604', text: 'was' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const examAnswerKey = {
+    items: {
+      '11111111-1111-4111-8111-111111111601': {
+        '22222222-2222-4222-8222-222222222601': '33333333-3333-4333-8333-333333333601',
+      },
+      '11111111-1111-4111-8111-111111111602': {
+        '22222222-2222-4222-8222-222222222602': '33333333-3333-4333-8333-333333333603',
+      },
+    },
+  };
+
   const actExam = await prisma.activity.upsert({
     where: { id: '20000000-0000-4000-8000-000000000005' },
-    update: {},
+    update: {
+      title: 'Midterm Exam A1',
+      exam_detail: {
+        upsert: {
+          update: {
+            config: examConfig,
+            answer_key: examAnswerKey,
+          },
+          create: {
+            organization_id: org.id,
+            config: examConfig,
+            answer_key: examAnswerKey,
+          },
+        },
+      },
+    },
     create: {
       id: '20000000-0000-4000-8000-000000000005',
       organization_id: org.id,
@@ -535,51 +595,8 @@ export async function seedDev() {
       exam_detail: {
         create: {
           organization_id: org.id,
-          config: {
-            title: 'Midterm Evaluation',
-            items: [
-              {
-                id: 'ex1',
-                weight: 50,
-                item: {
-                  id: '11111111-1111-4111-8111-111111111501',
-                  prompt: 'I {{22222222-2222-4222-8222-222222222501}} happy.',
-                  blanks: [
-                    {
-                      id: '22222222-2222-4222-8222-222222222501',
-                      options: [
-                        { id: '33333333-3333-4333-8333-333333333501', text: 'am' },
-                        { id: '33333333-3333-4333-8333-333333333502', text: 'is' },
-                      ],
-                    },
-                  ],
-                },
-              },
-              {
-                id: 'ex2',
-                weight: 50,
-                item: {
-                  id: '11111111-1111-4111-8111-111111111502',
-                  prompt: 'They {{22222222-2222-4222-8222-222222222502}} students.',
-                  blanks: [
-                    {
-                      id: '22222222-2222-4222-8222-222222222502',
-                      options: [
-                        { id: '33333333-3333-4333-8333-333333333503', text: 'are' },
-                        { id: '33333333-3333-4333-8333-333333333504', text: 'was' },
-                      ],
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-          answer_key: {
-            items: {
-              '22222222-2222-4222-8222-222222222501': '33333333-3333-4333-8333-333333333501',
-              '22222222-2222-4222-8222-222222222502': '33333333-3333-4333-8333-333333333503',
-            },
-          },
+          config: examConfig,
+          answer_key: examAnswerKey,
         },
       },
     },

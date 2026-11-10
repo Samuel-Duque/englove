@@ -705,6 +705,149 @@ describe('SPEC-07: ReviewsService — Calificación, feedback, retención y nuev
         'They eat meat and dog food.',
       );
     });
+
+    it('P1-07: no puentea answers["text"] a answers[activity.id] si open_question es multi-pregunta', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValue({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        status: AttemptStatus.pending_review,
+        score: null,
+        attempt_number: 1,
+        assignment_id: assignmentId,
+        payload: {
+          answers: {
+            text: 'Some general text',
+            '11111111-1111-4111-8111-111111111101': 'Answer 1',
+          },
+        },
+        student: { id: studentId, age_segment: AgeSegment.teens, user: { name: 'Carlos Teens' } },
+        assignment: {
+          id: assignmentId,
+          due_at: new Date('2026-10-30T18:00:00Z'),
+          cancelled_at: null,
+          group: { id: 'g-1', name: 'Teens B1' },
+          activity: {
+            id: 'act-oq-multi',
+            title: 'Multi-Question Essay',
+            type: ActivityType.open_question,
+            open_question_detail: {
+              config: {
+                instructions: 'Answer all questions.',
+                items: [
+                  {
+                    id: '11111111-1111-4111-8111-111111111101',
+                    prompt: 'What animal do you like?',
+                    rubric: 'Check animal vocabulary.',
+                  },
+                  {
+                    id: '11111111-1111-4111-8111-111111111102',
+                    prompt: 'What do they eat?',
+                    rubric: 'Check food vocabulary.',
+                  },
+                ],
+              },
+            },
+          },
+        },
+        review: null,
+        media_assets: [],
+      });
+
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+
+      const detail = await service.getReviewDetail(orgId, attemptId);
+
+      expect(detail.answers['act-oq-multi']).toBeUndefined();
+      expect(detail.answers['11111111-1111-4111-8111-111111111102']).toBeUndefined();
+      expect(detail.answers['11111111-1111-4111-8111-111111111101']).toBe('Answer 1');
+    });
+
+    it('P1-07: en open_question mono-pregunta con items[0].id personalizado asocia answers[text] al id del ítem', async () => {
+      const customItemId = '99999999-9999-4999-8999-999999999999';
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.pending_review,
+        payload: {
+          answers: {
+            text: 'Respuesta única del estudiante',
+          },
+        },
+        student: { id: studentId, age_segment: AgeSegment.kids, user: { name: 'Ana Kids' } },
+        assignment: {
+          id: assignmentId,
+          due_at: new Date('2026-10-30T18:00:00Z'),
+          cancelled_at: null,
+          group: { id: 'g-1', name: 'Kids A1' },
+          activity: {
+            id: 'act-oq-single',
+            title: 'Single Question',
+            type: ActivityType.open_question,
+            open_question_detail: {
+              config: {
+                instructions: 'Answer the question.',
+                items: [
+                  {
+                    id: customItemId,
+                    prompt: 'What is your name?',
+                  },
+                ],
+              },
+            },
+          },
+        },
+        review: null,
+        media_assets: [],
+      });
+      mockPrisma.attempt.findMany.mockResolvedValue([]);
+
+      const detail = await service.getReviewDetail(orgId, attemptId);
+
+      expect(detail.answers[customItemId]).toBe('Respuesta única del estudiante');
+      expect(detail.answers['text']).toBe('Respuesta única del estudiante');
+    });
+  });
+
+  describe('P1-06 (revisión): Condiciones de carrera y doble clic en submitReview', () => {
+    it('evita duplicidad de ProgressEvent y P2002 si el review ya fue creado en una petición concurrente', async () => {
+      const pendingAttempt = {
+        id: attemptId,
+        student_id: studentId,
+        organization_id: orgId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.pending_review,
+        student: { user: { name: 'Student' } },
+        assignment: {
+          activity: { type: ActivityType.open_question },
+          group: { id: 'g-1' },
+        },
+        review: null,
+      };
+
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce(pendingAttempt);
+      vi.spyOn(service, 'getReviewDetail').mockResolvedValueOnce({} as any);
+
+      mockPrisma.review = {
+        findFirst: vi.fn().mockResolvedValueOnce({ id: 'existing-rev-id' }),
+        update: vi.fn().mockResolvedValueOnce({ id: 'existing-rev-id' }),
+        create: vi.fn(),
+      };
+      mockPrisma.progressEvent = {
+        create: vi.fn(),
+      };
+
+      await service.submitReview(orgId, teacherId, attemptId, {
+        score: 4.5,
+        comment: 'Buen trabajo',
+      });
+
+      expect(mockPrisma.review.update).toHaveBeenCalled();
+      expect(mockPrisma.review.create).not.toHaveBeenCalled();
+      expect(mockPrisma.progressEvent.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('RF-12: Anti-IDOR isolation', () => {

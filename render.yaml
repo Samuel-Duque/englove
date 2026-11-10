@@ -7,7 +7,7 @@ services:
     env: docker
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     numInstances: 1
     healthCheckPath: /health
     envVars:
@@ -16,8 +16,6 @@ services:
       - key: PORT
         value: 10000
       - key: DATABASE_URL
-        sync: false
-      - key: MIGRATION_DATABASE_URL
         sync: false
       - key: R2_ACCOUNT_ID
         sync: false
@@ -32,7 +30,7 @@ services:
       - key: COOKIE_DOMAIN
         value: .englove.org
       - key: COOKIE_PREFIX
-        value: englove_staging_
+        value: englove_stg_
       - key: WEB_BASE_URL
         sync: false
       - key: NEXT_PUBLIC_API_URL

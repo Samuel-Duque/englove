@@ -11,12 +11,25 @@ type ExtensionQueryHook = (params: {
 
 interface ExtensionDefinition {
   query?: {
+    $queryRaw?: (params: { args: unknown; query: (args: unknown) => Promise<unknown> }) => Promise<unknown>;
+    $executeRaw?: (params: { args: unknown; query: (args: unknown) => Promise<unknown> }) => Promise<unknown>;
     $allModels?: {
       findMany?: ExtensionQueryHook;
       findFirst?: ExtensionQueryHook;
       count?: ExtensionQueryHook;
+      create?: ExtensionQueryHook;
+      createMany?: ExtensionQueryHook;
+      update?: ExtensionQueryHook;
       updateMany?: ExtensionQueryHook;
+      delete?: ExtensionQueryHook;
       deleteMany?: ExtensionQueryHook;
+      upsert?: (params: {
+        model: string;
+        args: { where: Record<string, unknown>; create: Record<string, unknown>; update: Record<string, unknown> };
+        query: (args: unknown) => Promise<unknown>;
+      }) => Promise<unknown>;
+      findUnique?: ExtensionQueryHook;
+      findUniqueOrThrow?: ExtensionQueryHook;
     };
   };
 }
@@ -274,6 +287,159 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
       });
       expect(res).toEqual({ where: { id: 'some-sid' } });
     });
+  });
+
+  it('correctly discovers explicit organization_id inside nested AND / OR arrays', async () => {
+    const extensionDef = extractExtensionDef();
+    const findManyHook = extensionDef.query?.$allModels?.findMany;
+    expect(findManyHook).toBeDefined();
+    if (!findManyHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    // 1. Without TenantContext: explicit organization_id inside AND array must be accepted
+    const andQuery = { where: { AND: [{ id: 'stu-1' }, { organization_id: orgId }] } };
+    const resAnd = await findManyHook({
+      model: 'Student',
+      args: andQuery,
+      query: mockQuery,
+    });
+    expect(resAnd).toEqual(andQuery);
+
+    // 2. With TenantContext: conflicting organization_id inside AND array must throw violation
+    const conflictingAndQuery = {
+      where: { AND: [{ id: 'stu-1' }, { organization_id: '99999999-9999-9999-9999-999999999999' }] },
+    };
+    await expect(
+      TenantContext.run({ organizationId: orgId }, async () => {
+        return findManyHook({
+          model: 'Student',
+          args: conflictingAndQuery,
+          query: mockQuery,
+        });
+      }),
+    ).rejects.toThrow(/Violación de aislamiento tenant en Student: organization_id discordante/);
+
+    // 3. With TenantContext: matching { equals: orgId } must be recognized without false discordance
+    const equalsQuery = { where: { organization_id: { equals: orgId } } };
+    const resEquals = await TenantContext.run({ organizationId: orgId }, async () => {
+      return findManyHook({
+        model: 'Student',
+        args: equalsQuery,
+        query: mockQuery,
+      });
+    });
+    expect(resEquals).toBeDefined();
+  });
+
+  it('intercepts mutations (create, update, delete, upsert) enforcing strict tenant rules', async () => {
+    const extensionDef = extractExtensionDef();
+    const createHook = extensionDef.query?.$allModels?.create;
+    const updateHook = extensionDef.query?.$allModels?.update;
+    const deleteHook = extensionDef.query?.$allModels?.delete;
+    const upsertHook = extensionDef.query?.$allModels?.upsert;
+
+    expect(createHook).toBeDefined();
+    expect(updateHook).toBeDefined();
+    expect(deleteHook).toBeDefined();
+    expect(upsertHook).toBeDefined();
+    if (!createHook || !updateHook || !deleteHook || !upsertHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    // 1. create injects organization_id inside TenantContext
+    const resCreate = (await TenantContext.run({ organizationId: orgId }, async () => {
+      return createHook({
+        model: 'User',
+        args: { data: { name: 'New Student' } },
+        query: mockQuery,
+      });
+    })) as { data: { name: string; organization_id: string } };
+    expect(resCreate.data.organization_id).toBe(orgId);
+
+    // 2. create rejects without TenantContext and without explicit orgId
+    await expect(
+      createHook({
+        model: 'User',
+        args: { data: { name: 'Orphan User' } },
+        query: mockQuery,
+      }),
+    ).rejects.toThrow(/Operación multi-tenant rechazada/);
+
+    // 3. update rejects conflicting organization_id in TenantContext
+    await expect(
+      TenantContext.run({ organizationId: orgId }, async () => {
+        return updateHook({
+          model: 'Student',
+          args: { where: { id: 's-1', organization_id: 'different-org-id' }, data: { birth_date: new Date() } },
+          query: mockQuery,
+        });
+      }),
+    ).rejects.toThrow(/Violación de aislamiento tenant/);
+
+    // 4. delete rejects when organization_id is missing and TenantContext is absent
+    await expect(
+      deleteHook({
+        model: 'Student',
+        args: { where: { id: 's-1' } },
+        query: mockQuery,
+      }),
+    ).rejects.toThrow(/Operación multi-tenant rechazada/);
+
+    // 5. upsert injects tenant into where and create, and checks update
+    const resUpsert = (await TenantContext.run({ organizationId: orgId }, async () => {
+      return upsertHook({
+        model: 'Student',
+        args: {
+          where: { id: 's-1' },
+          create: { user_id: 'u-1' },
+          update: { birth_date: new Date() },
+        },
+        query: mockQuery,
+      });
+    })) as { where: { id: string; organization_id: string }; create: { organization_id: string } };
+    expect(resUpsert.where.organization_id).toBe(orgId);
+    expect(resUpsert.create.organization_id).toBe(orgId);
+  });
+
+  it('strictly rejects tenant bypass attempts using NOT or OR branches without TenantContext', async () => {
+    const extensionDef = extractExtensionDef();
+    const findFirstHook = extensionDef.query?.$allModels?.findFirst;
+    const findManyHook = extensionDef.query?.$allModels?.findMany;
+    expect(findFirstHook).toBeDefined();
+    expect(findManyHook).toBeDefined();
+    if (!findFirstHook || !findManyHook) return;
+
+    const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+    // 1. NOT branch wrapping organization_id must NOT be accepted as a positive tenant filter
+    await expect(
+      findFirstHook({
+        model: 'User',
+        args: { where: { NOT: [{ organization_id: orgId }] } },
+        query: mockQuery,
+      }),
+    ).rejects.toThrow(/Operación multi-tenant rechazada/);
+
+    // 2. OR branch containing organization_id along with other conditions must NOT leak cross-tenant rows
+    await expect(
+      findManyHook({
+        model: 'Student',
+        args: { where: { OR: [{ organization_id: orgId }, { id: 'victim-student' }] } },
+        query: mockQuery,
+      }),
+    ).rejects.toThrow(/Operación multi-tenant rechazada/);
+
+    // 3. Negating organization_id even inside active TenantContext must throw isolation violation
+    await expect(
+      TenantContext.run({ organizationId: orgId }, async () => {
+        return findManyHook({
+          model: 'Student',
+          args: { where: { NOT: { organization_id: orgId } } },
+          query: mockQuery,
+        });
+      }),
+    ).rejects.toThrow(/Violación de aislamiento tenant en Student: organization_id no puede ser negado/);
   });
 });
 

@@ -10,6 +10,7 @@ import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { TenantContext } from '../src/common/tenant/tenant.context';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -142,26 +143,34 @@ describe('SPEC-05 RF-7 (ENG-074): lotes de eventos concurrentes en PostgreSQL re
       });
 
       const parsed = parseFillBlankSimpleSyntax('The cat is [sleeping|barking]');
-      const activity = await activitiesService.createActivity(orgId, teacherId, {
-        title: 'ENG-074 concurrencia',
-        type: ActivityType.fill_blank,
-        level: Level.A1,
-        config: {
-          items: itemIds.map((id) => ({ id, prompt: parsed.prompt, blanks: parsed.blanks })),
+      const assigned = await TenantContext.run(
+        { organizationId: orgId, userId: teacherId, role: Role.teacher },
+        async () => {
+          const activity = await activitiesService.createActivity(orgId, teacherId, {
+            title: 'ENG-074 concurrencia',
+            type: ActivityType.fill_blank,
+            level: Level.A1,
+            config: {
+              items: itemIds.map((id) => ({ id, prompt: parsed.prompt, blanks: parsed.blanks })),
+            },
+            answerKey: {
+              items: Object.fromEntries(itemIds.map((id) => [id, parsed.answerKey])),
+            },
+          });
+          await activitiesService.publishActivity(orgId, activity.id);
+          return assignmentsService.createAssignments(orgId, {
+            activityId: activity.id,
+            groupIds: [groupId],
+            opensAt: new Date(Date.now() - 3600000).toISOString(),
+            dueAt: new Date(Date.now() + 86400000).toISOString(),
+          });
         },
-        answerKey: {
-          items: Object.fromEntries(itemIds.map((id) => [id, parsed.answerKey])),
-        },
-      });
-      await activitiesService.publishActivity(orgId, activity.id);
-      const assigned = await assignmentsService.createAssignments(orgId, {
-        activityId: activity.id,
-        groupIds: [groupId],
-        opensAt: new Date(Date.now() - 3600000).toISOString(),
-        dueAt: new Date(Date.now() + 86400000).toISOString(),
-      });
+      );
 
-      const started = await attemptsService.startAttempt(orgId, studentId, assigned.items[0]!.id);
+      const started = await TenantContext.run(
+        { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+        async () => attemptsService.startAttempt(orgId, studentId, assigned.items[0]!.id),
+      );
       attemptId = started.attempt.id;
       if (!started.attemptToken) throw new Error('attemptToken ausente');
       attemptToken = started.attemptToken;
@@ -185,27 +194,33 @@ describe('SPEC-05 RF-7 (ENG-074): lotes de eventos concurrentes en PostgreSQL re
 
   it('SPEC-05 RF-7: lotes concurrentes con IDs distintos no pierden respuestas ni IDs procesados', async () => {
     if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
 
-    const results = await Promise.allSettled(
-      itemIds.map((itemId, i) =>
-        attemptsService.submitEvents(orgId, studentId, attemptId, attemptToken, {
-          events: [{ itemId, answer: { blank: `option-${i}` }, clientEventId: `eng074-ev-${i}` }],
-        }),
-      ),
-    );
-    expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const results = await Promise.allSettled(
+          itemIds.map((itemId, i) =>
+            attemptsService.submitEvents(orgId, studentId, attemptId, attemptToken, {
+              events: [{ itemId, answer: { blank: `option-${i}` }, clientEventId: `eng074-ev-${i}` }],
+            }),
+          ),
+        );
+        expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
 
-    const stored = await prisma.attempt.findFirst({
-      where: { id: attemptId, organization_id: orgId },
-    });
-    const payload = stored?.payload as {
-      answers?: Record<string, unknown>;
-      processedEventIds?: string[];
-    } | null;
+        const stored = await activePrisma.attempt.findFirst({
+          where: { id: attemptId, organization_id: orgId },
+        });
+        const payload = stored?.payload as {
+          answers?: Record<string, unknown>;
+          processedEventIds?: string[];
+        } | null;
 
-    expect(Object.keys(payload?.answers ?? {}).sort()).toEqual([...itemIds].sort());
-    expect([...(payload?.processedEventIds ?? [])].sort()).toEqual(
-      itemIds.map((_, i) => `eng074-ev-${i}`).sort(),
+        expect(Object.keys(payload?.answers ?? {}).sort()).toEqual([...itemIds].sort());
+        expect([...(payload?.processedEventIds ?? [])].sort()).toEqual(
+          itemIds.map((_, i) => `eng074-ev-${i}`).sort(),
+        );
+      },
     );
   });
 });

@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   Req,
@@ -12,6 +13,7 @@ import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
 import {
   LoginDto,
@@ -63,6 +65,12 @@ export class AuthController {
     return this.authService.refresh(tokenValue, res);
   }
 
+  @Get('session')
+  @HttpCode(HttpStatus.OK)
+  async getSession(@CurrentUser() user: AuthenticatedUser): Promise<SessionView> {
+    return this.authService.getSession(user);
+  }
+
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -74,7 +82,12 @@ export class AuthController {
     const accessCookieName = `${this.cookiePrefix}access_token`;
 
     const refreshTokenValue = req.cookies?.[refreshCookieName];
-    const accessTokenValue = req.cookies?.[accessCookieName];
+    const authHeader = req.headers.authorization;
+    const headerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : undefined;
+    const accessTokenValue = req.cookies?.[accessCookieName] || headerToken;
 
     await this.authService.logout(refreshTokenValue, accessTokenValue, res);
   }

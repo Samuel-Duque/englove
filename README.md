@@ -231,7 +231,7 @@ pnpm install
 
 ### 5. Iniciar servicios locales (PostgreSQL 18, MinIO y Mailpit)
 
-Levanta los contenedores de desarrollo en segundo plano:
+Levanta los contenedores de desarrollo en segundo plano (PostgreSQL 18 se expone en el puerto local **`5433`** (`localhost:5433`) para evitar colisiones con instancias nativas de Postgres en el puerto estándar 5432):
 
 ```bash
 docker compose up -d

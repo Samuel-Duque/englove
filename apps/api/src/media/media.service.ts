@@ -5,10 +5,12 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  UnauthorizedException,
   PayloadTooLargeException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import {
   S3Client,
   PutObjectCommand,
@@ -21,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn } from 'child_process';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,6 +33,7 @@ import {
   MediaAssetStatus,
   MediaUploadUrlResponse,
   MediaPlaybackUrlResponse,
+  MediaConfirmResponse,
   ActivityType,
 } from '@englove/shared';
 
@@ -39,16 +43,22 @@ export class MediaService implements OnModuleInit {
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
   private readonly transcodeQueue: string[] = [];
+  private readonly jwtSecret: string;
   private isProcessingQueue = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly jwtService?: JwtService,
   ) {
     const accountId = this.configService.get<string>('R2_ACCOUNT_ID') || 'mock-account';
     const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID') || 'mock-key';
     const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || 'mock-secret';
     this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || 'englove-dev';
+    this.jwtSecret =
+      this.configService.get<string>('JWT_ATTEMPT_SECRET') ||
+      this.configService.get<string>('JWT_SECRET') ||
+      'dev-secret-attempt-englove';
     const r2Endpoint = this.configService.get<string>('R2_ENDPOINT');
 
     const endpoint = r2Endpoint || `https://${accountId}.r2.cloudflarestorage.com`;
@@ -88,11 +98,67 @@ export class MediaService implements OnModuleInit {
     }
   }
 
+  verifyAttemptToken(
+    token: string,
+    studentId: string,
+    organizationId: string,
+    expectedAttemptId?: string,
+  ): { attemptId: string; studentId: string; organizationId: string } {
+    if (!token) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'AUTH_UNAUTHORIZED',
+        message: 'Token de intento ausente',
+      });
+    }
+
+    const jwt = this.jwtService || new JwtService({ secret: this.jwtSecret });
+    let payload: {
+      attemptId: string;
+      studentId: string;
+      organizationId: string;
+      typ: string;
+    };
+
+    try {
+      payload = jwt.verify(token, {
+        secret: this.jwtSecret,
+        ignoreExpiration: true,
+      });
+    } catch {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'AUTH_UNAUTHORIZED',
+        message: 'Token de intento alterado o inválido',
+      });
+    }
+
+    if (
+      payload.studentId !== studentId ||
+      payload.organizationId !== organizationId ||
+      payload.typ !== 'attempt' ||
+      (expectedAttemptId && payload.attemptId !== expectedAttemptId)
+    ) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'AUTH_UNAUTHORIZED',
+        message: 'Token de intento discordante o tipo inválido',
+      });
+    }
+
+    return payload;
+  }
+
   async createUploadUrl(
     organizationId: string,
     studentId: string,
     dto: MediaUploadUrlDto,
+    attemptToken?: string,
   ): Promise<MediaUploadUrlResponse> {
+    if (attemptToken) {
+      this.verifyAttemptToken(attemptToken, studentId, organizationId, dto.attemptId);
+    }
+
     if (dto.sizeBytes > 10 * 1024 * 1024) {
       throw new PayloadTooLargeException({
         statusCode: 413,
@@ -172,6 +238,27 @@ export class MediaService implements OnModuleInit {
       });
     }
 
+    // Cuota de pending_upload: máximo 5 pendientes por intento (QA-05, T3.4)
+    const pendingAssets = await this.prisma.mediaAsset.findMany({
+      where: {
+        attempt_id: attempt.id,
+        organization_id: organizationId,
+        status: MediaAssetStatus.pending_upload,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+
+    if (pendingAssets.length >= 5) {
+      const toDelete = pendingAssets.slice(0, pendingAssets.length - 4);
+      await this.prisma.mediaAsset.updateMany({
+        where: {
+          id: { in: toDelete.map((a) => a.id) },
+          organization_id: organizationId,
+        },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+    }
+
     let ext = '.webm';
     if (dto.mimeType.includes('mp4')) ext = '.mp4';
     else if (dto.mimeType.includes('ogg')) ext = '.ogg';
@@ -210,6 +297,111 @@ export class MediaService implements OnModuleInit {
     };
   }
 
+  async confirmUploadEndpoint(
+    organizationId: string,
+    studentId: string,
+    mediaId: string,
+    attemptToken: string,
+  ): Promise<MediaConfirmResponse> {
+    const payload = this.verifyAttemptToken(attemptToken, studentId, organizationId);
+    const attempt = await this.prisma.attempt.findFirst({
+      where: {
+        id: payload.attemptId,
+        student_id: studentId,
+        organization_id: organizationId,
+      },
+      include: {
+        assignment: {
+          include: {
+            activity: {
+              include: {
+                speaking_detail: true,
+              },
+            },
+          },
+        },
+        activity: {
+          include: {
+            speaking_detail: true,
+          },
+        },
+        previous_attempt: true,
+      },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'ATTEMPT_NOT_FOUND',
+        message: 'Intento no encontrado',
+      });
+    }
+
+    const assignment = attempt.assignment;
+    const act = attempt.activity ?? assignment?.activity;
+    if (!act || act.type !== ActivityType.speaking) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'ATTEMPT_NOT_SPEAKING',
+        message: 'Este intento no corresponde a una actividad de speaking',
+      });
+    }
+
+    const effectiveDueAt =
+      attempt.previous_attempt?.retry_extend_until ?? assignment?.due_at;
+    if (effectiveDueAt) {
+      const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
+      if (new Date() > completeUntil) {
+        if (
+          attempt.status === 'in_progress' ||
+          attempt.status === ('abandoned' as import('@englove/shared').AttemptStatus)
+        ) {
+          const currentFlags = attempt.flags || [];
+          const newFlags = currentFlags.includes('offline_sync')
+            ? currentFlags
+            : [...currentFlags, 'offline_sync'];
+
+          await this.prisma.attempt.update({
+            where: { id: attempt.id },
+            data: {
+              status: 'abandoned',
+              flags: newFlags,
+            },
+          });
+        }
+
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'ATTEMPT_CLOSED',
+          message: 'La actividad ya está cerrada',
+        });
+      }
+    }
+
+    if (attempt.status !== 'in_progress') {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ATTEMPT_NOT_IN_PROGRESS',
+        message: 'El intento no está en curso',
+      });
+    }
+
+    const maxDurationSeconds = act.speaking_detail?.max_duration_seconds ?? 120;
+
+    const confirmed = await this.confirmUpload(
+      organizationId,
+      studentId,
+      payload.attemptId,
+      mediaId,
+      maxDurationSeconds,
+    );
+    return {
+      mediaId: confirmed.id,
+      status: confirmed.status,
+      durationSeconds: confirmed.duration_seconds ?? 0,
+    };
+  }
+
   async confirmUpload(
     organizationId: string,
     studentId: string,
@@ -242,6 +434,29 @@ export class MediaService implements OnModuleInit {
     }
 
     if (asset.status === MediaAssetStatus.ready) {
+      const dur = asset.duration_seconds ?? 0;
+      if (dur < 2) {
+        await this.prisma.mediaAsset.update({
+          where: { id: asset.id },
+          data: { status: MediaAssetStatus.pending_delete },
+        });
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'AUDIO_IMPLAUSIBLE_DURATION',
+          message: 'Graba al menos 2 segundos',
+        });
+      }
+      if (dur > maxDurationSeconds) {
+        await this.prisma.mediaAsset.update({
+          where: { id: asset.id },
+          data: { status: MediaAssetStatus.pending_delete },
+        });
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'AUDIO_EXCEEDS_MAX_DURATION',
+          message: 'La grabación supera el tiempo permitido',
+        });
+      }
       return asset;
     }
 
@@ -287,10 +502,22 @@ export class MediaService implements OnModuleInit {
     }
 
     // Measure duration
-    const duration =
-      forcedDurationSeconds !== undefined
-        ? forcedDurationSeconds
-        : await this.probeDuration(asset.key, actualSize);
+    let duration: number;
+    try {
+      duration =
+        forcedDurationSeconds !== undefined
+          ? forcedDurationSeconds
+          : await this.probeDuration(asset.key, actualSize);
+    } catch (err: unknown) {
+      if (err instanceof PayloadTooLargeException) {
+        await this.deleteFile(asset.key).catch(() => {});
+      }
+      await this.prisma.mediaAsset.update({
+        where: { id: asset.id },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+      throw err;
+    }
 
     if (duration < 2) {
       await this.prisma.mediaAsset.update({
@@ -317,12 +544,35 @@ export class MediaService implements OnModuleInit {
       });
     }
 
-    const updated = await this.prisma.mediaAsset.update({
-      where: { id: asset.id },
-      data: {
-        status: MediaAssetStatus.ready,
-        duration_seconds: Math.round(duration),
-      },
+    // Transition to ready under transaction, locking and marking previous ready assets as pending_delete (QA-05, T3.4)
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // guardrails-ignore G-A06: Bloqueo transaccional anti-carrera P2002 para activos de speaking
+      const previousReady = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM media_assets
+        WHERE attempt_id = ${attemptId}::uuid
+          AND organization_id = ${organizationId}::uuid
+          AND status = 'ready'
+          AND id != ${asset.id}::uuid
+        FOR UPDATE
+      `;
+
+      if (previousReady.length > 0) {
+        await tx.mediaAsset.updateMany({
+          where: {
+            id: { in: previousReady.map((r) => r.id) },
+            organization_id: organizationId,
+          },
+          data: { status: MediaAssetStatus.pending_delete },
+        });
+      }
+
+      return await tx.mediaAsset.update({
+        where: { id: asset.id },
+        data: {
+          status: MediaAssetStatus.ready,
+          duration_seconds: Math.round(duration),
+        },
+      });
     });
 
     this.enqueueTranscode(updated.id);
@@ -447,9 +697,23 @@ export class MediaService implements OnModuleInit {
       if (!assetId) continue;
 
       try {
+        // guardrails-ignore G-A06: procesamiento serial de transcodificación en background worker sin contexto HTTP
         await TenantContext.runBypass(() => this.transcodeAsset(assetId));
       } catch (err: unknown) {
         this.logger.error(`Error transcodificando asset ${assetId}: ${(err as Error)?.message || String(err)}`);
+        // Re-enqueue if transcode_attempts < 3 (P1-03)
+        try {
+          // guardrails-ignore G-A11: consulta de intentos de transcodificación por ID interno de asset
+          const current = await this.prisma.mediaAsset.findUnique({
+            where: { id: assetId },
+            select: { transcode_attempts: true, transcode_failed_at: true },
+          });
+          if (current && current.transcode_attempts < 3 && !current.transcode_failed_at) {
+            this.transcodeQueue.push(assetId);
+          }
+        } catch {
+          // ignore
+        }
       }
     }
 
@@ -517,7 +781,7 @@ export class MediaService implements OnModuleInit {
         fs.writeFileSync(rawLocalPath, Buffer.from([]));
       }
 
-      // Run ffmpeg structured without shell with 60s timeout (Rule G-C07, SPEC-11 RF-5)
+      // Run ffmpeg structured without shell with 60s timeout, draining stderr/stdout and escalating to SIGKILL (Rule G-C07, SPEC-11 RF-5, P1-03)
       await new Promise<void>((resolve, reject) => {
         const proc = spawn('ffmpeg', [
           '-y',
@@ -532,31 +796,55 @@ export class MediaService implements OnModuleInit {
           convertedLocalPath,
         ], { shell: false });
 
+        // DRAIN stderr and stdout to prevent deadlock on large recordings (P1-03)
+        proc.stdout.on('data', () => {});
+        proc.stderr.on('data', () => {});
+
+        let killed = false;
+        let killTimer: NodeJS.Timeout | null = null;
         const timer = setTimeout(() => {
-          proc.kill();
+          killed = true;
+          try {
+            proc.kill('SIGTERM');
+          } catch {
+            // ignore
+          }
+          killTimer = setTimeout(() => {
+            try {
+              proc.kill('SIGKILL');
+            } catch {
+              // ignore
+            }
+          }, 2000);
           reject(new Error('ffmpeg timed out after 60s'));
         }, 60000);
 
         proc.on('close', (code) => {
           clearTimeout(timer);
+          if (killTimer) clearTimeout(killTimer);
+          if (killed) return;
           if (code === 0) resolve();
           else reject(new Error(`ffmpeg exited with code ${code}`));
         });
 
         proc.on('error', (err) => {
           clearTimeout(timer);
+          if (killTimer) clearTimeout(killTimer);
+          if (killed) return;
           reject(err);
         });
       });
 
-      // Upload converted mp4 to R2
-      const convertedBuffer = fs.readFileSync(convertedLocalPath);
+      // Upload converted mp4 to R2 via stream (Rule G-C07)
+      const convertedStat = fs.statSync(convertedLocalPath);
+      const convertedStream = fs.createReadStream(convertedLocalPath);
       await this.s3Client.send(
         new PutObjectCommand({
           Bucket: this.bucketName,
           Key: convertedKey,
           ContentType: 'audio/mp4',
-          Body: convertedBuffer,
+          Body: convertedStream,
+          ContentLength: convertedStat.size,
         }),
       );
 
@@ -603,7 +891,7 @@ export class MediaService implements OnModuleInit {
     });
   }
 
-  private async probeDuration(key: string, sizeBytes: number): Promise<number> {
+  private async probeDuration(key: string, _sizeBytes?: number): Promise<number> {
     const tmpDir = os.tmpdir();
     const tempFile = path.join(tmpDir, `probe_${randomUUID()}.tmp`);
 
@@ -615,68 +903,165 @@ export class MediaService implements OnModuleInit {
         }),
       );
 
+      let downloadedBytes = 0;
+      const MAX_BYTES = 10 * 1024 * 1024; // 10 MiB
+      const byteCounter = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+          downloadedBytes += chunk.length;
+          if (downloadedBytes > MAX_BYTES) {
+            callback(
+              new PayloadTooLargeException({
+                statusCode: 413,
+                code: 'AUDIO_FILE_TOO_LARGE',
+                message: 'El archivo de audio supera 10 MB',
+              }),
+            );
+            return;
+          }
+          callback(null, chunk);
+        },
+      });
+
       if (getRes.Body) {
         if (typeof (getRes.Body as { pipe?: unknown }).pipe === 'function') {
-          await pipeline(getRes.Body as NodeJS.ReadableStream, fs.createWriteStream(tempFile));
+          await pipeline(getRes.Body as NodeJS.ReadableStream, byteCounter, fs.createWriteStream(tempFile));
         } else if (
           typeof (getRes.Body as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray ===
           'function'
         ) {
           const bytes = await (getRes.Body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+          if (bytes.length > MAX_BYTES) {
+            throw new PayloadTooLargeException({
+              statusCode: 413,
+              code: 'AUDIO_FILE_TOO_LARGE',
+              message: 'El archivo de audio supera 10 MB',
+            });
+          }
           fs.writeFileSync(tempFile, Buffer.from(bytes));
         }
       }
 
-      if (fs.existsSync(tempFile) && fs.statSync(tempFile).size > 0) {
-        const duration = await new Promise<number>((resolve, reject) => {
-          const proc = spawn(
-            'ffprobe',
-            [
-              '-v',
-              'error',
-              '-show_entries',
-              'format=duration',
-              '-of',
-              'default=noprint_wrappers=1:nokey=1',
-              tempFile,
-            ],
-            { shell: false },
-          );
+      if (!fs.existsSync(tempFile) || fs.statSync(tempFile).size === 0) {
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'AUDIO_IMPLAUSIBLE_DURATION',
+          message: 'Graba al menos 2 segundos',
+        });
+      }
 
-          let output = '';
-          proc.stdout.on('data', (d) => {
-            output += d.toString();
-          });
+      // Check magic bytes (EBML for WebM, OggS for Ogg, ftyp for MP4)
+      const fd = fs.openSync(tempFile, 'r');
+      const headerBuffer = Buffer.alloc(12);
+      const bytesRead = fs.readSync(fd, headerBuffer, 0, 12, 0);
+      fs.closeSync(fd);
 
-          const timer = setTimeout(() => {
-            proc.kill();
-            reject(new Error('ffprobe timed out after 10s'));
-          }, 10000);
+      if (bytesRead < 4) {
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'AUDIO_IMPLAUSIBLE_DURATION',
+          message: 'Graba al menos 2 segundos',
+        });
+      }
 
-          proc.on('close', (code) => {
-            clearTimeout(timer);
-            if (code === 0) {
-              const parsed = parseFloat(output.trim());
-              if (!isNaN(parsed) && parsed > 0) {
-                resolve(parsed);
-                return;
-              }
-            }
-            reject(new Error(`ffprobe failed with code ${code}`));
-          });
+      const isEbml =
+        headerBuffer[0] === 0x1a &&
+        headerBuffer[1] === 0x45 &&
+        headerBuffer[2] === 0xdf &&
+        headerBuffer[3] === 0xa3;
+      const isOgg =
+        headerBuffer[0] === 0x4f &&
+        headerBuffer[1] === 0x67 &&
+        headerBuffer[2] === 0x67 &&
+        headerBuffer[3] === 0x53;
+      const isFtyp = bytesRead >= 8 && headerBuffer.subarray(4, 8).toString('ascii') === 'ftyp';
 
-          proc.on('error', (err) => {
-            clearTimeout(timer);
-            reject(err);
-          });
+      if (!isEbml && !isOgg && !isFtyp) {
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'AUDIO_IMPLAUSIBLE_DURATION',
+          message: 'Graba al menos 2 segundos',
+        });
+      }
+
+      const duration = await new Promise<number>((resolve, reject) => {
+        const proc = spawn(
+          'ffprobe',
+          [
+            '-v',
+            'error',
+            '-show_entries',
+            'format=duration',
+            '-of',
+            'default=noprint_wrappers=1:nokey=1',
+            tempFile,
+          ],
+          { shell: false },
+        );
+
+        let output = '';
+        let stderr = '';
+        proc.stdout.on('data', (d) => {
+          output += d.toString();
+        });
+        proc.stderr.on('data', (d) => {
+          if (stderr.length < 4096) {
+            stderr += d.toString().slice(0, 4096 - stderr.length);
+          }
         });
 
-        return duration;
-      }
+        let killed = false;
+        let killTimer: NodeJS.Timeout | null = null;
+        const timer = setTimeout(() => {
+          killed = true;
+          try {
+            proc.kill('SIGTERM');
+          } catch {
+            // ignore
+          }
+          killTimer = setTimeout(() => {
+            try {
+              proc.kill('SIGKILL');
+            } catch {
+              // ignore
+            }
+          }, 2000);
+          reject(new Error('ffprobe timed out after 10s'));
+        }, 10000);
+
+        proc.on('close', (code) => {
+          clearTimeout(timer);
+          if (killTimer) clearTimeout(killTimer);
+          if (killed) return;
+          if (code === 0) {
+            const parsed = parseFloat(output.trim());
+            if (!isNaN(parsed) && parsed > 0) {
+              resolve(parsed);
+              return;
+            }
+          }
+          reject(new Error(`ffprobe failed with code ${code}: ${stderr}`));
+        });
+
+        proc.on('error', (err) => {
+          clearTimeout(timer);
+          if (killTimer) clearTimeout(killTimer);
+          reject(err);
+        });
+      });
+
+      return duration;
     } catch (err: unknown) {
+      if (err instanceof PayloadTooLargeException) {
+        throw err;
+      }
       this.logger.warn(
-        `ffprobe no pudo medir duración del asset (${(err as Error)?.message}). Usando fallback de tamaño.`,
+        `ffprobe no pudo medir duración del asset (${(err as Error)?.message}). Rechazando con AUDIO_IMPLAUSIBLE_DURATION`,
       );
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        code: 'AUDIO_IMPLAUSIBLE_DURATION',
+        message: 'Graba al menos 2 segundos',
+      });
     } finally {
       if (fs.existsSync(tempFile)) {
         try {
@@ -686,11 +1071,5 @@ export class MediaService implements OnModuleInit {
         }
       }
     }
-
-    // Fallback based on size if ffprobe is unavailable in current runtime
-    if (sizeBytes < 8000) {
-      return 1.0;
-    }
-    return Math.min(300, Math.max(3, sizeBytes / 8000));
   }
 }

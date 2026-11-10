@@ -104,8 +104,9 @@ Esta especificación define el contrato vinculante de la **Etapa 12 «Calidad y 
 | `1 ⭐` (`0.1 <= score <= 2.9`) | `¡Ya tienes 1 estrella! Cada partida te ayuda a mejorar.` | `¡Sumaste 1 estrella! Repasa las pistas e inténtalo de nuevo.` |
 | `0 ⭐` (`score === 0.0`) | `¡Sigue intentando! Juega otra vez para ganar tu primera estrella.` | `¡No pasa nada! Vuelve a intentarlo para desbloquear tus estrellas.` |
 
-3. **Puntos de juego, tope anti-repetición y desempates del ranking privado (decisión 137):**
+3. **Puntos de juego, tope anti-repetición y desempates del ranking privado (decisión 137, precisada por QA-06 / Decisión 143):**
    - Universo: estudiantes `approved` de la organización (filtrables por `groupId` vigente y `Student.level`) y partidas `type = 'game'` con `status = 'graded'`, `graded_at` dentro de `[from, to]` (por defecto últimos 30 días en `America/Bogota`) y sin `'implausible_duration'` en `Attempt.flags`.
+   - Exclusión total por QA-06 (Decisión 143): toda partida cuyo `Attempt.flags` contenga `'implausible_duration'` queda excluida al 100 % de todas las métricas de fila del ranking (`gamePoints`, `totalStars`, `gamesPlayedCount`, `uniqueGamesPlayed` y `practiceTimeSeconds`). La sección individual «Práctica en juegos» (`gamesPractice`) conserva el desglose diagnóstico con la marca correspondiente.
    - Conversión por partida: `0 ⭐ = 0 pts`, `1 ⭐ = 10 pts`, `2 ⭐ = 25 pts`, `3 ⭐ = 50 pts`.
    - Tope por juego en el periodo: para evitar inflar el ranking repitiendo indefinidamente un único juego elemental, `gamePoints` y `totalStars` del ranking suman como máximo las **5 mejores partidas** (por puntos) de cada estudiante por `activity_id` dentro de `[from, to]`. En «Práctica en juegos» (`gamesPractice`) se contabilizan **todas** las partidas `1..N` y todo su tiempo recortado (`LEAST(finished_at - started_at, expected_duration_seconds * 3)`).
    - Orden determinista: `1)` `gamePoints DESC`, `2)` `totalStars DESC`, `3)` `uniqueGamesPlayed DESC`, `4)` `practiceTimeSeconds DESC`, `5)` `studentName ASC` (`es-CO`), `6)` `studentId ASC`.
@@ -127,10 +128,10 @@ Todos los endpoints viven bajo `/api/v1`, filtran por `organization_id` y respon
 | Método y ruta | Rol | Entrada (`DTO` / query) | Respuesta exitosa | Códigos de error `code` relevantes |
 | --- | --- | --- | --- | --- |
 | `GET /api/v1/me/games` | `student` | Sin paginación truncada | `200 { items: StudentGameItem[] }` (`activityId`, `title`, `description`, `level`, `mechanic`, `expectedDurationSeconds`, `attemptsCount`, `bestStars`, `lastStars`, `lastPlayedAt`, `inProgressAttemptId`; nunca `score`) | `401 AUTH_UNAUTHORIZED`, `403 AUTH_FORBIDDEN`, `409 ACTIVITY_NOT_AVAILABLE` (`flags.games = false`) |
-| `POST /api/v1/activities/:id/attempts` | `student` | Parámetro UUID `id` | `201` con intento `in_progress` (`assignmentId: null`, `activityId: id`, `attemptNumber`, `publicConfig` vía `toPublicConfig()`) + `x-attempt-token` (`typ: 'attempt'`) | `404 ACTIVITY_NOT_FOUND`, `409 ACTIVITY_NOT_AVAILABLE`, `409 ATTEMPT_ALREADY_EXISTS` |
+| `POST /api/v1/activities/:id/attempts` | `student` | Parámetro UUID `id` | `201` con intento `in_progress` (`assignmentId: null`, `activityId: id`, `attemptNumber`, `publicConfig` vía `toPublicConfig()`) + `x-attempt-token` (`typ: 'attempt'`); elimina o descarta intentos `in_progress` previos para permitir reinicios limpios («Jugar de nuevo») | `404 ACTIVITY_NOT_FOUND`, `409 ACTIVITY_NOT_AVAILABLE` |
 | `POST /api/v1/assignments` | `teacher` | `CreateAssignmentDto` | `201` asignaciones creadas para tipos asignables | Añade `422 GAME_ASSIGNMENT_NOT_ALLOWED` si `activity.type === 'game'` |
 | `PUT /api/v1/students/:id/group` | `teacher` | `{ groupId: UUID, confirmLostRetries?: boolean }` | `200` membresía actualizada | Añade `409 UNCONSUMED_RETRY_WARNING` con `details.affectedActivities: Array<{ assignmentId, activityId, activityTitle, effectiveDueAt }>` |
-| `GET /api/v1/stats/games-leaderboard` | `teacher` | `from?`, `to?`, `groupId?`, `level?` (`A1`..`B2`) | `200 { period: { from, to }, items: Array<{ rank, studentId, studentName, groupId, groupName, level, gamePoints, totalStars, gamesPlayedCount, uniqueGamesPlayed, practiceTimeSeconds, lastPlayedAt }> }` | `401 AUTH_UNAUTHORIZED`, `403 AUTH_FORBIDDEN` (`student`), `400 VALIDATION_ERROR` |
+| `GET /api/v1/stats/games-leaderboard` | `teacher` | `from?`, `to?`, `groupId?`, `level?` (`A1`..`B2`) | `200 { period: { from, to }, items: Array<{ rank, studentId, studentName, groupId, groupName, level, gamePoints, totalStars, gamesPlayedCount, uniqueGamesPlayed, practiceTimeSeconds, lastPlayedAt }> }` (excluye intentos con `implausible_duration` en todas las métricas de fila, QA-06) | `401 AUTH_UNAUTHORIZED`, `403 AUTH_FORBIDDEN` (`student`), `400 VALIDATION_ERROR` |
 | `GET /api/v1/stats/groups/:id` y `GET /api/v1/stats/students/:id` | `teacher` | `from?`, `to?`, `type?`, `level?` | `200`: métricas académicas sin `game` + objeto `gamesPractice` (`totalSessions`, `uniqueGamesPlayed`, `totalPracticeTimeSeconds`, `byMechanic`, `dailySummary`, `weeklySummary`, y en alumno `sessions[]` `1..N` con `stars`, `durationSeconds`, `playedAtBogota`, `implausibleDuration`) | `403 AUTH_FORBIDDEN`, `404 GROUP_NOT_FOUND` / `404 STUDENT_NOT_FOUND` |
 
 ### 5.2. Endurecimiento de contratos existentes
@@ -220,10 +221,10 @@ No existen preguntas abiertas que bloqueen la revisión ni la aprobación de `SP
 - `Q-07` → **Decisión 136:** descarte transaccional de intentos y asignaciones de microjuegos de prueba, sin migrarlos.
 - `Q-08` → **Decisión 137:** ranking privado docente por puntos de juego y sección «Práctica en juegos» separados de las notas académicas.
 
-### 11.2. Propuestas técnicas concretadas en `SPEC-11` que se ratifican al aprobarla (`Propuesto`)
+### 11.2. Propuestas técnicas concretadas en `SPEC-11` ratificadas al aprobarla
 
-1. **Decisión 128 (`CONTEXT §14`, `Propuesto`):** criterio de resolución de discrepancias hacia lo ya decidido y regla de parches en `SPEC-01` a `SPEC-10` (al aprobar `SPEC-11`, `SPEC-08` actualiza los RF listados en §4.5 pasando por `En revisión` según `sdd-process §6`, mientras las demás specs registran alineaciones menores en su §12 conservando `Verificada`).
-2. **Detalles de contrato fijados en §§4–6 (`Propuesto`):** escala `10/25/50` puntos con tope de las 5 mejores partidas por `activity_id` en el periodo y 6 criterios de desempate en `GET /api/v1/stats/games-leaderboard`; campo `confirmLostRetries` y error `409 UNCONSUMED_RETRY_WARNING` en `PUT /api/v1/students/:id/group`; textos motivadores Kids/Teens de §4.2; y restricción `attempts_parent_xor_check` en `Attempt`.
+1. **Decisión 128 (`CONTEXT §14`):** criterio de resolución de discrepancias hacia lo ya decidido y regla de parches en `SPEC-01` a `SPEC-10` (al aprobar `SPEC-11`, `SPEC-08` actualiza los RF listados en §4.5 pasando por `En revisión` según `sdd-process §6`, mientras las demás specs registran alineaciones menores en su §12 conservando `Verificada`).
+2. **Detalles de contrato fijados en §§4–6:** escala `10/25/50` puntos con tope de las 5 mejores partidas por `activity_id` en el periodo y 6 criterios de desempate en `GET /api/v1/stats/games-leaderboard`; campo `confirmLostRetries` y error `409 UNCONSUMED_RETRY_WARNING` en `PUT /api/v1/students/:id/group`; textos motivadores Kids/Teens de §4.2; y restricción `attempts_parent_xor_check` en `Attempt`.
 
 ### 11.3. Parches de alineación previstos sobre specs, documentos y skills en `DOC-09` (se ejecutan tras aprobar `SPEC-11`)
 
@@ -245,6 +246,7 @@ No existen preguntas abiertas que bloqueen la revisión ni la aprobación de `SP
 
 | Fecha | Cambio | Motivo |
 | --- | --- | --- |
-| 2026-11-08 | Verificación completa de SPEC-11 | Implementación de ENG-143, ENG-150 a ENG-162 y DOC-09 verificada con 566 tests en monorepo, 0 errores en guardrails y compuertas de calidad superadas |
+| 2026-11-09 | Alineación de SPEC-11 con auditoría post-spec-11 y decisiones QA-01..QA-08 | Retiro de etiquetas residuales (Propuesto) en §11.2, formalización de exclusión total de implausible_duration en ranking docente (QA-06), endpoint POST /media/:id/confirm (QA-05) y sincronización con remediación de pipeline WP-01 |
+| 2026-11-08 | Verificación inicial de SPEC-11 | Implementación de ENG-143, ENG-150 a ENG-162 y DOC-09 en monorepo (posteriormente auditada el 2026-11-09 evidenciando ajustes necesarios en compuertas de compilación, pipeline y tests) |
 | 2026-11-08 | Aprobación de SPEC-11 por el líder del proyecto | Se cierra la revisión de la especificación y se habilita la implementación de la Etapa 12 |
 | 2026-11-08 | Redacción inicial de `SPEC-11` en estado `Borrador` | Formalizar los requisitos, contratos, modelo de datos, matriz de regresión y consideraciones previas de la Etapa 12 a partir de `AUDITORIA.md`, `testing-issues/` y las decisiones 127 a 137 de `CONTEXT §14` |

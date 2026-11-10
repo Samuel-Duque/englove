@@ -68,7 +68,7 @@ export class JwtAuthGuard implements CanActivate {
         secret: this.jwtSecret,
       });
 
-      if (payload.typ && payload.typ !== 'access') {
+      if (payload.typ !== 'access') {
         throw new UnauthorizedException({
           statusCode: 401,
           code: 'AUTH_UNAUTHORIZED',
@@ -79,6 +79,7 @@ export class JwtAuthGuard implements CanActivate {
       // Query session by sid to ensure session is active and not revoked (Decision 68)
       const session = await this.prisma.authSession.findFirst({
         where: { id: payload.sid, organization_id: payload.org },
+        include: { user: { select: { id: true, locked_until: true } } },
       });
 
       if (!session || session.revoked_at !== null || session.expires_at <= new Date()) {
@@ -94,6 +95,23 @@ export class JwtAuthGuard implements CanActivate {
           statusCode: 401,
           code: 'AUTH_UNAUTHORIZED',
           message: 'Tu sesión terminó. Inicia sesión de nuevo',
+        });
+      }
+
+      // Check user locked_until to sever active sessions for locked accounts (P1-12)
+      let lockedUntil = (session as { user?: { locked_until?: Date | null } }).user?.locked_until;
+      if (lockedUntil === undefined && this.prisma.user) {
+        const u = await this.prisma.user.findFirst({
+          where: { id: payload.sub, organization_id: payload.org },
+          select: { locked_until: true },
+        });
+        lockedUntil = u?.locked_until;
+      }
+      if (lockedUntil && lockedUntil > new Date()) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'Tu cuenta se encuentra bloqueada temporalmente',
         });
       }
 
@@ -134,7 +152,7 @@ export class JwtAuthGuard implements CanActivate {
       if (isPublic) {
         return true;
       }
-      if (err instanceof ForbiddenException) {
+      if (err instanceof ForbiddenException || err instanceof UnauthorizedException) {
         throw err;
       }
       throw new UnauthorizedException({

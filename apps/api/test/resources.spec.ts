@@ -63,7 +63,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
       student: {
         findFirst: vi.fn(),
       },
-      $transaction: vi.fn(async (actions) => Promise.all(actions)),
+      $transaction: vi.fn(async (arg) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg))),
     };
 
     mockFeatureFlags = {

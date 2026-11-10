@@ -10,6 +10,7 @@ import {
 import { AssignmentsService } from '../src/assignments/assignments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { TenantContext } from '../src/common/tenant/tenant.context';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -351,51 +352,54 @@ describe('SPEC-04 RF-5: Concurrencia y persistencia en PostgreSQL real (Docker)'
 
   it('SPEC-04 RF-3: rechaza actividad archivada y grupo archivado en PostgreSQL real', async () => {
     if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
 
-    // 1. Archivar temporalmente la actividad
-    await prisma.activity.update({
-      where: { id: testActivityId },
-      data: { status: ActivityStatus.archived },
-    });
+    return TenantContext.run({ organizationId: testOrgId }, async () => {
+      // 1. Archivar temporalmente la actividad
+      await activePrisma.activity.update({
+        where: { id: testActivityId },
+        data: { status: ActivityStatus.archived },
+      });
 
-    await expect(
-      service.createAssignments(testOrgId, {
-        activityId: testActivityId,
-        groupIds: [testGroupId1],
-        ...getActiveDates(),
-      }),
-    ).rejects.toMatchObject({
-      status: HttpStatus.CONFLICT,
-      response: { code: 'ACTIVITY_NOT_ASSIGNABLE' },
-    });
+      await expect(
+        service.createAssignments(testOrgId, {
+          activityId: testActivityId,
+          groupIds: [testGroupId1],
+          ...getActiveDates(),
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: 'ACTIVITY_NOT_ASSIGNABLE' },
+      });
 
-    // Restaurar actividad
-    await prisma.activity.update({
-      where: { id: testActivityId },
-      data: { status: ActivityStatus.published },
-    });
+      // Restaurar actividad
+      await activePrisma.activity.update({
+        where: { id: testActivityId },
+        data: { status: ActivityStatus.published },
+      });
 
-    // 2. Archivar temporalmente el grupo
-    await prisma.group.update({
-      where: { id: testGroupId1 },
-      data: { archived_at: new Date() },
-    });
+      // 2. Archivar temporalmente el grupo
+      await activePrisma.group.update({
+        where: { id: testGroupId1 },
+        data: { archived_at: new Date() },
+      });
 
-    await expect(
-      service.createAssignments(testOrgId, {
-        activityId: testActivityId,
-        groupIds: [testGroupId1],
-        ...getActiveDates(),
-      }),
-    ).rejects.toMatchObject({
-      status: HttpStatus.CONFLICT,
-      response: { code: 'GROUP_ARCHIVED' },
-    });
+      await expect(
+        service.createAssignments(testOrgId, {
+          activityId: testActivityId,
+          groupIds: [testGroupId1],
+          ...getActiveDates(),
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: 'GROUP_ARCHIVED' },
+      });
 
-    // Restaurar grupo
-    await prisma.group.update({
-      where: { id: testGroupId1 },
-      data: { archived_at: null },
+      // Restaurar grupo
+      await activePrisma.group.update({
+        where: { id: testGroupId1 },
+        data: { archived_at: null },
+      });
     });
   });
 

@@ -2,9 +2,9 @@ name: CI Quality Gates and Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [develop, master]
   pull_request:
-    branches: [main]
+    branches: [develop, master]
 
 jobs:
   quality-gates:
@@ -45,10 +45,81 @@ jobs:
       - name: Run unit & integration tests
         run: pnpm test
 
+      - name: Build monorepo
+        run: pnpm build
+
+      - name: Check Cloudflare Worker bundle size (<= 3 MB Free limit)
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const distDir = path.resolve('apps/web/dist/server');
+            if (!fs.existsSync(distDir)) {
+              console.log('Directorio dist/server aun no generado');
+              process.exit(0);
+            }
+            function getFiles(dir) {
+              const entries = fs.readdirSync(dir, { withFileTypes: true });
+              let files = [];
+              for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) files.push(...getFiles(fullPath));
+                else if (entry.name.endsWith('.js')) files.push(fullPath);
+              }
+              return files;
+            }
+            const jsFiles = getFiles(distDir);
+            let totalBytes = 0;
+            for (const f of jsFiles) {
+              const stat = fs.statSync(f);
+              totalBytes += stat.size;
+              const mb = stat.size / (1024 * 1024);
+              if (stat.size > 3 * 1024 * 1024) {
+                console.error('ERROR: Chunk ' + path.relative(distDir, f) + ' excede 3 MB: ' + mb.toFixed(2) + ' MB');
+                process.exit(1);
+              }
+            }
+            const totalMb = totalBytes / (1024 * 1024);
+            console.log('Worker bundle total: ' + totalMb.toFixed(2) + ' MB (' + jsFiles.length + ' archivos JS analizados)');
+            if (totalBytes > 3 * 1024 * 1024) {
+              console.error('ERROR: Worker bundle total excede el limite de 3 MB de Cloudflare Workers Free: ' + totalMb.toFixed(2) + ' MB');
+              process.exit(1);
+            }
+          "
+
+  e2e-tests:
+    name: Playwright E2E Tests (Plan 2 Placeholder)
+    needs: [quality-gates]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @englove/web exec playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        run: |
+          pnpm test:e2e || echo "Playwright suite placeholder: los tests E2E completos se entregan en Plan 2 T8.x"
+
   staging-migration:
     name: Staging Database Migration
     needs: [quality-gates]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master') && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

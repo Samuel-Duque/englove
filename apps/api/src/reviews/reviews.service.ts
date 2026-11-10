@@ -344,12 +344,29 @@ export class ReviewsService {
     }
     const answers = { ...rawAnswers };
 
-    // If open_question, bridge answers['text'] with answers[act.id]
+    // If open_question, bridge answers['text'] with answers[act.id] and answers[item.id] ONLY for single-item activity (P1-07, RFC-01)
     if (act.type === ActivityType.open_question) {
-      if (answers['text'] !== undefined && answers[act.id] === undefined) {
-        answers[act.id] = answers['text'];
-      } else if (answers[act.id] !== undefined && answers['text'] === undefined) {
-        answers['text'] = answers[act.id];
+      const config = act.open_question_detail?.config as { items?: Array<{ id: string }> } | undefined;
+      const isMultiItem = Array.isArray(config?.items) && config.items.length > 1;
+      if (!isMultiItem) {
+        const singleItemId =
+          Array.isArray(config?.items) && config.items.length === 1 && config.items[0]?.id
+            ? config.items[0].id
+            : act.id;
+
+        if (answers['text'] !== undefined && answers[singleItemId] === undefined) {
+          answers[singleItemId] = answers['text'];
+        } else if (answers[singleItemId] !== undefined && answers['text'] === undefined) {
+          answers['text'] = answers[singleItemId];
+        }
+
+        if (singleItemId !== act.id) {
+          if (answers['text'] !== undefined && answers[act.id] === undefined) {
+            answers[act.id] = answers['text'];
+          } else if (answers[act.id] !== undefined && answers['text'] === undefined) {
+            answers['text'] = answers[act.id];
+          }
+        }
       }
     }
 
@@ -514,16 +531,34 @@ export class ReviewsService {
           },
         });
 
-        // Create review
-        await tx.review.create({
-          data: {
-            organization_id: organizationId,
-            attempt_id: attempt.id,
-            reviewer_id: reviewerId,
-            comment: rawComment.length > 0 ? rawComment : null,
-            stickers,
-          },
-        });
+        // Create or update review atomically (P1-06)
+        const existingReview = tx.review?.findFirst
+          ? await tx.review.findFirst({
+              where: { attempt_id: attempt.id, organization_id: organizationId },
+            })
+          : attempt.review;
+
+        if (existingReview) {
+          const reviewTarget = tx.review ?? this.prisma.review;
+          await reviewTarget.update({
+            where: { id: existingReview.id },
+            data: {
+              reviewer_id: reviewerId,
+              comment: rawComment.length > 0 ? rawComment : null,
+              stickers,
+            },
+          });
+        } else {
+          await tx.review.create({
+            data: {
+              organization_id: organizationId,
+              attempt_id: attempt.id,
+              reviewer_id: reviewerId,
+              comment: rawComment.length > 0 ? rawComment : null,
+              stickers,
+            },
+          });
+        }
 
         // Set retention_until on ready MediaAssets
         await tx.mediaAsset.updateMany({
@@ -537,16 +572,18 @@ export class ReviewsService {
           },
         });
 
-        // Create progress event (review_received)
-        await tx.progressEvent.create({
-          data: {
-            organization_id: organizationId,
-            student_id: attempt.student_id,
-            attempt_id: attempt.id,
-            type: ProgressEventType.review_received,
-            value: new Prisma.Decimal(roundedScore),
-          },
-        });
+        // Create progress event (review_received) only once
+        if (!existingReview) {
+          await tx.progressEvent.create({
+            data: {
+              organization_id: organizationId,
+              student_id: attempt.student_id,
+              attempt_id: attempt.id,
+              type: ProgressEventType.review_received,
+              value: new Prisma.Decimal(roundedScore),
+            },
+          });
+        }
 
         if (dto.allowRetry) {
           await this.applyGrantRetryTx(
@@ -593,12 +630,28 @@ export class ReviewsService {
         }
       }
 
-      isFirstReview = !attempt.review;
-
       await this.prisma.$transaction(async (tx) => {
-        if (attempt.review) {
-          await tx.review.update({
-            where: { id: attempt.review.id },
+        if (typeof tx.$queryRaw === 'function') {
+          await tx.$queryRaw`
+            SELECT id
+            FROM attempts
+            WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+            FOR UPDATE
+          `;
+        }
+
+        const existingReview = tx.review?.findFirst
+          ? await tx.review.findFirst({
+              where: { attempt_id: attempt.id, organization_id: organizationId },
+            })
+          : attempt.review;
+
+        isFirstReview = !existingReview;
+
+        if (existingReview) {
+          const reviewTarget = tx.review ?? this.prisma.review;
+          await reviewTarget.update({
+            where: { id: existingReview.id },
             data: {
               reviewer_id: reviewerId,
               comment: rawComment.length > 0 ? rawComment : null,

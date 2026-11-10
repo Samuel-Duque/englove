@@ -22,7 +22,18 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     expect(env.COOKIE_PREFIX).toBe('englove_');
   });
 
-  it('requires RESEND_API_KEY and secure JWT_SECRET in staging or production (SEC-01, RF-02)', () => {
+  it('requires RESEND_API_KEY, COOKIE_DOMAIN, and secure JWT_SECRET in staging or production (SEC-01, RF-02)', () => {
+    const stagingConfigWithoutCookieDomain = {
+      ...baseValidLocalConfig,
+      APP_ENV: 'staging',
+      RESEND_API_KEY: 're_test_key_placeholder',
+      JWT_SECRET: 'a-secure-production-jwt-secret-min-32-chars!',
+    };
+
+    expect(() => validateEnvironment(stagingConfigWithoutCookieDomain)).toThrowError(
+      /Configuración de entorno inválida para staging\. Variables faltantes o inseguras:.*COOKIE_DOMAIN/,
+    );
+
     const stagingConfig = {
       ...baseValidLocalConfig,
       APP_ENV: 'staging',
@@ -40,6 +51,7 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     };
     const env = validateEnvironment(validStagingConfig);
     expect(env.APP_ENV).toBe(AppEnv.staging);
+    expect(env.COOKIE_DOMAIN).toBe('.englove.org');
     expect(env.JWT_SECRET).toBe('a-secure-production-jwt-secret-min-32-chars!');
   });
 

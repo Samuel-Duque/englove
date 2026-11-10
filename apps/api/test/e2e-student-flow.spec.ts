@@ -19,6 +19,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException } from '@nestjs/common';
+import { TenantContext } from '../src/common/tenant/tenant.context';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -189,42 +190,47 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
       });
 
       // Teacher creates and publishes fill_blank activity
-      const parsed = parseFillBlankSimpleSyntax('The cat is [sleeping|barking]');
-      blankId = parsed.blanks[0]!.id;
-      // In parseFillBlankSimpleSyntax, the first option is the correct one
-      correctOptionId = parsed.answerKey[blankId]!;
+      await TenantContext.run(
+        { organizationId: orgId, userId: teacherId, role: Role.teacher },
+        async () => {
+          const parsed = parseFillBlankSimpleSyntax('The cat is [sleeping|barking]');
+          blankId = parsed.blanks[0]!.id;
+          // In parseFillBlankSimpleSyntax, the first option is the correct one
+          correctOptionId = parsed.answerKey[blankId]!;
 
-      const createdActivity = await activitiesService.createActivity(orgId, teacherId, {
-        title: 'Fill Blank E2E Student Flow',
-        type: ActivityType.fill_blank,
-        level: Level.A1,
-        config: {
-          items: [
-            {
-              id: itemId,
-              prompt: parsed.prompt,
-              blanks: parsed.blanks,
+          const createdActivity = await activitiesService.createActivity(orgId, teacherId, {
+            title: 'Fill Blank E2E Student Flow',
+            type: ActivityType.fill_blank,
+            level: Level.A1,
+            config: {
+              items: [
+                {
+                  id: itemId,
+                  prompt: parsed.prompt,
+                  blanks: parsed.blanks,
+                },
+              ],
             },
-          ],
-        },
-        answerKey: {
-          items: {
-            [itemId]: parsed.answerKey,
-          },
-        },
-      });
-      activityId = createdActivity.id;
+            answerKey: {
+              items: {
+                [itemId]: parsed.answerKey,
+              },
+            },
+          });
+          activityId = createdActivity.id;
 
-      await activitiesService.publishActivity(orgId, activityId);
+          await activitiesService.publishActivity(orgId, activityId);
 
-      // Teacher assigns activity to group (active now)
-      const assignResult = await assignmentsService.createAssignments(orgId, {
-        activityId,
-        groupIds: [groupId],
-        opensAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        dueAt: new Date(Date.now() + 86400000).toISOString(), // in 24 hours
-      });
-      assignmentId = assignResult.items[0]!.id;
+          // Teacher assigns activity to group (active now)
+          const assignResult = await assignmentsService.createAssignments(orgId, {
+            activityId,
+            groupIds: [groupId],
+            opensAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+            dueAt: new Date(Date.now() + 86400000).toISOString(), // in 24 hours
+          });
+          assignmentId = assignResult.items[0]!.id;
+        },
+      );
     } catch (err: unknown) {
       console.warn('Error inicializando PostgreSQL para E2E student flow:', err);
       isPostgresAvailable = false;
@@ -258,194 +264,227 @@ describe('SPEC-05 RF-30: Flujo de intento del alumno en PostgreSQL real (ENG-072
 
   it('Paso 1: Alumno inicia intento válidamente (RF-3)', async () => {
     if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
 
-    const result = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const result = await attemptsService.startAttempt(orgId, studentId, assignmentId);
 
-    expect(result.attempt).toBeDefined();
-    expect(result.attempt.status).toBe(AttemptStatus.in_progress);
-    expect(result.attempt.attemptNumber).toBe(1);
-    expect(result.attemptToken).toBeTruthy();
-    if (!result.attemptToken) {
-      throw new Error('attemptToken should be defined');
-    }
+        expect(result.attempt).toBeDefined();
+        expect(result.attempt.status).toBe(AttemptStatus.in_progress);
+        expect(result.attempt.attemptNumber).toBe(1);
+        expect(result.attemptToken).toBeTruthy();
+        if (!result.attemptToken) {
+          throw new Error('attemptToken should be defined');
+        }
 
-    attemptId = result.attempt.id;
-    attemptToken = result.attemptToken;
+        attemptId = result.attempt.id;
+        attemptToken = result.attemptToken;
 
-    // Verificar persistencia en base de datos real
-    const dbAttempt = await prisma.attempt.findFirst({
-      where: { organization_id: orgId, id: attemptId },
-    });
-    expect(dbAttempt).not.toBeNull();
-    expect(dbAttempt?.status).toBe('in_progress');
-    expect(dbAttempt?.student_id).toBe(studentId);
+        // Verificar persistencia en base de datos real
+        const dbAttempt = await activePrisma.attempt.findFirst({
+          where: { organization_id: orgId, id: attemptId },
+        });
+        expect(dbAttempt).not.toBeNull();
+        expect(dbAttempt?.status).toBe('in_progress');
+        expect(dbAttempt?.student_id).toBe(studentId);
+      },
+    );
   });
 
   it('Paso 2: Alumno envía eventos de respuesta con clientEventId idempotente (RF-7)', async () => {
     if (!isPostgresAvailable || !prisma) return;
 
-    const clientEventId1 = 'e2e-student-event-001';
-    const submitResult = await attemptsService.submitEvents(
-      orgId,
-      studentId,
-      attemptId,
-      attemptToken,
-      {
-        events: [
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const clientEventId1 = 'e2e-student-event-001';
+        const submitResult = await attemptsService.submitEvents(
+          orgId,
+          studentId,
+          attemptId,
+          attemptToken,
           {
-            clientEventId: clientEventId1,
-            itemId,
-            answer: {
-              [blankId]: correctOptionId,
-            },
+            events: [
+              {
+                clientEventId: clientEventId1,
+                itemId,
+                answer: {
+                  [blankId]: correctOptionId,
+                },
+              },
+            ],
           },
-        ],
+        );
+
+        expect(submitResult.acceptedEventIds).toContain(clientEventId1);
+
+        // Reenvío idempotente del mismo clientEventId no genera duplicados
+        const resubmitResult = await attemptsService.submitEvents(
+          orgId,
+          studentId,
+          attemptId,
+          attemptToken,
+          {
+            events: [
+              {
+                clientEventId: clientEventId1,
+                itemId,
+                answer: {
+                  [blankId]: correctOptionId,
+                },
+              },
+            ],
+          },
+        );
+        expect(resubmitResult.acceptedEventIds).toContain(clientEventId1);
       },
     );
-
-    expect(submitResult.acceptedEventIds).toContain(clientEventId1);
-
-    // Reenvío idempotente del mismo clientEventId no genera duplicados
-    const resubmitResult = await attemptsService.submitEvents(
-      orgId,
-      studentId,
-      attemptId,
-      attemptToken,
-      {
-        events: [
-          {
-            clientEventId: clientEventId1,
-            itemId,
-            answer: {
-              [blankId]: correctOptionId,
-            },
-          },
-        ],
-      },
-    );
-    expect(resubmitResult.acceptedEventIds).toContain(clientEventId1);
   });
 
   it('Paso 3: Alumno finaliza entrega, se autocalifica en servidor y registra eventos (RF-8, RF-9, RF-16)', async () => {
     if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
 
-    const completion = await attemptsService.completeAttempt(
-      orgId,
-      studentId,
-      attemptId,
-      attemptToken,
-      {},
-    );
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const completion = await attemptsService.completeAttempt(
+          orgId,
+          studentId,
+          attemptId,
+          attemptToken,
+          {},
+        );
 
-    expect(completion.attempt.status).toBe(AttemptStatus.graded);
-    expect(Number(completion.attempt.score)).toBe(5.0);
-    expect(completion.attempt.gradedAt).toBeDefined();
-    expect(completion.correction).toBeDefined();
-    const correctionMap = completion.correction as Record<string, Record<string, { correct: boolean }>>;
-    expect(correctionMap[itemId]?.[blankId]?.correct).toBe(true);
+        expect(completion.attempt.status).toBe(AttemptStatus.graded);
+        expect(Number(completion.attempt.score)).toBe(5.0);
+        expect(completion.attempt.gradedAt).toBeDefined();
+        expect(completion.correction).toBeDefined();
+        const correctionMap = completion.correction as Record<string, Record<string, { correct: boolean }>>;
+        expect(correctionMap[itemId]?.[blankId]?.correct).toBe(true);
 
-    // Verificar en PostgreSQL real
-    const dbAttempt = await prisma.attempt.findFirst({
-      where: { organization_id: orgId, id: attemptId },
-    });
-    expect(dbAttempt?.status).toBe('graded');
-    expect(Number(dbAttempt?.score)).toBe(5.0);
-    expect(dbAttempt?.finished_at).not.toBeNull();
-    expect(dbAttempt?.graded_at).not.toBeNull();
+        // Verificar en PostgreSQL real
+        const dbAttempt = await activePrisma.attempt.findFirst({
+          where: { organization_id: orgId, id: attemptId },
+        });
+        expect(dbAttempt?.status).toBe('graded');
+        expect(Number(dbAttempt?.score)).toBe(5.0);
+        expect(dbAttempt?.finished_at).not.toBeNull();
+        expect(dbAttempt?.graded_at).not.toBeNull();
 
-    // Verificar emisión de ProgressEvent
-    const progressEvents = await prisma.progressEvent.findMany({
-      where: {
-        organization_id: orgId,
-        student_id: studentId,
-        attempt_id: attemptId,
+        // Verificar emisión de ProgressEvent
+        const progressEvents = await activePrisma.progressEvent.findMany({
+          where: {
+            organization_id: orgId,
+            student_id: studentId,
+            attempt_id: attemptId,
+          },
+        });
+        expect(progressEvents.length).toBeGreaterThanOrEqual(1);
+        const completedEvent = progressEvents.find(
+          (e) => e.type === ProgressEventType.attempt_completed,
+        );
+        expect(completedEvent).toBeDefined();
+        expect(Number(completedEvent?.value)).toBe(5.0);
       },
-    });
-    expect(progressEvents.length).toBeGreaterThanOrEqual(1);
-    const completedEvent = progressEvents.find(
-      (e) => e.type === ProgressEventType.attempt_completed,
     );
-    expect(completedEvent).toBeDefined();
-    expect(Number(completedEvent?.value)).toBe(5.0);
   });
 
   it('Paso 4: Consulta de progreso propio refleja estrellas y racha actualizada (RF-22)', async () => {
     if (!isPostgresAvailable || !prisma) return;
 
-    const progress = await attemptsService.getStudentProgress(orgId, studentId);
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const progress = await attemptsService.getStudentProgress(orgId, studentId);
 
-    expect(progress.activities.length).toBe(1);
-    expect(progress.activities[0]?.score).toBe(5.0);
-    expect(progress.activities[0]?.stars).toBe(3); // 5.0 score -> 3 stars (Decision 101)
-    expect(progress.streak.weeks).toBeGreaterThanOrEqual(1);
-    expect(progress.streak.forgivenessAvailable).toBe(true);
+        expect(progress.activities.length).toBe(1);
+        expect(progress.activities[0]?.score).toBe(5.0);
+        expect(progress.activities[0]?.stars).toBe(3); // 5.0 score -> 3 stars (Decision 101)
+        expect(progress.streak.weeks).toBeGreaterThanOrEqual(1);
+        expect(progress.streak.forgivenessAvailable).toBe(true);
+      },
+    );
   });
 
   it('Paso 5: Concurrencia real en PostgreSQL garantiza exactamente 1 intento creado y 1 conflicto 409 (RF-3, RF-4)', async () => {
     if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
 
-    // Crear una segunda actividad publicada para tener una nueva asignación activa en el grupo
-    const parsed2 = parseFillBlankSimpleSyntax('The dog is [running|walking]');
-    const itemId2 = 'e2e77777-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-    const activity2 = await activitiesService.createActivity(orgId, teacherId, {
-      title: 'Fill Blank E2E Concurrent Attempt',
-      type: ActivityType.fill_blank,
-      level: Level.A1,
-      config: {
-        items: [
-          {
-            id: itemId2,
-            prompt: parsed2.prompt,
-            blanks: parsed2.blanks,
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        // Crear una segunda actividad publicada para tener una nueva asignación activa en el grupo
+        const parsed2 = parseFillBlankSimpleSyntax('The dog is [running|walking]');
+        const itemId2 = 'e2e77777-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const activity2 = await activitiesService.createActivity(orgId, teacherId, {
+          title: 'Fill Blank E2E Concurrent Attempt',
+          type: ActivityType.fill_blank,
+          level: Level.A1,
+          config: {
+            items: [
+              {
+                id: itemId2,
+                prompt: parsed2.prompt,
+                blanks: parsed2.blanks,
+              },
+            ],
           },
-        ],
+          answerKey: {
+            items: {
+              [itemId2]: parsed2.answerKey,
+            },
+          },
+        });
+        await activitiesService.publishActivity(orgId, activity2.id);
+
+        // Crear una segunda asignación para probar concurrencia de inicio
+        const assignResult2 = await assignmentsService.createAssignments(orgId, {
+          activityId: activity2.id,
+          groupIds: [groupId],
+          opensAt: new Date(Date.now() - 3600000).toISOString(),
+          dueAt: new Date(Date.now() + 86400000).toISOString(),
+        });
+        const concurrentAssignmentId = assignResult2.items[0]!.id;
+
+        await TenantContext.run(
+          { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+          async () => {
+            // Ejecutar dos startAttempt en paralelo inmediato contra PostgreSQL real
+            const results = await Promise.allSettled([
+              attemptsService.startAttempt(orgId, studentId, concurrentAssignmentId),
+              attemptsService.startAttempt(orgId, studentId, concurrentAssignmentId),
+            ]);
+
+            const fulfilled = results.filter((r) => r.status === 'fulfilled');
+            const rejected = results.filter((r) => r.status === 'rejected');
+
+            expect(fulfilled.length).toBe(1);
+            expect(rejected.length).toBe(1);
+
+            const error = (rejected[0] as PromiseRejectedResult).reason;
+            expect(error).toBeInstanceOf(ConflictException);
+            expect(error.getResponse()).toEqual(
+              expect.objectContaining({
+                statusCode: 409,
+                code: 'ATTEMPT_ALREADY_EXISTS',
+              }),
+            );
+
+            // Verificar en DB que solo existe 1 registro
+            const attemptsInDb = await activePrisma.attempt.findMany({
+              where: {
+                organization_id: orgId,
+                student_id: studentId,
+                assignment_id: concurrentAssignmentId,
+              },
+            });
+            expect(attemptsInDb.length).toBe(1);
+          },
+        );
       },
-      answerKey: {
-        items: {
-          [itemId2]: parsed2.answerKey,
-        },
-      },
-    });
-    await activitiesService.publishActivity(orgId, activity2.id);
-
-    // Crear una segunda asignación para probar concurrencia de inicio
-    const assignResult2 = await assignmentsService.createAssignments(orgId, {
-      activityId: activity2.id,
-      groupIds: [groupId],
-      opensAt: new Date(Date.now() - 3600000).toISOString(),
-      dueAt: new Date(Date.now() + 86400000).toISOString(),
-    });
-    const concurrentAssignmentId = assignResult2.items[0]!.id;
-
-    // Ejecutar dos startAttempt en paralelo inmediato contra PostgreSQL real
-    const results = await Promise.allSettled([
-      attemptsService.startAttempt(orgId, studentId, concurrentAssignmentId),
-      attemptsService.startAttempt(orgId, studentId, concurrentAssignmentId),
-    ]);
-
-    const fulfilled = results.filter((r) => r.status === 'fulfilled');
-    const rejected = results.filter((r) => r.status === 'rejected');
-
-    expect(fulfilled.length).toBe(1);
-    expect(rejected.length).toBe(1);
-
-    const error = (rejected[0] as PromiseRejectedResult).reason;
-    expect(error).toBeInstanceOf(ConflictException);
-    expect(error.getResponse()).toEqual(
-      expect.objectContaining({
-        statusCode: 409,
-        code: 'ATTEMPT_ALREADY_EXISTS',
-      }),
     );
-
-    // Verificar en DB que solo existe 1 registro
-    const attemptsInDb = await prisma.attempt.findMany({
-      where: {
-        organization_id: orgId,
-        student_id: studentId,
-        assignment_id: concurrentAssignmentId,
-      },
-    });
-    expect(attemptsInDb.length).toBe(1);
   });
 });

@@ -105,7 +105,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     statsService = new StatsService(prisma, gamificationService);
 
     const configService = new ConfigService({ APP_ENV: 'local' });
-    const pendingSummaryService = new PendingSummaryService(prisma);
+    const pendingSummaryService = new PendingSummaryService(prisma, {} as any);
     const mailService = new MailService(configService);
     maintenanceService = new MaintenanceService(
       prisma,
@@ -638,7 +638,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
 
     // Set student3 to pending_approval so there is a pending registration for teacher_pending_summary (SPEC-11 RF-12)
     await prisma.student.update({
-      where: { id: student3Id },
+      where: { id: student3Id, organization_id: orgId } as unknown as Prisma.StudentWhereUniqueInput,
       data: { approval_status: ApprovalStatus.pending_approval },
     });
 
@@ -671,7 +671,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
 
     // Restore student3 to approved for subsequent steps
     await prisma.student.update({
-      where: { id: student3Id },
+      where: { id: student3Id, organization_id: orgId } as unknown as Prisma.StudentWhereUniqueInput,
       data: { approval_status: ApprovalStatus.approved },
     });
   });
@@ -688,7 +688,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
 
     const transferDate = new Date();
     await prisma.groupMembership.update({
-      where: { id: m2!.id },
+      where: { id: m2!.id, organization_id: orgId } as unknown as Prisma.GroupMembershipWhereUniqueInput,
       data: { left_at: transferDate },
     });
 

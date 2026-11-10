@@ -116,6 +116,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
         attemptId,
         studentId,
         organizationId: orgId,
+        typ: 'attempt',
       });
 
       await expect(
@@ -165,7 +166,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
         {} as FeatureFlagsService,
       );
 
-      const authenticToken = jwtService.sign({ attemptId, studentId, organizationId: orgId });
+      const authenticToken = jwtService.sign({ attemptId, studentId, organizationId: orgId, typ: 'attempt' });
 
       await expect(
         attemptsService.submitEvents(orgId, studentId, attemptId, authenticToken, {
@@ -219,6 +220,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
         attemptId,
         studentId,
         organizationId: orgId,
+        typ: 'attempt',
       });
 
       await expect(
@@ -265,7 +267,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
         {} as FeatureFlagsService,
       );
 
-      const authenticToken = jwtService.sign({ attemptId, studentId, organizationId: orgId });
+      const authenticToken = jwtService.sign({ attemptId, studentId, organizationId: orgId, typ: 'attempt' });
 
       await expect(
         attemptsService.completeAttempt(orgId, studentId, attemptId, authenticToken, {}),

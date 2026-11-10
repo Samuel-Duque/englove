@@ -151,12 +151,14 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         student: null,
       });
 
-      // Verify httpOnly cookies were set
-      expect(res.cookie).toHaveBeenCalledTimes(2);
+      // Verify session cookies were set (access, refresh, session_hint per QA-02)
+      expect(res.cookie).toHaveBeenCalledTimes(3);
       expect(res.cookies['englove_access_token']?.options.httpOnly).toBe(true);
       expect(res.cookies['englove_access_token']?.options.path).toBe('/');
       expect(res.cookies['englove_refresh_token']?.options.httpOnly).toBe(true);
-      expect(res.cookies['englove_refresh_token']?.options.path).toBe('/api/v1/auth/refresh');
+      expect(res.cookies['englove_refresh_token']?.options.path).toBe('/api/v1/auth');
+      expect(res.cookies['englove_session_hint']?.options.httpOnly).toBe(false);
+      expect(res.cookies['englove_session_hint']?.options.path).toBe('/');
     });
 
     it('devuelve respuesta uniforme 401 AUTH_INVALID_CREDENTIALS ante correo inexistente o contraseña errónea', async () => {
@@ -350,7 +352,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
           }),
         }),
       );
-      expect(res.cookie).toHaveBeenCalledTimes(2);
+      expect(res.cookie).toHaveBeenCalledTimes(3);
     });
 
     it('revoca la familia de sesión completa si se detecta reuso de token rotado', async () => {
@@ -1454,7 +1456,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
     it('JwtAuthGuard bloquea JWT sintético de estudiante sin student_id cuando el alumno no está aprobado', async () => {
       // Synthetic token without student_id in payload
       const token = jwtService.sign(
-        { sub: studentUserId, email: 'carlos@student.edu', role: Role.student, org: orgId, sid: sessionId },
+        { sub: studentUserId, email: 'carlos@student.edu', role: Role.student, org: orgId, sid: sessionId, typ: 'access' },
         { secret: JWT_SECRET },
       );
 

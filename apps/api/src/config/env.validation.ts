@@ -64,6 +64,9 @@ export function validateEnvironment(config: Record<string, unknown>): ValidatedE
   // Staging and production require RESEND_API_KEY, non-empty COOKIE_DOMAIN, and a non-dev JWT_SECRET (SEC-01, RF-02)
   if (env.APP_ENV === AppEnv.staging || env.APP_ENV === AppEnv.production) {
     const extraMissing: string[] = [];
+    if (!env.COOKIE_DOMAIN || env.COOKIE_DOMAIN.trim() === '') {
+      extraMissing.push('COOKIE_DOMAIN');
+    }
     if (!env.RESEND_API_KEY || env.RESEND_API_KEY.trim() === '') {
       extraMissing.push('RESEND_API_KEY');
     }

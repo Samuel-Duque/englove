@@ -10,8 +10,6 @@ import {
   UseInterceptors,
   ParseUUIDPipe,
   BadRequestException,
-  Optional,
-  NotFoundException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -44,7 +42,6 @@ const uuidPipe = new ParseUUIDPipe({
 export class AssignmentsController {
   constructor(
     private readonly assignmentsService: AssignmentsService,
-    @Optional()
     @Inject(forwardRef(() => AttemptsService))
     private readonly attemptsService?: AttemptsService,
   ) {}
@@ -65,8 +62,8 @@ export class AssignmentsController {
     }
 
     if (!this.attemptsService) {
-      throw new NotFoundException({
-        statusCode: 404,
+      throw new BadRequestException({
+        statusCode: 400,
         code: 'ATTEMPTS_NOT_CONFIGURED',
         message: 'Módulo de intentos no disponible',
       });

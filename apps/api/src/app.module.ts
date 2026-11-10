@@ -28,6 +28,22 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
+export function sanitizePinoReq<T extends { url?: string; originalUrl?: string; query?: unknown }>(req: T): T {
+  const rawUrl = req.url ?? '';
+  const sanitizedUrl = rawUrl.includes('?') ? rawUrl.split('?')[0] : rawUrl;
+  const rawOriginalUrl = req.originalUrl;
+  const sanitizedOriginalUrl =
+    typeof rawOriginalUrl === 'string' && rawOriginalUrl.includes('?')
+      ? rawOriginalUrl.split('?')[0]
+      : rawOriginalUrl;
+  return {
+    ...req,
+    url: sanitizedUrl,
+    ...(sanitizedOriginalUrl !== undefined ? { originalUrl: sanitizedOriginalUrl } : {}),
+    query: {},
+  };
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -40,6 +56,9 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
           paths: [
             'req.headers.authorization',
             'req.headers.cookie',
+            'req.headers["x-attempt-token"]',
+            'req.query',
+            'req.query.*',
             'req.body.password',
             'req.body.email',
             'req.body.token',
@@ -49,6 +68,9 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
             'res.headers["set-cookie"]',
           ],
           remove: true,
+        },
+        serializers: {
+          req: sanitizePinoReq,
         },
         autoLogging: true,
       },

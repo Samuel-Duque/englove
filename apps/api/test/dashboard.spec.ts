@@ -18,7 +18,14 @@ describe('SPEC-03: Gestor de Contenidos — Dashboard reminders (ENG-045)', () =
       },
     };
 
-    service = new PendingSummaryService(mockPrisma as unknown as PrismaService);
+    const mockFeatureFlags = {
+      getConfiguration: vi.fn().mockResolvedValue({ config: { ungraded_reminder_days: 3 } }),
+    };
+
+    service = new PendingSummaryService(
+      mockPrisma as unknown as PrismaService,
+      mockFeatureFlags as any,
+    );
     controller = new DashboardController(service);
   });
 

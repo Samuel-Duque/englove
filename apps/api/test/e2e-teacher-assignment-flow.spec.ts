@@ -11,6 +11,7 @@ import { AssignmentsService } from '../src/assignments/assignments.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException } from '@nestjs/common';
+import { TenantContext } from '../src/common/tenant/tenant.context';
 import * as net from 'net';
 
 function getPostgresPort(): number {
@@ -128,6 +129,9 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
 
   it('SPEC-04 RF-16: flujo completo real login -> crear fill_blank -> publicar -> asignar -> verificar grupo y persistencia', async () => {
     if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
+
+    return TenantContext.run({ organizationId: orgId, userId: teacherId, role: Role.teacher }, async () => {
 
     // 1. Docente crea una actividad fill_blank en borrador (draft) usando el servicio real
     const parsed = parseFillBlankSimpleSyntax('The lion lives in the [savannah|ocean|arctic]');
@@ -158,7 +162,7 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     expect(createdActivity.version).toBe(1);
 
     // Verificar en PostgreSQL real
-    const dbActivity = await prisma.activity.findFirst({
+    const dbActivity = await activePrisma.activity.findFirst({
       where: { id: createdActivity.id, organization_id: orgId },
     });
     expect(dbActivity).not.toBeNull();
@@ -179,7 +183,7 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     ).rejects.toThrow(HttpException);
 
     // Confirmar que no se crearon asignaciones huérfanas
-    const asgCountDraft = await prisma.assignment.count({
+    const asgCountDraft = await activePrisma.assignment.count({
       where: { organization_id: orgId, activity_id: createdActivity.id },
     });
     expect(asgCountDraft).toBe(0);
@@ -188,7 +192,7 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     const publishedActivity = await activitiesService.publishActivity(orgId, createdActivity.id);
     expect(publishedActivity.status).toBe(ActivityStatus.published);
 
-    const dbActivityPublished = await prisma.activity.findFirst({
+    const dbActivityPublished = await activePrisma.activity.findFirst({
       where: { id: createdActivity.id, organization_id: orgId },
     });
     expect(dbActivityPublished?.status).toBe(ActivityStatus.published);
@@ -212,7 +216,7 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     expect(assignment1.availability).toBe(AssignmentAvailability.scheduled);
 
     // Verificar exactamente una fila persistida en PostgreSQL
-    const dbAssignments = await prisma.assignment.findMany({
+    const dbAssignments = await activePrisma.assignment.findMany({
       where: { organization_id: orgId, group_id: groupId },
     });
     expect(dbAssignments).toHaveLength(1);
@@ -272,9 +276,10 @@ describe('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-
     expect(finalHistory.items.map((i) => i.id)).toContain(assignment2.id);
 
     // Verificar en PostgreSQL real
-    const totalInDb = await prisma.assignment.count({
+    const totalInDb = await activePrisma.assignment.count({
       where: { organization_id: orgId, group_id: groupId },
     });
     expect(totalInDb).toBe(2);
+    });
   });
 });

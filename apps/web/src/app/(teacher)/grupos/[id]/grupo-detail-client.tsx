@@ -1,20 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GroupView, StudentView, StudentListResponse } from '@englove/shared';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { GroupView, StudentListResponse } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { ConfirmDialog } from '../../../../components/ui/modal';
 
 export function GrupoDetailClient({ id }: { id: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [group, setGroup] = useState<GroupView | null>(null);
-  const [members, setMembers] = useState<StudentView[]>([]);
-  const [totalMembers, setTotalMembers] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Rename modal / inline state
@@ -28,57 +26,111 @@ export function GrupoDetailClient({ id }: { id: string }) {
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  const fetchGroupData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const groupData = await apiFetch<GroupView>(`/api/v1/groups/${id}`);
-      setGroup(groupData);
-      setNewName(groupData.name);
-      try {
-        const membersData = await apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`);
-        setMembers(membersData.items);
-        setTotalMembers(membersData.total);
-      } catch (memberErr) {
-        if (memberErr instanceof ApiError) setError(memberErr.message);
-        else setError('Error al cargar la lista de alumnos del grupo');
-      }
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('Error al cargar la información del grupo');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
+  const groupQuery = useQuery({
+    queryKey: ['teacher', 'group', id],
+    queryFn: () => apiFetch<GroupView>(`/api/v1/groups/${id}`),
+  });
+
+  const membersQuery = useQuery({
+    queryKey: ['teacher', 'group', id, 'members'],
+    queryFn: () => apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`),
+  });
 
   useEffect(() => {
-    fetchGroupData();
-  }, [fetchGroupData]);
+    if (groupQuery.data && !isRenaming) {
+      setNewName(groupQuery.data.name);
+    }
+  }, [groupQuery.data, isRenaming]);
 
-  const handleSaveRename = async () => {
+  const renameMutation = useMutation({
+    mutationFn: (name: string) =>
+      apiFetch<GroupView>(`/api/v1/groups/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['teacher', 'group', id], updated);
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      setIsRenaming(false);
+      setSuccess('Grupo renombrado exitosamente.');
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_ARCHIVED') {
+          setActionError('No es posible renombrar un grupo archivado.');
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo renombrar el grupo');
+      }
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<GroupView>(`/api/v1/groups/${id}/archive`, {
+        method: 'POST',
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['teacher', 'group', id], updated);
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      setSuccess('Grupo archivado exitosamente.');
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
+          setActionError(
+            'Este grupo tiene alumnos activos. Para archivarlo, traslada sus alumnos a otro grupo desde su ficha de alumno.',
+          );
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo archivar el grupo');
+      }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiFetch(`/api/v1/groups/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      router.push('/grupos');
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_HAS_HISTORY') {
+          setActionError('No se puede borrar un grupo con historial. Archívalo en su lugar.');
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo eliminar el grupo');
+      }
+    },
+  });
+
+  const handleSaveRename = () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
 
-    setError(null);
+    setActionError(null);
     setSuccess(null);
-    try {
-      const updated = await apiFetch<GroupView>(`/api/v1/groups/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name: trimmed }),
-      });
-      setGroup(updated);
-      setIsRenaming(false);
-      setSuccess('Grupo renombrado exitosamente.');
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo renombrar el grupo');
-    }
+    renameMutation.mutate(trimmed);
   };
+
+  const group = groupQuery.data ?? null;
+  const members = membersQuery.data?.items ?? [];
+  const totalMembers = membersQuery.data?.total ?? 0;
+  const isLoading = groupQuery.isLoading || membersQuery.isLoading;
 
   const handleArchive = () => {
     const activeCount = group?.activeStudentCount ?? totalMembers ?? members.length;
     if (activeCount > 0) {
-      setError(
+      setActionError(
         `No es posible archivar el grupo: tiene ${activeCount} alumno(s) activo(s) (decisión 96). Traslada los alumnos antes de archivar.`,
       );
       return;
@@ -89,29 +141,11 @@ export function GrupoDetailClient({ id }: { id: string }) {
       title: 'Archivar grupo',
       message: '¿Seguro que deseas archivar este grupo?',
       isDestructive: false,
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setError(null);
+        setActionError(null);
         setSuccess(null);
-        try {
-          const updated = await apiFetch<GroupView>(`/api/v1/groups/${id}/archive`, {
-            method: 'POST',
-          });
-          setGroup(updated);
-          setSuccess('Grupo archivado exitosamente.');
-        } catch (err) {
-          if (err instanceof ApiError) {
-            if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
-              setError(
-                'Este grupo tiene alumnos activos. Para archivarlo, traslada sus alumnos a otro grupo desde su ficha de alumno.',
-              );
-            } else {
-              setError(err.message);
-            }
-          } else {
-            setError('No se pudo archivar el grupo');
-          }
-        }
+        archiveMutation.mutate();
       },
     });
   };
@@ -122,26 +156,18 @@ export function GrupoDetailClient({ id }: { id: string }) {
       title: 'Eliminar grupo',
       message: '¿Seguro que deseas eliminar este grupo? Solo es posible si no tiene historial.',
       isDestructive: true,
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setError(null);
-        try {
-          await apiFetch(`/api/v1/groups/${id}`, { method: 'DELETE' });
-          router.push('/grupos');
-        } catch (err) {
-          if (err instanceof ApiError) {
-            if (err.code === 'GROUP_HAS_HISTORY') {
-              setError('No se puede borrar un grupo con historial. Archívalo en su lugar.');
-            } else {
-              setError(err.message);
-            }
-          } else {
-            setError('No se pudo eliminar el grupo');
-          }
-        }
+        setActionError(null);
+        deleteMutation.mutate();
       },
     });
   };
+
+  const error =
+    actionError ||
+    (groupQuery.error instanceof ApiError ? groupQuery.error.message : groupQuery.error instanceof Error ? groupQuery.error.message : null) ||
+    (membersQuery.error instanceof ApiError ? membersQuery.error.message : membersQuery.error instanceof Error ? membersQuery.error.message : null);
 
   if (isLoading) {
     return <div className="py-12 text-center text-zinc-500 text-sm">Cargando grupo…</div>;
@@ -201,7 +227,10 @@ export function GrupoDetailClient({ id }: { id: string }) {
               {!isArchived && (
                 <button
                   type="button"
-                  onClick={() => setIsRenaming(true)}
+                  onClick={() => {
+                    setNewName(group.name);
+                    setIsRenaming(true);
+                  }}
                   className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
                 >
                   (Renombrar)
@@ -258,7 +287,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
           className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
         >
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} className="text-rose-600 font-bold ml-4">
+          <button type="button" onClick={() => setActionError(null)} className="text-rose-600 font-bold ml-4">
             ✕
           </button>
         </div>

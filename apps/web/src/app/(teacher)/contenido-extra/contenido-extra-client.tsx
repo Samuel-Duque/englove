@@ -18,6 +18,10 @@ interface FeatureFlagsResponse {
   };
 }
 
+function isLevel(val: string): val is Level {
+  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+}
+
 export function ContenidoExtraClient() {
   const queryClient = useQueryClient();
 
@@ -32,7 +36,7 @@ export function ContenidoExtraClient() {
   // Form fields
   const [formTitle, setFormTitle] = useState('');
   const [formUrl, setFormUrl] = useState('');
-  const [formLevel, setFormLevel] = useState<string>('');
+  const [formLevel, setFormLevel] = useState<Level | ''>('');
   const [formDescription, setFormDescription] = useState('');
   const [formUrlError, setFormUrlError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -231,7 +235,7 @@ export function ContenidoExtraClient() {
     const payload = {
       title: formTitle.trim(),
       url: normalizedUrl,
-      level: formLevel ? (formLevel as Level) : null,
+      level: formLevel || null,
       description: formDescription.trim() ? formDescription.trim() : null,
     };
 
@@ -581,7 +585,10 @@ export function ContenidoExtraClient() {
                 <select
                   id="form-level"
                   value={formLevel}
-                  onChange={(e) => setFormLevel(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFormLevel(isLevel(v) ? v : '');
+                  }}
                   className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">General (todos los niveles)</option>

@@ -317,6 +317,144 @@ const notDoc = (p) => !isDoc(p);
 
 const windowHas = (lines, i, re, n = 12) => lines.slice(i, i + n + 1).some((l) => re.test(l));
 
+function maskCode(text) {
+  let out = '';
+  let i = 0;
+  const n = text.length;
+  let state = 'code';
+  const exprBraces = [];
+  let prevNonWs = '';
+
+  while (i < n) {
+    const ch = text[i];
+    const nx = text[i + 1];
+
+    if (state === 'code') {
+      if (ch === '/' && nx === '/') {
+        state = 'lc'; out += '  '; i += 2; continue;
+      }
+      if (ch === '/' && nx === '*') {
+        state = 'bc'; out += '  '; i += 2; continue;
+      }
+      if (ch === '/' && nx !== '/' && nx !== '*' && /[=([,;:!&|?~{}<>^%+-]/.test(prevNonWs || '=')) {
+        let j = i + 1;
+        let inClass = false;
+        let foundEnd = false;
+        while (j < n && text[j] !== '\n') {
+          if (text[j] === '\\') { j += 2; continue; }
+          if (text[j] === '[') inClass = true;
+          else if (text[j] === ']') inClass = false;
+          else if (text[j] === '/' && !inClass) { foundEnd = true; break; }
+          j++;
+        }
+        if (foundEnd) {
+          out += '/' + ' '.repeat(j - i - 1) + '/';
+          i = j + 1;
+          prevNonWs = '/';
+          continue;
+        }
+      }
+      if (ch === "'") { state = 'sq'; out += "'"; i++; continue; }
+      if (ch === '"') { state = 'dq'; out += '"'; i++; continue; }
+      if (ch === '`') { state = 'bq'; out += '`'; i++; continue; }
+      if (ch === '{' && exprBraces.length) {
+        exprBraces[exprBraces.length - 1]++;
+      } else if (ch === '}' && exprBraces.length) {
+        exprBraces[exprBraces.length - 1]--;
+        if (exprBraces[exprBraces.length - 1] === 0) {
+          exprBraces.pop();
+          state = 'bq';
+          out += '}';
+          prevNonWs = '}';
+          i++;
+          continue;
+        }
+      }
+      out += ch;
+      if (!/\s/.test(ch)) prevNonWs = ch;
+      i++;
+    } else if (state === 'lc') {
+      if (ch === '\n') { state = 'code'; out += '\n'; }
+      else out += ' ';
+      i++;
+    } else if (state === 'bc') {
+      if (ch === '*' && nx === '/') { state = 'code'; out += '  '; i += 2; }
+      else { out += (ch === '\n' ? '\n' : ' '); i++; }
+    } else if (state === 'sq' || state === 'dq') {
+      if (ch === '\n') { state = 'code'; out += '\n'; i++; continue; }
+      if (ch === '\\') {
+        if (nx === '\n') { out += ' \n'; i += 2; continue; }
+        out += '  '; i += 2; continue;
+      }
+      if ((state === 'sq' && ch === "'") || (state === 'dq' && ch === '"')) {
+        state = 'code'; out += ch; prevNonWs = ch;
+      } else {
+        out += ' ';
+      }
+      i++;
+    } else if (state === 'bq') {
+      if (ch === '\\') {
+        if (nx === '\n') { out += ' \n'; i += 2; continue; }
+        out += '  '; i += 2; continue;
+      }
+      if (ch === '$' && nx === '{') {
+        exprBraces.push(1);
+        state = 'code';
+        out += '${';
+        prevNonWs = '{';
+        i += 2;
+        continue;
+      }
+      if (ch === '`') {
+        state = 'code'; out += '`'; prevNonWs = '`';
+      } else {
+        out += (ch === '\n' ? '\n' : ' ');
+      }
+      i++;
+    }
+  }
+  return out;
+}
+
+const maskedCache = new Map();
+function getMaskedLines(text) {
+  let m = maskedCache.get(text);
+  if (!m) {
+    m = maskCode(text).split('\n');
+    maskedCache.set(text, m);
+  }
+  return m;
+}
+
+function isImportOrExportAs(maskedLines, lineIdx, matchIdx) {
+  const beforeOnLine = maskedLines[lineIdx].slice(0, matchIdx);
+  if (/\*\s*$/.test(beforeOnLine)) {
+    const prefixLines = maskedLines.slice(Math.max(0, lineIdx - 10), lineIdx);
+    const joined = [...prefixLines, beforeOnLine].join('\n');
+    if (/(?:^|[;{}\r\n])\s*(?:import|export)\s*\*[\s\n]*$/.test(joined)) {
+      return true;
+    }
+  }
+  const startLine = Math.max(0, lineIdx - 80);
+  const windowText = [...maskedLines.slice(startLine, lineIdx), beforeOnLine].join('\n');
+  let depth = 0;
+  let openBracePos = -1;
+  for (let idx = windowText.length - 1; idx >= 0; idx--) {
+    const ch = windowText[idx];
+    if (ch === '}') depth++;
+    else if (ch === '{') {
+      if (depth === 0) {
+        openBracePos = idx;
+        break;
+      }
+      depth--;
+    }
+  }
+  if (openBracePos === -1) return false;
+  const header = windowText.slice(0, openBracePos);
+  return /(?:^|[;{}\r\n])\s*(?:import(?:\s+type)?(?:\s+[\p{L}\p{N}_$]+\s*,)?|export(?:\s+type)?)\s*$/u.test(header);
+}
+
 const TIMESTAMP_FIELD = /\b(started_?at|finished_?at|graded_?at|occurred_?at|joined_?at|left_?at|created_?at|updated_?at|deleted_?at|awarded_?at|rotated_?at|revoked_?at|used_?at|terms_?accepted_?at)\s*[?!]?\s*:/i;
 
 const LINE_RULES = [
@@ -465,9 +603,48 @@ const LINE_RULES = [
   { id: 'G-C11', sev: 'ERROR', files: any, re: /\bNEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE|PASSWORD|DATABASE|R2_SECRET)/, msg: 'variable secreta con prefijo NEXT_PUBLIC_ (iría al bundle web)' },
   {
     id: 'G-C12', sev: 'ERROR',
-    files: (p) => (isApiSrc(p) || isWeb(p) || isSharedSrc(p)) && !isTest(p) && !isMigrationSql(p),
+    files: (p) => (isApiSrc(p) || isWeb(p) || isSharedSrc(p)) && !isTest(p) && !isMigrationSql(p) && isCode(p),
     re: /\b(?:as\s+any\b|:\s*any\b|@ts-ignore|@ts-nocheck)/,
     msg: 'uso de any, @ts-ignore o @ts-nocheck en código de runtime; usa tipado estricto, unknown o esquemas Zod',
+  },
+  {
+    id: 'G-C12', sev: 'ERROR',
+    files: (p) => (isApiSrc(p) || isWeb(p) || isSharedSrc(p)) && !isTest(p) && !isMigrationSql(p) && isCode(p),
+    re: /(?<![\p{L}\p{N}_$*])as\s+(?!const\b)/u,
+    skip: (line) => /^\s*(?:\/\/|\/\*|\*)/.test(line),
+    when: ({ i, text }) => {
+      const maskedLines = getMaskedLines(text);
+      const ml = maskedLines[i];
+      if (!ml) return false;
+      const asRe = /(?<![\p{L}\p{N}_$*])as\s+(?!const\b)(?:[\p{L}_$[{('"`]|\b(?:typeof|keyof|readonly|infer|unknown|never|any|void|null|undefined|object|string|number|boolean|symbol|bigint)\b)/gu;
+      let m;
+      while ((m = asRe.exec(ml)) !== null) {
+        if (!isImportOrExportAs(maskedLines, i, m.index)) return true;
+      }
+      return false;
+    },
+    msg: 'aserción "as <Type>" en código de runtime; prohibido por tipado estricto (usa type guards, esquemas Zod o frontera con // guardrails-ignore G-C12: <motivo>)',
+  },
+  {
+    id: 'G-C12', sev: 'ERROR',
+    files: (p) => (isApiSrc(p) || isWeb(p) || isSharedSrc(p)) && !isTest(p) && !isMigrationSql(p) && isCode(p) && !p.endsWith('.tsx') && !p.endsWith('.jsx'),
+    re: /(?:^|[=:(,[?!&|;]|\b(?:return|throw|yield|await))\s*<[A-Za-z_$][\w$.\[\]\s|&:'"?<>]*(?<![,\s])>\s*(?=[A-Za-z0-9_$([{"'`!])/,
+    skip: (line) => /^\s*(?:\/\/|\/\*|\*)/.test(line),
+    when: ({ lines, i, text }) => {
+      const ml = getMaskedLines(text)[i];
+      if (!ml) return false;
+      const angleRe = /(?:^|[=:(,[?!&|;]|\b(?:return|throw|yield|await|typeof|delete|void))\s*<([A-Za-z_$][\w$.\[\]\s|&:'"?<>]*(?<![,\s]))>\s*(?=[A-Za-z0-9_$([{"'`!])/g;
+      let m;
+      while ((m = angleRe.exec(ml)) !== null) {
+        const inner = m[1];
+        if (/[=]|&&|\|\|/.test(inner)) continue;
+        const afterAngle = ml.slice(m.index + m[0].length);
+        if (afterAngle.startsWith('(') && /^\([^)]*\)\s*=>/.test(afterAngle)) continue;
+        return true;
+      }
+      return false;
+    },
+    msg: 'aserción "<Type>expr" en código de runtime; prohibido por tipado estricto (usa type guards o esquemas Zod)',
   },
   {
     id: 'G-C13', sev: 'AVISO', files: (p) => isWeb(p) && isCode(p) && !isTest(p),
@@ -577,6 +754,39 @@ function fileRules(file, text, ctx) {
   }
   if (isCode(p) && /^\s*['"]use cache['"]/m.test(text) && /\b(cookies|headers)\(\)|getSession|getCurrentUser|\bauth\(\)/.test(text)) {
     add('G-B04', 'ERROR', firstLine(/^\s*['"]use cache['"]/), '"use cache" junto a lectura de cookies, headers o sesión: nunca se cachean datos autenticados');
+  }
+  if (isWeb(p) && /^apps\/web\/src\/(?:app|components)\//.test(p) && !isTest(p) && isCode(p)) {
+    const mLines = getMaskedLines(text);
+    for (let i = 0; i < mLines.length; i++) {
+      if (/\b(?:React\.)?useEffect\s*\(/.test(mLines[i])) {
+        let depth = 0;
+        let started = false;
+        let hasFetch = false;
+        for (let j = i; j < mLines.length; j++) {
+          const ml = mLines[j];
+          for (const ch of ml) {
+            if (ch === '(' || ch === '{') { depth++; started = true; }
+            else if (ch === ')' || ch === '}') depth--;
+          }
+          if (/\bapiFetch\b|\bfetch\s*\(/.test(ml)) {
+            hasFetch = true;
+            break;
+          }
+          if (started && depth <= 0) break;
+        }
+        if (hasFetch) {
+          add('G-B04', 'ERROR', i + 1, 'useEffect con apiFetch o fetch manual en vista de cliente; usa useQuery/useMutation de TanStack Query (QA-04)');
+        }
+      }
+    }
+  }
+  if (p === 'apps/web/package.json') {
+    if (!/"serwist"\s*:/.test(text) || !/"@serwist\/vite"\s*:/.test(text)) {
+      add('G-C13', 'ERROR', 1, 'apps/web/package.json debe incluir "serwist" y "@serwist/vite" para el Service Worker (PWA)');
+    }
+  }
+  if (isWeb(p) && /(^|\/)public\/sw\.[cm]?js$/.test(p)) {
+    add('G-C13', 'ERROR', 1, 'apps/web/public/sw.js manual detectado; el Service Worker se genera con @serwist/vite en dist/client/sw.js desde src/sw.ts');
   }
   if (/(^|\/)wrangler\.(jsonc?|toml)$/.test(p)) {
     if (!/nodejs_compat/.test(text)) add('G-B06', 'ERROR', 1, 'wrangler sin la bandera nodejs_compat');

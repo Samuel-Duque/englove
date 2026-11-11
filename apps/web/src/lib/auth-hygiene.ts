@@ -41,9 +41,8 @@ export async function clearSharedDeviceSession(
                 const req = window.indexedDB.open(name);
                 req.onupgradeneeded = (event) => {
                   if (event.oldVersion === 0) {
-                    const openReq = event.target as IDBOpenDBRequest | null;
-                    if (openReq?.transaction) {
-                      openReq.transaction.abort();
+                    if (req.transaction) {
+                      req.transaction.abort();
                     }
                   }
                 };

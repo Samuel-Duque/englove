@@ -1,16 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { StudentProfileView } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { clearSharedProfile } from '../../../lib/auth-session';
 import { syncUserSegment } from '../../../lib/user-segment';
 
 export function PerfilClient() {
-  const [profile, setProfile] = useState<StudentProfileView | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isUpdatingTheme, setIsUpdatingTheme] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: profile, isLoading, error: queryError } = useQuery({
+    queryKey: ['student', 'profile'],
+    queryFn: () => apiFetch<StudentProfileView>('/api/v1/me'),
+  });
+
+  const error = queryError instanceof ApiError
+    ? queryError.message
+    : queryError instanceof Error
+      ? queryError.message
+      : null;
+
   const [themeSuccess, setThemeSuccess] = useState<string | null>(null);
   const [themeError, setThemeError] = useState<string | null>(null);
 
@@ -22,145 +32,93 @@ export function PerfilClient() {
   const [otpCode, setOtpCode] = useState('');
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-  const loadProfile = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await apiFetch<StudentProfileView>('/api/v1/me');
-      setProfile(data);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('Error al cargar tu perfil');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-    async function init() {
-      try {
-        const data = await apiFetch<StudentProfileView>('/api/v1/me');
-        if (isMounted) setProfile(data);
-      } catch (err) {
-        if (isMounted) {
-          if (err instanceof ApiError) setError(err.message);
-          else setError('Error al cargar tu perfil');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    init();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleThemeChange = async (newSegment: 'kids' | 'teens') => {
-    if (!profile?.student?.canSwitchInterface) return;
-    setIsUpdatingTheme(true);
-    setThemeSuccess(null);
-    setThemeError(null);
-    try {
-      await fetch(`${apiUrl}/api/v1/me/interface`, {
+  const themeMutation = useMutation({
+    mutationFn: async (newSegment: 'kids' | 'teens') => {
+      await apiFetch<void>('/api/v1/me/interface', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
         body: JSON.stringify({ ageSegment: newSegment }),
       });
-
+      return newSegment;
+    },
+    onSuccess: (newSegment) => {
       clearSharedProfile();
       syncUserSegment(newSegment);
       setThemeSuccess(`¡Interfaz actualizada a ${newSegment === 'kids' ? 'Kids' : 'Teens'}!`);
-      // Reload profile and page to apply cookie
+      void queryClient.invalidateQueries({ queryKey: ['student', 'profile'] });
       window.location.reload();
-    } catch {
-      setThemeError('No se pudo actualizar la interfaz');
-    } finally {
-      setIsUpdatingTheme(false);
-    }
+    },
+    onError: (err: unknown) => {
+      setThemeError(err instanceof ApiError ? err.message : 'No se pudo actualizar la interfaz');
+    },
+  });
+
+  const handleThemeChange = (newSegment: 'kids' | 'teens') => {
+    if (!profile?.student?.canSwitchInterface) return;
+    setThemeSuccess(null);
+    setThemeError(null);
+    themeMutation.mutate(newSegment);
   };
 
-  const handleRequestEmailChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingEmail(true);
-    setEmailError(null);
-    setEmailSuccess(null);
+  const isUpdatingTheme = themeMutation.isPending;
 
-    try {
-      const res = await fetch(`${apiUrl}/api/v1/me/email-change`, {
+  const requestEmailMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<void>('/api/v1/me/email-change', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
         body: JSON.stringify({
           newEmail,
           currentPassword,
         }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Error al solicitar cambio de correo');
-      }
-
+      }),
+    onSuccess: () => {
       setEmailSuccess('Código OTP enviado a tu nuevo correo. Escríbelo a continuación para confirmar.');
       setIsAwaitingOtp(true);
       setCurrentPassword('');
-    } catch (err: unknown) {
-      setEmailError((err as Error)?.message || 'No se pudo enviar la solicitud');
-    } finally {
-      setIsSubmittingEmail(false);
-    }
-  };
+    },
+    onError: (err: unknown) => {
+      setEmailError(err instanceof Error ? err.message : 'No se pudo enviar la solicitud');
+    },
+  });
 
-  const handleConfirmEmailChange = async (e: React.FormEvent) => {
+  const handleRequestEmailChange = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmittingEmail(true);
     setEmailError(null);
     setEmailSuccess(null);
+    requestEmailMutation.mutate();
+  };
 
-    try {
-      const res = await fetch(`${apiUrl}/api/v1/me/email-change/confirm`, {
+  const confirmEmailMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<void>('/api/v1/me/email-change/confirm', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
         body: JSON.stringify({
           newEmail,
           otp: otpCode.trim(),
         }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Código OTP inválido o vencido');
-      }
-
+      }),
+    onSuccess: async () => {
+      clearSharedProfile();
       setEmailSuccess('¡Correo actualizado exitosamente! El cambio ya está activo.');
       setIsAwaitingOtp(false);
       setIsChangingEmail(false);
       setNewEmail('');
       setOtpCode('');
-      await loadProfile();
-    } catch (err: unknown) {
-      setEmailError((err as Error)?.message || 'No se pudo confirmar el cambio de correo');
-    } finally {
-      setIsSubmittingEmail(false);
-    }
+      await queryClient.invalidateQueries({ queryKey: ['student', 'profile'] });
+    },
+    onError: (err: unknown) => {
+      setEmailError(err instanceof Error ? err.message : 'No se pudo confirmar el cambio de correo');
+    },
+  });
+
+  const handleConfirmEmailChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError(null);
+    setEmailSuccess(null);
+    confirmEmailMutation.mutate();
   };
+
+  const isSubmittingEmail = requestEmailMutation.isPending || confirmEmailMutation.isPending;
 
   if (isLoading) {
     return (

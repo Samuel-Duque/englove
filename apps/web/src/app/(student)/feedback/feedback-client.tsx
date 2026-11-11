@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useTransition } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   StudentFeedbackListResponse,
   StudentFeedbackItemView,
@@ -20,30 +21,21 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function FeedbackClient() {
   const router = useRouter();
-  const [items, setItems] = useState<StudentFeedbackItemView[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
-  const [isStartingAttempt, startStartingAttempt] = useTransition();
   const [startingAssignmentId, setStartingAssignmentId] = useState<string | null>(null);
 
-  const loadFeedback = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await apiFetch<StudentFeedbackListResponse>('/api/v1/student/feedback');
-      setItems(data.items || []);
-    } catch (err) {
-      setError((err as ApiError)?.message || 'No pudimos cargar tus calificaciones y comentarios.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { data: feedbackData, isLoading, error: queryError, refetch: loadFeedback } = useQuery({
+    queryKey: ['student', 'feedback'],
+    queryFn: () => apiFetch<StudentFeedbackListResponse>('/api/v1/student/feedback'),
+  });
 
-  useEffect(() => {
-    loadFeedback();
-  }, [loadFeedback]);
+  const items: StudentFeedbackItemView[] = feedbackData?.items || [];
+  const error = queryError instanceof ApiError
+    ? queryError.message
+    : queryError instanceof Error
+      ? queryError.message
+      : null;
 
   const toggleHistory = (assignmentId: string) => {
     setExpandedHistory((prev) => ({
@@ -52,23 +44,27 @@ export function FeedbackClient() {
     }));
   };
 
+  const retryMutation = useMutation({
+    mutationFn: (assignmentId: string) =>
+      apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
+        method: 'POST',
+      }),
+    onSuccess: (runtime) => {
+      router.push(`/actividad/${runtime.attempt.id}`);
+    },
+    onError: (err: unknown) => {
+      setRetryError(err instanceof ApiError ? err.message : 'No fue posible iniciar el nuevo intento.');
+      setStartingAssignmentId(null);
+    },
+  });
+
   const handleStartRetry = (assignmentId: string) => {
     setStartingAssignmentId(assignmentId);
     setRetryError(null);
-    startStartingAttempt(async () => {
-      try {
-        const runtime = await apiFetch<RuntimeView>(
-          `/api/v1/assignments/${assignmentId}/attempts`,
-          { method: 'POST' },
-        );
-        router.push(`/actividad/${runtime.attempt.id}`);
-      } catch (err) {
-        setRetryError((err as ApiError)?.message || 'No fue posible iniciar el nuevo intento.');
-      } finally {
-        setStartingAssignmentId(null);
-      }
-    });
+    retryMutation.mutate(assignmentId);
   };
+
+  const isStartingAttempt = retryMutation.isPending;
 
   if (isLoading) {
     return (
@@ -87,7 +83,9 @@ export function FeedbackClient() {
         <p className="text-xs text-rose-700">{error}</p>
         <button
           type="button"
-          onClick={loadFeedback}
+          onClick={() => {
+            void loadFeedback();
+          }}
           className="mt-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors"
         >
           Reintentar

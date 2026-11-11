@@ -79,7 +79,7 @@ export function ExtraClient() {
   });
 
   const meQuery = useQuery({
-    queryKey: ['me'],
+    queryKey: ['student', 'profile'],
     queryFn: () => apiFetch<StudentProfileView>('/api/v1/me'),
   });
 

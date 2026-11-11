@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMutation } from '@tanstack/react-query';
 import { getAuthErrorMessage } from '../../../../lib/auth-errors';
 
 export function ResetPasswordForm() {
@@ -14,9 +15,57 @@ export function ResetPasswordForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isTokenInvalid, setIsTokenInvalid] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ tokenVal, newPasswordVal }: { tokenVal: string; newPasswordVal: string }) => {
+      const res = await fetch(`${apiUrl}/api/v1/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: window.location.origin,
+        },
+        body: JSON.stringify({
+          token: tokenVal,
+          newPassword: newPasswordVal,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const code =
+          data && typeof data === 'object' && 'code' in data && typeof data.code === 'string'
+            ? data.code
+            : undefined;
+        const msg =
+          data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+            ? data.message
+            : undefined;
+        if (code === 'PASSWORD_RESET_INVALID') {
+          setIsTokenInvalid(true);
+        }
+        throw new Error(getAuthErrorMessage(code, msg));
+      }
+
+      const message =
+        data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+          ? data.message
+          : 'Contraseña actualizada. Inicia sesión.';
+
+      return { message };
+    },
+    onSuccess: (data) => {
+      // RF-12: Uniform success message
+      setSuccessMessage(data.message);
+    },
+    onError: (err: Error) => {
+      setErrorMessage(
+        err.message || 'No fue posible conectar con el servidor. Verifica tu conexión.',
+      );
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,37 +83,7 @@ export function ResetPasswordForm() {
       return;
     }
 
-    startTransition(async () => {
-      try {
-        const res = await fetch(`${apiUrl}/api/v1/auth/reset-password`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Origin: window.location.origin,
-          },
-          body: JSON.stringify({
-            token,
-            newPassword,
-          }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          if (data?.code === 'PASSWORD_RESET_INVALID') {
-            setIsTokenInvalid(true);
-          }
-          const msg = getAuthErrorMessage(data?.code, data?.message);
-          setErrorMessage(msg);
-          return;
-        }
-
-        // RF-12: Uniform success message
-        setSuccessMessage(data?.message || 'Contraseña actualizada. Inicia sesión.');
-      } catch {
-        setErrorMessage('No fue posible conectar con el servidor. Verifica tu conexión.');
-      }
-    });
+    resetPasswordMutation.mutate({ tokenVal: token, newPasswordVal: newPassword });
   };
 
   if (successMessage) {
@@ -151,10 +170,10 @@ export function ResetPasswordForm() {
 
             <button
               type="submit"
-              disabled={isPending}
+              disabled={resetPasswordMutation.isPending}
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending ? 'Guardando…' : 'Guardar contraseña'}
+              {resetPasswordMutation.isPending ? 'Guardando…' : 'Guardar contraseña'}
             </button>
           </form>
         )}

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityType,
   ActivityStatus,
@@ -22,18 +23,83 @@ interface ActivityEditorProps {
 
 type GameMechanicType = 'match' | 'order_words' | 'drag_drop' | 'memory' | 'timed_choice';
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
 function asRecord(val: unknown): Record<string, unknown> | null {
-  if (val && typeof val === 'object' && !Array.isArray(val)) {
-    return val as Record<string, unknown>;
+  if (isRecord(val)) {
+    return val;
   }
   return null;
 }
 
 function getStringProp(obj: unknown, key: string, fallback = ''): string {
-  const rec = asRecord(obj);
-  if (rec && typeof rec[key] === 'string') return rec[key] as string;
-  if (rec && typeof rec[key] === 'number') return String(rec[key]);
+  if (isRecord(obj)) {
+    const v = obj[key];
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number') return String(v);
+  }
   return fallback;
+}
+
+function isIdTextItem(val: unknown): val is { id: string; text: string } {
+  return isRecord(val) && typeof val.id === 'string' && typeof val.text === 'string';
+}
+
+function isTextItem(val: unknown): val is { text: string } {
+  return isRecord(val) && typeof val.text === 'string';
+}
+
+function isStringPair(val: unknown): val is [string, string] {
+  return Array.isArray(val) && val.length === 2 && typeof val[0] === 'string' && typeof val[1] === 'string';
+}
+
+interface ParsedTimedQuestion {
+  id: string;
+  prompt: string;
+  options: Array<{ id: string; text: string }>;
+}
+
+function isTimedQuestion(val: unknown): val is ParsedTimedQuestion {
+  if (!isRecord(val)) return false;
+  return (
+    typeof val.id === 'string' &&
+    typeof val.prompt === 'string' &&
+    Array.isArray(val.options)
+  );
+}
+
+function isGameMechanicType(val: string): val is GameMechanicType {
+  return (
+    val === 'match' ||
+    val === 'order_words' ||
+    val === 'drag_drop' ||
+    val === 'memory' ||
+    val === 'timed_choice'
+  );
+}
+
+function isLevel(val: string): val is Level {
+  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+}
+
+function isActivityType(val: string): val is ActivityType {
+  return (
+    val === ActivityType.fill_blank ||
+    val === ActivityType.open_question ||
+    val === ActivityType.speaking ||
+    val === ActivityType.game ||
+    val === ActivityType.exam
+  );
+}
+
+function isGamePublicConfig(cfg: unknown): cfg is GamePublicConfig {
+  return isRecord(cfg) && typeof cfg.mechanic === 'string' && 'settings' in cfg;
+}
+
+function isGameAnswerKey(ak: unknown): ak is GameAnswerKey {
+  return isRecord(ak) && 'solution' in ak;
 }
 
 export function generateUuid(): string {
@@ -115,8 +181,8 @@ export function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSente
   const rec = asRecord(cfg);
   if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
     const akRec = asRecord(ak);
-    const akItems =
-      akRec && asRecord(akRec['items']) ? (akRec['items'] as Record<string, unknown>) : {};
+    const rawAkItems = akRec ? akRec['items'] : null;
+    const akItems = asRecord(rawAkItems) || {};
 
     const items: FormSentenceItem[] = [];
     for (const rawItem of rec['items']) {
@@ -205,8 +271,8 @@ export function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceIt
   const rec = asRecord(cfg);
   if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
     const akRec = asRecord(ak);
-    const akItems =
-      akRec && asRecord(akRec['items']) ? (akRec['items'] as Record<string, unknown>) : {};
+    const rawAkItems = akRec ? akRec['items'] : null;
+    const akItems = asRecord(rawAkItems) || {};
 
     const items: FormSentenceItem[] = [];
     for (const rawItem of rec['items']) {
@@ -567,11 +633,17 @@ function parseInitialMatchPairs(
   if (rec && rec['mechanic'] === 'match') {
     const settings = asRecord(rec['settings']);
     if (settings && Array.isArray(settings['left']) && Array.isArray(settings['right'])) {
-      const left = settings['left'] as Array<{ id: string; text: string }>;
-      const right = settings['right'] as Array<{ id: string; text: string }>;
+      const left = settings['left'].filter(isIdTextItem);
+      const right = settings['right'].filter(isIdTextItem);
       const akRec = asRecord(ak);
       const sol = akRec ? asRecord(akRec['solution']) : null;
-      const pairs = sol && asRecord(sol['pairs']) ? (sol['pairs'] as Record<string, string>) : {};
+      const rawPairs = sol ? asRecord(sol['pairs']) : null;
+      const pairs: Record<string, string> = {};
+      if (rawPairs) {
+        for (const [k, v] of Object.entries(rawPairs)) {
+          if (typeof v === 'string') pairs[k] = v;
+        }
+      }
       const rightMap = new Map(right.map((r) => [r.id, r.text]));
       const parsed = left.map((l) => {
         const rightId = pairs[l.id];
@@ -595,7 +667,7 @@ function parseInitialOrderWords(cfg: unknown): string {
   if (rec && rec['mechanic'] === 'order_words') {
     const settings = asRecord(rec['settings']);
     if (settings && Array.isArray(settings['tokens'])) {
-      const words = (settings['tokens'] as Array<{ text: string }>).map((t) => t.text);
+      const words = settings['tokens'].filter(isTextItem).map((t) => t.text);
       if (words.length > 0) return words.join(' ');
     }
   }
@@ -613,12 +685,17 @@ function parseInitialDragDrop(
   if (rec && rec['mechanic'] === 'drag_drop') {
     const settings = asRecord(rec['settings']);
     if (settings && Array.isArray(settings['targets']) && Array.isArray(settings['objects'])) {
-      const targets = settings['targets'] as Array<{ id: string; text: string }>;
-      const objects = settings['objects'] as Array<{ id: string; text: string }>;
+      const targets = settings['targets'].filter(isIdTextItem);
+      const objects = settings['objects'].filter(isIdTextItem);
       const akRec = asRecord(ak);
       const sol = akRec ? asRecord(akRec['solution']) : null;
-      const placements =
-        sol && asRecord(sol['placements']) ? (sol['placements'] as Record<string, string>) : {};
+      const rawPlacements = sol ? asRecord(sol['placements']) : null;
+      const placements: Record<string, string> = {};
+      if (rawPlacements) {
+        for (const [k, v] of Object.entries(rawPlacements)) {
+          if (typeof v === 'string') placements[k] = v;
+        }
+      }
       const targetIndexMap = new Map(targets.map((t, i) => [t.id, i]));
       const parsedTargets = targets.map((t) => ({ name: t.text }));
       const parsedObjects = objects.map((o) => {
@@ -651,12 +728,12 @@ function parseInitialMemory(
   if (rec && rec['mechanic'] === 'memory') {
     const settings = asRecord(rec['settings']);
     if (settings && Array.isArray(settings['cards'])) {
-      const cards = settings['cards'] as Array<{ id: string; text: string }>;
+      const cards = settings['cards'].filter(isIdTextItem);
       const cardMap = new Map(cards.map((c) => [c.id, c.text]));
       const akRec = asRecord(ak);
       const sol = akRec ? asRecord(akRec['solution']) : null;
       if (sol && Array.isArray(sol['pairs'])) {
-        const pairs = sol['pairs'] as Array<[string, string]>;
+        const pairs = sol['pairs'].filter(isStringPair);
         const parsed = pairs.map(([c1, c2]) => ({
           card1Text: (c1 && cardMap.get(c1)) || '',
           card2Text: (c2 && cardMap.get(c2)) || '',
@@ -682,20 +759,21 @@ function parseInitialTimedChoice(
   if (rec && rec['mechanic'] === 'timed_choice') {
     const settings = asRecord(rec['settings']);
     if (settings && Array.isArray(settings['questions'])) {
-      const questions = settings['questions'] as Array<{
-        id: string;
-        prompt: string;
-        options: Array<{ id: string; text: string }>;
-      }>;
+      const questions = settings['questions'].filter(isTimedQuestion);
       const akRec = asRecord(ak);
       const sol = akRec ? asRecord(akRec['solution']) : null;
-      const choices =
-        sol && asRecord(sol['choices']) ? (sol['choices'] as Record<string, string>) : {};
+      const rawChoices = sol ? asRecord(sol['choices']) : null;
+      const choices: Record<string, string> = {};
+      if (rawChoices) {
+        for (const [k, v] of Object.entries(rawChoices)) {
+          if (typeof v === 'string') choices[k] = v;
+        }
+      }
       const parsed = questions.map((q) => {
         const opt1 = q.options[0]?.text || 'Opción 1';
         const opt2 = q.options[1]?.text || 'Opción 2';
         const correctOptId = choices[q.id];
-        const correct = correctOptId === q.options[1]?.id ? ('opt2' as const) : ('opt1' as const);
+        const correct: 'opt1' | 'opt2' = correctOptId === q.options[1]?.id ? 'opt2' : 'opt1';
         return {
           prompt: q.prompt,
           opt1,
@@ -728,10 +806,12 @@ export function ActivityEditorComponent({
   onActivityUpdated,
 }: ActivityEditorProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEditing = Boolean(initialActivity?.id);
   const initialCfg = initialActivity?.config;
   const initialAk = initialActivity?.answerKey;
-  const initialMechanic = getStringProp(initialCfg, 'mechanic', 'match') as GameMechanicType;
+  const rawMechanic = getStringProp(initialCfg, 'mechanic', 'match');
+  const initialMechanic: GameMechanicType = isGameMechanicType(rawMechanic) ? rawMechanic : 'match';
 
   // Core metadata
   const [title, setTitle] = useState(initialActivity?.title ?? '');
@@ -926,8 +1006,8 @@ export function ActivityEditorComponent({
     getStringProp(initialCfg, 'instructions', ''),
   );
   const [oqQuestions, setOqQuestions] = useState<OqQuestionItem[]>(() => {
-    if (initialCfg && typeof initialCfg === 'object' && Array.isArray((initialCfg as { items?: unknown[] }).items)) {
-      const items = (initialCfg as { items: Array<Record<string, unknown>> }).items;
+    if (isRecord(initialCfg) && Array.isArray(initialCfg.items)) {
+      const items = initialCfg.items.filter(isRecord);
       if (items.length > 0) {
         return items.map((it) => ({
           id: typeof it.id === 'string' ? it.id : crypto.randomUUID(),
@@ -989,7 +1069,6 @@ export function ActivityEditorComponent({
   const [timedQuestions, setTimedQuestions] = useState(initialTc.questions);
 
   // UI state
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [weightsAdjustedNotice, setWeightsAdjustedNotice] = useState(false);
@@ -1021,21 +1100,18 @@ export function ActivityEditorComponent({
     } else if (type === ActivityType.open_question) {
       if (oqQuestions.length === 0) {
         setError('Debes agregar al menos una pregunta abierta');
-        setIsSaving(false);
         return;
       }
       for (let i = 0; i < oqQuestions.length; i++) {
         const q = oqQuestions[i];
         if (!q || !q.prompt.trim()) {
           setError(`La pregunta ${i + 1} no puede estar vacía`);
-          setIsSaving(false);
           return;
         }
       }
       const firstQ = oqQuestions[0];
       if (!firstQ) {
         setError('Debes agregar al menos una pregunta abierta');
-        setIsSaving(false);
         return;
       }
 
@@ -1290,77 +1366,73 @@ export function ActivityEditorComponent({
     };
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setError(null);
-    setSuccess(null);
-    setWeightsAdjustedNotice(false);
-
-    try {
-      const payload = buildPayload();
-      if (!payload) return;
-
+  const saveMutation = useMutation({
+    mutationFn: async (payload: {
+      title: string;
+      type: ActivityType;
+      level: Level;
+      config: unknown;
+      answerKey: unknown;
+      expectedDurationSeconds: number | null;
+      minPlausibleSeconds: number | null;
+    }) => {
       if (isEditing && initialActivity?.id) {
-        const updated = await apiFetch<ActivityEditor>(
-          `/api/v1/activities/${initialActivity.id}`,
-          {
-            method: 'PATCH',
-            body: JSON.stringify({
-              title: payload.title,
-              level: payload.level,
-              config: payload.config,
-              answerKey: payload.answerKey,
-              expectedDurationSeconds: payload.expectedDurationSeconds,
-              minPlausibleSeconds: payload.minPlausibleSeconds,
-            }),
-          },
-        );
-        setCurrentStatus(updated.status);
-        onActivityUpdated?.(updated);
-        setSuccess('Actividad guardada correctamente');
-        if (updated.weightsAdjusted) setWeightsAdjustedNotice(true);
-      } else {
-        const created = await apiFetch<ActivityEditor>('/api/v1/activities', {
-          method: 'POST',
-          body: JSON.stringify(payload),
+        return apiFetch<ActivityEditor>(`/api/v1/activities/${initialActivity.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            title: payload.title,
+            level: payload.level,
+            config: payload.config,
+            answerKey: payload.answerKey,
+            expectedDurationSeconds: payload.expectedDurationSeconds,
+            minPlausibleSeconds: payload.minPlausibleSeconds,
+          }),
         });
-        setCurrentStatus(created.status);
-        onActivityUpdated?.(created);
-        setSuccess('Actividad creada exitosamente');
-        if (created.weightsAdjusted) setWeightsAdjustedNotice(true);
-        router.push(`/actividades/${created.id}`);
       }
-    } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else if (err instanceof Error) {
+      return apiFetch<ActivityEditor>('/api/v1/activities', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: (data) => {
+      setCurrentStatus(data.status);
+      onActivityUpdated?.(data);
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      if (initialActivity?.id) {
+        queryClient.setQueryData(['teacher', 'activity', initialActivity.id], data);
+        setSuccess('Actividad guardada correctamente');
+      } else {
+        setSuccess('Actividad creada exitosamente');
+        router.push(`/actividades/${data.id}`);
+      }
+      if (data.weightsAdjusted) setWeightsAdjustedNotice(true);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError || err instanceof Error) {
         setError(err.message);
       } else {
         setError('Error al guardar la actividad');
       }
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    },
+  });
 
-  const handlePublish = async () => {
-    if (!initialActivity?.id) return;
-    setIsSaving(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const published = await apiFetch<ActivityEditor>(
-        `/api/v1/activities/${initialActivity.id}/publish`,
-        {
-          method: 'POST',
-        },
-      );
+  const publishMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiFetch<ActivityEditor>(`/api/v1/activities/${id}/publish`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (published) => {
       setCurrentStatus(ActivityStatus.published);
       onActivityUpdated?.(published);
+      if (initialActivity?.id) {
+        queryClient.setQueryData(['teacher', 'activity', initialActivity.id], published);
+      }
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
       setSuccess('¡Actividad publicada exitosamente! Ya está disponible en el catálogo.');
       router.refresh();
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       if (err instanceof ApiError) {
         if (err.code === 'EXAM_MIN_ITEMS') {
           setError('Un examen debe tener al menos 2 oraciones para ser publicado.');
@@ -1370,9 +1442,34 @@ export function ActivityEditorComponent({
       } else {
         setError('Error al publicar la actividad');
       }
-    } finally {
-      setIsSaving(false);
+    },
+  });
+
+  const isSaving = saveMutation.isPending || publishMutation.isPending;
+
+  const handleSave = () => {
+    setError(null);
+    setSuccess(null);
+    setWeightsAdjustedNotice(false);
+
+    try {
+      const payload = buildPayload();
+      if (!payload) return;
+      saveMutation.mutate(payload);
+    } catch (err: unknown) {
+      if (err instanceof ApiError || err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Error al guardar la actividad');
+      }
     }
+  };
+
+  const handlePublish = () => {
+    if (!initialActivity?.id) return;
+    setError(null);
+    setSuccess(null);
+    publishMutation.mutate(initialActivity.id);
   };
 
   return (
@@ -1513,7 +1610,9 @@ export function ActivityEditorComponent({
             <select
               id="activity-level"
               value={level}
-              onChange={(e) => setLevel(e.target.value as Level)}
+              onChange={(e) => {
+                if (isLevel(e.target.value)) setLevel(e.target.value);
+              }}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value={Level.A1}>A1 — Principiante inicial</option>
@@ -1532,7 +1631,9 @@ export function ActivityEditorComponent({
               id="activity-type"
               value={type}
               disabled={isEditing}
-              onChange={(e) => setType(e.target.value as ActivityType)}
+              onChange={(e) => {
+                if (isActivityType(e.target.value)) setType(e.target.value);
+              }}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-100 disabled:cursor-not-allowed"
             >
               <option value={ActivityType.fill_blank}>Rellenar huecos (Fill in the blanks)</option>
@@ -2209,7 +2310,9 @@ export function ActivityEditorComponent({
                 id="game-mechanic"
                 value={gameMechanic}
                 disabled={isEditing}
-                onChange={(e) => setGameMechanic(e.target.value as GameMechanicType)}
+                onChange={(e) => {
+                  if (isGameMechanicType(e.target.value)) setGameMechanic(e.target.value);
+                }}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 disabled:bg-zinc-100 disabled:cursor-not-allowed"
               >
                 <option value="order_words">Ordenar palabras (Order words)</option>
@@ -2838,12 +2941,12 @@ export function ActivityEditorComponent({
               let previewConfig: GamePublicConfig | null;
               try {
                 const payload = buildPayload();
-                if (!payload) {
+                if (!payload || !isGamePublicConfig(payload.config) || !isGameAnswerKey(payload.answerKey)) {
                   previewConfig = null;
                 } else {
                   previewConfig = {
-                    ...(payload.config as GamePublicConfig),
-                    answerKey: (payload.answerKey as GameAnswerKey) || undefined,
+                    ...payload.config,
+                    answerKey: payload.answerKey,
                   };
                 }
               } catch {

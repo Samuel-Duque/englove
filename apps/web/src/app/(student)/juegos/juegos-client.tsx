@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   StudentGameCard,
   StudentGamesListResponse,
@@ -16,53 +17,62 @@ import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
 export function JuegosClient() {
   const router = useRouter();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [gamesEnabled, setGamesEnabled] = useState(false);
-  const [games, setGames] = useState<StudentGameCard[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [startingGameId, setStartingGameId] = useState<string | null>(null);
   const [speakingGameId, setSpeakingGameId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const flagsQuery = useQuery({
+    queryKey: ['feature-flags'],
+    queryFn: async () => {
+      const flagRes = await fetchSharedFeatureFlags();
+      if (!flagRes) throw new Error('No se pudieron obtener las feature flags');
+      return flagRes;
+    },
+  });
+
+  const gamesEnabled = Boolean(flagsQuery.data?.flags?.games);
+
+  const gamesQuery = useQuery({
+    queryKey: ['student', 'games'],
+    queryFn: () => apiFetch<StudentGamesListResponse>('/api/v1/me/games'),
+    enabled: gamesEnabled,
+  });
 
   useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // 1. Check feature flags (SPEC-06 RF-11)
-        const flagRes = await fetchSharedFeatureFlags();
-        if (!flagRes) throw new Error('No se pudieron obtener las feature flags');
-        if (!isMounted) return;
-
-        const isGamesOn = Boolean(flagRes.flags?.games);
-        setGamesEnabled(isGamesOn);
-
-        if (isGamesOn) {
-          // 2. Fetch autonomous microgames (SPEC-11 RF-1, RF-10)
-          const gamesRes = await apiFetch<StudentGamesListResponse>('/api/v1/me/games');
-          if (!isMounted) return;
-          setGames(gamesRes.items || []);
-        }
-      } catch (err) {
-        if (isMounted) {
-          if (err instanceof ApiError) setError(err.message);
-          else setError('No se pudieron cargar los juegos.');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadData();
     return () => {
-      isMounted = false;
-      setStartingGameId(null);
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
   }, []);
+
+  const startGameMutation = useMutation({
+    mutationFn: (gameId: string) =>
+      apiFetch<{ attempt: { id: string } }>(`/api/v1/activities/${gameId}/attempts`, {
+        method: 'POST',
+      }),
+    onSuccess: (res) => {
+      router.push(`/actividad/${res.attempt.id}`);
+    },
+    onError: (err: unknown, gameId: string) => {
+      const game = games.find((g) => g.id === gameId);
+      if (err instanceof ApiError) {
+        if (err.code === 'ATTEMPT_ALREADY_EXISTS' && game?.inProgressAttemptId) {
+          router.push(`/actividad/${game.inProgressAttemptId}`);
+          return;
+        }
+        setActionError(err.message);
+      } else {
+        setActionError('No se pudo iniciar el juego');
+      }
+      setStartingGameId(null);
+    },
+  });
+
+  const isLoading = flagsQuery.isLoading || (gamesEnabled && gamesQuery.isLoading);
+  const games: StudentGameCard[] = gamesQuery.data?.items || [];
+  const error = actionError || (flagsQuery.error instanceof Error ? flagsQuery.error.message : null) || (gamesQuery.error instanceof Error ? gamesQuery.error.message : null);
 
   const handleSpeak = (game: StudentGameCard) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -81,7 +91,7 @@ export function JuegosClient() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const handleStartGame = async (game: StudentGameCard) => {
+  const handleStartGame = (game: StudentGameCard) => {
     // If there is already an in-progress attempt, navigate directly to it
     if (game.status === 'in_progress' && game.inProgressAttemptId) {
       router.push(`/actividad/${game.inProgressAttemptId}`);
@@ -89,28 +99,8 @@ export function JuegosClient() {
     }
 
     setStartingGameId(game.id);
-    setError(null);
-    try {
-      const res = await apiFetch<{ attempt: { id: string } }>(
-        `/api/v1/activities/${game.id}/attempts`,
-        {
-          method: 'POST',
-        },
-      );
-      router.push(`/actividad/${res.attempt.id}`);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === 'ATTEMPT_ALREADY_EXISTS' && game.inProgressAttemptId) {
-          router.push(`/actividad/${game.inProgressAttemptId}`);
-          return;
-        }
-        setError(err.message);
-      } else {
-        setError('No se pudo iniciar el juego');
-      }
-    } finally {
-      setStartingGameId(null);
-    }
+    setActionError(null);
+    startGameMutation.mutate(game.id);
   };
 
   // Filtered cards
@@ -209,7 +199,7 @@ export function JuegosClient() {
           <span>{error}</span>
           <button
             type="button"
-            onClick={() => setError(null)}
+            onClick={() => setActionError(null)}
             className="text-xs font-bold underline hover:no-underline"
           >
             Cerrar

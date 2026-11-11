@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  TimedChoiceSettings,
-  TimedChoiceSolution,
+  TimedChoiceSettingsSchema,
+  TimedChoiceSolutionSchema,
 } from '@englove/shared';
 import { soundManager } from '../../../lib/sound';
 
@@ -18,8 +18,10 @@ export function TimedChoiceGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as TimedChoiceSettings;
-  const solution = config.answerKey?.solution as TimedChoiceSolution | undefined;
+  const parsedSettings = TimedChoiceSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = TimedChoiceSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const questions = settings?.questions || [];
   const timeLimitSeconds = settings?.timeLimitSeconds || 20;

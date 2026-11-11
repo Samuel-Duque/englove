@@ -410,7 +410,7 @@ flowchart TD
 | **`WP-06`** | Cliente / Sesión | Specs cliente, `AccessibleModal` foco estable, higiene IDB, sesión web | Completado | Tests web en verde, modal sin saltos de foco |
 | **`WP-07`** | Cliente / PWA | Spike e instalación Serwist real con `vinext`, retiro de `sw.js` | Completado | Build worker `<= 3 MB`, `pnpm build` web (`Exit 0`) |
 | **`WP-08`** | Cliente / UI | Flujos estudiante y maestra, editor UUIDs, coma decimal, microjuegos | Completado | 232 tests web en verde (`Exit 0`), editor UUIDs verificado |
-| **`WP-09`** | Cliente / TanStack | 20 vistas a TanStack Query, 168+ `as Type` fuera, guardrails web | Pendiente | `check-guardrails.mjs` 0 errores (`G-B04`, `G-C12`, `G-C13`) |
+| **`WP-09`** | Cliente / TanStack | 20 vistas a TanStack Query, 168+ `as Type` fuera, guardrails web | Completado | `check-guardrails.mjs` 0 errores (`G-B04`, `G-C12`, `G-C13`) |
 | **`WP-10`** | Cliente / Cierre | Contraste Teens, axe `wcag22aa`, Playwright E2E, cierre documental | Pendiente | Monorepo 100% verde + E2E + informe final |
 
 ---

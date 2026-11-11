@@ -1,29 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityEditorComponent } from '../activity-editor';
 import { ActivityEditor } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 
 export function ActividadDetailClient({ id }: { id: string }) {
-  const [activity, setActivity] = useState<ActivityEditor | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    async function loadActivity() {
-      try {
-        const data = await apiFetch<ActivityEditor>(`/api/v1/activities/${id}`);
-        setActivity(data);
-      } catch (err) {
-        if (err instanceof ApiError) setError(err.message);
-        else setError('Error al cargar la actividad');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadActivity();
-  }, [id]);
+  const { data: activity, isLoading, error: queryError } = useQuery({
+    queryKey: ['teacher', 'activity', id],
+    queryFn: () => apiFetch<ActivityEditor>(`/api/v1/activities/${id}`),
+  });
+
+  const error = queryError instanceof ApiError
+    ? queryError.message
+    : queryError instanceof Error
+      ? queryError.message
+      : null;
 
   if (isLoading) {
     return (
@@ -48,7 +43,9 @@ export function ActividadDetailClient({ id }: { id: string }) {
   return (
     <ActivityEditorComponent
       initialActivity={activity}
-      onActivityUpdated={(updated) => setActivity(updated)}
+      onActivityUpdated={(updated) => {
+        queryClient.setQueryData(['teacher', 'activity', id], updated);
+      }}
     />
   );
 }

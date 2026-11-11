@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  MemorySettings,
-  MemorySolution,
+  MemorySettingsSchema,
+  MemorySolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { soundManager } from '../../../lib/sound';
@@ -20,8 +20,10 @@ export function MemoryGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as MemorySettings;
-  const solution = config.answerKey?.solution as MemorySolution | undefined;
+  const parsedSettings = MemorySettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = MemorySolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalCards = settings?.cards || [];
 

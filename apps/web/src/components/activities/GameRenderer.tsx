@@ -14,13 +14,13 @@ import {
   scoreToGameStars,
   getGameMotivationMessage,
   AgeSegment,
-  MatchSolution,
-  OrderWordsSettings,
-  OrderWordsSolution,
-  DragDropSolution,
-  MemorySettings,
-  MemorySolution,
-  TimedChoiceSolution,
+  MatchSolutionSchema,
+  OrderWordsSettingsSchema,
+  OrderWordsSolutionSchema,
+  DragDropSolutionSchema,
+  MemorySettingsSchema,
+  MemorySolutionSchema,
+  TimedChoiceSolutionSchema,
 } from '@englove/shared';
 
 import { MatchGame } from './games/MatchGame';
@@ -46,32 +46,47 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
     const solution = config.answerKey?.solution;
 
     if (mechanic === GameMechanic.match && solution) {
-      fraction = calculateMatchScore((solution as MatchSolution).pairs, finalAnswers.pairs || {});
+      const parsedSol = MatchSolutionSchema.safeParse(solution);
+      if (parsedSol.success) {
+        fraction = calculateMatchScore(parsedSol.data.pairs, finalAnswers.pairs || {});
+      }
     } else if (mechanic === GameMechanic.order_words && solution) {
-      const settings = config.settings as OrderWordsSettings;
-      fraction = calculateOrderWordsScore(
-        settings.tokens,
-        (solution as OrderWordsSolution).tokenIds,
-        finalAnswers.tokenIds || [],
-      );
+      const parsedSettings = OrderWordsSettingsSchema.safeParse(config.settings);
+      const parsedSol = OrderWordsSolutionSchema.safeParse(solution);
+      if (parsedSettings.success && parsedSol.success) {
+        fraction = calculateOrderWordsScore(
+          parsedSettings.data.tokens,
+          parsedSol.data.tokenIds,
+          finalAnswers.tokenIds || [],
+        );
+      }
     } else if (mechanic === GameMechanic.drag_drop && solution) {
-      fraction = calculateDragDropScore(
-        (solution as DragDropSolution).placements,
-        finalAnswers.placements || {},
-      );
+      const parsedSol = DragDropSolutionSchema.safeParse(solution);
+      if (parsedSol.success) {
+        fraction = calculateDragDropScore(
+          parsedSol.data.placements,
+          finalAnswers.placements || {},
+        );
+      }
     } else if (mechanic === GameMechanic.memory && solution) {
-      const settings = config.settings as MemorySettings;
-      const recon = reconstructMemoryPlays(
-        settings.cards,
-        (solution as MemorySolution).pairs,
-        finalAnswers.selections || [],
-      );
-      fraction = recon.fraction;
+      const parsedSettings = MemorySettingsSchema.safeParse(config.settings);
+      const parsedSol = MemorySolutionSchema.safeParse(solution);
+      if (parsedSettings.success && parsedSol.success) {
+        const recon = reconstructMemoryPlays(
+          parsedSettings.data.cards,
+          parsedSol.data.pairs,
+          finalAnswers.selections || [],
+        );
+        fraction = recon.fraction;
+      }
     } else if (mechanic === GameMechanic.timed_choice && solution) {
-      fraction = calculateTimedChoiceScore(
-        (solution as TimedChoiceSolution).choices,
-        finalAnswers.choices || {},
-      );
+      const parsedSol = TimedChoiceSolutionSchema.safeParse(solution);
+      if (parsedSol.success) {
+        fraction = calculateTimedChoiceScore(
+          parsedSol.data.choices,
+          finalAnswers.choices || {},
+        );
+      }
     }
 
     const score = Math.round(fraction * 5 * 10) / 10;
@@ -108,7 +123,7 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
       default:
         return (
           <div className="p-8 text-center text-zinc-500 font-semibold">
-            Mecánica de juego no reconocida: {(config as { mechanic?: string })?.mechanic}
+            Mecánica de juego no reconocida: {String(config?.mechanic)}
           </div>
         );
     }

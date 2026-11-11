@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  OrderWordsSettings,
-  OrderWordsSolution,
+  OrderWordsSettingsSchema,
+  OrderWordsSolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -21,8 +21,10 @@ export function OrderWordsGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as OrderWordsSettings;
-  const solution = config.answerKey?.solution as OrderWordsSolution | undefined;
+  const parsedSettings = OrderWordsSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = OrderWordsSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalTokens = settings?.tokens || [];
 

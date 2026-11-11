@@ -1,5 +1,8 @@
+'use client';
+
 import React, { useTransition, useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { ConfirmDialog } from './ui/modal';
 import { usePathname } from 'next/navigation';
 import { clearSharedDeviceSession } from '../lib/auth-hygiene';
@@ -27,28 +30,19 @@ export function StudentNav({
 }: StudentNavProps) {
   const pathname = usePathname();
   const [isLoggingOut, startLogout] = useTransition();
-  const [gamesOn, setGamesOn] = React.useState(gamesEnabled ?? false);
-  const [extraContentOn, setExtraContentOn] = React.useState(extraContentEnabled ?? false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [isAttemptingFlush, setIsAttemptingFlush] = useState(false);
 
-  React.useEffect(() => {
-    if (gamesEnabled !== undefined && extraContentEnabled !== undefined) {
-      setGamesOn(gamesEnabled);
-      setExtraContentOn(extraContentEnabled);
-      return;
-    }
-    fetchSharedFeatureFlags()
-      .then((data) => {
-        if (data?.flags?.games !== undefined && gamesEnabled === undefined) {
-          setGamesOn(Boolean(data.flags.games));
-        }
-        if (data?.flags?.extra_content !== undefined && extraContentEnabled === undefined) {
-          setExtraContentOn(Boolean(data.flags.extra_content));
-        }
-      })
-      .catch(() => {});
-  }, [gamesEnabled, extraContentEnabled]);
+  const shouldFetchFlags = gamesEnabled === undefined || extraContentEnabled === undefined;
+  const featureFlagsQuery = useQuery({
+    queryKey: ['feature-flags'],
+    queryFn: () => fetchSharedFeatureFlags(),
+    enabled: shouldFetchFlags,
+    retry: false,
+  });
+
+  const gamesOn = gamesEnabled ?? Boolean(featureFlagsQuery.data?.flags?.games);
+  const extraContentOn = extraContentEnabled ?? Boolean(featureFlagsQuery.data?.flags?.extra_content);
 
   const navItems = [
     { label: 'Inicio', href: '/inicio', icon: '🏠', ariaLabel: undefined },

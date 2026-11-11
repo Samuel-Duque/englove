@@ -46,7 +46,7 @@
     "englove-guardrails": {
       "source": "./.agents/skills/englove-guardrails",
       "sourceType": "local",
-      "computedHash": "85e7e020ce1adcfdb2e2457bf66de493e133ba647cbab1b42ee50f5c98759bf8"
+      "computedHash": "0166b210664687c6627f0f6b16b3a52a50cc4e980cc80a5263700f3ebc77745f"
     },
     "englove-spec": {
       "source": "./.agents/skills/englove-spec",

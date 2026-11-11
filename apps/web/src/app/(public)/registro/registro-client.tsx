@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useMutation } from '@tanstack/react-query';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
 
 export function RegistroClient() {
@@ -15,9 +16,44 @@ export function RegistroClient() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  const registerMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const res = await fetch(`${apiUrl}/api/v1/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: window.location.origin,
+        },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const code =
+          data && typeof data === 'object' && 'code' in data && typeof data.code === 'string'
+            ? data.code
+            : undefined;
+        throw new Error(getAuthErrorMessage(code));
+      }
+
+      const data = await res.json().catch(() => null);
+      const message =
+        data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+          ? data.message
+          : '¡Solicitud enviada con éxito! Tu cuenta está en revisión. Tu docente la aprobará pronto para que puedas ingresar.';
+      return { message };
+    },
+    onSuccess: (data) => {
+      setSuccessMessage(data.message);
+    },
+    onError: (err: Error) => {
+      setErrorMessage(err.message || 'Ocurrió un error inesperado. Intenta de nuevo más tarde');
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,49 +70,22 @@ export function RegistroClient() {
       return;
     }
 
-    startTransition(async () => {
-      try {
-        const payload: Record<string, unknown> = {
-          name,
-          email,
-          password,
-          birthDate,
-          acceptTerms: true,
-        };
+    const payload: Record<string, unknown> = {
+      name,
+      email,
+      password,
+      birthDate,
+      acceptTerms: true,
+    };
 
-        if (guardianName.trim()) {
-          payload.guardianName = guardianName.trim();
-        }
-        if (guardianContact.trim()) {
-          payload.guardianContact = guardianContact.trim();
-        }
+    if (guardianName.trim()) {
+      payload.guardianName = guardianName.trim();
+    }
+    if (guardianContact.trim()) {
+      payload.guardianContact = guardianContact.trim();
+    }
 
-        const res = await fetch(`${apiUrl}/api/v1/auth/signup`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Origin: window.location.origin,
-          },
-          body: JSON.stringify(payload),
-          credentials: 'include',
-        });
-
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
-          const message = getAuthErrorMessage(data?.code);
-          setErrorMessage(message);
-          return;
-        }
-
-        const data = await res.json();
-        setSuccessMessage(
-          data.message ||
-            '¡Solicitud enviada con éxito! Tu cuenta está en revisión. Tu docente la aprobará pronto para que puedas ingresar.',
-        );
-      } catch {
-        setErrorMessage('Ocurrió un error inesperado. Intenta de nuevo más tarde');
-      }
-    });
+    registerMutation.mutate(payload);
   };
 
   if (successMessage) {
@@ -257,10 +266,10 @@ export function RegistroClient() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={registerMutation.isPending}
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
-            {isPending ? 'Enviando…' : 'Enviar solicitud'}
+            {registerMutation.isPending ? 'Enviando…' : 'Enviar solicitud'}
           </button>
         </form>
 

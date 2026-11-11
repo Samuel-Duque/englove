@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
-  AssignmentView,
   AssignmentListResponse,
   AssignmentAvailability,
-  GroupView,
   GroupListResponse,
   ActivityType,
   formatBogotaDateTime,
@@ -56,12 +55,6 @@ export function AsignacionesClient() {
   const initialGroupId = searchParams.get('groupId') || 'all';
   const initialAvailability = searchParams.get('availability') || 'all';
 
-  const [assignments, setAssignments] = useState<AssignmentView[]>([]);
-  const [total, setTotal] = useState(0);
-  const [groups, setGroups] = useState<GroupView[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [selectedGroup, setSelectedGroup] = useState<string>(initialGroupId);
   const [selectedAvailability, setSelectedAvailability] =
     useState<string>(initialAvailability);
@@ -75,19 +68,14 @@ export function AsignacionesClient() {
   }, [searchParams]);
 
   // Load all groups (including archived ones for historical filter, SPEC-04 RF-9)
-  const fetchGroups = useCallback(async () => {
-    try {
-      const data = await apiFetch<GroupListResponse>('/api/v1/groups?limit=100');
-      setGroups(data.items);
-    } catch {
-      // Ignore group list error here, main error handled in fetchAssignments
-    }
-  }, []);
+  const groupsQuery = useQuery({
+    queryKey: ['teacher', 'groups', 'all'],
+    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?limit=100'),
+  });
 
-  const fetchAssignments = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const assignmentsQuery = useQuery({
+    queryKey: ['teacher', 'assignments', selectedGroup, selectedAvailability],
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedGroup !== 'all') {
         params.set('groupId', selectedGroup);
@@ -96,38 +84,32 @@ export function AsignacionesClient() {
         params.set('availability', selectedAvailability);
       }
       params.set('limit', '100');
+      return apiFetch<AssignmentListResponse>(`/api/v1/assignments?${params.toString()}`);
+    },
+  });
 
-      const data = await apiFetch<AssignmentListResponse>(
-        `/api/v1/assignments?${params.toString()}`,
-      );
-      setAssignments(data.items);
-      setTotal(data.total);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.statusCode === 404) {
-          setError('No encontramos esta asignación o alguno de los recursos seleccionados');
-        } else if (err.statusCode === 403) {
-          setError('No tienes acceso a esta sección');
-        } else if (err.statusCode === 429) {
-          setError('Espera un momento antes de volver a intentarlo');
-        } else {
-          setError(err.message || 'No pudimos cargar las asignaciones');
-        }
-      } else {
-        setError('No pudimos cargar las asignaciones');
+  const groups = groupsQuery.data?.items ?? [];
+  const assignments = assignmentsQuery.data?.items ?? [];
+  const total = assignmentsQuery.data?.total ?? 0;
+  const isLoading = assignmentsQuery.isLoading;
+
+  const getErrorMessage = () => {
+    if (!assignmentsQuery.error) return null;
+    const err = assignmentsQuery.error;
+    if (err instanceof ApiError) {
+      if (err.statusCode === 404) {
+        return 'No encontramos esta asignación o alguno de los recursos seleccionados';
+      } else if (err.statusCode === 403) {
+        return 'No tienes acceso a esta sección';
+      } else if (err.statusCode === 429) {
+        return 'Espera un momento antes de volver a intentarlo';
       }
-    } finally {
-      setIsLoading(false);
+      return err.message || 'No pudimos cargar las asignaciones';
     }
-  }, [selectedGroup, selectedAvailability]);
+    return 'No pudimos cargar las asignaciones';
+  };
 
-  useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
-
-  useEffect(() => {
-    fetchAssignments();
-  }, [fetchAssignments]);
+  const error = getErrorMessage();
 
   const handleGroupFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -262,7 +244,9 @@ export function AsignacionesClient() {
           <p className="font-medium">{error}</p>
           <button
             type="button"
-            onClick={fetchAssignments}
+            onClick={() => {
+              void assignmentsQuery.refetch();
+            }}
             className="mt-3 inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
           >
             Reintentar

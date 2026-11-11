@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   StudentView,
   StudentListResponse,
-  GroupView,
   GroupListResponse,
   Level,
   AgeSegment,
@@ -14,22 +14,27 @@ import {
 import { apiFetch, ApiError } from '../../../lib/api';
 import { ConfirmDialog, AccessibleModal } from '../../../components/ui/modal';
 
+function isLevel(val: string): val is Level {
+  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+}
+
+function isAgeSegment(val: string): val is AgeSegment {
+  return val === AgeSegment.kids || val === AgeSegment.teens;
+}
+
 function StudentsManagementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get('tab') as 'students' | 'requests' | 'locked') || 'students';
+  const queryClient = useQueryClient();
+
+  const rawTab = searchParams.get('tab');
+  const initialTab: 'students' | 'requests' | 'locked' =
+    rawTab === 'requests' || rawTab === 'locked' ? rawTab : 'students';
 
   const [activeTab, setActiveTab] = useState<'students' | 'requests' | 'locked'>(initialTab);
 
-  // Data lists
-  const [students, setStudents] = useState<StudentView[]>([]);
-  const [requests, setRequests] = useState<StudentView[]>([]);
-  const [locked, setLocked] = useState<StudentView[]>([]);
-  const [groups, setGroups] = useState<GroupView[]>([]);
-
   // UI state
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Approve Modal state
@@ -39,7 +44,6 @@ function StudentsManagementContent() {
   const [guardianName, setGuardianName] = useState('');
   const [guardianContact, setGuardianContact] = useState('');
   const [ageSegment, setAgeSegment] = useState<AgeSegment>(AgeSegment.kids);
-  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
   const [rejectConfirmDialog, setRejectConfirmDialog] = useState<{
     isOpen: boolean;
     student: StudentView | null;
@@ -48,54 +52,98 @@ function StudentsManagementContent() {
   // Sync tab with URL
   const handleTabChange = (tab: 'students' | 'requests' | 'locked') => {
     setActiveTab(tab);
-    setError(null);
+    setActionError(null);
     setSuccess(null);
     const params = new URLSearchParams(window.location.search);
     params.set('tab', tab);
     router.replace(`/alumnos?${params.toString()}`);
   };
 
-  // Fetch groups for approval dropdown
-  const loadActiveGroups = useCallback(async () => {
-    try {
-      const data = await apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100');
-      setGroups(data.items);
-      if (data.items.length > 0 && !selectedGroupId) {
-        setSelectedGroupId(data.items[0]?.id ?? '');
-      }
-    } catch {
-      // Non-blocking
-    }
-  }, [selectedGroupId]);
+  const studentsQuery = useQuery({
+    queryKey: ['teacher', 'students', 'all'],
+    queryFn: () => apiFetch<StudentListResponse>('/api/v1/students?limit=100'),
+    enabled: activeTab === 'students',
+  });
 
-  const loadTabData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      if (activeTab === 'students') {
-        const data = await apiFetch<StudentListResponse>('/api/v1/students?limit=100');
-        setStudents(data.items);
-      } else if (activeTab === 'requests') {
-        const [requestsData] = await Promise.all([
-          apiFetch<StudentListResponse>('/api/v1/students/requests?limit=100'),
-          loadActiveGroups(),
-        ]);
-        setRequests(requestsData.items);
-      } else if (activeTab === 'locked') {
-        const data = await apiFetch<StudentListResponse>('/api/v1/students/locked?limit=100');
-        setLocked(data.items);
-      }
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('Error al cargar la información');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeTab, loadActiveGroups]);
+  const requestsQuery = useQuery({
+    queryKey: ['teacher', 'students', 'requests'],
+    queryFn: () => apiFetch<StudentListResponse>('/api/v1/students/requests?limit=100'),
+    enabled: activeTab === 'requests',
+  });
 
-  useEffect(() => {
-    loadTabData();
-  }, [loadTabData]);
+  const lockedQuery = useQuery({
+    queryKey: ['teacher', 'students', 'locked'],
+    queryFn: () => apiFetch<StudentListResponse>('/api/v1/students/locked?limit=100'),
+    enabled: activeTab === 'locked',
+  });
+
+  const groupsQuery = useQuery({
+    queryKey: ['teacher', 'groups', 'active'],
+    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+  });
+
+  const groups = groupsQuery.data?.items || [];
+  const students = studentsQuery.data?.items || [];
+  const requests = requestsQuery.data?.items || [];
+  const locked = lockedQuery.data?.items || [];
+
+  const isLoading =
+    (activeTab === 'students' && studentsQuery.isLoading) ||
+    (activeTab === 'requests' && requestsQuery.isLoading) ||
+    (activeTab === 'locked' && lockedQuery.isLoading);
+
+  const approveMutation = useMutation({
+    mutationFn: (body: {
+      studentId: string;
+      level: Level;
+      groupId: string;
+      guardianName?: string;
+      guardianContact?: string;
+      ageSegment: AgeSegment;
+    }) =>
+      apiFetch<StudentView>(`/api/v1/students/${body.studentId}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({
+          level: body.level,
+          groupId: body.groupId,
+          guardianName: body.guardianName,
+          guardianContact: body.guardianContact,
+          ageSegment: body.ageSegment,
+        }),
+      }),
+    onSuccess: (_, variables) => {
+      const studentName = approvingStudent?.name || variables.studentId;
+      setSuccess(`Alumno "${studentName}" aprobado exitosamente.`);
+      setApprovingStudent(null);
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo aprobar al alumno');
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (studentId: string) =>
+      apiFetch(`/api/v1/students/${studentId}/reject`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo rechazar la solicitud');
+    },
+  });
+
+  const unlockMutation = useMutation({
+    mutationFn: (studentId: string) =>
+      apiFetch(`/api/v1/students/${studentId}/unlock`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo desbloquear la cuenta');
+    },
+  });
 
   // Handle Approve button click
   const openApproveModal = (student: StudentView) => {
@@ -109,74 +157,62 @@ function StudentsManagementContent() {
     }
   };
 
-  const handleConfirmApproval = async (e: React.FormEvent) => {
+  const handleConfirmApproval = (e: React.FormEvent) => {
     e.preventDefault();
     if (!approvingStudent) return;
     if (!selectedGroupId) {
-      setError('Debes seleccionar un grupo activo para aprobar al alumno');
+      setActionError('Debes seleccionar un grupo activo para aprobar al alumno');
       return;
     }
 
-    setIsSubmittingApproval(true);
-    setError(null);
+    setActionError(null);
     setSuccess(null);
 
-    try {
-      await apiFetch<StudentView>(`/api/v1/students/${approvingStudent.id}/approve`, {
-        method: 'POST',
-        body: JSON.stringify({
-          level: selectedLevel,
-          groupId: selectedGroupId,
-          guardianName: guardianName.trim() || undefined,
-          guardianContact: guardianContact.trim() || undefined,
-          ageSegment,
-        }),
-      });
-
-      setSuccess(`Alumno "${approvingStudent.name}" aprobado exitosamente.`);
-      setApprovingStudent(null);
-      loadTabData();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo aprobar al alumno');
-    } finally {
-      setIsSubmittingApproval(false);
-    }
+    approveMutation.mutate({
+      studentId: approvingStudent.id,
+      level: selectedLevel,
+      groupId: selectedGroupId,
+      guardianName: guardianName.trim() || undefined,
+      guardianContact: guardianContact.trim() || undefined,
+      ageSegment,
+    });
   };
+
+  const isSubmittingApproval = approveMutation.isPending;
 
   const handleReject = (student: StudentView) => {
     setRejectConfirmDialog({ isOpen: true, student });
   };
 
-  const handleConfirmReject = async () => {
+  const handleConfirmReject = () => {
     const student = rejectConfirmDialog.student;
     setRejectConfirmDialog({ isOpen: false, student: null });
     if (!student) return;
 
-    setError(null);
+    setActionError(null);
     setSuccess(null);
-    try {
-      await apiFetch(`/api/v1/students/${student.id}/reject`, { method: 'POST' });
-      setSuccess(`Solicitud de "${student.name}" rechazada.`);
-      loadTabData();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo rechazar la solicitud');
-    }
+    rejectMutation.mutate(student.id, {
+      onSuccess: () => {
+        setSuccess(`Solicitud de "${student.name}" rechazada.`);
+      },
+    });
   };
 
-  const handleUnlock = async (student: StudentView) => {
-    setError(null);
+  const handleUnlock = (student: StudentView) => {
+    setActionError(null);
     setSuccess(null);
-    try {
-      await apiFetch(`/api/v1/students/${student.id}/unlock`, { method: 'POST' });
-      setSuccess(`Cuenta de "${student.name}" desbloqueada exitosamente.`);
-      loadTabData();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo desbloquear la cuenta');
-    }
+    unlockMutation.mutate(student.id, {
+      onSuccess: () => {
+        setSuccess(`Cuenta de "${student.name}" desbloqueada exitosamente.`);
+      },
+    });
   };
+
+  const error =
+    actionError ||
+    (studentsQuery.error instanceof ApiError ? studentsQuery.error.message : studentsQuery.error instanceof Error ? studentsQuery.error.message : null) ||
+    (requestsQuery.error instanceof ApiError ? requestsQuery.error.message : requestsQuery.error instanceof Error ? requestsQuery.error.message : null) ||
+    (lockedQuery.error instanceof ApiError ? lockedQuery.error.message : lockedQuery.error instanceof Error ? lockedQuery.error.message : null);
 
   return (
     <div className="space-y-6">
@@ -197,7 +233,7 @@ function StudentsManagementContent() {
           className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
         >
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} className="text-rose-600 font-bold ml-4">
+          <button type="button" onClick={() => setActionError(null)} className="text-rose-600 font-bold ml-4">
             ✕
           </button>
         </div>
@@ -498,7 +534,9 @@ function StudentsManagementContent() {
               <select
                 id="approve-level"
                 value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value as Level)}
+                onChange={(e) => {
+                  if (isLevel(e.target.value)) setSelectedLevel(e.target.value);
+                }}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
               >
                 <option value={Level.A1}>A1</option>
@@ -567,7 +605,9 @@ function StudentsManagementContent() {
               <select
                 id="approve-segment"
                 value={ageSegment}
-                onChange={(e) => setAgeSegment(e.target.value as AgeSegment)}
+                onChange={(e) => {
+                  if (isAgeSegment(e.target.value)) setAgeSegment(e.target.value);
+                }}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
               >
                 <option value={AgeSegment.kids}>Kids (7 a 10 años)</option>

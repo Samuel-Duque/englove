@@ -31,7 +31,8 @@ export function AccessibleModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    previousActiveElement.current = document.activeElement as HTMLElement | null;
+    previousActiveElement.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

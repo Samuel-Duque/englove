@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AssignmentView,
   AssignmentAvailability,
@@ -47,49 +48,70 @@ const availabilityBadges: Record<
 };
 
 export function AsignacionDetailClient({ id }: { id: string }) {
+  const queryClient = useQueryClient();
 
-  const [assignment, setAssignment] = useState<AssignmentView | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Cancellation Modal state
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const modalReturnBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const fetchAssignment = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await apiFetch<AssignmentView>(`/api/v1/assignments/${id}`);
-      setAssignment(data);
-    } catch (err) {
+  const assignmentQuery = useQuery({
+    queryKey: ['teacher', 'assignment', id],
+    queryFn: () => apiFetch<AssignmentView>(`/api/v1/assignments/${id}`),
+  });
+
+  const assignment = assignmentQuery.data ?? null;
+  const isLoading = assignmentQuery.isLoading;
+
+  const getErrorMessage = () => {
+    if (!assignmentQuery.error) return null;
+    const err = assignmentQuery.error;
+    if (err instanceof ApiError) {
+      if (err.statusCode === 404) {
+        return 'No encontramos esta asignación o alguno de los recursos seleccionados';
+      } else if (err.statusCode === 403) {
+        return 'No tienes acceso a esta sección';
+      } else if (err.statusCode === 429) {
+        return 'Espera un momento antes de volver a intentarlo';
+      }
+      return err.message || 'No pudimos cargar la asignación';
+    }
+    return 'No pudimos cargar la asignación';
+  };
+
+  const error = getErrorMessage();
+
+  const cancelMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<AssignmentView>(`/api/v1/assignments/${id}/cancel`, {
+        method: 'POST',
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['teacher', 'assignment', id], updated);
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      setShowCancelModal(false);
+      setSuccessNotice('Asignación cancelada');
+      setTimeout(() => {
+        cancelButtonRef.current?.focus();
+      }, 50);
+    },
+    onError: (err: unknown) => {
       if (err instanceof ApiError) {
-        if (err.statusCode === 404) {
-          setError(
-            'No encontramos esta asignación o alguno de los recursos seleccionados',
-          );
-        } else if (err.statusCode === 403) {
-          setError('No tienes acceso a esta sección');
-        } else if (err.statusCode === 429) {
-          setError('Espera un momento antes de volver a intentarlo');
+        if (err.statusCode === 409) {
+          setCancelError('Esta asignación no se puede cancelar porque ya está cerrada o cancelada');
         } else {
-          setError(err.message || 'No pudimos cargar la asignación');
+          setCancelError(err.message || 'No se pudo cancelar la asignación');
         }
       } else {
-        setError('No pudimos cargar la asignación');
+        setCancelError('No se pudo cancelar la asignación');
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
+    },
+  });
 
-  useEffect(() => {
-    fetchAssignment();
-  }, [fetchAssignment]);
+  const isCancelling = cancelMutation.isPending;
 
   // Keyboard accessibility: handle Escape key to close cancellation modal (RF-15)
   useEffect(() => {
@@ -121,44 +143,9 @@ export function AsignacionDetailClient({ id }: { id: string }) {
     }, 50);
   };
 
-  const handleConfirmCancel = async () => {
-    setIsCancelling(true);
+  const handleConfirmCancel = () => {
     setCancelError(null);
-    try {
-      const updated = await apiFetch<AssignmentView>(
-        `/api/v1/assignments/${id}/cancel`,
-        {
-          method: 'POST',
-        },
-      );
-      setAssignment(updated);
-      setShowCancelModal(false);
-      setSuccessNotice('Asignación cancelada');
-      setTimeout(() => {
-        cancelButtonRef.current?.focus();
-      }, 50);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.statusCode === 403) {
-          setCancelError('No tienes acceso a esta sección');
-        } else if (err.statusCode === 404) {
-          setCancelError(
-            'No encontramos esta asignación o alguno de los recursos seleccionados',
-          );
-        } else if (err.statusCode === 429) {
-          setCancelError('Espera un momento antes de volver a intentarlo');
-        } else {
-          setCancelError(
-            err.message ||
-              'No se pudo cancelar la asignación. Intenta de nuevo.',
-          );
-        }
-      } else {
-        setCancelError('No se pudo cancelar la asignación. Intenta de nuevo.');
-      }
-    } finally {
-      setIsCancelling(false);
-    }
+    cancelMutation.mutate();
   };
 
   if (isLoading) {

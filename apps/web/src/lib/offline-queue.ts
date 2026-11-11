@@ -55,6 +55,10 @@ function createStoresIfMissing(db: IDBDatabase) {
   }
 }
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
 let isQueuePausedDueToAuth = false;
 let isFlushingInternal = false;
 let currentRetryTimeout: NodeJS.Timeout | null = null;
@@ -140,7 +144,7 @@ export async function enqueueEvent(record: Omit<PendingEventRecord, 'id' | 'crea
     };
     const req = store.add(item);
     req.onsuccess = () => {
-      const generatedId = req.result as number;
+      const generatedId = typeof req.result === 'number' ? req.result : Number(req.result);
       resolve(generatedId);
     };
     req.onerror = () => reject(req.error);
@@ -732,10 +736,9 @@ export async function executeFlush(activeUserId?: string): Promise<void> {
         }
 
         try {
-          const compPayload = (completionEvent.payload || {}) as {
-            answers?: Record<string, unknown>;
-          };
-          const compAnswers = compPayload.answers;
+          const compPayload = isRecord(completionEvent.payload) ? completionEvent.payload : {};
+          const answersVal = compPayload.answers;
+          const compAnswers = isRecord(answersVal) ? answersVal : undefined;
           const completeBody: Record<string, unknown> = {
             ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {}),
             ...(compAnswers && Object.keys(compAnswers).length > 0 ? { answers: compAnswers } : {}),

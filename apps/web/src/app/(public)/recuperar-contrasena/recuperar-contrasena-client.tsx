@@ -1,49 +1,63 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useMutation } from '@tanstack/react-query';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
 
 export function RecuperarContrasenaClient() {
   const [email, setEmail] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  const forgotPasswordMutation = useMutation({
+    mutationFn: async (emailVal: string) => {
+      const res = await fetch(`${apiUrl}/api/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: window.location.origin,
+        },
+        body: JSON.stringify({ email: emailVal }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const code =
+          data && typeof data === 'object' && 'code' in data && typeof data.code === 'string'
+            ? data.code
+            : undefined;
+        const msg =
+          data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+            ? data.message
+            : undefined;
+        throw new Error(getAuthErrorMessage(code, msg));
+      }
+
+      const message =
+        data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+          ? data.message
+          : 'Si el correo tiene una cuenta, recibirás un enlace para restablecer tu contraseña.';
+
+      return { message };
+    },
+    onSuccess: (data) => {
+      setSuccessMessage(data.message);
+    },
+    onError: (err: Error) => {
+      setErrorMessage(
+        err.message || 'No fue posible conectar con el servidor. Verifica tu conexión.',
+      );
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-
-    startTransition(async () => {
-      try {
-        const res = await fetch(`${apiUrl}/api/v1/auth/forgot-password`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Origin: window.location.origin,
-          },
-          body: JSON.stringify({ email }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          const msg = getAuthErrorMessage(data?.code, data?.message);
-          setErrorMessage(msg);
-          return;
-        }
-
-        // RF-11: Uniform success message
-        setSuccessMessage(
-          data?.message ||
-            'Si el correo tiene una cuenta, recibirás un enlace para restablecer tu contraseña.',
-        );
-      } catch {
-        setErrorMessage('No fue posible conectar con el servidor. Verifica tu conexión.');
-      }
-    });
+    forgotPasswordMutation.mutate(email);
   };
 
   if (successMessage) {
@@ -102,10 +116,10 @@ export function RecuperarContrasenaClient() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={forgotPasswordMutation.isPending}
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isPending ? 'Enviando…' : 'Enviar enlace'}
+            {forgotPasswordMutation.isPending ? 'Enviando…' : 'Enviar enlace'}
           </button>
         </form>
 

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
 import {
   setSharedSession,
@@ -41,16 +42,13 @@ export function LoginClient() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const [isPending, startTransition] = useTransition();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Silent refresh check on load (RF-17, §7, H12)
-  useEffect(() => {
-    let isMounted = true;
-
-    async function trySilentRefresh() {
+  // Silent refresh check on load via useQuery (RF-17, §7, H12, QA-04)
+  const { isLoading: isCheckingSession } = useQuery({
+    queryKey: ['auth', 'silent-refresh', nextParam],
+    queryFn: async () => {
       // Only attempt silent refresh if there is an active session hint (QA-02, P0-02)
       const hasSessionHint =
         typeof window !== 'undefined' &&
@@ -65,81 +63,80 @@ export function LoginClient() {
           });
 
       if (!hasSessionHint) {
-        if (isMounted) setIsCheckingSession(false);
-        return;
+        return false;
       }
 
       try {
         const refreshed = await requestSharedRefresh();
-        if (refreshed && isMounted) {
+        if (refreshed) {
           const destination =
             nextParam && isSafeNextDestination(nextParam) ? nextParam : '/inicio';
           router.replace(destination);
-          return;
+          return true;
         }
       } catch {
         // Fallback: stay on login page
       }
 
-      if (isMounted) {
-        setIsCheckingSession(false);
+      return false;
+    },
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async ({ emailVal, passwordVal }: { emailVal: string; passwordVal: string }) => {
+      const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: window.location.origin,
+        },
+        body: JSON.stringify({ email: emailVal, password: passwordVal }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const code =
+          data && typeof data === 'object' && 'code' in data && typeof data.code === 'string'
+            ? data.code
+            : undefined;
+        throw new Error(getAuthErrorMessage(code));
       }
-    }
 
-    trySilentRefresh();
+      const session: SessionView = await res.json();
+      return session;
+    },
+    onSuccess: async (data) => {
+      // RF-5 / ISSUE-09 hygiene: Purge offline queue events from any other user
+      if (data.user?.id) {
+        await purgeOtherUsersEntries(data.user.id).catch((purgeErr) => {
+          console.warn('[Login] Offline queue purge notice:', purgeErr);
+        });
+      }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [nextParam, router]);
+      setSharedSession(data);
+      clearSharedProfile();
+      clearSharedFeatureFlags();
+
+      // Reset query cache to avoid showing stale data from previous user
+      getQueryClient().clear();
+
+      // Redirection
+      const destination =
+        nextParam && isSafeNextDestination(nextParam) ? nextParam : '/inicio';
+      router.push(destination);
+    },
+    onError: (err: Error) => {
+      setErrorMessage(err.message || 'Ocurrió un error inesperado. Intenta de nuevo más tarde');
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-
-    startTransition(async () => {
-      try {
-        const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Origin: window.location.origin,
-          },
-          body: JSON.stringify({ email, password }),
-          credentials: 'include',
-        });
-
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
-          const message = getAuthErrorMessage(data?.code);
-          setErrorMessage(message);
-          return;
-        }
-
-        const data: SessionView = await res.json();
-
-        // RF-5 / ISSUE-09 hygiene: Purge offline queue events from any other user
-        if (data.user?.id) {
-          await purgeOtherUsersEntries(data.user.id).catch((purgeErr) => {
-            console.warn('[Login] Offline queue purge notice:', purgeErr);
-          });
-        }
-
-        setSharedSession(data);
-        clearSharedProfile();
-        clearSharedFeatureFlags();
-
-        // Reset query cache to avoid showing stale data from previous user
-        getQueryClient().clear();
-
-        // Redirection
-        const destination =
-          nextParam && isSafeNextDestination(nextParam) ? nextParam : '/inicio';
-        router.push(destination);
-      } catch {
-        setErrorMessage('Ocurrió un error inesperado. Intenta de nuevo más tarde');
-      }
-    });
+    loginMutation.mutate({ emailVal: email, passwordVal: password });
   };
 
   if (isCheckingSession) {
@@ -220,10 +217,10 @@ export function LoginClient() {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={loginMutation.isPending}
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
-            {isPending ? 'Entrando…' : 'Entrar'}
+            {loginMutation.isPending ? 'Entrando…' : 'Entrar'}
           </button>
         </form>
 

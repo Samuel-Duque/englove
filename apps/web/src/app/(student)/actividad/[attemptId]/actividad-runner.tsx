@@ -3,13 +3,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityType,
   AttemptStatus,
   RuntimeView,
   CompletionView,
-  FillBlankConfig,
-  ExamConfig,
+  FillBlankConfigSchema,
+  ExamConfigSchema,
+  SpeakingConfigSchema,
+  OpenQuestionConfigSchema,
   GamePublicConfig,
   GameAnswers,
   getOpenQuestionItems,
@@ -26,19 +29,49 @@ import { setActiveAttemptState } from '../../../../lib/pwa-manager';
 import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb } from '../../../../lib/offline-queue';
 import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function getNumberProp(obj: unknown, prop: string): number | undefined {
+  if (obj !== null && typeof obj === 'object') {
+    const val = Reflect.get(obj, prop);
+    if (typeof val === 'number') return val;
+  }
+  return undefined;
+}
+
+function getStringRecord(val: unknown): Record<string, string> {
+  if (!isRecord(val)) return {};
+  const res: Record<string, string> = {};
+  for (const [k, v] of Object.entries(val)) {
+    if (typeof v === 'string') {
+      res[k] = v;
+    }
+  }
+  return res;
+}
+
+function isGamePublicConfig(config: unknown): config is GamePublicConfig {
+  if (!isRecord(config)) return false;
+  return 'mechanic' in config && 'settings' in config;
+}
+
+function isGameAnswers(val: unknown): val is GameAnswers {
+  return isRecord(val);
+}
+
 interface ActividadRunnerProps {
   attemptId: string;
 }
 
 export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [runtime, setRuntime] = useState<RuntimeView | null>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [completion, setCompletion] = useState<CompletionView | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [theme, setTheme] = useState<'kids' | 'teens'>('kids');
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
@@ -73,10 +106,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const timerIntervalRef = useRef<NodeJS.Timeout | number | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingDurationRef = useRef<number>(0);
   const stopRecordingRef = useRef<() => void>(() => {});
   const pendingEventsRef = useRef<Set<Promise<unknown>>>(new Set());
+  const initializedAttemptRef = useRef<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -186,71 +220,79 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
   };
 
-  // Load Attempt Runtime
-  useEffect(() => {
-    let isMounted = true;
-    async function loadAttempt() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [data, profile] = await Promise.all([
-          apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`),
-          fetchSharedProfile().catch(() => null),
-        ]);
-        if (isMounted) {
-          const resolvedUserId = profile?.user?.id || getSharedSession()?.user?.id || '';
-          if (resolvedUserId) {
-            setCurrentUserId(resolvedUserId);
-          }
-          const ageSegment = profile?.student?.ageSegment ?? 'kids';
-          setTheme(ageSegment);
-          setSoundEnabled(ageSegment === 'kids'); // soundEnabled starts true for kids, false for teens (RF-9)
-          setRuntime(data);
-          setAnswers(data.answers || {});
-          if (data.mediaId) setMediaId(data.mediaId);
-          if (data.attempt.status === AttemptStatus.in_progress) {
-            setActiveAttemptState(true); // RF-9: defer update notices during active attempt
-          }
-          if (
-            data.attempt.status === AttemptStatus.graded ||
-            data.attempt.status === AttemptStatus.pending_review
-          ) {
-            setActiveAttemptState(false);
-            setCompletion({
-              attempt: data.attempt,
-              correction: data.correction,
-              newBadges: [],
-            });
-          }
-        }
+  // Load Attempt Runtime via useQuery (QA-04, T6.2)
+  const {
+    data: attemptData,
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ['attempt', attemptId],
+    queryFn: async () => {
+      const [data, profile] = await Promise.all([
+        apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`),
+        fetchSharedProfile().catch(() => null),
+      ]);
+      const savedRec = await loadLocalRecording(attemptId);
+      return { data, profile, savedRec };
+    },
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
-        // Restore pending local audio blob if any
-        const savedRec = await loadLocalRecording(attemptId);
-        if (savedRec && isMounted && !data.mediaId) {
-          setRecordedAudioBlob(savedRec.blob);
-          const restoredSec =
-            savedRec.durationMs > 0 ? Math.round(savedRec.durationMs / 1000) : 5;
-          recordingDurationRef.current = Math.max(2, restoredSec);
-          setRecordingSeconds(Math.max(2, restoredSec));
-        }
-      } catch (err) {
-        if (isMounted) {
-          if (err instanceof ApiError) setError(err.message);
-          else setError('No se pudo cargar la actividad');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+  const runtime = attemptData?.data ?? null;
+  const error =
+    queryError instanceof ApiError
+      ? queryError.message
+      : queryError instanceof Error
+        ? queryError.message
+        : queryError
+          ? 'No se pudo cargar la actividad'
+          : null;
+
+  useEffect(() => {
+    if (!attemptData || initializedAttemptRef.current === attemptId) {
+      return;
     }
-    loadAttempt();
-    return () => {
-      isMounted = false;
+
+    initializedAttemptRef.current = attemptId;
+    const { data, profile, savedRec } = attemptData;
+    const resolvedUserId = profile?.user?.id || getSharedSession()?.user?.id || '';
+    if (resolvedUserId) {
+      setCurrentUserId(resolvedUserId);
+    }
+    const ageSegment = profile?.student?.ageSegment ?? 'kids';
+    setTheme(ageSegment);
+    setSoundEnabled(ageSegment === 'kids'); // soundEnabled starts true for kids, false for teens (RF-9)
+    setAnswers((prev) => (Object.keys(prev).length === 0 ? data.answers || {} : prev));
+    if (data.mediaId) setMediaId(data.mediaId);
+    if (data.attempt.status === AttemptStatus.in_progress) {
+      setActiveAttemptState(true); // RF-9: defer update notices during active attempt
+    }
+    if (
+      data.attempt.status === AttemptStatus.graded ||
+      data.attempt.status === AttemptStatus.pending_review
+    ) {
       setActiveAttemptState(false);
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [attemptId]);
+      setCompletion((prev) =>
+        prev ?? {
+          attempt: data.attempt,
+          correction: data.correction,
+          newBadges: [],
+        },
+      );
+    }
+
+    // Restore pending local audio blob if any
+    if (savedRec && !data.mediaId) {
+      setRecordedAudioBlob(savedRec.blob);
+      const restoredSec =
+        savedRec.durationMs > 0 ? Math.round(savedRec.durationMs / 1000) : 5;
+      recordingDurationRef.current = Math.max(2, restoredSec);
+      setRecordingSeconds(Math.max(2, restoredSec));
+    }
+  }, [attemptData, attemptId]);
 
   // Persistent event emitter (RF-10, Decision 37)
   const sendEvent = useCallback(
@@ -308,7 +350,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   const stopRecording = useCallback(() => {
     if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current as NodeJS.Timeout);
+      clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -327,8 +369,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   useEffect(() => {
     return () => {
+      setActiveAttemptState(false);
       if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current as NodeJS.Timeout);
+        clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -386,10 +429,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setRecordingSeconds(0);
       recordingDurationRef.current = 0;
 
-      const maxSec = (runtime?.activity?.config as { maxDurationSeconds?: number })?.maxDurationSeconds ?? 120;
+      const maxSec = getNumberProp(runtime?.activity?.config, 'maxDurationSeconds') ?? 120;
       let elapsed = 0;
       if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current as NodeJS.Timeout);
+        clearInterval(timerIntervalRef.current);
       }
       timerIntervalRef.current = setInterval(() => {
         elapsed += 1;
@@ -427,7 +470,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     const blobToUpload = blobOverride ?? recordedAudioBlob;
     if (!blobToUpload) return mediaId;
     const minSec =
-      (runtime?.activity?.config as { minDurationSeconds?: number })?.minDurationSeconds ?? 2;
+      getNumberProp(runtime?.activity?.config, 'minDurationSeconds') ?? 2;
     if (recordingDurationRef.current < minSec) {
       setUploadError(`Graba al menos ${minSec} segundos`);
       return null;
@@ -473,15 +516,113 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
   };
 
-  // Submit attempt completion
-  const handleCompleteAttempt = async (overrideAnswers?: Record<string, unknown>) => {
-    if (!runtime?.attemptToken) {
-      setRunnerAlert('Token de intento no disponible');
+  const completeAttemptMutation = useMutation({
+    mutationFn: async ({
+      completeBody,
+      attemptToken,
+    }: {
+      completeBody: Record<string, unknown>;
+      attemptToken: string;
+    }) => {
+      let res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-attempt-token': attemptToken,
+          Origin: window.location.origin,
+        },
+        credentials: 'include',
+        body: JSON.stringify(completeBody),
+      });
+
+      if (!res.ok && res.status === 401) {
+        const refreshed = await requestSharedRefresh().catch(() => false);
+        if (refreshed) {
+          res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-attempt-token': attemptToken,
+              Origin: window.location.origin,
+            },
+            credentials: 'include',
+            body: JSON.stringify(completeBody),
+          });
+        }
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        const msg =
+          isRecord(errData) && typeof errData.message === 'string'
+            ? errData.message
+            : 'Error al entregar la actividad';
+        throw new Error(msg);
+      }
+
+      const compData: CompletionView = await res.json();
+      return compData;
+    },
+    onSuccess: async (compData) => {
+      setCompletion(compData);
+      setActiveAttemptState(false);
+
+      // Trigger celebration confetti when student scores >= 3.0 (RF-9, ENG-086)
+      if (compData.attempt.score !== null && compData.attempt.score !== undefined && compData.attempt.score >= 3.0) {
+        fireCelebrationConfetti({ theme });
+      }
+
+      // Clean local storage upon confirmed completion (RF-13, RF-28)
+      await clearLocalRecording(attemptId);
+      queryClient.setQueryData<typeof attemptData>(['attempt', attemptId], (prev) =>
+        prev
+          ? {
+              ...prev,
+              data: {
+                ...prev.data,
+                attempt: compData.attempt,
+                correction: compData.correction,
+                answers,
+              },
+              savedRec: null,
+            }
+          : prev,
+      );
+      void queryClient.invalidateQueries({ queryKey: ['student'] });
+    },
+  });
+
+  const playAgainMutation = useMutation({
+    mutationFn: async (activityId: string) => {
+      const url = `/api/v1/activities/${activityId}/attempts`;
+      return apiFetch<RuntimeView>(url, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (res) => {
+      if (res?.attempt?.id) {
+        window.location.href = `/actividad/${res.attempt.id}`;
+      } else {
+        router.refresh();
+      }
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'No se pudo iniciar un nuevo intento del juego';
+      setRunnerAlert(msg);
+    },
+  });
+
+  const handleCompleteAttempt = async (overrideAnswers?: Record<string, unknown> | GameAnswers) => {
+    if (!runtime) return;
+    if (isSubmitting || completeAttemptMutation.isPending) return;
+
+    if (isRecording) {
+      stopRecording();
       return;
     }
     const attemptToken = runtime.attemptToken;
 
-    const effectiveAnswers = overrideAnswers
+    const effectiveAnswers: Record<string, unknown> = overrideAnswers
       ? { ...answers, ...overrideAnswers }
       : answers;
 
@@ -538,59 +679,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         completeBody.answers = effectiveAnswers;
       }
 
-      let res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-attempt-token': attemptToken,
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
-        body: JSON.stringify(completeBody),
-      });
-
-      if (!res.ok && res.status === 401) {
-        const refreshed = await requestSharedRefresh().catch(() => false);
-        if (refreshed) {
-          res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-attempt-token': attemptToken,
-              Origin: window.location.origin,
-            },
-            credentials: 'include',
-            body: JSON.stringify(completeBody),
-          });
-        }
-      }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        if (res.status >= 400 && res.status < 500) {
-          setRunnerAlert(errData.message || 'Error al entregar la actividad');
-          setIsSubmitting(false);
-          return;
-        }
-        throw new Error(errData.message || 'Error al entregar la actividad');
-      }
-
-      const compData: CompletionView = await res.json();
-      setCompletion(compData);
-      setActiveAttemptState(false);
-
-      // Trigger celebration confetti when student scores >= 3.0 (RF-9, ENG-086)
-      if (compData.attempt.score !== null && compData.attempt.score !== undefined && compData.attempt.score >= 3.0) {
-        fireCelebrationConfetti({ theme });
-      }
-
-      // Clean local storage upon confirmed completion (RF-13, RF-28)
-      await clearLocalRecording(attemptId);
+      await completeAttemptMutation.mutateAsync({ completeBody, attemptToken: attemptToken || '' });
     } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : '';
       const isNetworkError =
         (typeof navigator !== 'undefined' && !navigator.onLine) ||
         err instanceof TypeError ||
-        Boolean((err as Error)?.message && /network|fetch|offline|failed to fetch/i.test((err as Error).message));
+        Boolean(errMsg && /network|fetch|offline|failed to fetch/i.test(errMsg));
 
       if (isNetworkError) {
         // RF-12: Entrega sin conexión. Queda en la cola y muestra mensaje sin nota ficticia.
@@ -608,7 +703,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}),
             answers: effectiveAnswers,
           },
-          attemptToken,
+          attemptToken: attemptToken || '',
         });
 
         if (recordedAudioBlob) {
@@ -623,14 +718,14 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             mimeType: recordedAudioBlob.type || 'audio/webm',
             durationMs: effectiveDurationMs,
             mediaId: finalMediaId || mediaId || null,
-            attemptToken,
+            attemptToken: attemptToken || undefined,
           });
         }
 
         setIsOfflineSaved(true);
         setActiveAttemptState(false);
       } else {
-        setRunnerAlert((err as Error)?.message || 'No se pudo completar la entrega');
+        setRunnerAlert(errMsg || 'No se pudo completar la entrega');
       }
     } finally {
       setIsSubmitting(false);
@@ -638,23 +733,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   };
 
   // Play again for microgames (Decision 104, RF-4, Decisión 130, RF-1.5)
-  const handlePlayAgain = async () => {
-    setIsSubmitting(true);
-    try {
-      const url = `/api/v1/activities/${activity.id}/attempts`;
-      const res = await apiFetch<RuntimeView>(url, {
-        method: 'POST',
-      });
-      if (res?.attempt?.id) {
-        window.location.href = `/actividad/${res.attempt.id}`;
-      } else {
-        router.refresh();
-      }
-    } catch (err: unknown) {
-      setRunnerAlert((err as Error)?.message || 'No se pudo iniciar un nuevo intento del juego');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handlePlayAgain = () => {
+    if (!activity?.id) return;
+    playAgainMutation.mutate(activity.id);
   };
 
   if (isLoading) {
@@ -799,17 +880,20 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               </h4>
               <div className="space-y-1.5 text-xs">
                 {Object.entries(completion.correction).map(([itemId, blanks]) => {
-                  if (!blanks || typeof blanks !== 'object') return null;
+                  if (!isRecord(blanks)) return null;
                   return (
                     <div key={itemId} className="space-y-1">
-                      {Object.entries(blanks as Record<string, { correct?: boolean }>).map(([blankId, res], bIdx) => (
-                        <div key={blankId} className="flex items-center gap-2">
-                          <span>{res?.correct ? '✅' : '❌'}</span>
-                          <span className="font-semibold text-zinc-800">
-                            Espacio {bIdx + 1}: {res?.correct ? 'Correcto' : 'Incorrecto'}
-                          </span>
-                        </div>
-                      ))}
+                      {Object.entries(blanks).map(([blankId, res], bIdx) => {
+                        const isCorrect = isRecord(res) && res.correct === true;
+                        return (
+                          <div key={blankId} className="flex items-center gap-2">
+                            <span>{isCorrect ? '✅' : '❌'}</span>
+                            <span className="font-semibold text-zinc-800">
+                              Espacio {bIdx + 1}: {isCorrect ? 'Correcto' : 'Incorrecto'}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -865,16 +949,15 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   }
 
   // Activity Configuration Rendering
-  const fbConfig = activity.config as FillBlankConfig;
-  const examConfig = activity.config as ExamConfig;
-  const speakingConfig = activity.config as {
-    prompt?: string;
-    exampleUrl?: string | null;
-    minDurationSeconds?: number;
-    maxDurationSeconds?: number;
-  };
+  const parsedFb = FillBlankConfigSchema.safeParse(activity.config);
+  const fbConfig = parsedFb.success ? parsedFb.data : null;
+  const parsedExam = ExamConfigSchema.safeParse(activity.config);
+  const examConfig = parsedExam.success ? parsedExam.data : null;
+  const parsedSpeaking = SpeakingConfigSchema.safeParse(activity.config);
+  const speakingConfig = parsedSpeaking.success ? parsedSpeaking.data : null;
   const openQItems = getOpenQuestionItems(activity.config, activity.id);
-  const openQInstructions = (activity.config as { instructions?: string })?.instructions;
+  const parsedOpenQ = OpenQuestionConfigSchema.safeParse(activity.config);
+  const openQInstructions = parsedOpenQ.success ? parsedOpenQ.data.instructions : undefined;
 
   return (
     <div className="max-w-3xl mx-auto py-6 space-y-6">
@@ -986,8 +1069,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                 {/* Blank inputs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   {item.blanks.map((blank, blankIdx) => {
-                    const itemAnswers = (answers[item.id] as Record<string, string>) || {};
-                    const currentVal = itemAnswers[blank.id] || (answers[blank.id] as string) || '';
+                    const itemAnswers = getStringRecord(answers[item.id]);
+                    const rawBlankVal = itemAnswers[blank.id] || answers[blank.id];
+                    const currentVal = typeof rawBlankVal === 'string' ? rawBlankVal : '';
                     const blankInputId = `blank-${item.id}-${blank.id || blankIdx}`;
                     const blankLabel = `Espacio ${blankIdx + 1}`;
                     return (
@@ -1045,7 +1129,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               Examen — Responde cada una de las oraciones:
             </p>
             {examConfig.items.map((item, itemIdx) => {
-              const itemAnswers = (answers[item.id] as Record<string, string>) || {};
+              const itemAnswers = getStringRecord(answers[item.id]);
               return (
                 <div
                   key={item.id}
@@ -1136,9 +1220,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
             {openQItems.map((item, idx) => {
               const isSingleItem = openQItems.length === 1;
+              const rawItemAns = answers[item.id];
+              const rawTextAns = answers['text'];
               const itemAnswer =
-                (answers[item.id] as string) ??
-                (isSingleItem ? (answers['text'] as string) : '') ??
+                (typeof rawItemAns === 'string' ? rawItemAns : undefined) ??
+                (isSingleItem && typeof rawTextAns === 'string' ? rawTextAns : '') ??
                 '';
               const maxLen = item.maxLength || 2000;
 
@@ -1291,10 +1377,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         )}
 
         {/* Microgame Type (SPEC-06, ENG-080 to ENG-085) */}
-        {activity.type === ActivityType.game && (
+        {activity.type === ActivityType.game && isGamePublicConfig(activity.config) && (
           <GameRenderer
-            config={activity.config as GamePublicConfig}
-            initialState={answers as GameAnswers}
+            config={activity.config}
+            initialState={isGameAnswers(answers) ? answers : {}}
             onEvent={(event) => {
               if ('itemId' in event && 'answer' in event) {
                 handleAnswerChange(event.itemId, event.answer);
@@ -1303,7 +1389,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             soundEnabled={soundEnabled}
             theme={theme}
             onComplete={(finalAnswers) => {
-              handleCompleteAttempt(finalAnswers as Record<string, unknown>);
+              handleCompleteAttempt(finalAnswers);
             }}
           />
         )}

@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  ActivitySummary,
   ActivityListResponse,
   ActivityType,
   ActivityStatus,
   Level,
-  GroupView,
   GroupListResponse,
   CreateAssignmentResponse,
   formatBogotaDateTime,
@@ -27,11 +26,38 @@ const typeLabels: Record<ActivityType, string> = {
 
 export function NuevaAsignacionClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [activities, setActivities] = useState<ActivitySummary[]>([]);
-  const [groups, setGroups] = useState<GroupView[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const activitiesQuery = useQuery({
+    queryKey: ['teacher', 'activities', 'published'],
+    queryFn: () =>
+      apiFetch<ActivityListResponse>(
+        `/api/v1/activities?status=${ActivityStatus.published}&limit=100`,
+      ),
+  });
+
+  const groupsQuery = useQuery({
+    queryKey: ['teacher', 'groups', 'active'],
+    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+  });
+
+  const activities = useMemo(() => {
+    return (activitiesQuery.data?.items ?? []).filter((a) => a.type !== ActivityType.game);
+  }, [activitiesQuery.data]);
+
+  const groups = groupsQuery.data?.items ?? [];
+  const isLoading = activitiesQuery.isLoading || groupsQuery.isLoading;
+  const loadError =
+    (activitiesQuery.error instanceof ApiError
+      ? activitiesQuery.error.message
+      : activitiesQuery.error instanceof Error
+        ? activitiesQuery.error.message
+        : null) ||
+    (groupsQuery.error instanceof ApiError
+      ? groupsQuery.error.message
+      : groupsQuery.error instanceof Error
+        ? groupsQuery.error.message
+        : null);
 
   // Form selection state
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
@@ -44,7 +70,6 @@ export function NuevaAsignacionClient() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   // Submit & Error states
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const errorAlertRef = useRef<HTMLDivElement | null>(null);
 
@@ -55,50 +80,74 @@ export function NuevaAsignacionClient() {
     }, 50);
   };
 
-  const fetchOptions = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const [actData, grpData] = await Promise.all([
-        apiFetch<ActivityListResponse>(
-          `/api/v1/activities?status=${ActivityStatus.published}&limit=100`,
-        ),
-        apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
-      ]);
-      setActivities(actData.items.filter((a) => a.type !== ActivityType.game));
-      setGroups(grpData.items);
+  useEffect(() => {
+    // Default dates: opens tomorrow at 08:00, due in 7 days at 18:00 (Bogota time)
+    const now = new Date();
+    const bogotaNow = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+    const tomorrow = new Date(bogotaNow);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextWeek = new Date(bogotaNow);
+    nextWeek.setDate(nextWeek.getDate() + 7);
 
-      // Default dates: opens tomorrow at 08:00, due in 7 days at 18:00 (Bogota time)
-      const now = new Date();
-      const bogotaNow = new Date(now.getTime() - 5 * 60 * 60 * 1000);
-      const tomorrow = new Date(bogotaNow);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const nextWeek = new Date(bogotaNow);
-      nextWeek.setDate(nextWeek.getDate() + 7);
+    const y1 = tomorrow.getUTCFullYear();
+    const m1 = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+    const d1 = String(tomorrow.getUTCDate()).padStart(2, '0');
+    setOpensAtInput(`${y1}-${m1}-${d1}T08:00`);
 
-      const y1 = tomorrow.getUTCFullYear();
-      const m1 = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-      const d1 = String(tomorrow.getUTCDate()).padStart(2, '0');
-      setOpensAtInput(`${y1}-${m1}-${d1}T08:00`);
-
-      const y2 = nextWeek.getUTCFullYear();
-      const m2 = String(nextWeek.getUTCMonth() + 1).padStart(2, '0');
-      const d2 = String(nextWeek.getUTCDate()).padStart(2, '0');
-      setDueAtInput(`${y2}-${m2}-${d2}T18:00`);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setLoadError(err.message);
-      } else {
-        setLoadError('No pudimos cargar las opciones');
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    const y2 = nextWeek.getUTCFullYear();
+    const m2 = String(nextWeek.getUTCMonth() + 1).padStart(2, '0');
+    const d2 = String(nextWeek.getUTCDate()).padStart(2, '0');
+    setDueAtInput(`${y2}-${m2}-${d2}T18:00`);
   }, []);
 
-  useEffect(() => {
-    fetchOptions();
-  }, [fetchOptions]);
+  const createMutation = useMutation({
+    mutationFn: (body: unknown) =>
+      apiFetch<CreateAssignmentResponse>('/api/v1/assignments', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      const count = selectedGroupIds.length;
+      const msg =
+        count === 1
+          ? 'Asignación creada'
+          : `Asignaciones creadas en ${count} grupos`;
+      router.push(`/asignaciones?notice=${encodeURIComponent(msg)}`);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'ASSIGNMENT_ALREADY_ACTIVE') {
+          showError(
+            'La actividad ya tiene una asignación activa en uno de los grupos seleccionados',
+          );
+        } else if (err.code === 'ACTIVITY_NOT_ASSIGNABLE') {
+          showError('Solo puedes asignar actividades publicadas');
+        } else if (err.code === 'GROUP_ARCHIVED') {
+          showError('Uno de los grupos fue archivado. Elige un grupo activo');
+        } else if (err.statusCode === 403) {
+          showError('No tienes acceso a esta sección');
+        } else if (err.statusCode === 404) {
+          showError(
+            'No encontramos esta asignación o alguno de los recursos seleccionados',
+          );
+        } else if (err.statusCode === 429) {
+          showError('Espera un momento antes de volver a intentarlo');
+        } else {
+          showError(
+            err.message ||
+              'No pudimos guardar. Revisa las asignaciones antes de volver a intentarlo',
+          );
+        }
+      } else {
+        showError(
+          'No pudimos guardar. Revisa las asignaciones antes de volver a intentarlo',
+        );
+      }
+    },
+  });
+
+  const isSubmitting = createMutation.isPending;
 
   // Filter activities
   const filteredActivities = useMemo(() => {
@@ -186,57 +235,12 @@ export function NuevaAsignacionClient() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      await apiFetch<CreateAssignmentResponse>('/api/v1/assignments', {
-        method: 'POST',
-        body: JSON.stringify({
-          activityId: selectedActivityId,
-          groupIds: selectedGroupIds,
-          opensAt: opensAtIso,
-          dueAt: dueAtIso,
-        }),
-      });
-
-      const count = selectedGroupIds.length;
-      const msg =
-        count === 1
-          ? 'Asignación creada'
-          : `Asignaciones creadas en ${count} grupos`;
-      // Pass message via query param or session notification
-      router.push(`/asignaciones?notice=${encodeURIComponent(msg)}`);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === 'ASSIGNMENT_ALREADY_ACTIVE') {
-          showError(
-            'La actividad ya tiene una asignación activa en uno de los grupos seleccionados',
-          );
-        } else if (err.code === 'ACTIVITY_NOT_ASSIGNABLE') {
-          showError('Solo puedes asignar actividades publicadas');
-        } else if (err.code === 'GROUP_ARCHIVED') {
-          showError('Uno de los grupos fue archivado. Elige un grupo activo');
-        } else if (err.statusCode === 403) {
-          showError('No tienes acceso a esta sección');
-        } else if (err.statusCode === 404) {
-          showError(
-            'No encontramos esta asignación o alguno de los recursos seleccionados',
-          );
-        } else if (err.statusCode === 429) {
-          showError('Espera un momento antes de volver a intentarlo');
-        } else {
-          showError(
-            err.message ||
-              'No pudimos guardar. Revisa las asignaciones antes de volver a intentarlo',
-          );
-        }
-      } else {
-        showError(
-          'No pudimos guardar. Revisa las asignaciones antes de volver a intentarlo',
-        );
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
+    createMutation.mutate({
+      activityId: selectedActivityId,
+      groupIds: selectedGroupIds,
+      opensAt: opensAtIso,
+      dueAt: dueAtIso,
+    });
   };
 
   if (isLoading) {
@@ -256,7 +260,10 @@ export function NuevaAsignacionClient() {
         <p className="font-medium">{loadError}</p>
         <button
           type="button"
-          onClick={fetchOptions}
+          onClick={() => {
+            void activitiesQuery.refetch();
+            void groupsQuery.refetch();
+          }}
           className="mt-3 inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
         >
           Reintentar

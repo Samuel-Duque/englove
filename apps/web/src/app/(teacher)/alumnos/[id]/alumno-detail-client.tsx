@@ -1,33 +1,69 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   StudentView,
-  GroupView,
   GroupListResponse,
-  MembershipView,
   MembershipListResponse,
   Level,
   MessageResponse,
+  z,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { ConfirmDialog, AccessibleModal } from '../../../../components/ui/modal';
 
-export function AlumnoDetailClient({ id }: { id: string }) {
+const retryWarningSchema = z.object({
+  affectedActivities: z.array(
+    z.union([
+      z.string(),
+      z.object({
+        assignmentId: z.string(),
+        activityId: z.string(),
+        activityTitle: z.string(),
+        effectiveDueAt: z.string(),
+        attemptNumber: z.number(),
+      }),
+    ]),
+  ).optional(),
+});
 
-  const [student, setStudent] = useState<StudentView | null>(null);
-  const [memberships, setMemberships] = useState<MembershipView[]>([]);
-  const [activeGroups, setActiveGroups] = useState<GroupView[]>([]);
+function isLevel(val: string): val is Level {
+  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+}
+
+export function AlumnoDetailClient({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+
+  const studentQuery = useQuery({
+    queryKey: ['teacher', 'student', id],
+    queryFn: () => apiFetch<StudentView>(`/api/v1/students/${id}`),
+  });
+
+  const membershipsQuery = useQuery({
+    queryKey: ['teacher', 'student', id, 'memberships'],
+    queryFn: () => apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`),
+  });
+
+  const groupsQuery = useQuery({
+    queryKey: ['teacher', 'groups', 'active'],
+    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+  });
+
+  const student = studentQuery.data ?? null;
+  const memberships = membershipsQuery.data?.items ?? [];
+  const activeGroups = groupsQuery.data?.items ?? [];
+
+  const isLoading = studentQuery.isLoading || membershipsQuery.isLoading || groupsQuery.isLoading;
 
   // UI state
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Group transfer state
   const [selectedDestinationGroup, setSelectedDestinationGroup] = useState<string>('');
-  const [isTransferringGroup, setIsTransferringGroup] = useState(false);
+  const syncedGroupIdRef = useRef<string | null>(null);
 
   // Profile edit state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -36,19 +72,16 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   const [editLevel, setEditLevel] = useState<Level>(Level.A1);
   const [editGuardianName, setEditGuardianName] = useState('');
   const [editGuardianContact, setEditGuardianContact] = useState('');
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Change Email Modal state (RF-18, RF-19, Decision 63)
   const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
-  const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
   const [changeEmailError, setChangeEmailError] = useState<string | null>(null);
 
   // Delete Student state (ENG-070, Decision 103)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -67,104 +100,72 @@ export function AlumnoDetailClient({ id }: { id: string }) {
     >
   >([]);
 
-  const handleDeleteStudent = async () => {
-    setIsDeletingStudent(true);
-    setDeleteError(null);
-    try {
-      await apiFetch<void>(`/api/v1/students/${id}`, {
+  useEffect(() => {
+    const data = studentQuery.data;
+    if (!data) return;
+
+    if (!isEditingProfile) {
+      setEditName(data.name);
+      setEditBirthDate(data.birthDate);
+      setEditLevel(data.level ?? Level.A1);
+      setEditGuardianName(data.guardianName ?? '');
+      setEditGuardianContact(data.guardianContact ?? '');
+    }
+
+    if (data.groupId && syncedGroupIdRef.current !== data.groupId) {
+      syncedGroupIdRef.current = data.groupId;
+      setSelectedDestinationGroup(data.groupId);
+    }
+  }, [studentQuery.data, isEditingProfile]);
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<void>(`/api/v1/students/${id}`, {
         method: 'DELETE',
         headers: {
           Origin: window.location.origin,
         },
-      });
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
       window.location.href = '/alumnos';
-    } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        setDeleteError(err.message);
-      } else {
-        setDeleteError('No se pudo dar de baja al estudiante');
-      }
-      setIsDeletingStudent(false);
-    }
+    },
+    onError: (err: unknown) => {
+      setDeleteError(err instanceof ApiError ? err.message : 'No se pudo dar de baja al estudiante');
+    },
+  });
+  const isDeletingStudent = deleteStudentMutation.isPending;
+
+  const handleDeleteStudent = () => {
+    setDeleteError(null);
+    deleteStudentMutation.mutate();
   };
 
-  const loadStudentData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [studentData, membershipsData, groupsData] = await Promise.all([
-        apiFetch<StudentView>(`/api/v1/students/${id}`),
-        apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`),
-        apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
-      ]);
-
-      setStudent(studentData);
-      setMemberships(membershipsData.items);
-      setActiveGroups(groupsData.items);
-
-      // Pre-populate profile edit state
-      setEditName(studentData.name);
-      setEditBirthDate(studentData.birthDate);
-      setEditLevel(studentData.level ?? Level.A1);
-      setEditGuardianName(studentData.guardianName ?? '');
-      setEditGuardianContact(studentData.guardianContact ?? '');
-
-      if (groupsData.items.length > 0) {
-        setSelectedDestinationGroup(studentData.groupId ?? groupsData.items[0]?.id ?? '');
-      }
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('Error al cargar la información del alumno');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    loadStudentData();
-  }, [loadStudentData]);
-
   // Group transfer handler (P0-09, QA-07, RF-9, Decision 131)
-  const handleGroupTransfer = async (confirmLostRetries = false) => {
-    if (!selectedDestinationGroup || selectedDestinationGroup === student?.groupId) return;
-
-    setIsTransferringGroup(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const updated = await apiFetch<StudentView>(`/api/v1/students/${id}/group`, {
+  const transferGroupMutation = useMutation({
+    mutationFn: ({ groupId, confirmLostRetries }: { groupId: string; confirmLostRetries: boolean }) =>
+      apiFetch<StudentView>(`/api/v1/students/${id}/group`, {
         method: 'PUT',
         body: JSON.stringify({
-          groupId: selectedDestinationGroup,
+          groupId,
           confirmLostRetries,
         }),
-      });
-      setStudent(updated);
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['teacher', 'student', id], updated);
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'student', id, 'memberships'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'group'] });
       setSuccess('Grupo actualizado exitosamente.');
       setRetryWarningModalOpen(false);
       setAffectedActivities([]);
-      // Refresh memberships history
-      const memData = await apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`);
-      setMemberships(memData.items);
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       if (err instanceof ApiError) {
         if (err.code === 'UNCONSUMED_RETRY_WARNING') {
-          const detailsObj = err.details as
-            | {
-                affectedActivities?: Array<
-                  | string
-                  | {
-                      assignmentId: string;
-                      activityId: string;
-                      activityTitle: string;
-                      effectiveDueAt: string;
-                      attemptNumber: number;
-                    }
-                >;
-              }
-            | undefined;
-          const acts = Array.isArray(detailsObj?.affectedActivities) ? detailsObj.affectedActivities : [];
+          const parsed = retryWarningSchema.safeParse(err.details);
+          const acts = parsed.success && parsed.data.affectedActivities ? parsed.data.affectedActivities : [];
           setAffectedActivities(acts);
           setRetryWarningModalOpen(true);
         } else if (err.code === 'GROUP_ARCHIVED') {
@@ -177,42 +178,56 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       } else {
         setError('No se pudo trasladar de grupo al alumno');
       }
-    } finally {
-      setIsTransferringGroup(false);
-    }
+    },
+  });
+  const isTransferringGroup = transferGroupMutation.isPending;
+
+  const handleGroupTransfer = (confirmLostRetries = false) => {
+    if (!selectedDestinationGroup || selectedDestinationGroup === student?.groupId) return;
+
+    setError(null);
+    setSuccess(null);
+    transferGroupMutation.mutate({
+      groupId: selectedDestinationGroup,
+      confirmLostRetries,
+    });
   };
 
   // Profile update handler
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const saveProfileMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      apiFetch<StudentView>(`/api/v1/students/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['teacher', 'student', id], updated);
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      setIsEditingProfile(false);
+      setSuccess('Ficha del alumno actualizada.');
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar la información del alumno');
+    },
+  });
+  const isSavingProfile = saveProfileMutation.isPending;
+
+  const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSavingProfile(true);
     setError(null);
     setSuccess(null);
 
-    try {
-      const payload: Record<string, unknown> = {
-        name: editName.trim(),
-        birthDate: editBirthDate || undefined,
-        guardianName: editGuardianName.trim() || undefined,
-        guardianContact: editGuardianContact.trim() || undefined,
-      };
-      if (student?.approvalStatus === 'approved') {
-        payload.level = editLevel;
-      }
-
-      const updated = await apiFetch<StudentView>(`/api/v1/students/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
-      });
-      setStudent(updated);
-      setIsEditingProfile(false);
-      setSuccess('Ficha del alumno actualizada.');
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo guardar la información del alumno');
-    } finally {
-      setIsSavingProfile(false);
+    const payload: Record<string, unknown> = {
+      name: editName.trim(),
+      birthDate: editBirthDate || undefined,
+      guardianName: editGuardianName.trim() || undefined,
+      guardianContact: editGuardianContact.trim() || undefined,
+    };
+    if (student?.approvalStatus === 'approved') {
+      payload.level = editLevel;
     }
+
+    saveProfileMutation.mutate(payload);
   };
 
   // Password reset handler
@@ -220,47 +235,42 @@ export function AlumnoDetailClient({ id }: { id: string }) {
     setShowResetConfirm(true);
   };
 
-  const handleConfirmSendPasswordReset = async () => {
+  const resetPasswordMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<MessageResponse>(`/api/v1/students/${id}/reset-password`, {
+        method: 'POST',
+      }),
+    onSuccess: (res) => {
+      setSuccess(res.message || 'Enlace de recuperación enviado al correo del alumno.');
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof ApiError ? err.message : 'No se pudo solicitar la recuperación de contraseña');
+    },
+  });
+
+  const handleConfirmSendPasswordReset = () => {
     setShowResetConfirm(false);
     setError(null);
     setSuccess(null);
-    try {
-      const res = await apiFetch<MessageResponse>(`/api/v1/students/${id}/reset-password`, {
-        method: 'POST',
-      });
-      setSuccess(res.message || 'Enlace de recuperación enviado al correo del alumno.');
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo solicitar la recuperación de contraseña');
-    }
+    resetPasswordMutation.mutate();
   };
 
   // Change Email handler (RF-18, RF-19, Decision 63)
-  const handleChangeEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!identityConfirmed) {
-      setChangeEmailError('Debes confirmar que verificaste la identidad del alumno.');
-      return;
-    }
-
-    setIsSubmittingEmail(true);
-    setChangeEmailError(null);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const res = await apiFetch<MessageResponse>(`/api/v1/students/${id}/change-email`, {
+  const changeEmailMutation = useMutation({
+    mutationFn: (email: string) =>
+      apiFetch<MessageResponse>(`/api/v1/students/${id}/change-email`, {
         method: 'POST',
-        body: JSON.stringify({ newEmail: newEmail.trim() }),
-      });
-
+        body: JSON.stringify({ newEmail: email }),
+      }),
+    onSuccess: (res) => {
       setSuccess(res.message);
       setIsChangeEmailOpen(false);
       setNewEmail('');
       setIdentityConfirmed(false);
-      // Reload student data to reflect new email
-      loadStudentData();
-    } catch (err) {
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'student', id] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+    },
+    onError: (err: unknown) => {
       if (err instanceof ApiError) {
         if (err.code === 'EMAIL_TAKEN') {
           setChangeEmailError('Ese correo no está disponible');
@@ -270,9 +280,21 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       } else {
         setChangeEmailError('Error al cambiar el correo');
       }
-    } finally {
-      setIsSubmittingEmail(false);
+    },
+  });
+  const isSubmittingEmail = changeEmailMutation.isPending;
+
+  const handleChangeEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identityConfirmed) {
+      setChangeEmailError('Debes confirmar que verificaste la identidad del alumno.');
+      return;
     }
+
+    setChangeEmailError(null);
+    setError(null);
+    setSuccess(null);
+    changeEmailMutation.mutate(newEmail.trim());
   };
 
   if (isLoading) {
@@ -410,7 +432,9 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                   <select
                     id="edit-lvl"
                     value={editLevel}
-                    onChange={(e) => setEditLevel(e.target.value as Level)}
+                    onChange={(e) => {
+                      if (isLevel(e.target.value)) setEditLevel(e.target.value);
+                    }}
                     className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
                   >
                     <option value={Level.A1}>A1</option>
@@ -781,17 +805,16 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               <p className="font-bold text-amber-950">Actividades con reintentos que se revocarán:</p>
               <ul className="list-disc pl-4 space-y-1 text-zinc-800">
                 {affectedActivities.map((act, actIdx) => {
-                  const isString = typeof act === 'string';
-                  const key = !isString && (act as { assignmentId?: string }).assignmentId
-                    ? (act as { assignmentId: string }).assignmentId
-                    : String(actIdx);
-                  const title = isString
-                    ? act
-                    : (act as { activityTitle?: string }).activityTitle || 'Actividad';
-                  const attemptNum =
-                    !isString && (act as { attemptNumber?: number }).attemptNumber
-                      ? ` (Intento #${(act as { attemptNumber: number }).attemptNumber})`
-                      : '';
+                  if (typeof act === 'string') {
+                    return (
+                      <li key={String(actIdx)}>
+                        <span className="font-semibold">{act}</span>
+                      </li>
+                    );
+                  }
+                  const key = act.assignmentId || String(actIdx);
+                  const title = act.activityTitle || 'Actividad';
+                  const attemptNum = act.attemptNumber ? ` (Intento #${act.attemptNumber})` : '';
                   return (
                     <li key={key}>
                       <span className="font-semibold">{title}</span>{attemptNum}

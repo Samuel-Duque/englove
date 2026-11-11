@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  MatchSettings,
-  MatchSolution,
+  MatchSettingsSchema,
+  MatchSolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -21,8 +21,10 @@ export function MatchGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as MatchSettings;
-  const solution = config.answerKey?.solution as MatchSolution | undefined;
+  const parsedSettings = MatchSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = MatchSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const leftItems = settings?.left || [];
   const rightOriginal = settings?.right || [];
@@ -335,7 +337,8 @@ function DropTargetRightItem({
       onDragLeave: () => setIsOver(false),
       onDrop: ({ source }) => {
         setIsOver(false);
-        const droppedLeftId = source.data?.leftId as string | undefined;
+        const droppedLeftId =
+          typeof source.data?.leftId === 'string' ? source.data.leftId : undefined;
         if (droppedLeftId) {
           onDropLink(droppedLeftId);
         }

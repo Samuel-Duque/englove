@@ -239,4 +239,234 @@ export class AppModule {}
       }
     });
   });
+
+  describe('WP-09 / T6.4: Reglas de cliente (G-C12, G-B04, G-C13)', () => {
+    it('G-C12 bloquea aserciones "as <Type>" y "<Type>expr" en runtime y permite "as const", textos en español e imports', () => {
+      const tempRoot = createTempRoot();
+      const webLibDir = path.join(tempRoot, 'apps', 'web', 'src', 'lib');
+      const webAppDir = path.join(tempRoot, 'apps', 'web', 'src', 'app');
+      fs.mkdirSync(webLibDir, { recursive: true });
+      fs.mkdirSync(webAppDir, { recursive: true });
+
+      const badTs = path.join(webLibDir, 'bad-casts.ts');
+      fs.writeFileSync(
+        badTs,
+        `
+import * as path from 'node:path';
+import {
+  Foo as Bar,
+  Baz as Qux,
+} from './other';
+export {
+  Qux as RenamedQux,
+} from './other';
+
+export const ROLES = ['student', 'teacher'] as const;
+const goodArrow = <T>(x: T) => x;
+
+export const unsafeExport = ({ a: 1 }) as { a: number };
+
+export function unsafeOne(val: unknown) {
+  return val as string;
+}
+
+export function unsafeTwo(val: unknown) {
+  return <number>val;
+}
+
+export function justified(val: unknown) {
+  // guardrails-ignore G-C12: frontera genérica HTTP justificada
+  return val as Record<string, unknown>;
+}
+`,
+      );
+
+      const goodTsx = path.join(webAppDir, 'clean-view.tsx');
+      fs.writeFileSync(
+        goodTsx,
+        `
+import React from 'react';
+
+export const STATUSES = ['pending', 'done'] as const;
+
+export function CleanView() {
+  const msg = 'Las contraseñas no coinciden';
+  return (
+    <div>
+      <span>Categorías / Destinos</span>
+      <span>Pestañas</span>
+      <span>Días sin actividad</span>
+      <p>{msg}</p>
+    </div>
+  );
+}
+`,
+      );
+
+      try {
+        const badRes = runGuardrailsJson(tempRoot, 'apps/web/src/lib/bad-casts.ts');
+        expect(badRes.exitCode).toBe(1);
+        const c12Errors = badRes.data.findings.filter((f) => f.id === 'G-C12' && f.severity === 'ERROR');
+        expect(c12Errors.length).toBe(3);
+        expect(c12Errors.some((e) => e.message.includes('as <Type>'))).toBe(true);
+        expect(c12Errors.some((e) => e.message.includes('<Type>expr'))).toBe(true);
+        expect(badRes.data.suppressed.some((s) => s.id === 'G-C12')).toBe(true);
+
+        const goodRes = runGuardrailsJson(tempRoot, 'apps/web/src/app/clean-view.tsx');
+        expect(goodRes.exitCode).toBe(0);
+        expect(goodRes.data.findings.filter((f) => f.id === 'G-C12').length).toBe(0);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('G-C12 ignora aserciones "as Type" dentro de archivos de prueba (*.spec.ts)', () => {
+      const tempRoot = createTempRoot();
+      const testDir = path.join(tempRoot, 'apps', 'web', 'test');
+      fs.mkdirSync(testDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(testDir, 'sample.spec.ts'),
+        `
+export function helper(x: unknown) {
+  return x as { ok: boolean };
+}
+`,
+      );
+
+      try {
+        const res = runGuardrailsJson(tempRoot, 'apps/web/test/sample.spec.ts');
+        expect(res.exitCode).toBe(0);
+        expect(res.data.findings.filter((f) => f.id === 'G-C12').length).toBe(0);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('G-B04 detecta ERROR si vistas cliente (incl. >40 líneas o componentes) usan useEffect con apiFetch/fetch, pero permite useEffect de UI sin fetch', () => {
+      const tempRoot = createTempRoot();
+      const appDir = path.join(tempRoot, 'apps', 'web', 'src', 'app', 'demo');
+      const compDir = path.join(tempRoot, 'apps', 'web', 'src', 'components');
+      fs.mkdirSync(appDir, { recursive: true });
+      fs.mkdirSync(compDir, { recursive: true });
+
+      const badClient = path.join(appDir, 'bad-client.tsx');
+      fs.writeFileSync(
+        badClient,
+        `
+'use client';
+import { useEffect, useState } from 'react';
+import { apiFetch } from '../../../lib/api';
+
+export function BadClient() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    void apiFetch('/api/v1/me').then(setData);
+  }, []);
+  return <div>{String(data)}</div>;
+}
+`,
+      );
+
+      const longEditor = path.join(appDir, 'activity-editor.tsx');
+      const paddingLines = Array.from({ length: 45 }, (_, idx) => `    const step${idx} = ${idx};`).join('\n');
+      fs.writeFileSync(
+        longEditor,
+        `
+'use client';
+import { useEffect } from 'react';
+import { apiFetch } from '../../../lib/api';
+
+export function ActivityEditor() {
+  useEffect(() => {
+${paddingLines}
+    void apiFetch('/api/v1/activities');
+  }, []);
+  return <div />;
+}
+`,
+      );
+
+      const badFetchComp = path.join(compDir, 'nav-widget.tsx');
+      fs.writeFileSync(
+        badFetchComp,
+        `
+'use client';
+import { useEffect } from 'react';
+
+export function NavWidget({ url }: { url: string }) {
+  useEffect(() => {
+    void fetch(url);
+  }, [url]);
+  return <div />;
+}
+`,
+      );
+
+      const goodClient = path.join(appDir, 'good-client.tsx');
+      fs.writeFileSync(
+        goodClient,
+        `
+'use client';
+import { useEffect, useState } from 'react';
+
+export function GoodClient() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  return <div>{mounted ? 'ok' : ''}</div>;
+}
+`,
+      );
+
+      try {
+        const badRes = runGuardrailsJson(tempRoot, 'apps/web/src/app/demo/bad-client.tsx');
+        expect(badRes.exitCode).toBe(1);
+        expect(badRes.data.findings.some((f) => f.id === 'G-B04' && f.severity === 'ERROR')).toBe(true);
+
+        const longEditorRes = runGuardrailsJson(tempRoot, 'apps/web/src/app/demo/activity-editor.tsx');
+        expect(longEditorRes.exitCode).toBe(1);
+        expect(longEditorRes.data.findings.some((f) => f.id === 'G-B04' && f.severity === 'ERROR')).toBe(true);
+
+        const badCompRes = runGuardrailsJson(tempRoot, 'apps/web/src/components/nav-widget.tsx');
+        expect(badCompRes.exitCode).toBe(1);
+        expect(badCompRes.data.findings.some((f) => f.id === 'G-B04' && f.severity === 'ERROR')).toBe(true);
+
+        const goodRes = runGuardrailsJson(tempRoot, 'apps/web/src/app/demo/good-client.tsx');
+        expect(goodRes.exitCode).toBe(0);
+        expect(goodRes.data.findings.filter((f) => f.id === 'G-B04').length).toBe(0);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('G-C13 exige serwist y @serwist/vite en apps/web/package.json y bloquea apps/web/public/sw.js manual', () => {
+      const tempRoot = createTempRoot();
+      const webDir = path.join(tempRoot, 'apps', 'web');
+      const publicDir = path.join(webDir, 'public');
+      fs.mkdirSync(publicDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(webDir, 'package.json'),
+        JSON.stringify({ name: '@englove/web', dependencies: { react: '19.3.1' } }, null, 2),
+      );
+      fs.writeFileSync(path.join(publicDir, 'sw.js'), '// manual service worker');
+
+      try {
+        const pkgRes = runGuardrailsJson(tempRoot, 'apps/web/package.json');
+        expect(pkgRes.exitCode).toBe(1);
+        expect(pkgRes.data.findings.some((f) => f.id === 'G-C13' && f.severity === 'ERROR' && f.message.includes('@serwist/vite'))).toBe(true);
+
+        const swRes = runGuardrailsJson(tempRoot, 'apps/web/public/sw.js');
+        expect(swRes.exitCode).toBe(1);
+        expect(swRes.data.findings.some((f) => f.id === 'G-C13' && f.severity === 'ERROR' && f.message.includes('public/sw.js'))).toBe(true);
+
+        const realPkgRes = runGuardrailsJson(repoRoot, 'apps/web/package.json');
+        expect(realPkgRes.exitCode).toBe(0);
+        expect(realPkgRes.data.findings.filter((f) => f.id === 'G-C13').length).toBe(0);
+      } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    });
+  });
 });

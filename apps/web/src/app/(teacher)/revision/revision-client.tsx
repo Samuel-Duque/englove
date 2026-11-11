@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityType,
   STICKERS,
@@ -18,10 +18,12 @@ import { apiFetch, ApiError } from '../../../lib/api';
 import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
 
 export function RevisionClient() {
+  const queryClient = useQueryClient();
+
   const [activeTab, setActiveTab] = useState<'pending' | 'graded'>('pending');
 
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<AttemptReviewDetailView | null>(null);
+  const hydratedAttemptRef = useRef<string | null>(null);
 
   // Filter states
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
@@ -36,20 +38,13 @@ export function RevisionClient() {
   const [allowRetry, setAllowRetry] = useState<boolean>(false);
   const [retryExtendUntil, setRetryExtendUntil] = useState<string>('');
 
-  // Audio state
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [audioWarning, setAudioWarning] = useState<boolean>(false);
-  const [isLoadingAudio, setIsLoadingAudio] = useState<boolean>(false);
-
   // Status & notifications
-  const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Load groups for filter dropdown
   const groupsQuery = useQuery({
-    queryKey: ['groups', 'active'],
+    queryKey: ['teacher', 'groups', 'active'],
     queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
   });
   const groups: GroupView[] = groupsQuery.data?.items ?? [];
@@ -85,10 +80,6 @@ export function RevisionClient() {
       : 'Error al cargar las entregas para revisión'
     : null;
   const shownErrorMessage = errorMessage ?? listErrorMessage;
-  const fetchList = () => {
-    void pendingQuery.refetch();
-    void gradedQuery.refetch();
-  };
 
   // Auto-select first pending if none selected
   const firstPendingId = pendingItems[0]?.attempt.attemptId ?? null;
@@ -98,52 +89,52 @@ export function RevisionClient() {
     }
   }, [selectedAttemptId, firstPendingId, activeTab]);
 
-  // Load attempt detail
-  const loadDetail = useCallback(async (attemptId: string) => {
-    setIsLoadingDetail(true);
-    setAudioUrl(null);
-    setAudioWarning(false);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-
-    try {
-      const data = await apiFetch<AttemptReviewDetailView>(`/api/v1/attempts/${attemptId}/review-detail`);
-      setDetail(data);
-
-      // Initialize form fields
-      setScoreInput(data.attempt.score !== null ? data.attempt.score.toFixed(1).replace('.', ',') : '');
-      setCommentInput(data.review?.comment || '');
-      setSelectedStickers(data.review?.stickers || []);
-      setAllowRetry(false);
-      setRetryExtendUntil('');
-
-      // If speaking with ready media, load audio URL
+  // Load attempt detail via TanStack Query
+  const detailQuery = useQuery({
+    queryKey: ['teacher', 'review-detail', selectedAttemptId],
+    queryFn: async () => {
+      if (!selectedAttemptId) return null;
+      const data = await apiFetch<AttemptReviewDetailView>(`/api/v1/attempts/${selectedAttemptId}/review-detail`);
+      let audio: string | null = null;
+      let warning = false;
       if (data.activity.type === ActivityType.speaking && data.mediaAsset && data.mediaAsset.status !== 'deleted') {
-        setIsLoadingAudio(true);
         try {
           const mediaRes = await apiFetch<MediaPlaybackUrlResponse>(`/api/v1/media/${data.mediaAsset.id}/url`);
-          setAudioUrl(mediaRes.url);
-          setAudioWarning(Boolean(mediaRes.compatibilityWarning || mediaRes.format !== 'converted'));
+          audio = mediaRes.url;
+          warning = Boolean(mediaRes.compatibilityWarning || mediaRes.format !== 'converted');
         } catch {
-          // Audio load error handled visually
-        } finally {
-          setIsLoadingAudio(false);
+          // ignore audio failure
         }
       }
-    } catch (err) {
-      setErrorMessage((err as ApiError)?.message || 'Error al cargar el detalle del intento');
-    } finally {
-      setIsLoadingDetail(false);
-    }
-  }, []);
+      return { detail: data, audioUrl: audio, audioWarning: warning };
+    },
+    enabled: Boolean(selectedAttemptId),
+  });
+
+  const detail = detailQuery.data?.detail ?? null;
+  const audioUrl = detailQuery.data?.audioUrl ?? null;
+  const audioWarning = detailQuery.data?.audioWarning ?? false;
+  const isLoadingAudio = detailQuery.isLoading && detail?.activity.type === ActivityType.speaking;
+  const isLoadingDetail = detailQuery.isLoading;
 
   useEffect(() => {
-    if (selectedAttemptId) {
-      loadDetail(selectedAttemptId);
-    } else {
-      setDetail(null);
+    if (!selectedAttemptId) {
+      hydratedAttemptRef.current = null;
+      return;
     }
-  }, [selectedAttemptId, loadDetail]);
+    const data = detailQuery.data?.detail;
+    if (!data || data.attempt.attemptId !== selectedAttemptId) return;
+    if (hydratedAttemptRef.current === selectedAttemptId) return;
+
+    hydratedAttemptRef.current = selectedAttemptId;
+    setScoreInput(data.attempt.score !== null ? data.attempt.score.toFixed(1).replace('.', ',') : '');
+    setCommentInput(data.review?.comment || '');
+    setSelectedStickers(data.review?.stickers || []);
+    setAllowRetry(false);
+    setRetryExtendUntil('');
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  }, [selectedAttemptId, detailQuery.data]);
 
   const handleDownloadAudio = async () => {
     if (!detail?.mediaAsset?.id) return;
@@ -152,8 +143,8 @@ export function RevisionClient() {
         `/api/v1/media/${detail.mediaAsset.id}/download-url`,
       );
       window.open(downloadRes.url, '_blank');
-    } catch (err) {
-      setErrorMessage((err as ApiError)?.message || 'Error al obtener enlace de descarga de audio');
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof ApiError ? err.message : 'Error al obtener enlace de descarga de audio');
     }
   };
 
@@ -169,66 +160,75 @@ export function RevisionClient() {
     }
   };
 
-  const handleSubmitReview = async (e: React.FormEvent) => {
+  const reviewMutation = useMutation({
+    mutationFn: (body: unknown) =>
+      apiFetch<AttemptReviewDetailView>(
+        `/api/v1/attempts/${selectedAttemptId}/review`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        },
+      ),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['teacher', 'review-detail', selectedAttemptId], {
+        detail: updated,
+        audioUrl,
+        audioWarning,
+      });
+      setSuccessMessage('¡Calificación y retroalimentación guardadas exitosamente!');
+      void queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'reminders'] });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError && err.code === 'SCORE_OUT_OF_RANGE') {
+        setErrorMessage('La calificación debe estar entre 0,0 y 5,0.');
+      } else {
+        setErrorMessage(err instanceof ApiError ? err.message : 'Error al guardar la revisión');
+      }
+    },
+  });
+
+  const isSubmitting = reviewMutation.isPending;
+
+  const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (!detail) return;
 
     setErrorMessage(null);
     setSuccessMessage(null);
-    setIsSubmitting(true);
 
-    try {
-      const isPending = detail.attempt.status === 'pending_review';
-      const body: {
-        score?: number;
-        comment?: string;
-        stickers?: StickerCode[];
-        allowRetry?: boolean;
-        retryExtendUntil?: string | null;
-      } = {
-        comment: commentInput.trim(),
-        stickers: selectedStickers,
-        allowRetry,
-        retryExtendUntil: retryExtendUntil ? new Date(retryExtendUntil).toISOString() : null,
-      };
+    const isPendingStatus = detail.attempt.status === 'pending_review';
+    const body: {
+      score?: number;
+      comment?: string;
+      stickers?: StickerCode[];
+      allowRetry?: boolean;
+      retryExtendUntil?: string | null;
+    } = {
+      comment: commentInput.trim(),
+      stickers: selectedStickers,
+      allowRetry,
+      retryExtendUntil: retryExtendUntil ? new Date(retryExtendUntil).toISOString() : null,
+    };
 
-      if (isPending) {
-        const trimmedScore = scoreInput.trim();
-        if (!/^\d+(?:[.,]\d+)?$/.test(trimmedScore)) {
-          setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
-          setIsSubmitting(false);
-          return;
-        }
-        const normalized = trimmedScore.replace(',', '.');
-        const parsedScore = parseFloat(normalized);
-        if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 5) {
-          setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
-          setIsSubmitting(false);
-          return;
-        }
-        body.score = Math.round(parsedScore * 10) / 10;
+    if (isPendingStatus) {
+      const trimmedScore = scoreInput.trim();
+      if (!/^\d+(?:[.,]\d+)?$/.test(trimmedScore)) {
+        setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
+        return;
       }
-
-      const updated = await apiFetch<AttemptReviewDetailView>(
-        `/api/v1/attempts/${detail.attempt.attemptId}/review`,
-        {
-          method: 'POST',
-          body: JSON.stringify(body),
-        },
-      );
-
-      setDetail(updated);
-      setSuccessMessage('¡Calificación y retroalimentación guardadas exitosamente!');
-      fetchList();
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'SCORE_OUT_OF_RANGE') {
-        setErrorMessage('La calificación debe estar entre 0,0 y 5,0.');
-      } else {
-        setErrorMessage((err as ApiError)?.message || 'Error al guardar la revisión');
+      const normalized = trimmedScore.replace(',', '.');
+      const parsedScore = parseFloat(normalized);
+      if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 5) {
+        setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
+        return;
       }
-    } finally {
-      setIsSubmitting(false);
+      body.score = Math.round(parsedScore * 10) / 10;
     }
+
+    reviewMutation.mutate(body);
   };
 
   const currentList = activeTab === 'pending' ? pendingItems : gradedItems;
@@ -573,9 +573,11 @@ export function RevisionClient() {
                       if (rawAnswer !== undefined && rawAnswer !== null) {
                         if (
                           typeof rawAnswer === 'object' &&
-                          'text' in (rawAnswer as Record<string, unknown>)
+                          rawAnswer !== null &&
+                          'text' in rawAnswer
                         ) {
-                          displayAnswer = String((rawAnswer as Record<string, unknown>).text);
+                          const textVal = Reflect.get(rawAnswer, 'text');
+                          displayAnswer = textVal !== null && textVal !== undefined ? String(textVal) : '';
                         } else if (typeof rawAnswer === 'object') {
                           displayAnswer = JSON.stringify(rawAnswer, null, 2);
                         } else {

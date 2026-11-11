@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import type {
   SessionView,
   RemindersResponse,
@@ -21,94 +22,86 @@ import { AccessibleModal } from '../../components/ui/modal';
 
 export function InicioClient() {
   const router = useRouter();
-  const [session, setSession] = useState<SessionView | null>(null);
-  const [profile, setProfile] = useState<StudentProfileView | null>(null);
-  const [reminders, setReminders] = useState<RemindersResponse | null>(null);
-  const [assignmentCards, setAssignmentCards] = useState<AssignmentCard[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [networkError, setNetworkError] = useState<string | null>(null);
   const [attemptError, setAttemptError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [startingCardId, setStartingCardId] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
-      setNetworkError(null);
+  const sessionQuery = useQuery({
+    queryKey: ['auth', 'session'],
+    queryFn: async (): Promise<SessionView | null> => {
       let sessionData = await fetchSharedSession();
-
       if (!sessionData) {
-        // Tolerancia a 401: intenta refresco silencioso antes de redirigir (P0-02, P0-03)
         const refreshed = await requestSharedRefresh().catch(() => false);
         if (refreshed) {
           sessionData = await fetchSharedSession();
         }
       }
-
       if (!sessionData) {
         router.replace('/login');
-        return;
+        return null;
       }
-      setSession(sessionData);
+      return sessionData;
+    },
+  });
 
-      // If teacher, fetch reminders from PendingSummaryService (RF-17)
-      if (sessionData.user.role === 'teacher') {
-        try {
-          const remindersData = await apiFetch<RemindersResponse>('/api/v1/dashboard/reminders');
-          setReminders(remindersData);
-        } catch {
-          // Reminders load failure is non-blocking
-        }
-      } else if (sessionData.user.role === 'student') {
-        // If student, fetch student assignments cards and profile
-        try {
-          const [cardsData, profileData] = await Promise.all([
-            apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments'),
-            fetchSharedProfile().catch(() => null),
-          ]);
-          setAssignmentCards(cardsData.items || []);
-          if (profileData) {
-            setProfile(profileData);
-          }
-        } catch {
-          // Non-blocking
-        }
-      }
-    } catch (err: unknown) {
-      const msg = (err as Error)?.message;
-      if (msg === 'NETWORK_ERROR' || msg?.startsWith('SERVER_ERROR_')) {
-        setNetworkError('Hubo un problema de conexión con el servidor. Por favor, reintenta en unos instantes.');
-        setIsLoading(false);
-        return;
-      }
-      router.replace('/login');
-      return;
-    }
+  const session = sessionQuery.data ?? null;
 
-    setIsLoading(false);
-  }, [router]);
+  const remindersQuery = useQuery({
+    queryKey: ['teacher', 'reminders'],
+    queryFn: () => apiFetch<RemindersResponse>('/api/v1/dashboard/reminders'),
+    enabled: session?.user.role === 'teacher',
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const cardsQuery = useQuery({
+    queryKey: ['student', 'assignments'],
+    queryFn: () => apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments'),
+    enabled: session?.user.role === 'student',
+  });
 
-  const handleStartAttempt = async (assignmentId: string) => {
-    setStartingCardId(assignmentId);
-    setAttemptError(null);
-    try {
-      const data = await apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
+  const profileQuery = useQuery({
+    queryKey: ['student', 'profile'],
+    queryFn: () => fetchSharedProfile(),
+    enabled: session?.user.role === 'student',
+  });
+
+  const startAttemptMutation = useMutation({
+    mutationFn: (assignmentId: string) =>
+      apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
         method: 'POST',
-      });
+      }),
+    onSuccess: (data) => {
       router.push(`/actividad/${data.attempt.id}`);
-    } catch (err: unknown) {
+    },
+    onError: (err: unknown) => {
       if (err instanceof ApiError) {
         setAttemptError(err.message || 'No se pudo iniciar el intento de la actividad.');
       } else {
         setAttemptError('Error de conexión al iniciar el intento. Verifica tu red y reintenta.');
       }
-    } finally {
       setStartingCardId(null);
-    }
+    },
+  });
+
+  const handleStartAttempt = (assignmentId: string) => {
+    setStartingCardId(assignmentId);
+    setAttemptError(null);
+    startAttemptMutation.mutate(assignmentId);
   };
+
+  const isNetworkError = sessionQuery.isError && sessionQuery.error instanceof Error &&
+    (sessionQuery.error.message === 'NETWORK_ERROR' || sessionQuery.error.message.startsWith('SERVER_ERROR_'));
+
+  const networkError = isNetworkError
+    ? 'Hubo un problema de conexión con el servidor. Por favor, reintenta en unos instantes.'
+    : null;
+
+  const isLoading = sessionQuery.isLoading ||
+    (session?.user.role === 'teacher' && remindersQuery.isLoading) ||
+    (session?.user.role === 'student' && cardsQuery.isLoading);
+
+  const reminders = remindersQuery.data ?? null;
+  const assignmentCards: AssignmentCard[] = cardsQuery.data?.items ?? [];
+  const profile: StudentProfileView | null = profileQuery.data ?? null;
 
   if (networkError) {
     return (
@@ -120,8 +113,7 @@ export function InicioClient() {
           <button
             type="button"
             onClick={() => {
-              setIsLoading(true);
-              loadData();
+              void sessionQuery.refetch();
             }}
             className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
           >

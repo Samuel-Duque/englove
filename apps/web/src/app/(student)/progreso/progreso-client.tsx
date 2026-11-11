@@ -1,38 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { StudentProgressView, BadgeAwardView } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { renderBadgeIcon } from '../../../lib/badges';
 
 export function ProgresoClient() {
-  const [progress, setProgress] = useState<StudentProgressView | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: progress, isLoading, error: queryError } = useQuery({
+    queryKey: ['student', 'progress'],
+    queryFn: () => apiFetch<StudentProgressView>('/api/v1/me/progress'),
+  });
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadProgress() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await apiFetch<StudentProgressView>('/api/v1/me/progress');
-        if (isMounted) setProgress(data);
-      } catch (err) {
-        if (isMounted) {
-          if (err instanceof ApiError) setError(err.message);
-          else setError('Error al cargar tu progreso');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    loadProgress();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const error = queryError instanceof ApiError
+    ? queryError.message
+    : queryError instanceof Error
+      ? queryError.message
+      : null;
 
   if (isLoading) {
     return (

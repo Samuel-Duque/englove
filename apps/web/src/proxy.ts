@@ -17,11 +17,15 @@ function decodeJwtPayload(token: string): DecodedJwt | null {
     if (!part1) return null;
     const base64 = part1.replace(/-/g, '+').replace(/_/g, '/');
     const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
-    const payload = JSON.parse(jsonStr) as { role?: unknown; exp?: unknown; typ?: unknown };
+    const parsed: unknown = JSON.parse(jsonStr);
+    const rec = typeof parsed === 'object' && parsed !== null ? parsed : {};
+    const roleVal = Reflect.get(rec, 'role');
+    const expVal = Reflect.get(rec, 'exp');
+    const typVal = Reflect.get(rec, 'typ');
     return {
-      role: typeof payload.role === 'string' ? payload.role : undefined,
-      exp: typeof payload.exp === 'number' ? payload.exp : undefined,
-      typ: typeof payload.typ === 'string' ? payload.typ : undefined,
+      role: typeof roleVal === 'string' ? roleVal : undefined,
+      exp: typeof expVal === 'number' ? expVal : undefined,
+      typ: typeof typVal === 'string' ? typVal : undefined,
     };
   } catch {
     return null;

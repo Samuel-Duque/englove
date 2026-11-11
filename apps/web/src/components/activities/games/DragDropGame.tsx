@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  DragDropSettings,
-  DragDropSolution,
+  DragDropSettingsSchema,
+  DragDropSolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -21,8 +21,10 @@ export function DragDropGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as DragDropSettings;
-  const solution = config.answerKey?.solution as DragDropSolution | undefined;
+  const parsedSettings = DragDropSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = DragDropSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalObjects = settings?.objects || [];
   const targets = settings?.targets || [];
@@ -128,8 +130,12 @@ export function DragDropGame({
               id={target.id}
               name={
                 target.text ||
-                (target as unknown as { label?: string }).label ||
-                (target as unknown as { name?: string }).name ||
+                (typeof Reflect.get(target, 'label') === 'string'
+                  ? String(Reflect.get(target, 'label'))
+                  : undefined) ||
+                (typeof Reflect.get(target, 'name') === 'string'
+                  ? String(Reflect.get(target, 'name'))
+                  : undefined) ||
                 'Categoría'
               }
               placedObjects={placedInThis}
@@ -310,7 +316,8 @@ function TargetCategoryContainer({
       onDragLeave: () => setIsOver(false),
       onDrop: ({ source }) => {
         setIsOver(false);
-        const objId = source.data?.objectId as string | undefined;
+        const objId =
+          typeof source.data?.objectId === 'string' ? source.data.objectId : undefined;
         if (objId) onDropObject(objId);
       },
     });

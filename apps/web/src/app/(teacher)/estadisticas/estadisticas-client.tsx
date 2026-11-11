@@ -19,6 +19,11 @@ import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
 
 type TabType = 'overview' | 'groups' | 'leaderboard' | 'games-leaderboard';
 type PeriodPreset = '7d' | '30d' | '90d' | 'custom';
+const PERIOD_PRESETS: readonly PeriodPreset[] = ['7d', '30d', '90d', 'custom'];
+
+function isTabType(val: string | null): val is TabType {
+  return val === 'overview' || val === 'groups' || val === 'leaderboard' || val === 'games-leaderboard';
+}
 
 function formatScore(score: number | null | undefined): string {
   if (score === null || score === undefined) return '—';
@@ -70,7 +75,8 @@ export function EstadisticasClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const tabParam = (searchParams.get('tab') as TabType) || 'overview';
+  const rawTab = searchParams.get('tab');
+  const tabParam: TabType = isTabType(rawTab) ? rawTab : 'overview';
   const [activeTab, setActiveTab] = useState<TabType>(tabParam);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -113,7 +119,7 @@ export function EstadisticasClient() {
 
   // Load active groups for dropdowns
   const groupsQuery = useQuery({
-    queryKey: ['groups', 'active'],
+    queryKey: ['teacher', 'groups', 'active'],
     queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
   });
   const groups: GroupView[] = groupsQuery.data?.items ?? [];
@@ -244,7 +250,7 @@ export function EstadisticasClient() {
             Periodo:
           </span>
           <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 text-xs font-medium">
-            {(['7d', '30d', '90d', 'custom'] as PeriodPreset[]).map((preset) => {
+            {PERIOD_PRESETS.map((preset) => {
               const labels: Record<PeriodPreset, string> = {
                 '7d': 'Últimos 7 días',
                 '30d': 'Últimos 30 días',

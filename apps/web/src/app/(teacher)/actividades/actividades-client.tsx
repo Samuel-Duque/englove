@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivitySummary,
   ActivityListResponse,
@@ -29,10 +30,9 @@ const statusLabels: Record<ActivityStatus, { label: string; color: string }> = {
 
 export function ActividadesClient() {
   const router = useRouter();
-  const [activities, setActivities] = useState<ActivitySummary[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Filters
@@ -41,17 +41,13 @@ export function ActividadesClient() {
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
 
-  const fetchActivities = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const activitiesQuery = useQuery({
+    queryKey: ['teacher', 'activities', statusFilter, typeFilter, levelFilter],
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter === 'archived') {
         params.set('status', ActivityStatus.archived);
-      } else if (statusFilter === 'active') {
-        // Without status, API returns active catalog (draft + published)
       }
-
       if (typeFilter !== 'all') {
         params.set('type', typeFilter);
       }
@@ -59,88 +55,98 @@ export function ActividadesClient() {
         params.set('level', levelFilter);
       }
       params.set('limit', '100');
+      return apiFetch<ActivityListResponse>(`/api/v1/activities?${params.toString()}`);
+    },
+  });
 
-      const data = await apiFetch<ActivityListResponse>(`/api/v1/activities?${params.toString()}`);
-      setActivities(data.items);
-      setTotal(data.total);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError('Error al cargar actividades');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [statusFilter, typeFilter, levelFilter]);
-
-  useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
-
-  const handleDuplicate = async (id: string) => {
-    setError(null);
-    try {
-      const duplicated = await apiFetch<ActivitySummary>(`/api/v1/activities/${id}/duplicate`, {
-        method: 'POST',
-      });
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<ActivitySummary>(`/api/v1/activities/${id}/duplicate`, { method: 'POST' }),
+    onSuccess: (duplicated) => {
       setActionSuccess('Actividad duplicada exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
       router.push(`/actividades/${duplicated.id}`);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo duplicar la actividad');
-    }
-  };
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo duplicar la actividad');
+    },
+  });
 
-  const handleArchive = async (id: string) => {
-    setError(null);
-    try {
-      await apiFetch(`/api/v1/activities/${id}/archive`, { method: 'POST' });
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/v1/activities/${id}/archive`, { method: 'POST' }),
+    onSuccess: () => {
       setActionSuccess('Actividad archivada exitosamente');
-      fetchActivities();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo archivar la actividad');
-    }
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo archivar la actividad');
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/v1/activities/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => {
+      setActionSuccess('Actividad restaurada al catálogo');
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo restaurar la actividad');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/v1/activities/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setActionSuccess('Borrador eliminado exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'ACTIVITY_DELETE_NOT_ALLOWED') {
+          setActionError('No es posible eliminar la actividad: solo se pueden eliminar borradores sin asignaciones.');
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo eliminar la actividad');
+      }
+    },
+  });
+
+  const handleDuplicate = (id: string) => {
+    setActionError(null);
+    duplicateMutation.mutate(id);
   };
 
-  const handleRestore = async (id: string) => {
-    setError(null);
-    try {
-      await apiFetch(`/api/v1/activities/${id}/restore`, { method: 'POST' });
-      setActionSuccess('Actividad restaurada al catálogo');
-      fetchActivities();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo restaurar la actividad');
-    }
+  const handleArchive = (id: string) => {
+    setActionError(null);
+    archiveMutation.mutate(id);
+  };
+
+  const handleRestore = (id: string) => {
+    setActionError(null);
+    restoreMutation.mutate(id);
   };
 
   const handleDelete = (id: string) => {
     setDeletingActivityId(id);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = () => {
     const id = deletingActivityId;
     setDeletingActivityId(null);
     if (!id) return;
-    setError(null);
-    try {
-      await apiFetch(`/api/v1/activities/${id}`, { method: 'DELETE' });
-      setActionSuccess('Borrador eliminado exitosamente');
-      fetchActivities();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === 'ACTIVITY_DELETE_NOT_ALLOWED') {
-          setError('No es posible eliminar la actividad: solo se pueden eliminar borradores sin asignaciones.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('No se pudo eliminar la actividad');
-      }
-    }
+    setActionError(null);
+    deleteMutation.mutate(id);
   };
+
+  const isLoading = activitiesQuery.isLoading;
+  const activities: ActivitySummary[] = activitiesQuery.data?.items || [];
+  const total = activitiesQuery.data?.total || 0;
+  const error = actionError || (activitiesQuery.error instanceof ApiError ? activitiesQuery.error.message : activitiesQuery.error instanceof Error ? activitiesQuery.error.message : null);
 
   return (
     <div className="space-y-6">
@@ -171,7 +177,7 @@ export function ActividadesClient() {
           <span>{error}</span>
           <button
             type="button"
-            onClick={() => setError(null)}
+            onClick={() => setActionError(null)}
             className="text-rose-600 hover:text-rose-800 font-bold ml-4"
           >
             ✕

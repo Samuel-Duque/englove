@@ -77,6 +77,7 @@ export async function apiFetch<T>(
   }
 
   if (response.status === 204) {
+    // guardrails-ignore G-C12: frontera genérica HTTP de apiFetch<T> para respuesta 204 No Content
     return undefined as unknown as T;
   }
 
@@ -91,16 +92,27 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
-    const errorData = data as ApiErrorResponse | null;
-    const msg = Array.isArray(errorData?.message)
-      ? errorData?.message.join(', ')
-      : errorData?.message || `Error ${response.status}: ${response.statusText}`;
-    throw new ApiError(response.status, errorData?.code || 'ERROR', msg, errorData?.details);
+    let errorCode = 'ERROR';
+    let errorMessage = `Error ${response.status}: ${response.statusText}`;
+    let errorDetails: unknown;
+    if (typeof data === 'object' && data !== null) {
+      const code = Reflect.get(data, 'code');
+      if (typeof code === 'string') errorCode = code;
+      const message = Reflect.get(data, 'message');
+      if (Array.isArray(message)) {
+        errorMessage = message.filter((m): m is string => typeof m === 'string').join(', ');
+      } else if (typeof message === 'string') {
+        errorMessage = message;
+      }
+      errorDetails = Reflect.get(data, 'details');
+    }
+    throw new ApiError(response.status, errorCode, errorMessage, errorDetails);
   }
 
   if (schema) {
     return schema.parse(data);
   }
 
+  // guardrails-ignore G-C12: frontera genérica HTTP de apiFetch<T> cuando se invoca sin schema Zod explícito
   return data as T;
 }

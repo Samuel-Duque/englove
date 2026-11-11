@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GroupView, GroupListResponse } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { ConfirmDialog } from '../../../components/ui/modal';
 
 export function GruposClient() {
-  const [groups, setGroups] = useState<GroupView[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Filter: all, active, archived
@@ -19,7 +19,6 @@ export function GruposClient() {
   // Modal / Form state for creating group
   const [isCreating, setIsCreating] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Rename state
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
@@ -32,91 +31,133 @@ export function GruposClient() {
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  const fetchGroups = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const groupsQuery = useQuery({
+    queryKey: ['teacher', 'groups', archivedFilter],
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (archivedFilter === 'active') params.set('archived', 'false');
       else if (archivedFilter === 'archived') params.set('archived', 'true');
       params.set('limit', '100');
+      return apiFetch<GroupListResponse>(`/api/v1/groups?${params.toString()}`);
+    },
+  });
 
-      const data = await apiFetch<GroupListResponse>(`/api/v1/groups?${params.toString()}`);
-      setGroups(data.items);
-      setTotal(data.total);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('Error al cargar grupos');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [archivedFilter]);
+  const createGroupMutation = useMutation({
+    mutationFn: (name: string) =>
+      apiFetch<GroupView>('/api/v1/groups', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: (newGroup) => {
+      setSuccess(`Grupo "${newGroup.name}" creado exitosamente.`);
+      setNewGroupName('');
+      setIsCreating(false);
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof ApiError ? err.message : 'No se pudo crear el grupo');
+    },
+  });
 
-  useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+  const renameGroupMutation = useMutation({
+    mutationFn: (payload: { id: string; name: string }) =>
+      apiFetch<GroupView>(`/api/v1/groups/${payload.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: payload.name }),
+      }),
+    onSuccess: (_, payload) => {
+      setSuccess('Grupo renombrado exitosamente.');
+      setEditingGroupId(null);
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'group', payload.id] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_ARCHIVED') {
+          setActionError('No es posible renombrar un grupo archivado.');
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo renombrar el grupo');
+      }
+    },
+  });
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
+  const archiveGroupMutation = useMutation({
+    mutationFn: (groupId: string) =>
+      apiFetch<GroupView>(`/api/v1/groups/${groupId}/archive`, {
+        method: 'POST',
+      }),
+    onSuccess: (updated) => {
+      setSuccess(`Grupo "${updated.name}" archivado exitosamente.`);
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
+          setActionError(
+            'No es posible archivar un grupo con alumnos activos. Traslada sus alumnos a otro grupo antes de archivar.',
+          );
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo archivar el grupo');
+      }
+    },
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: (groupId: string) =>
+      apiFetch(`/api/v1/groups/${groupId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        if (err.code === 'GROUP_HAS_HISTORY') {
+          setActionError('No se puede borrar un grupo con historial de alumnos o asignaciones. Archívalo en su lugar.');
+        } else {
+          setActionError(err.message);
+        }
+      } else {
+        setActionError('No se pudo eliminar el grupo');
+      }
+    },
+  });
+
+  const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
     const name = newGroupName.trim();
     if (!name) return;
 
-    setIsSubmitting(true);
-    setError(null);
+    setActionError(null);
     setSuccess(null);
-
-    try {
-      await apiFetch<GroupView>('/api/v1/groups', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-      });
-      setSuccess(`Grupo "${name}" creado exitosamente.`);
-      setNewGroupName('');
-      setIsCreating(false);
-      fetchGroups();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo crear el grupo');
-    } finally {
-      setIsSubmitting(false);
-    }
+    createGroupMutation.mutate(name);
   };
+
+  const isSubmitting = createGroupMutation.isPending;
 
   const handleStartRename = (group: GroupView) => {
     setEditingGroupId(group.id);
     setEditingName(group.name);
   };
 
-  const handleSaveRename = async (id: string) => {
+  const handleSaveRename = (id: string) => {
     const name = editingName.trim();
     if (!name) return;
 
-    setError(null);
+    setActionError(null);
     setSuccess(null);
-    try {
-      await apiFetch<GroupView>(`/api/v1/groups/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name }),
-      });
-      setSuccess('Grupo renombrado exitosamente.');
-      setEditingGroupId(null);
-      fetchGroups();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_ARCHIVED') {
-          setError('No es posible renombrar un grupo archivado.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('No se pudo renombrar el grupo');
-      }
-    }
+    renameGroupMutation.mutate({ id, name });
   };
 
   const handleArchive = (group: GroupView) => {
     if (group.activeStudentCount > 0) {
-      setError(
+      setActionError(
         `No es posible archivar el grupo "${group.name}": tiene ${group.activeStudentCount} alumno(s) activo(s). Traslada los alumnos antes de archivar (decisión 96).`,
       );
       return;
@@ -127,29 +168,11 @@ export function GruposClient() {
       title: 'Archivar grupo',
       message: `¿Seguro que deseas archivar el grupo "${group.name}"?`,
       isDestructive: false,
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setError(null);
+        setActionError(null);
         setSuccess(null);
-        try {
-          await apiFetch<GroupView>(`/api/v1/groups/${group.id}/archive`, {
-            method: 'POST',
-          });
-          setSuccess(`Grupo "${group.name}" archivado exitosamente.`);
-          fetchGroups();
-        } catch (err) {
-          if (err instanceof ApiError) {
-            if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
-              setError(
-                'No es posible archivar un grupo con alumnos activos. Traslada sus alumnos a otro grupo antes de archivar.',
-              );
-            } else {
-              setError(err.message);
-            }
-          } else {
-            setError('No se pudo archivar el grupo');
-          }
-        }
+        archiveGroupMutation.mutate(group.id);
       },
     });
   };
@@ -160,28 +183,23 @@ export function GruposClient() {
       title: 'Eliminar grupo',
       message: `¿Seguro que deseas eliminar el grupo "${group.name}"? Esta acción solo se permite si el grupo no tiene historial.`,
       isDestructive: true,
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setError(null);
+        setActionError(null);
         setSuccess(null);
-        try {
-          await apiFetch(`/api/v1/groups/${group.id}`, { method: 'DELETE' });
-          setSuccess(`Grupo "${group.name}" eliminado exitosamente.`);
-          fetchGroups();
-        } catch (err) {
-          if (err instanceof ApiError) {
-            if (err.code === 'GROUP_HAS_HISTORY') {
-              setError('No se puede borrar un grupo con historial de alumnos o asignaciones. Archívalo en su lugar.');
-            } else {
-              setError(err.message);
-            }
-          } else {
-            setError('No se pudo eliminar el grupo');
-          }
-        }
+        deleteGroupMutation.mutate(group.id, {
+          onSuccess: () => {
+            setSuccess(`Grupo "${group.name}" eliminado exitosamente.`);
+          },
+        });
       },
     });
   };
+
+  const groups = groupsQuery.data?.items ?? [];
+  const total = groupsQuery.data?.total ?? 0;
+  const isLoading = groupsQuery.isLoading;
+  const error = actionError || (groupsQuery.error instanceof ApiError ? groupsQuery.error.message : groupsQuery.error instanceof Error ? groupsQuery.error.message : null);
 
   return (
     <div className="space-y-6">
@@ -199,7 +217,7 @@ export function GruposClient() {
           type="button"
           onClick={() => {
             setIsCreating(true);
-            setError(null);
+            setActionError(null);
           }}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
         >
@@ -216,7 +234,7 @@ export function GruposClient() {
           <span>{error}</span>
           <button
             type="button"
-            onClick={() => setError(null)}
+            onClick={() => setActionError(null)}
             className="text-rose-600 hover:text-rose-800 font-bold ml-4"
           >
             ✕
@@ -352,7 +370,7 @@ export function GruposClient() {
             type="button"
             onClick={() => {
               setIsCreating(true);
-              setError(null);
+              setActionError(null);
             }}
             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
           >

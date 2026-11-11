@@ -124,7 +124,7 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 
 - **Regla:** modelo de caché explícito de Next.js 16 con `use cache` y `cacheComponents: true`; React Compiler habilitado. Server Components (RSC) por defecto en `page.tsx` y `layout.tsx`; componentes cliente (`"use client"`) reducidos a las hojas interactivas. Acceso a la API y mutaciones mediante TanStack Query contra `api.<dominio>`; no usar Server Actions como backend de negocio. Nada se cachea por defecto y ninguna respuesta autenticada se cachea jamás. Carga diferida de variantes de animación (`Kids`/`Teens`).
 - **Fuente:** decisiones 81 y 88; architecture §3.2, §3.8 y §10.2; CONTEXT §6 (Convenciones de Next.js 16).
-- **Verificación:** Heurística — `AVISO` si `next.config.*` no tiene `cacheComponents: true` o `reactCompiler: true`; `AVISO` por APIs de caché implícita (`unstable_cache`, `export const revalidate`, `force-static`); `ERROR` si un archivo con `'use cache'` lee `cookies()`, `headers()` o la sesión.
+- **Verificación:** Heurística / Automática — `AVISO` si `next.config.*` no tiene `cacheComponents: true` o `reactCompiler: true`; `AVISO` por APIs de caché implícita (`unstable_cache`, `export const revalidate`, `force-static`); `ERROR` si un archivo con `'use cache'` lee `cookies()`, `headers()` o la sesión; `ERROR` si una vista `*-client.tsx` o `page.tsx` usa `useEffect` con `apiFetch` o `fetch('/api/v1/...')` manual en lugar de TanStack Query.
 - **Excepciones:** contenido público estático (por ejemplo, la página de Términos y Condiciones).
 
 ### G-B05 — Arrastrar y soltar con `@atlaskit/pragmatic-drag-and-drop`
@@ -277,14 +277,14 @@ Cada regla resume una decisión **ya tomada** y enlaza su fuente. El texto norma
 
 - **Regla:** prohibido el uso de `any`, `@ts-ignore`, `@ts-nocheck` y aserciones inseguras (`as Type`) en código de producción; usar `unknown` junto con *type narrowing* (`typeof`, `in`, `instanceof`) o esquemas Zod (`schema.parse()` / `schema.safeParse()`). Validación en dos niveles estricta: `class-validator` valida exclusivamente la envoltura HTTP en `apps/api` (`ValidationPipe` global con `whitelist: true` y `transform: true`, sin `forbidNonWhitelisted: true` para ignorar campos desconocidos como timestamps según A71); `Zod` (`packages/shared`) valida exclusivamente la configuración y respuestas por tipo de actividad (`ZodValidationPipe`). Los tipos y contratos compartidos residen como fuente única en `packages/shared` y nunca se duplican entre aplicaciones.
 - **Fuente:** decisión 20; architecture §2, §4.2 (A5), §4.4 (A71) y §13; SPEC-01 RF-1 y RF-13; CONTEXT §16.
-- **Verificación:** Automática — `ERROR` por `as any`, `: any`, `@ts-ignore` o `@ts-nocheck` en archivos de código de runtime de `apps/` y `packages/shared/`.
-- **Excepciones:** archivos de prueba (`*.spec.ts`, `*.test.ts`, fixtures) o mocks explícitos.
+- **Verificación:** Automática — `ERROR` por `as any`, `: any`, `@ts-ignore` o `@ts-nocheck` en archivos de código de runtime de `apps/` y `packages/shared/`; `ERROR` por toda aserción `as <Type>` o `<Type>expr` en código de runtime (excluyendo `as const` y tests).
+- **Excepciones:** archivos de prueba (`*.spec.ts`, `*.test.ts`, fixtures) o mocks explícitos; fronteras genéricas inevitables debidamente justificadas mediante `// guardrails-ignore G-C12: <motivo>`.
 
 ### G-C13 — Higiene en dispositivos compartidos, PWA y enlaces seguros
 
 - **Regla:** al cerrar sesión (`logout`) o cambiar de alumno en el cliente web, se debe vaciar obligatoriamente la caché de TanStack Query y las colecciones locales de IndexedDB (`pendingEvents`, `pendingUploads`) para evitar fuga de información entre alumnos que comparten la misma tablet o equipo. El Service Worker (Serwist) jamás debe cachear respuestas autenticadas de `/api/v1/*`. Toda URL externa en `ExternalResource` debe validar protocolo `https:` estricto (bloqueando `javascript:`, `data:`, `http:`) y abrirse con `rel="noopener noreferrer" target="_blank"`. Queda prohibido el uso de `dangerouslySetInnerHTML` para renderizar consignas pedagógicas, respuestas o comentarios de retroalimentación.
 - **Fuente:** decisiones 20 y 51; CONTEXT §5.2 y §9; architecture §7.6, §8.5, §10.1 y §10.2; SPEC-01 RF-15.
-- **Verificación:** Automática — `AVISO` por `dangerouslySetInnerHTML` en componentes de `apps/web`. Revisión manual para vaciado de IndexedDB/QueryClient en logout y validación de URLs en `ExternalResource`.
+- **Verificación:** Automática — `ERROR` si `apps/web/package.json` no incluye `serwist` y `@serwist/vite`; `ERROR` si existe `apps/web/public/sw.js` manual (el Service Worker se compila con `@serwist/vite` en `dist/client/sw.js` a partir de `src/sw.ts`); `AVISO` por `dangerouslySetInnerHTML` en componentes de `apps/web`. Revisión manual para vaciado de IndexedDB/QueryClient en logout y validación de URLs en `ExternalResource`.
 - **Excepciones:** ninguna.
 
 ---

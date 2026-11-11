@@ -59,7 +59,7 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
       return data;
     } catch (err: unknown) {
       cachedSession = null;
-      if ((err as Error)?.message?.startsWith('SERVER_ERROR_')) {
+      if (err instanceof Error && err.message.startsWith('SERVER_ERROR_')) {
         throw err;
       }
       // If network unreachable, throw NETWORK_ERROR so UI does not enter redirect loop

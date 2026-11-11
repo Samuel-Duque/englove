@@ -246,6 +246,7 @@ No existen preguntas abiertas que bloqueen la revisión ni la aprobación de `SP
 
 | Fecha | Cambio | Motivo |
 | --- | --- | --- |
+| 2026-11-11 | Verificación final y cierre de WP-10 (Accesibilidad WCAG 2.2 AA, E2E y Cierre Final) | Corrección de contrastes Teens y botones ámbar, landmarks en layout.tsx (SkipLink funcional, nav fuera de main), teclado y aria-live en microjuegos, suite Playwright E2E completa con 44/44 tests en verde (100%), auditoría axe wcag22aa en rutas públicas y autenticadas, monorepo limpio con 729 tests unitarios e integrados (68 shared + 426 api + 235 web) con Exit 0 en todas las compuertas de calidad |
 | 2026-11-09 | Alineación de SPEC-11 con auditoría post-spec-11 y decisiones QA-01..QA-08 | Retiro de etiquetas residuales (Propuesto) en §11.2, formalización de exclusión total de implausible_duration en ranking docente (QA-06), endpoint POST /media/:id/confirm (QA-05) y sincronización con remediación de pipeline WP-01 |
 | 2026-11-08 | Verificación inicial de SPEC-11 | Implementación de ENG-143, ENG-150 a ENG-162 y DOC-09 en monorepo (posteriormente auditada el 2026-11-09 evidenciando ajustes necesarios en compuertas de compilación, pipeline y tests) |
 | 2026-11-08 | Aprobación de SPEC-11 por el líder del proyecto | Se cierra la revisión de la especificación y se habilita la implementación de la Etapa 12 |

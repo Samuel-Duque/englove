@@ -40,6 +40,7 @@ export function DragDropGame({
   });
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<string>('');
 
   const objectMap = useMemo(() => {
     const map = new Map<string, { id: string; text: string }>();
@@ -75,6 +76,10 @@ export function DragDropGame({
     setSelectedObjectId(null);
     onEvent?.({ itemId: 'placements', answer: next });
 
+    const obj = objectMap.get(objectId);
+    const target = targets.find((t) => t.id === targetId);
+    setLiveStatus(`Ítem ${obj?.text ?? ''} colocado en categoría ${target?.text ?? 'categoría'}`);
+
     if (solution?.placements) {
       const isCorrect = solution.placements[objectId] === targetId;
       soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
@@ -86,6 +91,8 @@ export function DragDropGame({
     delete next[objectId];
     setPlacements(next);
     if (selectedObjectId === objectId) setSelectedObjectId(null);
+    const obj = objectMap.get(objectId);
+    setLiveStatus(`Ítem ${obj?.text ?? ''} devuelto a la bandeja`);
     onEvent?.({ itemId: 'placements', answer: next });
   };
 
@@ -109,6 +116,11 @@ export function DragDropGame({
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
+
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
 
       {config.instructions && (
         <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
@@ -215,8 +227,8 @@ export function DragDropGame({
           onClick={handleComplete}
           className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
             isKids
-              ? 'bg-amber-500 hover:bg-amber-600 text-white'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
           Finalizar clasificación ✨
@@ -372,8 +384,9 @@ function TargetCategoryContainer({
                   e.stopPropagation();
                   onRemoveObject(obj.id);
                 }}
-                className="text-rose-600 hover:text-rose-800 font-black ml-1"
+                className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-black text-rose-600 hover:text-rose-800 ml-1 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500"
                 title="Devolver a la bandeja"
+                aria-label={`Devolver ${obj.text} a la bandeja`}
               >
                 ✕
               </button>

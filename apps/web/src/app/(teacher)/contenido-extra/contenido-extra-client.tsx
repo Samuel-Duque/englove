@@ -4,19 +4,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ExternalResourceItem,
+  ExternalResourceItemSchema,
   ExternalResourceListResponse,
+  ExternalResourceListResponseSchema,
+  FeatureFlagsResponse,
+  FeatureFlagsResponseSchema,
   isValidHttpsResourceUrl,
   Level,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { AccessibleModal, ConfirmDialog } from '../../../components/ui/modal';
-
-interface FeatureFlagsResponse {
-  flags: {
-    games: boolean;
-    extra_content: boolean;
-  };
-}
 
 function isLevel(val: string): val is Level {
   return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
@@ -47,7 +44,10 @@ export function ContenidoExtraClient() {
   // 1. Feature flag query
   const flagsQuery = useQuery({
     queryKey: ['feature-flags'],
-    queryFn: () => apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags'),
+    queryFn: () =>
+      apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags', {
+        schema: FeatureFlagsResponseSchema,
+      }),
   });
 
   const isExtraContentEnabled = Boolean(flagsQuery.data?.flags?.extra_content);
@@ -60,7 +60,10 @@ export function ContenidoExtraClient() {
 
   const resourcesQuery = useQuery({
     queryKey: ['resources', levelFilter],
-    queryFn: () => apiFetch<ExternalResourceListResponse>(resourcesUrl),
+    queryFn: () =>
+      apiFetch<ExternalResourceListResponse>(resourcesUrl, {
+        schema: ExternalResourceListResponseSchema,
+      }),
   });
 
   // 3. Toggle feature flag mutation
@@ -69,6 +72,7 @@ export function ContenidoExtraClient() {
       apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags/extra_content', {
         method: 'PATCH',
         body: JSON.stringify({ enabled }),
+        schema: FeatureFlagsResponseSchema,
       }),
     onSuccess: () => {
       setServerError(null);
@@ -91,6 +95,7 @@ export function ContenidoExtraClient() {
       apiFetch<ExternalResourceItem>('/api/v1/resources', {
         method: 'POST',
         body: JSON.stringify(data),
+        schema: ExternalResourceItemSchema,
       }),
     onSuccess: () => {
       setServerError(null);
@@ -120,6 +125,7 @@ export function ContenidoExtraClient() {
       apiFetch<ExternalResourceItem>(`/api/v1/resources/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
+        schema: ExternalResourceItemSchema,
       }),
     onSuccess: () => {
       setServerError(null);
@@ -155,6 +161,7 @@ export function ContenidoExtraClient() {
       apiFetch<ExternalResourceListResponse>('/api/v1/resources/reorder', {
         method: 'PUT',
         body: JSON.stringify({ resourceIds }),
+        schema: ExternalResourceListResponseSchema,
       }),
     onSuccess: () => {
       setServerError(null);

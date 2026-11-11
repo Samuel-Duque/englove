@@ -45,7 +45,7 @@ Si una skill pide crear un ADR o un término de glosario, añádelo en esas secc
 - Privacidad y seguridad: cero PII en logs y Sentry; sin `dangerouslySetInnerHTML`; limpiar IndexedDB y caché al hacer logout en tablets compartidas.
 - No reintroducir `Guardian`, `ConsentRecord` ni Supabase Storage (los archivos van a Cloudflare R2).
 - No construir nada de la lista fuera de alcance del piloto (§2.4).
-- Etapa 12 (decisiones 127 a 129): las tareas de corrección no añaden funcionalidades (única excepción: ENG-162, decisión 137) y no pasan a `Hecho` sin una prueba de regresión nombrada por el hallazgo. Decisiones vigentes de la etapa: 130 a 137 (microjuegos abiertos a todos sin `Assignment`, descarte de intentos de juego de prueba, estrellas de práctica, ranking de juegos privado de la profesora, WCAG 2.2 AA, MinIO y Mailpit locales, Serwist real, entre otras).
+- Etapa 12 (decisiones 127 a 129): las tareas de corrección no añaden funcionalidades (única excepción: ENG-162, decisión 137) y no pasan a `Hecho` sin una prueba de regresión nombrada por el hallazgo. Decisiones vigentes de la etapa: 130 a 145 (microjuegos abiertos a todos sin `Assignment`, descarte de intentos de juego de prueba, estrellas de práctica, ranking de juegos privado de la profesora, WCAG 2.2 AA, MinIO y Mailpit locales, Serwist real, sesión continua y coordinación de refresh, editor multi-oración/huecos, migración integral a TanStack Query, ffprobe real con /media/:id/confirm, y cookies seguras por entorno, entre otras).
 
 ## Skills
 

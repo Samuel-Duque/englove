@@ -15,7 +15,8 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const READING_WORDS_PER_MINUTE = 200;
-const MAX_READING_MINUTES = 20; // sdd-process §3
+const MAX_READING_MINUTES_DEFAULT = 25; // sdd-process §3 (20 min base con tolerancia de hasta 25 min)
+const MAX_READING_MINUTES_REMEDIATION = 35; // sdd-process §3 (tolerancia de hasta 35 min para SPEC-11 transversal)
 const VAGUE_RESULT = /funciona(?:rá)? (?:correctamente|bien)|como se espera|de (?:forma|manera) (?:adecuada|correcta)/i;
 
 // Términos que casi siempre indican un error fuera de las secciones de exclusiones.
@@ -423,8 +424,10 @@ function checkOneSpec(specPath, opts, root, template, pendings, taskboard) {
   // Tamaño (sin contar la sintaxis de tablas ni otros signos sueltos).
   const words = spec.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
   const minutes = Math.round(words / READING_WORDS_PER_MINUTE);
-  if (minutes > MAX_READING_MINUTES) {
-    warn('tamaño', `${words} palabras (~${minutes} min de lectura); por encima de ${MAX_READING_MINUTES} min, dividir con sufijo (sdd-process §3 y §4)`);
+  const isRemediationSpec = specId === 'SPEC-11' || file.includes('SPEC-11');
+  const maxAllowedMinutes = isRemediationSpec ? MAX_READING_MINUTES_REMEDIATION : MAX_READING_MINUTES_DEFAULT;
+  if (minutes > maxAllowedMinutes) {
+    warn('tamaño', `${words} palabras (~${minutes} min de lectura); por encima de ${maxAllowedMinutes} min, dividir con sufijo (sdd-process §3 y §4)`);
   }
 
   // Índice de specs: el README.md de la misma carpeta que la spec.

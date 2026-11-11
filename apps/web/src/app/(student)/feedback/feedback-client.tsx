@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   StudentFeedbackListResponse,
+  StudentFeedbackListResponseSchema,
   StudentFeedbackItemView,
   RuntimeView,
+  RuntimeViewSchema,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { AccessibleModal } from '../../../components/ui/modal';
@@ -27,7 +29,10 @@ export function FeedbackClient() {
 
   const { data: feedbackData, isLoading, error: queryError, refetch: loadFeedback } = useQuery({
     queryKey: ['student', 'feedback'],
-    queryFn: () => apiFetch<StudentFeedbackListResponse>('/api/v1/student/feedback'),
+    queryFn: () =>
+      apiFetch<StudentFeedbackListResponse>('/api/v1/student/feedback', {
+        schema: StudentFeedbackListResponseSchema,
+      }),
   });
 
   const items: StudentFeedbackItemView[] = feedbackData?.items || [];
@@ -48,6 +53,7 @@ export function FeedbackClient() {
     mutationFn: (assignmentId: string) =>
       apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
         method: 'POST',
+        schema: RuntimeViewSchema,
       }),
     onSuccess: (runtime) => {
       router.push(`/actividad/${runtime.attempt.id}`);

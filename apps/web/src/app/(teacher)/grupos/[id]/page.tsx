@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Gestión de miembros y detalles de aula temática.',
 };
 
-export const instant = false;
-
 export default async function GroupDetailPage({
   params,
 }: {

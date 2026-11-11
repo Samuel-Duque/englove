@@ -64,7 +64,7 @@ Una spec **es**:
 - Un documento Markdown en `specs/`, con identificador `SPEC-NN`, que describe una capacidad de punta a punta: comportamiento observable, contrato de API, cambios de datos, interfaz, seguridad y criterios de aceptación verificables.
 - Escrita en español, con identificadores técnicos en inglés (CONTEXT §16). Usa "tipo de actividad" solo para los cinco valores de `ActivityType` y "mecánica de juego" solo para los cinco de `GameMechanic` (decisión 66).
 - Lo bastante concreta para que dos implementaciones independientes produzcan el mismo comportamiento observable.
-- Lo bastante corta para leerse en menos de 20 minutos. Si se pasa, se divide.
+- Lo bastante corta para leerse en menos de 20 minutos (con tolerancia operativa de hasta 25 minutos para especificaciones de capacidad consolidadas con tablas extensas de contratos o pruebas; hasta 35 minutos para especificaciones transversales de remediación y calidad como SPEC-11). Si excede la tolerancia, se divide con sufijo (por ejemplo, SPEC-05a, SPEC-05b).
 
 Una spec **no es**:
 

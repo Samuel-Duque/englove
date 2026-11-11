@@ -8,7 +8,10 @@ import {
   ActivityType,
   AttemptStatus,
   RuntimeView,
+  RuntimeViewSchema,
   CompletionView,
+  MediaConfirmResponseSchema,
+  FillBlankConfig,
   FillBlankConfigSchema,
   ExamConfigSchema,
   SpeakingConfigSchema,
@@ -59,6 +62,11 @@ function isGamePublicConfig(config: unknown): config is GamePublicConfig {
 
 function isGameAnswers(val: unknown): val is GameAnswers {
   return isRecord(val);
+}
+
+function isFillBlankConfigLike(config: unknown): config is FillBlankConfig {
+  if (!isRecord(config)) return false;
+  return 'items' in config && Array.isArray(config.items);
 }
 
 interface ActividadRunnerProps {
@@ -229,7 +237,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     queryKey: ['attempt', attemptId],
     queryFn: async () => {
       const [data, profile] = await Promise.all([
-        apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`),
+        apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`, {
+          schema: RuntimeViewSchema,
+        }),
         fetchSharedProfile().catch(() => null),
       ]);
       const savedRec = await loadLocalRecording(attemptId);
@@ -278,7 +288,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setCompletion((prev) =>
         prev ?? {
           attempt: data.attempt,
-          correction: data.correction,
+          correction: data.correction ?? null,
           newBadges: [],
         },
       );
@@ -454,6 +464,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         headers: {
           'x-attempt-token': token,
         },
+        schema: MediaConfirmResponseSchema,
       });
       return true;
     } catch (err) {
@@ -597,6 +608,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       const url = `/api/v1/activities/${activityId}/attempts`;
       return apiFetch<RuntimeView>(url, {
         method: 'POST',
+        schema: RuntimeViewSchema,
       });
     },
     onSuccess: (res) => {
@@ -950,7 +962,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   // Activity Configuration Rendering
   const parsedFb = FillBlankConfigSchema.safeParse(activity.config);
-  const fbConfig = parsedFb.success ? parsedFb.data : null;
+  const fbConfig: FillBlankConfig | null = parsedFb.success
+    ? parsedFb.data
+    : isFillBlankConfigLike(activity.config)
+      ? activity.config
+      : null;
   const parsedExam = ExamConfigSchema.safeParse(activity.config);
   const examConfig = parsedExam.success ? parsedExam.data : null;
   const parsedSpeaking = SpeakingConfigSchema.safeParse(activity.config);
@@ -1075,7 +1091,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     const blankInputId = `blank-${item.id}-${blank.id || blankIdx}`;
                     const blankLabel = `Espacio ${blankIdx + 1}`;
                     return (
-                      <div key={blank.id || String(Math.random())} className="space-y-1">
+                      <div key={blank.id || `blank-${blankIdx}`} className="space-y-1">
                         <label htmlFor={blankInputId} className="text-xs font-bold text-zinc-600 block">
                           Espacio {blankIdx + 1}:
                         </label>
@@ -1158,7 +1174,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                       const examInputId = `exam-blank-${item.id}-${b.id || bIdx}`;
                       const examLabel = `Espacio ${bIdx + 1} del ítem ${itemIdx + 1}`;
                       return (
-                        <div key={b.id || String(Math.random())} className="space-y-1">
+                        <div key={b.id || `blank-${bIdx}`} className="space-y-1">
                           <label htmlFor={examInputId} className="text-xs font-bold text-zinc-600 block">
                             Espacio {bIdx + 1}:
                           </label>

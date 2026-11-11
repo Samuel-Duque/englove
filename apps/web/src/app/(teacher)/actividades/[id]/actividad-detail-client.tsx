@@ -3,7 +3,7 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityEditorComponent } from '../activity-editor';
-import { ActivityEditor } from '@englove/shared';
+import { ActivityEditor, ActivityEditorSchema } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 
 export function ActividadDetailClient({ id }: { id: string }) {
@@ -11,7 +11,10 @@ export function ActividadDetailClient({ id }: { id: string }) {
 
   const { data: activity, isLoading, error: queryError } = useQuery({
     queryKey: ['teacher', 'activity', id],
-    queryFn: () => apiFetch<ActivityEditor>(`/api/v1/activities/${id}`),
+    queryFn: () =>
+      apiFetch<ActivityEditor>(`/api/v1/activities/${id}`, {
+        schema: ActivityEditorSchema,
+      }),
   });
 
   const error = queryError instanceof ApiError

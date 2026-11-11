@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
 import {
   StudentStatsResponse,
+  StudentStatsResponseSchema,
   WeekCalendarStatus,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../../lib/api';
@@ -76,7 +77,10 @@ export function EstudianteStatsClient({ studentId }: { studentId: string }) {
   const studentStatsQuery = useQuery({
     queryKey: ['stats', 'student', studentId, queryString],
     queryFn: () =>
-      apiFetch<StudentStatsResponse>(`/api/v1/stats/students/${studentId}?${queryString}`),
+      apiFetch<StudentStatsResponse>(
+        `/api/v1/stats/students/${studentId}?${queryString}`,
+        { schema: StudentStatsResponseSchema },
+      ),
     refetchInterval: POLLING_INTERVAL_MS,
   });
   const data = studentStatsQuery.data ?? null;
@@ -128,7 +132,7 @@ export function EstudianteStatsClient({ studentId }: { studentId: string }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500 bg-zinc-100 px-3 py-1 rounded-full">
+          <span className="inline-flex items-center gap-1.5 text-xs text-zinc-700 bg-zinc-100 px-3 py-1 rounded-full">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             Polling cada 30 s
           </span>

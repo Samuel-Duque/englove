@@ -7,13 +7,11 @@ export const metadata: Metadata = {
   description: 'Crea tu cuenta de estudiante en Englove.',
 };
 
-export const instant = false;
-
 export default function RegistroPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center p-6 text-center">
+        <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center outline-none">
           <p className="text-zinc-600 text-lg">Cargando formulario de registro…</p>
         </main>
       }

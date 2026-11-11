@@ -3,7 +3,12 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GroupView, GroupListResponse } from '@englove/shared';
+import {
+  GroupView,
+  GroupViewSchema,
+  GroupListResponse,
+  GroupListResponseSchema,
+} from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { ConfirmDialog } from '../../../components/ui/modal';
 
@@ -38,7 +43,9 @@ export function GruposClient() {
       if (archivedFilter === 'active') params.set('archived', 'false');
       else if (archivedFilter === 'archived') params.set('archived', 'true');
       params.set('limit', '100');
-      return apiFetch<GroupListResponse>(`/api/v1/groups?${params.toString()}`);
+      return apiFetch<GroupListResponse>(`/api/v1/groups?${params.toString()}`, {
+        schema: GroupListResponseSchema,
+      });
     },
   });
 
@@ -47,6 +54,7 @@ export function GruposClient() {
       apiFetch<GroupView>('/api/v1/groups', {
         method: 'POST',
         body: JSON.stringify({ name }),
+        schema: GroupViewSchema,
       }),
     onSuccess: (newGroup) => {
       setSuccess(`Grupo "${newGroup.name}" creado exitosamente.`);
@@ -64,6 +72,7 @@ export function GruposClient() {
       apiFetch<GroupView>(`/api/v1/groups/${payload.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: payload.name }),
+        schema: GroupViewSchema,
       }),
     onSuccess: (_, payload) => {
       setSuccess('Grupo renombrado exitosamente.');
@@ -90,6 +99,7 @@ export function GruposClient() {
     mutationFn: (groupId: string) =>
       apiFetch<GroupView>(`/api/v1/groups/${groupId}/archive`, {
         method: 'POST',
+        schema: GroupViewSchema,
       }),
     onSuccess: (updated) => {
       setSuccess(`Grupo "${updated.name}" archivado exitosamente.`);

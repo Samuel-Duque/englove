@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Consola docente para calificar actividades y proporcionar retroalimentación.',
 };
 
-export const instant = false;
-
 export default function RevisionPage() {
   return (
     <Suspense

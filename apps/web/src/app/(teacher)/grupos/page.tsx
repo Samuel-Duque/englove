@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Administración de grupos y aulas temáticas de estudiantes.',
 };
 
-export const instant = false;
-
 export default function GroupsPage() {
   return (
     <Suspense

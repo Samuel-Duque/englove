@@ -34,9 +34,10 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     const iconMaskable = await request.get('/icons/icon-512-maskable.png');
     expect(iconMaskable.status()).toBe(200);
 
-    // 3. Service Worker script público
+    // 3. Service Worker script público (servido por route.ts en dev o Serwist en producción)
     const swRes = await request.get('/sw.js');
     expect(swRes.status()).toBe(200);
+    expect(swRes.headers()['content-type']).toContain('javascript');
 
     // 4. Pantalla /offline pública sin sesión
     await page.goto('/offline');
@@ -60,37 +61,110 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     }
   });
 
-  test('RF-7: Aviso de actualización obligatoria por X-App-Min-Version mayor a la del cliente', async ({ page }) => {
-    // Mock refresh endpoint with X-App-Min-Version header
-    await page.route('**/api/v1/auth/refresh', async (route) => {
+  test('RF-7: Aviso de actualización obligatoria por X-App-Min-Version mayor a la del cliente', async ({ page, context }) => {
+    // Add student session cookies so client loads authenticated shell
+    await context.addCookies([
+      { name: 'englove_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+      { name: 'englove_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+    ]);
+
+    const corsHeaders = {
+      'Content-Type': 'application/json',
+      'X-App-Min-Version': '99.0.0',
+      'Access-Control-Expose-Headers': 'X-App-Min-Version',
+      'Access-Control-Allow-Origin': 'http://localhost:3000',
+      'Access-Control-Allow-Credentials': 'true',
+    };
+
+    await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
         status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Min-Version': '99.0.0',
-        },
+        headers: corsHeaders,
         json: {
           user: { id: 'std-1', name: 'Estudiante E2E', role: 'student' },
+          student: { id: 'std-1', level: 'A1', ageSegment: 'kids' },
           organizationId: 'org-1',
         },
       });
     });
 
-    await page.goto('/login');
-    // Banner should appear due to min version requirement from API
-    await page.waitForTimeout(500);
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        json: {
+          user: { id: 'std-1', name: 'Estudiante E2E', role: 'student' },
+          student: { id: 'std-1', level: 'A1', ageSegment: 'kids' },
+          organizationId: 'org-1',
+        },
+      });
+    });
 
-    // Comprobar que aparece el banner con role status
+    await page.route('**/api/v1/student/portal', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        json: {
+          student: { id: 'std-1', name: 'Estudiante E2E', level: 'A1' },
+          missions: [],
+          streak: { current: 1, best: 2 },
+        },
+      });
+    });
+
+    await page.route('**/api/v1/feature-flags', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        json: { flags: { games: true } },
+      });
+    });
+
+    await page.route('**/api/v1/me/assignments*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        json: { items: [], total: 0 },
+      });
+    });
+
+    await page.goto('/inicio');
+
+    // Comprobar incondicionalmente que aparece el banner con role status (RF-7)
     const banner = page.locator('aside[role="status"]');
-    // If banner triggered, verify "Ahora no" is absent (RF-7)
-    if (await banner.isVisible()) {
-      await expect(banner.locator('text=Ahora no')).not.toBeVisible();
-      await expect(banner.locator('button:has-text("Actualizar")')).toBeVisible();
-    }
+    await expect(banner).toBeVisible({ timeout: 5000 });
+    await expect(banner.locator('text=Ahora no')).not.toBeVisible();
+    await expect(banner.locator('button:has-text("Actualizar")')).toBeVisible();
   });
 
-  test('RF-17: Ficha de estudiante en panel muestra sección "Entregas que no llegaron a tiempo"', async ({ page }) => {
+  test('RF-17: Ficha de estudiante en panel muestra sección "Entregas que no llegaron a tiempo"', async ({ page, context }) => {
     const studentId = 'std-offline-late';
+
+    // Mock teacher session
+    await context.addCookies([
+      {
+        name: 'englove_local_access_token',
+        value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
+        domain: 'localhost',
+        path: '/',
+      },
+      {
+        name: 'englove_access_token',
+        value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
+        domain: 'localhost',
+        path: '/',
+      },
+    ]);
+
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'tch-1', name: 'Profesora Clara', role: 'teacher' },
+          organizationId: 'org-1',
+        },
+      });
+    });
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
@@ -99,6 +173,13 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
           user: { id: 'tch-1', name: 'Profesora Clara', role: 'teacher' },
           organizationId: 'org-1',
         },
+      });
+    });
+
+    await page.route('**/api/v1/groups?*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: { items: [], total: 0 },
       });
     });
 
@@ -161,29 +242,25 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       });
     });
 
-    // Mock teacher session
-    await page.context().addCookies([
-      {
-        name: 'englove_access_token',
-        value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
-
     await page.goto(`/estadisticas/estudiantes/${studentId}`);
 
     // Verify section "Entregas que no llegaron a tiempo" renders with data
     const section = page.locator('[data-testid="offline-undelivered-attempts-section"]');
-    await expect(section).toBeVisible();
+    await expect(section).toBeVisible({ timeout: 5000 });
     await expect(section.locator('text=Entregas que no llegaron a tiempo')).toBeVisible();
     await expect(section.locator('text=Animal Kingdom Speaking')).toBeVisible();
     await expect(section.locator('text=Se intentó enviar sin conexión después del límite')).toBeVisible();
   });
 
-  test('RF-18: Confirmación al salir con trabajo sin enviar en tablet / alumno', async ({ page }) => {
+  test('RF-18: Confirmación al salir con trabajo sin enviar en tablet / alumno', async ({ page, context }) => {
     // Mock student session and feature flags
-    await page.context().addCookies([
+    await context.addCookies([
+      {
+        name: 'englove_local_access_token',
+        value: `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`,
+        domain: 'localhost',
+        path: '/',
+      },
       {
         name: 'englove_access_token',
         value: `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`,
@@ -191,6 +268,22 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
         path: '/',
       },
     ]);
+
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: {
+            id: 'std-e2e-rf18',
+            email: 'laura@englove.local',
+            name: 'Laura Alumno',
+            role: 'student',
+          },
+          student: { id: 'std-e2e-rf18', level: 'A1', ageSegment: 'kids' },
+          organizationId: 'org-e2e',
+        },
+      });
+    });
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
@@ -209,6 +302,16 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     });
 
     await page.route('**/api/v1/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-e2e-rf18', name: 'Laura Alumno', role: 'student' },
+          student: { id: 'std-e2e-rf18', level: 'A1', ageSegment: 'kids' },
+        },
+      });
+    });
+
+    await page.route('**/api/v1/me/profile', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
@@ -252,7 +355,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     // Simulate an item added to IndexedDB offline queue
     await page.evaluate(async () => {
       const DB_NAME = 'englove_offline';
-      const DB_VERSION = 1;
+      const DB_VERSION = 2;
       const req = window.indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
@@ -291,7 +394,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     await logoutBtn.click();
 
     // Confirmation dialog should appear (RF-18, §7)
-    const alertdialog = page.locator('[role="alertdialog"]');
+    const alertdialog = page.locator('[role="dialog"], [role="alertdialog"]');
     await expect(alertdialog).toBeVisible();
     await expect(alertdialog.locator('text=Tienes trabajo sin enviar. Si sales ahora se perderá.')).toBeVisible();
 
@@ -312,23 +415,202 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     await page.waitForURL('**/login');
   });
 
-  test('RF-19: Auditoría de accesibilidad con axe en pantallas principales sin violaciones', async ({ page }) => {
-    // 1. Pantalla pública: /login
+  test('RF-19: Auditoría de accesibilidad con axe en pantallas públicas y autenticadas con tag wcag22aa (T7.4)', async ({ page, context }) => {
+    const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] as const;
+
+    // 1. Pantallas públicas: /login, /offline, /registro, /recuperar-contrasena
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({ status: 401, json: { code: 'AUTH_UNAUTHORIZED' } });
     });
-    await page.goto('/login');
-    const loginAxe = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-    expect(loginAxe.violations).toEqual([]);
+    for (const pubRoute of ['/login', '/offline', '/registro', '/recuperar-contrasena']) {
+      await page.goto(pubRoute);
+      await page.waitForLoadState('domcontentloaded');
+      const pubAxe = await new AxeBuilder({ page })
+        .withTags([...wcagTags])
+        .analyze();
+      expect(pubAxe.violations).toEqual([]);
+    }
 
-    // 2. Pantalla pública: /offline
-    await page.goto('/offline');
-    const offlineAxe = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-    expect(offlineAxe.violations).toEqual([]);
+    // 2. Rutas autenticadas Estudiante (/inicio, /juegos, /progreso, /perfil)
+    await context.addCookies([
+      { name: 'englove_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+      { name: 'englove_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+    ]);
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@englove.local' },
+          student: { id: 'std-a11y-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
+          organizationId: 'org-a11y',
+        },
+      });
+    });
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@englove.local' },
+          student: { id: 'std-a11y-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
+          organizationId: 'org-a11y',
+        },
+      });
+    });
+    await page.route('**/api/v1/me/profile', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@englove.local' },
+          student: { id: 'std-a11y-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false, birthDate: '2017-05-10' },
+        },
+      });
+    });
+    await page.route('**/api/v1/student/portal', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          student: { id: 'std-a11y-1', name: 'Laura Alumno', level: 'A1' },
+          missions: [],
+          streak: { current: 1, best: 2 },
+        },
+      });
+    });
+    await page.route('**/api/v1/feature-flags', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: { flags: { games: true, extra_content: true } },
+      });
+    });
+    await page.route('**/api/v1/me/games', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: { items: [], total: 0 },
+      });
+    });
+    await page.route('**/api/v1/student/progress', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          streak: { current: 1, best: 3, freezeAvailable: true, forgivenWeeks: [] },
+          badges: [],
+          activities: [],
+        },
+      });
+    });
+
+    for (const route of ['/inicio', '/juegos', '/progreso', '/perfil']) {
+      await page.goto(route);
+      await page.waitForLoadState('domcontentloaded');
+      const studentAxe = await new AxeBuilder({ page }).withTags([...wcagTags]).analyze();
+      expect(studentAxe.violations).toEqual([]);
+    }
+
+    // 2b. Rutas autenticadas Estudiante - Tema Teens
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@englove.local' },
+          student: { id: 'std-a11y-2', level: 'B1', ageSegment: 'teens', canSwitchInterface: false },
+          organizationId: 'org-a11y',
+        },
+      });
+    });
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@englove.local' },
+          student: { id: 'std-a11y-2', level: 'B1', ageSegment: 'teens', canSwitchInterface: false },
+          organizationId: 'org-a11y',
+        },
+      });
+    });
+    await page.route('**/api/v1/me/profile', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@englove.local' },
+          student: { id: 'std-a11y-2', level: 'B1', ageSegment: 'teens', canSwitchInterface: false, birthDate: '2012-03-15' },
+        },
+      });
+    });
+
+    for (const route of ['/inicio', '/juegos', '/progreso', '/perfil']) {
+      await page.goto(route);
+      await page.waitForLoadState('domcontentloaded');
+      const teensAxe = await new AxeBuilder({ page }).withTags([...wcagTags]).analyze();
+      expect(teensAxe.violations).toEqual([]);
+    }
+
+    // 3. Rutas autenticadas Docente (/inicio, /actividades, /asignaciones, /revision, /estadisticas, /grupos, /alumnos)
+    await context.clearCookies();
+    await context.addCookies([
+      { name: 'englove_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
+      { name: 'englove_local_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
+    ]);
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@englove.local' },
+          organizationId: 'org-a11y',
+        },
+      });
+    });
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@englove.local' },
+          organizationId: 'org-a11y',
+        },
+      });
+    });
+    await page.route('**/api/v1/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@englove.local' },
+        },
+      });
+    });
+    await page.route('**/api/v1/dashboard/reminders', async (route) => {
+      await route.fulfill({ status: 200, json: { pendingStudents: [], overdueAssignments: [] } });
+    });
+    await page.route('**/api/v1/activities*', async (route) => {
+      await route.fulfill({ status: 200, json: { items: [], total: 0 } });
+    });
+    await page.route('**/api/v1/assignments*', async (route) => {
+      await route.fulfill({ status: 200, json: { items: [], total: 0 } });
+    });
+    await page.route('**/api/v1/reviews/pending*', async (route) => {
+      await route.fulfill({ status: 200, json: { items: [], total: 0 } });
+    });
+    await page.route('**/api/v1/stats*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          kpis: { totalStudents: 0, averageScore: 0, completionRate: 0, activeStudentsCount: 0 },
+          trend: [],
+          leaderboard: [],
+          inactiveStudents: [],
+        },
+      });
+    });
+    await page.route('**/api/v1/groups*', async (route) => {
+      await route.fulfill({ status: 200, json: { items: [], total: 0 } });
+    });
+    await page.route('**/api/v1/students*', async (route) => {
+      await route.fulfill({ status: 200, json: { items: [], total: 0 } });
+    });
+
+    for (const teacherRoute of ['/inicio', '/actividades', '/asignaciones', '/revision', '/estadisticas', '/grupos', '/alumnos']) {
+      await page.goto(teacherRoute);
+      await page.waitForLoadState('domcontentloaded');
+      const teacherAxe = await new AxeBuilder({ page }).withTags([...wcagTags]).analyze();
+      expect(teacherAxe.violations).toEqual([]);
+    }
   });
 
   test('RF-21: Objetivos táctiles interactivos >= 48x48 px en dispositivos móviles (390x844)', async ({ page }) => {

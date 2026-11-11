@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivitySummary,
+  ActivitySummarySchema,
   ActivityListResponse,
+  ActivityListResponseSchema,
   ActivityType,
   ActivityStatus,
   Level,
@@ -55,13 +57,18 @@ export function ActividadesClient() {
         params.set('level', levelFilter);
       }
       params.set('limit', '100');
-      return apiFetch<ActivityListResponse>(`/api/v1/activities?${params.toString()}`);
+      return apiFetch<ActivityListResponse>(`/api/v1/activities?${params.toString()}`, {
+        schema: ActivityListResponseSchema,
+      });
     },
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch<ActivitySummary>(`/api/v1/activities/${id}/duplicate`, { method: 'POST' }),
+      apiFetch<ActivitySummary>(`/api/v1/activities/${id}/duplicate`, {
+        method: 'POST',
+        schema: ActivitySummarySchema,
+      }),
     onSuccess: (duplicated) => {
       setActionSuccess('Actividad duplicada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });

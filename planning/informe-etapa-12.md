@@ -1,8 +1,8 @@
 # Informe de Remediación y Verificación — Etapa 12 (Calidad y Remediación)
 
 > **Propósito:** Registrar formalmente la ejecución, validación y cierre de la **Etapa 12 «Calidad y remediación»** conforme a [SPEC-11](../specs/SPEC-11-calidad-y-correcciones.md), las decisiones 127 a 137 de [CONTEXT §14](../.agents/CONTEXT.md#14-registro-de-decisiones-arquitectónicas-y-de-producto), la resolución de [plan-remediacion-etapa-12.md](plan-remediacion-etapa-12.md), [AUDITORIA.md](../AUDITORIA.md) y [testing-issues/](../testing-issues/README.md) (incluyendo ISSUE-10), cubriendo las tareas ENG-143, ENG-150 a ENG-162 y DOC-09.  
-> **Fecha de ejecución:** 2026-11-08  
-> **Veredicto general:** **CUMPLIDA (100% VERIFICADA TRAS REMEDIACIÓN INTEGRAL)**. Las 15 especificaciones funcionales (RF-1 a RF-15) de SPEC-11 y los hallazgos de pruebas dinámicas han sido remediados y verificados con 566 pruebas automatizadas en verde, 0 errores en guardrails y compuertas de tipado, linting y compilación superadas.
+> **Fecha de ejecución:** 2026-11-11  
+> **Veredicto general:** **CUMPLIDA (100% VERIFICADA TRAS REMEDIACIÓN INTEGRAL)**. Las 15 especificaciones funcionales (RF-1 a RF-15) de SPEC-11, los paquetes WP-01 a WP-10 de la hoja de ruta y los hallazgos de pruebas dinámicas han sido remediados y verificados con 729 pruebas unitarias/integración automatizadas en verde (68 shared + 426 api + 235 web), 44 pruebas Playwright E2E pasando al 100%, 0 errores en guardrails y compuertas de tipado, linting y compilación superadas con Exit 0.
 
 ---
 
@@ -39,7 +39,7 @@ Adicionalmente, se ejecutó la remediación completa de las 6 brechas técnicas 
 | **ENG-143** | Migración RSC y TanStack Query (`G-B04`), Brecha 2 | **Hecho** | Arquitectura Server Components en las 30 páginas de la aplicación; desacoplamiento de las 18 páginas cliente en componentes `*-client.tsx` dedicados; metadatos descriptivos `<title>` por ruta en servidor sin `'use client'` superfluo. |
 | **ENG-159** | Accesibilidad WCAG 2.2 AA (decisión 133), Brechas 3 y 4 | **Hecho** | Contraste >= 4.5:1 en texto y >= 3:1 en controles en tema `teens`, desanidación de botones interactivos, anuncios `aria-live` en juegos, tamaño táctil >= 48x48 px, enlaces `SkipLink`, botón TTS en `GameRenderer`, y eliminación total de `alert`/`confirm`. |
 | **ENG-160** | Entorno local reproducible (decisión 134) | **Hecho** | `docker-compose.yml` con PostgreSQL 18, MinIO auto-inicializado con bucket `englove-dev` y Mailpit SMTP, sincronizado con `.env.example`. |
-| **ENG-161** | Regresión y cierre de etapa | **Hecho** | 566 pruebas en verde en monorepo, 0 errores en guardrails, typecheck y linter limpios en los 4 paquetes. |
+| **ENG-161** | Regresión y cierre de etapa | **Hecho** | 729 pruebas en verde en monorepo (68 shared + 235 web + 426 api), 0 errores en guardrails, typecheck y linter limpios en los paquetes del monorepo. |
 | **ENG-162** | Ranking de juegos y panel «Práctica en juegos» (decisión 137) | **Hecho** | Exclusión de `game` de promedios académicos, panel docente «Práctica en juegos» con tiempo recortado `3x` y sesiones `1..N`, y ranking privado docente por puntos de estrellas (máximo 5 mejores partidas por juego). |
 | **DOC-09** | Alineación documental y de skills | **Hecho** | Sincronización completa de `AGENTS.md`, `README.md`, `CONTEXT.md`, `architecture-overview.md`, `taskboard.md`, `specs/SPEC-06-microjuegos.md`, `specs/SPEC-08-estadisticas.md`, `specs/SPEC-11-calidad-y-correcciones.md`, `testing-issues/ISSUE-10-auth-endpoints-500-tenant-extension-bypass.md` y las tres copias de skills (`.agents`, `.claude`, `.kiro`). |
 
@@ -48,19 +48,24 @@ Adicionalmente, se ejecutó la remediación completa de las 6 brechas técnicas 
 ## 3. Evidencia de Verificación Técnica
 
 ### 3.1. Pruebas Automatizadas Monorepo (`pnpm test`)
-- **Total de pruebas ejecutadas:** 566 tests
-- **Resultado:** **566 passed (100% exitoso)**
+- **Total de pruebas unitarias/integración ejecutadas:** 729 tests
+- **Resultado:** **729 passed (100% exitoso, Exit 0)**
 - **Desglose por paquete:**
-  - `@englove/shared`: 4 test files, 65 tests passed
-  - `@englove/web`: 15 test files, 148 tests passed
-  - `@englove/api`: 36 test files, 353 tests passed (incluyendo pruebas concurrentes reales en PostgreSQL Docker, suite de tenant bypass para ISSUE-10, suite de leaderboard/práctica, E2E flows y pruebas de rendimiento)
+  - `@englove/shared`: 4 test files, 68 tests passed
+  - `@englove/web`: 23 test files, 235 tests passed
+  - `@englove/api`: 39 test files, 426 tests passed (incluyendo pruebas concurrentes reales en PostgreSQL Docker, suite de tenant bypass para ISSUE-10, suite de leaderboard/práctica, E2E flows y pruebas de rendimiento)
 
-### 3.2. Verificación Estática y Guardrails
-- **`pnpm typecheck`:** 4/4 proyectos tipados sin errores (0 errors).
-- **`pnpm lint`:** 0 errores, 0 avisos en `@englove/shared`, `@englove/web` y `@englove/api`.
-- **`pnpm build`:** Compilación exitosa para API (NestJS) y Web (Vite / vinext Cloudflare Workers).
-- **`check-guardrails.mjs --all`:** 309 archivos evaluados, **0 errores**, 37 excepciones justificadas por diseño y documentadas con `guardrails-ignore`.
-- **`check-spec.mjs specs/SPEC-11-calidad-y-correcciones.md`:** 0 errores, estructura conforme a `sdd-process.md §5`.
+### 3.2. Pruebas End-to-End Playwright (`pnpm --filter @englove/web test:e2e`)
+- **Total de pruebas E2E ejecutadas:** 44 tests en 10 archivos de especificación (`spec-00` a `spec-10`)
+- **Resultado:** **44 passed (100% exitoso, Exit 0)**
+- **Auditoría de Accesibilidad axe (T7.4, RF-19):** Incluye verificación con tag `'wcag22aa'` en todas las rutas públicas y autenticadas tanto de estudiante como de docente (`/login`, `/offline`, `/registro`, `/recuperar-contrasena`, `/inicio`, `/juegos`, `/progreso`, `/perfil`, `/actividades`, `/asignaciones`, `/revision`, `/estadisticas`, `/grupos`, `/alumnos`, `/contenido-extra`, `/extra`) sin violaciones.
+
+### 3.3. Verificación Estática y Guardrails
+- **`pnpm typecheck`:** 5/5 proyectos tipados sin errores (0 errors, Exit 0).
+- **`pnpm lint`:** 0 errores, 0 avisos en todos los paquetes del monorepo (Exit 0).
+- **`pnpm build`:** Compilación exitosa para API (NestJS) y Web (Vite / vinext Cloudflare Workers con Service Worker Serwist, Exit 0).
+- **`check-guardrails.mjs --all`:** 340 archivos evaluados, **0 errores**, 67 avisos informativos, 62 excepciones justificadas documentadas con `guardrails-ignore` (Exit 0).
+- **`check-spec.mjs`:** 11 specs analizadas (`SPEC-01` a `SPEC-11`), **0 errores**, estructura conforme a `sdd-process.md §5` (Exit 0).
 
 ---
 

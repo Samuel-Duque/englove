@@ -80,6 +80,34 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
       });
     });
 
+    await page.route('**/api/v1/me/games*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              id: 'act-game-1',
+              title: 'Colors Match Challenge',
+              mechanic: 'match',
+              level: 'A1',
+              expectedDurationSeconds: 180,
+              minPlausibleSeconds: 15,
+              bestStars: 3,
+              lastStars: 3,
+              bestScore: 5.0,
+              bestMaxScore: 5.0,
+              attemptsCount: 1,
+              lastPlayedAt: '2026-11-01T10:00:00.000Z',
+              status: 'in_progress',
+              inProgressAttemptId: 'att-game-1',
+            },
+          ],
+          total: 1,
+        }),
+      });
+    });
+
     await page.route('**/api/v1/me/assignments*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -150,12 +178,12 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
               instructions: 'Une los colores en español con su traducción.',
               settings: {
                 left: [
-                  { id: 'l1', text: 'Rojo' },
-                  { id: 'l2', text: 'Azul' },
+                  { id: '11111111-1111-4111-8111-111111111111', text: 'Rojo' },
+                  { id: '22222222-2222-4222-8222-222222222222', text: 'Azul' },
                 ],
                 right: [
-                  { id: 'r1', text: 'Red' },
-                  { id: 'r2', text: 'Blue' },
+                  { id: '33333333-3333-4333-8333-333333333333', text: 'Red' },
+                  { id: '44444444-4444-4444-8444-444444444444', text: 'Blue' },
                 ],
               },
             },
@@ -175,12 +203,12 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     // Verificar que la pestaña Juegos cargue y muestre la tarjeta
     await expect(page.locator('text=Colors Match Challenge')).toBeVisible({ timeout: 5000 });
 
-    // 4. Abrir la actividad de juego pulsando en Continuar juego
-    await page.click('text=Continuar juego');
+    // 4. Abrir la actividad de juego pulsando en Reanudar partida o Continuar juego
+    await page.locator('a:has-text("Reanudar partida"), a:has-text("Continuar juego")').click();
     await expect(page).toHaveURL(/\/actividad\/att-game-1/);
 
     // 5. Verificar que GameRenderer renderice los elementos interactivos del microjuego match
-    await expect(page.locator('text=Une los colores en español con su traducción.')).toBeVisible();
+    await expect(page.locator('text=Une los colores en español con su traducción.').first()).toBeVisible();
     await expect(page.locator('text=Rojo')).toBeVisible();
     await expect(page.locator('text=Azul')).toBeVisible();
     await expect(page.locator('text=Red')).toBeVisible();
@@ -203,7 +231,7 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     });
 
     await page.click('button:has-text("Finalizar")');
-    await expect(page.locator('text=¡Misión completada!')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('*:has-text("¡Partida completada!"), *:has-text("¡Misión completada!")').first()).toBeVisible({ timeout: 5000 });
     await expect(page.locator('button:has-text("Jugar de nuevo")')).toBeVisible();
   });
 
@@ -237,8 +265,8 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     });
 
     await page.goto('/juegos');
-    await expect(page.locator('text=Zona de Juegos en preparación')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=La zona de juegos no está habilitada')).toBeVisible();
+    await expect(page.locator('text=Microjuegos no disponibles')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=La zona de juegos interactivos no está habilitada')).toBeVisible();
     await expect(page.locator('a:has-text("Volver al inicio")')).toBeVisible();
   });
 });

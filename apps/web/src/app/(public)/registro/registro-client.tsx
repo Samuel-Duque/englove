@@ -90,7 +90,7 @@ export function RegistroClient() {
 
   if (successMessage) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 bg-zinc-50">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 bg-zinc-50 outline-none">
         <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-zinc-200 text-center">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
             🎉
@@ -109,7 +109,7 @@ export function RegistroClient() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6 bg-zinc-50">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 bg-zinc-50 outline-none">
       <div className="w-full max-w-lg bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight">Crea tu cuenta</h1>

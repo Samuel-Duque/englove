@@ -40,9 +40,7 @@ export default function RootLayout({
           Saltar al contenido principal
         </a>
         <Providers>
-          <main id="main-content" tabIndex={-1} className="outline-none">
-            {children}
-          </main>
+          {children}
         </Providers>
       </body>
     </html>

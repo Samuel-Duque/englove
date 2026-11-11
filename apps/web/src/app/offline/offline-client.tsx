@@ -37,7 +37,7 @@ export function OfflineClient() {
     isTeensOrTeacher || isTeensOrTeacherSegment(resolveUserSegment());
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-amber-50 text-zinc-900">
+    <main id="main-content" tabIndex={-1} className="min-h-screen flex flex-col items-center justify-center p-6 bg-amber-50 text-zinc-900 outline-none">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-amber-200 p-8 text-center flex flex-col items-center">
         <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-6 text-amber-800">
           <WifiOff className="w-8 h-8" aria-hidden="true" />

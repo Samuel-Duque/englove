@@ -6,8 +6,11 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   StudentView,
+  StudentViewSchema,
   StudentListResponse,
+  StudentListResponseSchema,
   GroupListResponse,
+  GroupListResponseSchema,
   Level,
   AgeSegment,
 } from '@englove/shared';
@@ -61,25 +64,37 @@ function StudentsManagementContent() {
 
   const studentsQuery = useQuery({
     queryKey: ['teacher', 'students', 'all'],
-    queryFn: () => apiFetch<StudentListResponse>('/api/v1/students?limit=100'),
+    queryFn: () =>
+      apiFetch<StudentListResponse>('/api/v1/students?limit=100', {
+        schema: StudentListResponseSchema,
+      }),
     enabled: activeTab === 'students',
   });
 
   const requestsQuery = useQuery({
     queryKey: ['teacher', 'students', 'requests'],
-    queryFn: () => apiFetch<StudentListResponse>('/api/v1/students/requests?limit=100'),
+    queryFn: () =>
+      apiFetch<StudentListResponse>('/api/v1/students/requests?limit=100', {
+        schema: StudentListResponseSchema,
+      }),
     enabled: activeTab === 'requests',
   });
 
   const lockedQuery = useQuery({
     queryKey: ['teacher', 'students', 'locked'],
-    queryFn: () => apiFetch<StudentListResponse>('/api/v1/students/locked?limit=100'),
+    queryFn: () =>
+      apiFetch<StudentListResponse>('/api/v1/students/locked?limit=100', {
+        schema: StudentListResponseSchema,
+      }),
     enabled: activeTab === 'locked',
   });
 
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+    queryFn: () =>
+      apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
+        schema: GroupListResponseSchema,
+      }),
   });
 
   const groups = groupsQuery.data?.items || [];
@@ -110,6 +125,7 @@ function StudentsManagementContent() {
           guardianContact: body.guardianContact,
           ageSegment: body.ageSegment,
         }),
+        schema: StudentViewSchema,
       }),
     onSuccess: (_, variables) => {
       const studentName = approvingStudent?.name || variables.studentId;

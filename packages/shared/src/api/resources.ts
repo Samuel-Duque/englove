@@ -1,4 +1,5 @@
-import type { Level } from '../enums';
+import { z } from 'zod';
+import { Level } from '../enums';
 
 declare const URL: {
   new (url: string, base?: string): {
@@ -30,24 +31,30 @@ export function isValidHttpsResourceUrl(raw: unknown): boolean {
   }
 }
 
-export interface ExternalResourceItem {
-  id: string;
-  title: string;
-  url: string;
-  description: string | null;
-  level: Level | null;
-  position: number;
-  createdBy: string;
+export const ExternalResourceItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  url: z.string(),
+  description: z.string().nullable(),
+  level: z.nativeEnum(Level).nullable(),
+  position: z.number().int(),
+  createdBy: z.string(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  createdAt: string;
+  createdAt: z.string(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  updatedAt: string;
-}
+  updatedAt: z.string(),
+});
 
-export interface ExternalResourceListResponse {
-  items: ExternalResourceItem[];
-  total: number;
-}
+export type ExternalResourceItem = z.infer<typeof ExternalResourceItemSchema>;
+
+export const ExternalResourceListResponseSchema = z.object({
+  items: z.array(ExternalResourceItemSchema),
+  total: z.number().int().optional(),
+  offset: z.number().int().optional(),
+  limit: z.number().int().optional(),
+});
+
+export type ExternalResourceListResponse = z.infer<typeof ExternalResourceListResponseSchema>;
 
 export interface CreateExternalResourceRequest {
   title: string;

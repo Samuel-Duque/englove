@@ -5,10 +5,14 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   StudentView,
+  StudentViewSchema,
   GroupListResponse,
+  GroupListResponseSchema,
   MembershipListResponse,
+  MembershipListResponseSchema,
   Level,
   MessageResponse,
+  MessageResponseSchema,
   z,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
@@ -38,17 +42,26 @@ export function AlumnoDetailClient({ id }: { id: string }) {
 
   const studentQuery = useQuery({
     queryKey: ['teacher', 'student', id],
-    queryFn: () => apiFetch<StudentView>(`/api/v1/students/${id}`),
+    queryFn: () =>
+      apiFetch<StudentView>(`/api/v1/students/${id}`, {
+        schema: StudentViewSchema,
+      }),
   });
 
   const membershipsQuery = useQuery({
     queryKey: ['teacher', 'student', id, 'memberships'],
-    queryFn: () => apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`),
+    queryFn: () =>
+      apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`, {
+        schema: MembershipListResponseSchema,
+      }),
   });
 
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+    queryFn: () =>
+      apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
+        schema: GroupListResponseSchema,
+      }),
   });
 
   const student = studentQuery.data ?? null;
@@ -106,7 +119,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
 
     if (!isEditingProfile) {
       setEditName(data.name);
-      setEditBirthDate(data.birthDate);
+      setEditBirthDate(data.birthDate ?? '');
       setEditLevel(data.level ?? Level.A1);
       setEditGuardianName(data.guardianName ?? '');
       setEditGuardianContact(data.guardianContact ?? '');
@@ -150,6 +163,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
           groupId,
           confirmLostRetries,
         }),
+        schema: StudentViewSchema,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'student', id], updated);
@@ -199,6 +213,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       apiFetch<StudentView>(`/api/v1/students/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
+        schema: StudentViewSchema,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'student', id], updated);
@@ -239,6 +254,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
     mutationFn: () =>
       apiFetch<MessageResponse>(`/api/v1/students/${id}/reset-password`, {
         method: 'POST',
+        schema: MessageResponseSchema,
       }),
     onSuccess: (res) => {
       setSuccess(res.message || 'Enlace de recuperación enviado al correo del alumno.');
@@ -261,6 +277,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       apiFetch<MessageResponse>(`/api/v1/students/${id}/change-email`, {
         method: 'POST',
         body: JSON.stringify({ newEmail: email }),
+        schema: MessageResponseSchema,
       }),
     onSuccess: (res) => {
       setSuccess(res.message);

@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Estadísticas y Desempeño',
 };
 
-export const instant = false;
-
 export default function EstadisticasPage() {
   return (
     <Suspense

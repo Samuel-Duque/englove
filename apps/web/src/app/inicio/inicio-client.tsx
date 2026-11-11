@@ -4,13 +4,16 @@ import React, { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import type {
-  SessionView,
-  RemindersResponse,
-  AssignmentCard,
-  AssignmentCardListResponse,
-  RuntimeView,
-  StudentProfileView,
+import {
+  RemindersResponseSchema,
+  AssignmentCardListResponseSchema,
+  RuntimeViewSchema,
+  type SessionView,
+  type RemindersResponse,
+  type AssignmentCard,
+  type AssignmentCardListResponse,
+  type RuntimeView,
+  type StudentProfileView,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../lib/api';
 import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh } from '../../lib/auth-session';
@@ -48,13 +51,19 @@ export function InicioClient() {
 
   const remindersQuery = useQuery({
     queryKey: ['teacher', 'reminders'],
-    queryFn: () => apiFetch<RemindersResponse>('/api/v1/dashboard/reminders'),
+    queryFn: () =>
+      apiFetch<RemindersResponse>('/api/v1/dashboard/reminders', {
+        schema: RemindersResponseSchema,
+      }),
     enabled: session?.user.role === 'teacher',
   });
 
   const cardsQuery = useQuery({
     queryKey: ['student', 'assignments'],
-    queryFn: () => apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments'),
+    queryFn: () =>
+      apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments', {
+        schema: AssignmentCardListResponseSchema,
+      }),
     enabled: session?.user.role === 'student',
   });
 
@@ -68,6 +77,7 @@ export function InicioClient() {
     mutationFn: (assignmentId: string) =>
       apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
         method: 'POST',
+        schema: RuntimeViewSchema,
       }),
     onSuccess: (data) => {
       router.push(`/actividad/${data.attempt.id}`);
@@ -105,7 +115,7 @@ export function InicioClient() {
 
   if (networkError) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-center bg-zinc-50">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center bg-zinc-50 outline-none">
         <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-zinc-200 shadow-sm space-y-4">
           <span className="text-4xl" aria-hidden="true">⚠️</span>
           <h1 className="text-xl font-bold text-zinc-900">Error de conexión</h1>
@@ -126,7 +136,7 @@ export function InicioClient() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-center bg-zinc-50">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center bg-zinc-50 outline-none">
         <p className="text-zinc-600 text-lg">Cargando tu espacio…</p>
       </main>
     );
@@ -143,7 +153,7 @@ export function InicioClient() {
           <TeacherNav teacherName={session.user.name} />
         </Suspense>
 
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 outline-none">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900">
               Panel Docente — Inicio
@@ -339,7 +349,7 @@ export function InicioClient() {
       />
       <OfflineStatusBanner />
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 outline-none">
         {/* Modal for attempt errors */}
         <AccessibleModal
           isOpen={!!attemptError}

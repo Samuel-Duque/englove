@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Ficha de Estudiante - Estadísticas',
 };
 
-export const instant = false;
-
 export default async function StudentDetailPage({
   params,
 }: {

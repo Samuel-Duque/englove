@@ -9,6 +9,7 @@ import {
   ActivityStatus,
   Level,
   ActivityEditor,
+  ActivityEditorSchema,
   GamePublicConfig,
   GameAnswerKey,
 } from '@englove/shared';
@@ -177,6 +178,21 @@ export function buildSentencePromptWithMarkers(rawPrompt: string, blanks: FormBl
   return prompt.replace(/\s+/g, ' ').trim();
 }
 
+const DEFAULT_FB_ITEM_ID = '10000000-0000-4000-8000-000000000001';
+const DEFAULT_FB_BLANK_ID = '10000000-0000-4000-8000-000000000002';
+const DEFAULT_FB_OPT1_ID = '10000000-0000-4000-8000-000000000003';
+const DEFAULT_FB_OPT2_ID = '10000000-0000-4000-8000-000000000004';
+
+const DEFAULT_EXAM_ITEM1_ID = '20000000-0000-4000-8000-000000000001';
+const DEFAULT_EXAM_BLANK1_ID = '20000000-0000-4000-8000-000000000002';
+const DEFAULT_EXAM_OPT1A_ID = '20000000-0000-4000-8000-000000000003';
+const DEFAULT_EXAM_OPT1B_ID = '20000000-0000-4000-8000-000000000004';
+
+const DEFAULT_EXAM_ITEM2_ID = '20000000-0000-4000-8000-000000000005';
+const DEFAULT_EXAM_BLANK2_ID = '20000000-0000-4000-8000-000000000006';
+const DEFAULT_EXAM_OPT2A_ID = '20000000-0000-4000-8000-000000000007';
+const DEFAULT_EXAM_OPT2B_ID = '20000000-0000-4000-8000-000000000008';
+
 export function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
   const rec = asRecord(cfg);
   if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
@@ -185,34 +201,35 @@ export function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSente
     const akItems = asRecord(rawAkItems) || {};
 
     const items: FormSentenceItem[] = [];
-    for (const rawItem of rec['items']) {
+    for (const [idx, rawItem] of rec['items'].entries()) {
       const item = asRecord(rawItem);
       if (!item) continue;
-      const itemId = typeof item['id'] === 'string' && item['id'] ? item['id'] : generateUuid();
+      const itemId = typeof item['id'] === 'string' && item['id'] ? item['id'] : `item-fb-${idx + 1}`;
       const prompt = typeof item['prompt'] === 'string' ? item['prompt'] : '';
 
       const blanks: FormBlank[] = [];
       const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
 
       if (Array.isArray(item['blanks']) && item['blanks'].length > 0) {
-        for (const rawBlank of item['blanks']) {
+        for (const [bIdx, rawBlank] of item['blanks'].entries()) {
           const blank = asRecord(rawBlank);
           if (!blank) continue;
-          const blankId = typeof blank['id'] === 'string' && blank['id'] ? blank['id'] : generateUuid();
+          const blankId = typeof blank['id'] === 'string' && blank['id'] ? blank['id'] : `blank-fb-${idx + 1}-${bIdx + 1}`;
           const options: FormOption[] = [];
 
           if (Array.isArray(blank['options']) && blank['options'].length > 0) {
-            for (const rawOpt of blank['options']) {
+            for (const [oIdx, rawOpt] of blank['options'].entries()) {
               const opt = asRecord(rawOpt);
               if (!opt) continue;
-              const optId = typeof opt['id'] === 'string' && opt['id'] ? opt['id'] : generateUuid();
+              const optId = typeof opt['id'] === 'string' && opt['id'] ? opt['id'] : `opt-fb-${idx + 1}-${bIdx + 1}-${oIdx + 1}`;
               const optText = typeof opt['text'] === 'string' ? opt['text'] : '';
               options.push({ id: optId, text: optText });
             }
           }
 
           while (options.length < 2) {
-            options.push({ id: generateUuid(), text: options.length === 0 ? 'Opción A' : 'Opción B' });
+            const fallbackOptId = `opt-fb-${idx + 1}-${bIdx + 1}-${options.length + 1}`;
+            options.push({ id: fallbackOptId, text: options.length === 0 ? 'Opción A' : 'Opción B' });
           }
 
           const correctOptId =
@@ -229,9 +246,9 @@ export function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSente
       }
 
       if (blanks.length === 0) {
-        const bId = generateUuid();
-        const o1 = { id: generateUuid(), text: 'cat' };
-        const o2 = { id: generateUuid(), text: 'dog' };
+        const bId = `blank-fb-${idx + 1}-1`;
+        const o1 = { id: `opt-fb-${idx + 1}-1-1`, text: 'cat' };
+        const o2 = { id: `opt-fb-${idx + 1}-1-2`, text: 'dog' };
         blanks.push({
           id: bId,
           options: [o1, o2],
@@ -249,18 +266,18 @@ export function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSente
     if (items.length > 0) return items;
   }
 
-  const b1 = generateUuid();
-  const o1 = { id: generateUuid(), text: 'cat' };
-  const o2 = { id: generateUuid(), text: 'dog' };
   return [
     {
-      id: generateUuid(),
-      prompt: `The {{${b1}}} is sleeping.`,
+      id: DEFAULT_FB_ITEM_ID,
+      prompt: `The {{${DEFAULT_FB_BLANK_ID}}} is sleeping.`,
       blanks: [
         {
-          id: b1,
-          options: [o1, o2],
-          correctOptionId: o1.id,
+          id: DEFAULT_FB_BLANK_ID,
+          options: [
+            { id: DEFAULT_FB_OPT1_ID, text: 'cat' },
+            { id: DEFAULT_FB_OPT2_ID, text: 'dog' },
+          ],
+          correctOptionId: DEFAULT_FB_OPT1_ID,
         },
       ],
     },
@@ -275,10 +292,10 @@ export function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceIt
     const akItems = asRecord(rawAkItems) || {};
 
     const items: FormSentenceItem[] = [];
-    for (const rawItem of rec['items']) {
+    for (const [idx, rawItem] of rec['items'].entries()) {
       const item = asRecord(rawItem);
       if (!item) continue;
-      const itemId = typeof item['id'] === 'string' && item['id'] ? item['id'] : generateUuid();
+      const itemId = typeof item['id'] === 'string' && item['id'] ? item['id'] : `item-exam-${idx + 1}`;
       const prompt = typeof item['prompt'] === 'string' ? item['prompt'] : '';
       const weight = typeof item['weight'] === 'number' ? String(item['weight']) : '50';
 
@@ -286,24 +303,25 @@ export function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceIt
       const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
 
       if (Array.isArray(item['blanks']) && item['blanks'].length > 0) {
-        for (const rawBlank of item['blanks']) {
+        for (const [bIdx, rawBlank] of item['blanks'].entries()) {
           const blank = asRecord(rawBlank);
           if (!blank) continue;
-          const blankId = typeof blank['id'] === 'string' && blank['id'] ? blank['id'] : generateUuid();
+          const blankId = typeof blank['id'] === 'string' && blank['id'] ? blank['id'] : `blank-exam-${idx + 1}-${bIdx + 1}`;
           const options: FormOption[] = [];
 
           if (Array.isArray(blank['options']) && blank['options'].length > 0) {
-            for (const rawOpt of blank['options']) {
+            for (const [oIdx, rawOpt] of blank['options'].entries()) {
               const opt = asRecord(rawOpt);
               if (!opt) continue;
-              const optId = typeof opt['id'] === 'string' && opt['id'] ? opt['id'] : generateUuid();
+              const optId = typeof opt['id'] === 'string' && opt['id'] ? opt['id'] : `opt-exam-${idx + 1}-${bIdx + 1}-${oIdx + 1}`;
               const optText = typeof opt['text'] === 'string' ? opt['text'] : '';
               options.push({ id: optId, text: optText });
             }
           }
 
           while (options.length < 2) {
-            options.push({ id: generateUuid(), text: options.length === 0 ? 'goes' : 'go' });
+            const fallbackOptId = `opt-exam-${idx + 1}-${bIdx + 1}-${options.length + 1}`;
+            options.push({ id: fallbackOptId, text: options.length === 0 ? 'goes' : 'go' });
           }
 
           const correctOptId =
@@ -320,9 +338,9 @@ export function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceIt
       }
 
       if (blanks.length === 0) {
-        const bId = generateUuid();
-        const o1 = { id: generateUuid(), text: 'goes' };
-        const o2 = { id: generateUuid(), text: 'go' };
+        const bId = `blank-exam-${idx + 1}-1`;
+        const o1 = { id: `opt-exam-${idx + 1}-1-1`, text: 'goes' };
+        const o2 = { id: `opt-exam-${idx + 1}-1-2`, text: 'go' };
         blanks.push({
           id: bId,
           options: [o1, o2],
@@ -341,35 +359,33 @@ export function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceIt
     if (items.length > 0) return items;
   }
 
-  const b1 = generateUuid();
-  const o1a = { id: generateUuid(), text: 'cat' };
-  const o1b = { id: generateUuid(), text: 'dog' };
-
-  const b2 = generateUuid();
-  const o2a = { id: generateUuid(), text: 'goes' };
-  const o2b = { id: generateUuid(), text: 'go' };
-
   return [
     {
-      id: generateUuid(),
-      prompt: `The {{${b1}}} is sleeping.`,
+      id: DEFAULT_EXAM_ITEM1_ID,
+      prompt: `The {{${DEFAULT_EXAM_BLANK1_ID}}} is sleeping.`,
       blanks: [
         {
-          id: b1,
-          options: [o1a, o1b],
-          correctOptionId: o1a.id,
+          id: DEFAULT_EXAM_BLANK1_ID,
+          options: [
+            { id: DEFAULT_EXAM_OPT1A_ID, text: 'cat' },
+            { id: DEFAULT_EXAM_OPT1B_ID, text: 'dog' },
+          ],
+          correctOptionId: DEFAULT_EXAM_OPT1A_ID,
         },
       ],
       weight: '50',
     },
     {
-      id: generateUuid(),
-      prompt: `She {{${b2}}} to school.`,
+      id: DEFAULT_EXAM_ITEM2_ID,
+      prompt: `She {{${DEFAULT_EXAM_BLANK2_ID}}} to school.`,
       blanks: [
         {
-          id: b2,
-          options: [o2a, o2b],
-          correctOptionId: o2a.id,
+          id: DEFAULT_EXAM_BLANK2_ID,
+          options: [
+            { id: DEFAULT_EXAM_OPT2A_ID, text: 'goes' },
+            { id: DEFAULT_EXAM_OPT2B_ID, text: 'go' },
+          ],
+          correctOptionId: DEFAULT_EXAM_OPT2A_ID,
         },
       ],
       weight: '50',
@@ -1387,11 +1403,13 @@ export function ActivityEditorComponent({
             expectedDurationSeconds: payload.expectedDurationSeconds,
             minPlausibleSeconds: payload.minPlausibleSeconds,
           }),
+          schema: ActivityEditorSchema,
         });
       }
       return apiFetch<ActivityEditor>('/api/v1/activities', {
         method: 'POST',
         body: JSON.stringify(payload),
+        schema: ActivityEditorSchema,
       });
     },
     onSuccess: (data) => {
@@ -1420,6 +1438,7 @@ export function ActivityEditorComponent({
     mutationFn: async (id: string) => {
       return apiFetch<ActivityEditor>(`/api/v1/activities/${id}/publish`, {
         method: 'POST',
+        schema: ActivityEditorSchema,
       });
     },
     onSuccess: (published) => {
@@ -2788,7 +2807,7 @@ export function ActivityEditorComponent({
                 onClick={() => setPreviewTheme('kids')}
                 className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   previewTheme === 'kids'
-                    ? 'bg-amber-500 text-white shadow-xs'
+                    ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
                     : 'text-zinc-600 hover:text-zinc-900'
                 }`}
               >
@@ -2822,7 +2841,7 @@ export function ActivityEditorComponent({
               </span>
               <span className="text-xs font-semibold text-zinc-500 capitalize">{type}</span>
             </div>
-            <h3 className="text-xl font-black text-amber-950">{title || 'Actividad sin título'}</h3>
+            <h3 className={`text-xl font-black ${previewTheme === 'kids' ? 'text-amber-950' : 'text-zinc-100'}`}>{title || 'Actividad sin título'}</h3>
 
             {type === ActivityType.fill_blank && (
               <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">

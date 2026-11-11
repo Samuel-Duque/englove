@@ -7,15 +7,25 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   StudentGameCard,
   StudentGamesListResponse,
+  StudentGamesListResponseSchema,
   GAME_MECHANIC_LABELS,
   scoreToGameStars,
   getGameMotivationMessage,
+  z,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
+import { fetchSharedProfile } from '../../../lib/auth-session';
 
 export function JuegosClient() {
   const router = useRouter();
+
+  const profileQuery = useQuery({
+    queryKey: ['student', 'profile', 'shell'],
+    queryFn: () => fetchSharedProfile(),
+  });
+  const ageSegment = profileQuery.data?.student?.ageSegment ?? 'kids';
+  const isKids = ageSegment === 'kids';
 
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [startingGameId, setStartingGameId] = useState<string | null>(null);
@@ -35,7 +45,10 @@ export function JuegosClient() {
 
   const gamesQuery = useQuery({
     queryKey: ['student', 'games'],
-    queryFn: () => apiFetch<StudentGamesListResponse>('/api/v1/me/games'),
+    queryFn: () =>
+      apiFetch<StudentGamesListResponse>('/api/v1/me/games', {
+        schema: StudentGamesListResponseSchema,
+      }),
     enabled: gamesEnabled,
   });
 
@@ -51,6 +64,7 @@ export function JuegosClient() {
     mutationFn: (gameId: string) =>
       apiFetch<{ attempt: { id: string } }>(`/api/v1/activities/${gameId}/attempts`, {
         method: 'POST',
+        schema: z.object({ attempt: z.object({ id: z.string() }) }),
       }),
     onSuccess: (res) => {
       router.push(`/actividad/${res.attempt.id}`);
@@ -124,14 +138,18 @@ export function JuegosClient() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center space-y-4">
         <div className="text-5xl" aria-hidden="true">🎮</div>
-        <h1 className="text-2xl font-black text-amber-950">Microjuegos no disponibles</h1>
-        <p className="text-sm text-zinc-600">
+        <h1 className={`text-2xl font-black ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>
+          Microjuegos no disponibles
+        </h1>
+        <p className={`text-sm ${isKids ? 'text-zinc-600' : 'text-zinc-400'}`}>
           La zona de juegos interactivos no está habilitada en este momento. Por favor, consulta más tarde con tu profesora.
         </p>
         <div className="pt-4">
           <Link
             href="/inicio"
-            className="inline-flex items-center px-4 py-2.5 rounded-2xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-colors"
+            className={`inline-flex items-center px-4 py-2.5 rounded-2xl font-black text-sm transition-colors ${
+              isKids ? 'bg-amber-500 hover:bg-amber-400 text-amber-950' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+            }`}
           >
             Volver al inicio
           </Link>
@@ -143,28 +161,36 @@ export function JuegosClient() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-amber-200/80 pb-6">
+      <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b ${
+        isKids ? 'border-amber-200/80' : 'border-zinc-800'
+      } pb-6`}>
         <div>
           <div className="flex items-center gap-2">
             <span className="text-3xl" aria-hidden="true">🎮</span>
-            <h1 className="text-3xl font-black tracking-tight text-amber-950">
+            <h1 className={`text-3xl font-black tracking-tight ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>
               Zona de Microjuegos
             </h1>
           </div>
-          <p className="text-sm font-medium text-amber-900/80 mt-1">
+          <p className={`text-sm font-medium ${isKids ? 'text-amber-950' : 'text-zinc-400'} mt-1`}>
             Practica inglés jugando de forma autónoma. ¡Gana estrellas y repasa todas las veces que quieras!
           </p>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-2 bg-amber-100/60 p-1.5 rounded-2xl self-start sm:self-auto">
+        <div className={`flex items-center gap-2 ${
+          isKids ? 'bg-amber-100/60' : 'bg-zinc-800'
+        } p-1.5 rounded-2xl self-start sm:self-auto`}>
           <button
             type="button"
             onClick={() => setFilter('all')}
             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
               filter === 'all'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'text-amber-900 hover:bg-amber-200/60'
+                ? isKids
+                  ? 'bg-amber-500 text-amber-950 shadow-xs'
+                  : 'bg-indigo-600 text-white shadow-xs'
+                : isKids
+                  ? 'text-amber-900 hover:bg-amber-200/60'
+                  : 'text-zinc-300 hover:bg-zinc-700'
             }`}
           >
             Todos ({games.length})
@@ -174,8 +200,12 @@ export function JuegosClient() {
             onClick={() => setFilter('pending')}
             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
               filter === 'pending'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'text-amber-900 hover:bg-amber-200/60'
+                ? isKids
+                  ? 'bg-amber-500 text-amber-950 shadow-xs'
+                  : 'bg-indigo-600 text-white shadow-xs'
+                : isKids
+                  ? 'text-amber-900 hover:bg-amber-200/60'
+                  : 'text-zinc-300 hover:bg-zinc-700'
             }`}
           >
             Por practicar ({games.filter((g) => g.status !== 'completed').length})
@@ -185,8 +215,12 @@ export function JuegosClient() {
             onClick={() => setFilter('completed')}
             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
               filter === 'completed'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'text-amber-900 hover:bg-amber-200/60'
+                ? isKids
+                  ? 'bg-amber-500 text-amber-950 shadow-xs'
+                  : 'bg-indigo-600 text-white shadow-xs'
+                : isKids
+                  ? 'text-amber-900 hover:bg-amber-200/60'
+                  : 'text-zinc-300 hover:bg-zinc-700'
             }`}
           >
             Jugados ({games.filter((g) => g.status === 'completed').length})
@@ -209,12 +243,16 @@ export function JuegosClient() {
 
       {/* Games Grid or Empty State */}
       {filteredGames.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-amber-50/50 border border-dashed border-amber-300 space-y-3">
+        <div className={`p-12 text-center rounded-3xl border border-dashed space-y-3 ${
+          isKids
+            ? 'bg-amber-50/50 border-amber-300 text-amber-950'
+            : 'bg-zinc-900 border-zinc-800 text-zinc-100'
+        }`}>
           <span className="text-4xl block" aria-hidden="true">🎲</span>
-          <p className="text-base font-bold text-amber-950">
+          <p className="text-base font-bold">
             Todavía no hay juegos publicados para practicar. ¡Vuelve pronto!
           </p>
-          <p className="text-xs text-amber-900/70 max-w-sm mx-auto">
+          <p className={`text-xs max-w-sm mx-auto ${isKids ? 'text-amber-950 font-medium' : 'text-zinc-400'}`}>
             Cuando tu profesora publique microjuegos interactivos, aparecerán aquí para que practiques cuantas veces quieras.
           </p>
         </div>
@@ -240,27 +278,45 @@ export function JuegosClient() {
             return (
               <div
                 key={game.id}
-                className="rounded-3xl bg-white border-2 border-amber-200/80 p-5 shadow-xs hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                className={`rounded-3xl border-2 p-5 shadow-xs transition-all flex flex-col justify-between space-y-4 ${
+                  isKids
+                    ? 'bg-white border-amber-200/80 hover:border-amber-400 hover:shadow-md'
+                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                      isKids
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                    }`}>
                       Nivel {game.level}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-100 text-purple-900 border border-purple-200">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold border ${
+                      isKids
+                        ? 'bg-purple-100 text-purple-900 border-purple-200'
+                        : 'bg-purple-950/80 text-purple-200 border-purple-800'
+                    }`}>
                       🎮 {game.mechanic ? GAME_MECHANIC_LABELS[game.mechanic] : 'Microjuego'}
                     </span>
                   </div>
 
                   <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-lg font-black text-amber-950 leading-snug line-clamp-2">
+                    <h2 className={`text-lg font-black leading-snug line-clamp-2 ${
+                      isKids ? 'text-amber-950' : 'text-zinc-100'
+                    }`}>
                       {game.title}
                     </h2>
                     <button
                       type="button"
                       onClick={() => handleSpeak(game)}
                       aria-label={isSpeaking ? `Detener lectura de ${game.title}` : `Escuchar ${game.title}`}
-                      className="shrink-0 inline-flex items-center justify-center min-h-[48px] min-w-[48px] p-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors cursor-pointer"
+                      className={`shrink-0 inline-flex items-center justify-center min-h-[48px] min-w-[48px] p-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        isKids
+                          ? 'bg-amber-100 hover:bg-amber-200 text-amber-950'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                      }`}
                     >
                       {isSpeaking ? '⏹' : '🔊'}
                     </button>
@@ -284,14 +340,14 @@ export function JuegosClient() {
                       </div>
 
                       {game.attemptsCount > 0 && (
-                        <span className="text-xs font-bold text-zinc-500">
+                        <span className={`text-xs font-bold ${isKids ? 'text-zinc-500' : 'text-zinc-400'}`}>
                           {game.attemptsCount} {game.attemptsCount === 1 ? 'partida' : 'partidas'}
                         </span>
                       )}
                     </div>
 
                     {motivationMessage && (
-                      <p className="text-xs font-semibold text-amber-900/80 leading-snug">
+                      <p className={`text-xs font-semibold leading-snug ${isKids ? 'text-amber-950' : 'text-zinc-300'}`}>
                         {motivationMessage}
                       </p>
                     )}
@@ -299,11 +355,15 @@ export function JuegosClient() {
                 </div>
 
                 {/* Card Action Buttons (SPEC-11 §7.1) */}
-                <div className="pt-3 border-t border-amber-100 space-y-2">
+                <div className={`pt-3 border-t space-y-2 ${isKids ? 'border-amber-100' : 'border-zinc-800'}`}>
                   {isInProgress && game.inProgressAttemptId ? (
                     <Link
                       href={`/actividad/${game.inProgressAttemptId}`}
-                      className="w-full min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+                      className={`w-full min-h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      }`}
                     >
                       <span aria-hidden="true">▶️</span>
                       <span>Reanudar partida</span>
@@ -313,7 +373,11 @@ export function JuegosClient() {
                       type="button"
                       disabled={isStarting}
                       onClick={() => handleStartGame(game)}
-                      className="w-full min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50 cursor-pointer"
+                      className={`w-full min-h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50 cursor-pointer ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      }`}
                     >
                       <span aria-hidden="true">🔄</span>
                       <span>{isStarting ? 'Iniciando…' : 'Jugar de nuevo'}</span>
@@ -323,7 +387,11 @@ export function JuegosClient() {
                       type="button"
                       disabled={isStarting}
                       onClick={() => handleStartGame(game)}
-                      className="w-full min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50 cursor-pointer"
+                      className={`w-full min-h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50 cursor-pointer ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      }`}
                     >
                       <span aria-hidden="true">🎮</span>
                       <span>{isStarting ? 'Iniciando…' : 'Jugar'}</span>

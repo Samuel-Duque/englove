@@ -1,22 +1,29 @@
+import { z } from 'zod';
 import { AgeSegment, Role } from '../enums';
 
-export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-}
+export const SessionUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.nativeEnum(Role),
+});
 
-export interface SessionStudent {
-  id: string;
-  ageSegment: AgeSegment;
-  canSwitchInterface: boolean;
-}
+export type SessionUser = z.infer<typeof SessionUserSchema>;
 
-export interface SessionView {
-  user: SessionUser;
-  student: SessionStudent | null;
-}
+export const SessionStudentSchema = z.object({
+  id: z.string(),
+  ageSegment: z.nativeEnum(AgeSegment),
+  canSwitchInterface: z.boolean(),
+});
+
+export type SessionStudent = z.infer<typeof SessionStudentSchema>;
+
+export const SessionViewSchema = z.object({
+  user: SessionUserSchema,
+  student: SessionStudentSchema.nullable(),
+});
+
+export type SessionView = z.infer<typeof SessionViewSchema>;
 
 export interface LoginInput {
   email: string;
@@ -51,6 +58,8 @@ export interface EmailChangeConfirmInput {
   otp: string;
 }
 
-export interface MessageResponse {
-  message: string;
-}
+export const MessageResponseSchema = z.object({
+  message: z.string(),
+});
+
+export type MessageResponse = z.infer<typeof MessageResponseSchema>;

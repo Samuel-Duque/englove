@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { StudentProfileView } from '@englove/shared';
+import { StudentProfileView, StudentProfileViewSchema } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { clearSharedProfile } from '../../../lib/auth-session';
 import { syncUserSegment } from '../../../lib/user-segment';
@@ -12,7 +12,10 @@ export function PerfilClient() {
 
   const { data: profile, isLoading, error: queryError } = useQuery({
     queryKey: ['student', 'profile'],
-    queryFn: () => apiFetch<StudentProfileView>('/api/v1/me'),
+    queryFn: () =>
+      apiFetch<StudentProfileView>('/api/v1/me', {
+        schema: StudentProfileViewSchema,
+      }),
   });
 
   const error = queryError instanceof ApiError
@@ -141,12 +144,13 @@ export function PerfilClient() {
 
   const { user, student } = profile;
   const currentSegment = student?.ageSegment ?? 'kids';
+  const isKids = currentSegment === 'kids';
 
   return (
     <div className="max-w-3xl mx-auto py-6 space-y-8">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-black text-amber-950">Tu Perfil de Alumno 👤</h1>
-        <p className="text-sm font-medium opacity-80 mt-1">
+        <h1 className={`text-2xl sm:text-3xl font-black ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>Tu Perfil de Alumno 👤</h1>
+        <p className={`text-sm font-medium mt-1 ${isKids ? 'text-zinc-600' : 'text-zinc-400'}`}>
           Información personal, configuración de interfaz y seguridad de tu cuenta.
         </p>
       </div>
@@ -158,40 +162,40 @@ export function PerfilClient() {
       )}
 
       {/* Profile Details Card */}
-      <div className="rounded-3xl border border-amber-200 bg-white p-6 sm:p-8 shadow-xs space-y-6">
-        <h2 className="text-lg font-black text-amber-950 border-b border-amber-100 pb-3">
+      <div className={`rounded-3xl border p-6 sm:p-8 shadow-xs space-y-6 ${isKids ? 'border-amber-200 bg-white' : 'border-zinc-800 bg-zinc-900'}`}>
+        <h2 className={`text-lg font-black border-b pb-3 ${isKids ? 'text-amber-950 border-amber-100' : 'text-zinc-100 border-zinc-800'}`}>
           Datos de la cuenta
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 block">
+            <span className={`text-xs font-bold uppercase tracking-wider block ${isKids ? 'text-zinc-500' : 'text-zinc-400'}`}>
               Nombre completo
             </span>
-            <p className="text-base font-extrabold text-amber-950 mt-0.5">{user.name}</p>
+            <p className={`text-base font-extrabold mt-0.5 ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>{user.name}</p>
           </div>
 
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 block">
+            <span className={`text-xs font-bold uppercase tracking-wider block ${isKids ? 'text-zinc-500' : 'text-zinc-400'}`}>
               Correo electrónico
             </span>
-            <p className="text-base font-extrabold text-amber-950 mt-0.5">{user.email}</p>
+            <p className={`text-base font-extrabold mt-0.5 ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>{user.email}</p>
           </div>
 
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 block">
+            <span className={`text-xs font-bold uppercase tracking-wider block ${isKids ? 'text-zinc-500' : 'text-zinc-400'}`}>
               Nivel asignado
             </span>
-            <p className="text-base font-extrabold text-amber-950 mt-0.5">
+            <p className={`text-base font-extrabold mt-0.5 ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>
               {student?.level ? `Nivel ${student.level}` : 'Sin asignar'}
             </p>
           </div>
 
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 block">
+            <span className={`text-xs font-bold uppercase tracking-wider block ${isKids ? 'text-zinc-500' : 'text-zinc-400'}`}>
               Fecha de nacimiento civil
             </span>
-            <p className="text-base font-extrabold text-amber-950 mt-0.5">
+            <p className={`text-base font-extrabold mt-0.5 ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>
               {student?.birthDate ? new Date(student.birthDate).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : '—'}
             </p>
           </div>
@@ -199,14 +203,14 @@ export function PerfilClient() {
       </div>
 
       {/* Interface Preference Card */}
-      <div className="rounded-3xl border border-amber-200 bg-white p-6 sm:p-8 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-amber-100 pb-3">
-          <h2 className="text-lg font-black text-amber-950">Tema de Interfaz 🎨</h2>
+      <div className={`rounded-3xl border p-6 sm:p-8 shadow-xs space-y-4 ${isKids ? 'border-amber-200 bg-white' : 'border-zinc-800 bg-zinc-900'}`}>
+        <div className={`flex items-center justify-between border-b pb-3 ${isKids ? 'border-amber-100' : 'border-zinc-800'}`}>
+          <h2 className={`text-lg font-black ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>Tema de Interfaz 🎨</h2>
           <span
             className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase ${
               currentSegment === 'kids'
                 ? 'bg-amber-100 text-amber-800'
-                : 'bg-indigo-100 text-indigo-800'
+                : 'bg-indigo-900/60 text-indigo-300'
             }`}
           >
             Tema actual: {currentSegment}
@@ -228,14 +232,16 @@ export function PerfilClient() {
               className={`p-5 rounded-2xl border-2 text-left transition-all ${
                 currentSegment === 'kids'
                   ? 'border-amber-500 bg-amber-50/70 shadow-xs'
-                  : 'border-zinc-200 hover:border-amber-300 bg-white'
+                  : isKids
+                    ? 'border-zinc-200 hover:border-amber-300 bg-white'
+                    : 'border-zinc-700 hover:border-zinc-600 bg-zinc-800'
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-2xl">🧸</span>
-                <h3 className="font-extrabold text-base text-amber-950">Kids (7 a 10 años)</h3>
+                <h3 className={`font-extrabold text-base ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>Kids (7 a 10 años)</h3>
               </div>
-              <p className="text-xs text-zinc-600">
+              <p className={`text-xs ${isKids ? 'text-zinc-600' : 'text-zinc-400'}`}>
                 Colores cálidos, botones grandes, tipografía amigable y lectura por voz integrada.
               </p>
             </button>
@@ -246,30 +252,34 @@ export function PerfilClient() {
               onClick={() => handleThemeChange('teens')}
               className={`p-5 rounded-2xl border-2 text-left transition-all ${
                 currentSegment === 'teens'
-                  ? 'border-indigo-600 bg-indigo-50/70 shadow-xs'
-                  : 'border-zinc-200 hover:border-indigo-300 bg-white'
+                  ? 'border-indigo-500 bg-indigo-950/70 shadow-xs'
+                  : isKids
+                    ? 'border-zinc-200 hover:border-indigo-300 bg-white'
+                    : 'border-zinc-700 hover:border-indigo-400 bg-zinc-800'
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-2xl">🎧</span>
-                <h3 className="font-extrabold text-base text-zinc-900">Teens (11 a 14 años)</h3>
+                <h3 className={`font-extrabold text-base ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>Teens (11 a 14 años)</h3>
               </div>
-              <p className="text-xs text-zinc-600">
+              <p className={`text-xs ${isKids ? 'text-zinc-600' : 'text-zinc-400'}`}>
                 Interfaz minimalista, paleta sobria en tonos oscuros y vista de actividades condensada.
               </p>
             </button>
           </div>
         ) : (
-          <div className="rounded-2xl bg-amber-50/60 border border-amber-200 p-4 text-xs text-amber-900 leading-relaxed">
+          <div className={`rounded-2xl border p-4 text-xs leading-relaxed ${
+            isKids ? 'bg-amber-50/60 border-amber-200 text-amber-900' : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+          }`}>
             ℹ️ La alternancia voluntaria de interfaz se habilitará automáticamente al cumplir 11 años de edad (RF-24).
           </div>
         )}
       </div>
 
       {/* Security and Email Change */}
-      <div className="rounded-3xl border border-amber-200 bg-white p-6 sm:p-8 shadow-xs space-y-4">
-        <h2 className="text-lg font-black text-amber-950">Seguridad de la cuenta 🔒</h2>
-        <p className="text-xs text-zinc-600">
+      <div className={`rounded-3xl border p-6 sm:p-8 shadow-xs space-y-4 ${isKids ? 'border-amber-200 bg-white' : 'border-zinc-800 bg-zinc-900'}`}>
+        <h2 className={`text-lg font-black ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>Seguridad de la cuenta 🔒</h2>
+        <p className={`text-xs ${isKids ? 'text-zinc-600' : 'text-zinc-400'}`}>
           Si necesitas actualizar tu correo electrónico registrado, puedes solicitarlo aquí.
         </p>
 
@@ -294,14 +304,18 @@ export function PerfilClient() {
               setEmailSuccess(null);
               setEmailError(null);
             }}
-            className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 transition-colors"
+            className={`rounded-xl border px-4 py-2 text-xs font-bold transition-colors ${
+              isKids
+                ? 'border-zinc-300 text-zinc-700 hover:bg-zinc-50'
+                : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+            }`}
           >
             Cambiar correo electrónico
           </button>
         ) : isAwaitingOtp ? (
           <form onSubmit={handleConfirmEmailChange} className="space-y-4 max-w-md pt-2">
             <div>
-              <label htmlFor="otp-code" className="text-xs font-bold text-zinc-700 block mb-1">
+              <label htmlFor="otp-code" className={`text-xs font-bold block mb-1 ${isKids ? 'text-zinc-700' : 'text-zinc-300'}`}>
                 Código de verificación OTP (enviado a {newEmail})
               </label>
               <input
@@ -313,7 +327,11 @@ export function PerfilClient() {
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
                 placeholder="123456"
-                className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-base font-mono tracking-widest text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className={`w-full rounded-xl border px-3 py-2 text-base font-mono tracking-widest focus:outline-none focus:ring-2 ${
+                  isKids
+                    ? 'border-zinc-300 text-zinc-900 bg-white focus:ring-amber-500'
+                    : 'border-zinc-700 text-zinc-100 bg-zinc-800 focus:ring-indigo-500'
+                }`}
               />
             </div>
 
@@ -321,7 +339,11 @@ export function PerfilClient() {
               <button
                 type="submit"
                 disabled={isSubmittingEmail || otpCode.trim().length < 6}
-                className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-2 text-xs shadow-sm transition-all disabled:opacity-50"
+                className={`rounded-xl font-black px-4 py-2 text-xs shadow-sm transition-all disabled:opacity-50 ${
+                  isKids
+                    ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                }`}
               >
                 {isSubmittingEmail ? 'Confirmando…' : 'Confirmar nuevo correo'}
               </button>
@@ -332,7 +354,11 @@ export function PerfilClient() {
                   setIsChangingEmail(false);
                   setOtpCode('');
                 }}
-                className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-50"
+                className={`rounded-xl border px-4 py-2 text-xs font-bold ${
+                  isKids
+                    ? 'border-zinc-300 text-zinc-600 hover:bg-zinc-50'
+                    : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+                }`}
               >
                 Cancelar
               </button>
@@ -341,7 +367,7 @@ export function PerfilClient() {
         ) : (
           <form onSubmit={handleRequestEmailChange} className="space-y-4 max-w-md pt-2">
             <div>
-              <label htmlFor="new-email" className="text-xs font-bold text-zinc-700 block mb-1">
+              <label htmlFor="new-email" className={`text-xs font-bold block mb-1 ${isKids ? 'text-zinc-700' : 'text-zinc-300'}`}>
                 Nuevo correo electrónico
               </label>
               <input
@@ -352,12 +378,16 @@ export function PerfilClient() {
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 placeholder="alumno.nuevo@colegio.edu"
-                className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  isKids
+                    ? 'border-zinc-300 text-zinc-900 bg-white focus:ring-amber-500'
+                    : 'border-zinc-700 text-zinc-100 bg-zinc-800 focus:ring-indigo-500'
+                }`}
               />
             </div>
 
             <div>
-              <label htmlFor="current-password" className="text-xs font-bold text-zinc-700 block mb-1">
+              <label htmlFor="current-password" className={`text-xs font-bold block mb-1 ${isKids ? 'text-zinc-700' : 'text-zinc-300'}`}>
                 Contraseña actual para confirmar
               </label>
               <input
@@ -368,7 +398,11 @@ export function PerfilClient() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Tu contraseña"
-                className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  isKids
+                    ? 'border-zinc-300 text-zinc-900 bg-white focus:ring-amber-500'
+                    : 'border-zinc-700 text-zinc-100 bg-zinc-800 focus:ring-indigo-500'
+                }`}
               />
             </div>
 
@@ -376,14 +410,22 @@ export function PerfilClient() {
               <button
                 type="submit"
                 disabled={isSubmittingEmail}
-                className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-2 text-xs shadow-sm transition-all disabled:opacity-50"
+                className={`rounded-xl font-black px-4 py-2 text-xs shadow-sm transition-all disabled:opacity-50 ${
+                  isKids
+                    ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                }`}
               >
                 {isSubmittingEmail ? 'Enviando…' : 'Solicitar cambio'}
               </button>
               <button
                 type="button"
                 onClick={() => setIsChangingEmail(false)}
-                className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-50"
+                className={`rounded-xl border px-4 py-2 text-xs font-bold ${
+                  isKids
+                    ? 'border-zinc-300 text-zinc-600 hover:bg-zinc-50'
+                    : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+                }`}
               >
                 Cancelar
               </button>

@@ -6,11 +6,14 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityListResponse,
+  ActivityListResponseSchema,
   ActivityType,
   ActivityStatus,
   Level,
   GroupListResponse,
+  GroupListResponseSchema,
   CreateAssignmentResponse,
+  CreateAssignmentResponseSchema,
   formatBogotaDateTime,
   getExtendedDueAt,
 } from '@englove/shared';
@@ -33,12 +36,16 @@ export function NuevaAsignacionClient() {
     queryFn: () =>
       apiFetch<ActivityListResponse>(
         `/api/v1/activities?status=${ActivityStatus.published}&limit=100`,
+        { schema: ActivityListResponseSchema },
       ),
   });
 
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+    queryFn: () =>
+      apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
+        schema: GroupListResponseSchema,
+      }),
   });
 
   const activities = useMemo(() => {
@@ -105,6 +112,7 @@ export function NuevaAsignacionClient() {
       apiFetch<CreateAssignmentResponse>('/api/v1/assignments', {
         method: 'POST',
         body: JSON.stringify(body),
+        schema: CreateAssignmentResponseSchema,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });

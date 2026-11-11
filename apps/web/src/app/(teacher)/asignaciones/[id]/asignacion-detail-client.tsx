@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AssignmentView,
+  AssignmentViewSchema,
   AssignmentAvailability,
   ActivityType,
   formatBogotaDateTime,
@@ -60,7 +61,10 @@ export function AsignacionDetailClient({ id }: { id: string }) {
 
   const assignmentQuery = useQuery({
     queryKey: ['teacher', 'assignment', id],
-    queryFn: () => apiFetch<AssignmentView>(`/api/v1/assignments/${id}`),
+    queryFn: () =>
+      apiFetch<AssignmentView>(`/api/v1/assignments/${id}`, {
+        schema: AssignmentViewSchema,
+      }),
   });
 
   const assignment = assignmentQuery.data ?? null;
@@ -88,6 +92,7 @@ export function AsignacionDetailClient({ id }: { id: string }) {
     mutationFn: () =>
       apiFetch<AssignmentView>(`/api/v1/assignments/${id}/cancel`, {
         method: 'POST',
+        schema: AssignmentViewSchema,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'assignment', id], updated);

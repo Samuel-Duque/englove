@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Editor docente para diseñar y configurar la actividad.',
 };
 
-export const instant = false;
-
 export default async function EditarActividadPage({
   params,
 }: {

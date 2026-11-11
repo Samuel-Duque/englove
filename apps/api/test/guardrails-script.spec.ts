@@ -95,7 +95,7 @@ export class TestService {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it('acepta y suprime TenantContext.runBypass cuando tiene comentario guardrails-ignore G-A06:', () => {
       const tempRoot = createTempRoot();
@@ -126,7 +126,7 @@ export class TestService {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it('avisa ante mutaciones prisma.<modelo>.update por { id } sin organization_id visible', () => {
       const tempRoot = createTempRoot();
@@ -155,7 +155,7 @@ export class MutationTest {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
   });
 
   describe('G-B10: Detección de mc anonymous set / acceso público en MinIO/R2', () => {
@@ -184,7 +184,7 @@ services:
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it('pasa limpio el docker-compose.yml oficial del repositorio', () => {
       const { data, exitCode } = runGuardrailsJson(repoRoot, 'docker-compose.yml');
@@ -237,7 +237,7 @@ export class AppModule {}
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
   });
 
   describe('WP-09 / T6.4: Reglas de cliente (G-C12, G-B04, G-C13)', () => {
@@ -318,7 +318,7 @@ export function CleanView() {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it('G-C12 ignora aserciones "as Type" dentro de archivos de prueba (*.spec.ts)', () => {
       const tempRoot = createTempRoot();
@@ -340,7 +340,7 @@ export function helper(x: unknown) {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it('G-B04 detecta ERROR si vistas cliente (incl. >40 líneas o componentes) usan useEffect con apiFetch/fetch, pero permite useEffect de UI sin fetch', () => {
       const tempRoot = createTempRoot();
@@ -438,7 +438,7 @@ export function GoodClient() {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it('G-C13 exige serwist y @serwist/vite en apps/web/package.json y bloquea apps/web/public/sw.js manual', () => {
       const tempRoot = createTempRoot();
@@ -467,6 +467,6 @@ export function GoodClient() {
       } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
   });
 });

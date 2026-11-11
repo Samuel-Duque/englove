@@ -6,10 +6,15 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   StatsOverviewResponse,
+  StatsOverviewResponseSchema,
   GroupStatsResponse,
+  GroupStatsResponseSchema,
   LeaderboardResponse,
+  LeaderboardResponseSchema,
   GamesLeaderboardResponse,
+  GamesLeaderboardResponseSchema,
   GroupListResponse,
+  GroupListResponseSchema,
   GroupView,
   TrendComparisonMode,
   ScoreTrendDirection,
@@ -120,7 +125,10 @@ export function EstadisticasClient() {
   // Load active groups for dropdowns
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+    queryFn: () =>
+      apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
+        schema: GroupListResponseSchema,
+      }),
   });
   const groups: GroupView[] = groupsQuery.data?.items ?? [];
   const effectiveGroupId = selectedGroupId || groups[0]?.id || '';
@@ -145,7 +153,10 @@ export function EstadisticasClient() {
   const overviewQuery = useQuery({
     queryKey: ['stats', 'overview', ...periodKey],
     queryFn: () =>
-      apiFetch<StatsOverviewResponse>(`/api/v1/stats/overview?${buildParams().toString()}`),
+      apiFetch<StatsOverviewResponse>(
+        `/api/v1/stats/overview?${buildParams().toString()}`,
+        { schema: StatsOverviewResponseSchema },
+      ),
     enabled: activeTab === 'overview',
     refetchInterval: POLLING_INTERVAL_MS,
   });
@@ -159,6 +170,7 @@ export function EstadisticasClient() {
       params.set('sortOrder', groupSortOrder);
       return apiFetch<GroupStatsResponse>(
         `/api/v1/stats/groups/${effectiveGroupId}?${params.toString()}`,
+        { schema: GroupStatsResponseSchema },
       );
     },
     enabled: activeTab === 'groups' && effectiveGroupId !== '',
@@ -171,7 +183,10 @@ export function EstadisticasClient() {
       const params = buildParams();
       if (leaderboardLevel) params.set('level', leaderboardLevel);
       if (leaderboardGroupId) params.set('groupId', leaderboardGroupId);
-      return apiFetch<LeaderboardResponse>(`/api/v1/stats/leaderboard?${params.toString()}`);
+      return apiFetch<LeaderboardResponse>(
+        `/api/v1/stats/leaderboard?${params.toString()}`,
+        { schema: LeaderboardResponseSchema },
+      );
     },
     enabled: activeTab === 'leaderboard',
     refetchInterval: POLLING_INTERVAL_MS,
@@ -183,7 +198,10 @@ export function EstadisticasClient() {
       const params = buildParams();
       if (leaderboardLevel) params.set('level', leaderboardLevel);
       if (leaderboardGroupId) params.set('groupId', leaderboardGroupId);
-      return apiFetch<GamesLeaderboardResponse>(`/api/v1/stats/games-leaderboard?${params.toString()}`);
+      return apiFetch<GamesLeaderboardResponse>(
+        `/api/v1/stats/games-leaderboard?${params.toString()}`,
+        { schema: GamesLeaderboardResponseSchema },
+      );
     },
     enabled: activeTab === 'games-leaderboard',
     refetchInterval: POLLING_INTERVAL_MS,
@@ -228,7 +246,7 @@ export function EstadisticasClient() {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500 bg-zinc-100 px-3 py-1 rounded-full">
+          <span className="inline-flex items-center gap-1.5 text-xs text-zinc-700 bg-zinc-100 px-3 py-1 rounded-full">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             Actualizado {isMounted ? lastRefreshedAt.toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} (cada 30 s)
           </span>
@@ -816,7 +834,7 @@ export function EstadisticasClient() {
                         <td className="px-4 py-3">
                           <TrendBadge
                             direction={st.scoreTrend}
-                            delta={st.scoreTrendDelta}
+                            delta={st.scoreTrendDelta ?? null}
                           />
                         </td>
                         <td className="px-3 py-3">{st.activeWeeksInPeriod}</td>

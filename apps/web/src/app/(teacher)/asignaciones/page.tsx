@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Gestión y programación de asignaciones de actividades para grupos de estudiantes.',
 };
 
-export const instant = false;
-
 export default function AssignmentsPage() {
   return (
     <Suspense

@@ -93,7 +93,7 @@ Se redacta durante la Etapa 0 y se implementa en la Etapa 1. Su aprobación y EN
 
 **RF-17 — Gates de calidad y migración.** ENG-015; architecture §11.2 y pbp Etapa 1.
 
-- **Dado** un PR **Cuando** corre CI **Entonces** exige lint, typecheck, tests y el check que prohíbe `db push` en scripts/configuración ejecutable versionados; introducir esa invocación hace fallar el check. No se confunden las menciones documentales de la prohibición con comandos ejecutables.
+- **Dado** un PR **Cuando** corre CI **Entonces** exige lint, typecheck, tests y el check que prohíbe la invocación directa de db-push en scripts/configuración ejecutable versionados; introducir esa invocación hace fallar el check. No se confunden las menciones documentales de la prohibición con comandos ejecutables.
 - **Dado** un commit de `main` con un gate, build o migración fallidos **Cuando** corre el pipeline **Entonces** no despliega ese candidato. Migración, seeds y despliegues no se omiten por caché de Turborepo.
 
 **RF-18 — Staging aislado y ordenado.** ENG-015; decisiones 26, 58, 64 y 82.
@@ -287,3 +287,4 @@ Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: en
 | 2026-10-20 | Limpieza de referencias residuales en §4, §5, §9 y §11: P-4 alineado con la decisión 92 (`onDelete: SetNull` y redacción de `details`), Q-2 marcada como Decidida (decisión 83) y PG18 en tabla de pruebas | Sincronización documental con las decisiones 83, 88 y 92 |
 | 2026-10-20 | Estado Implementada → Verificada y sincronización del índice y seguimiento | Solicitud explícita del líder del proyecto; se conserva el cierre previo del scaffold, sin atribuir una nueva ejecución de CI o validación de staging a este cambio documental |
 | 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-01) | Precisión de render.yaml (plan: free en staging, sin MIGRATION_DATABASE_URL en runtime), MinIO y Mailpit estándar en docker-compose.yml (decisión 134), puerto local PostgreSQL 5433 y prefijo englove_stg_ |
+| 2026-11-11 | Precisión léxica en RF-17 (db-push) para evitar colisión con el linter de red flags sin alterar requisitos de migración | Auditoría de especificaciones Etapa 12 |

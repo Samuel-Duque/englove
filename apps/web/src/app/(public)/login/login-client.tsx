@@ -141,14 +141,14 @@ export function LoginClient() {
 
   if (isCheckingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-center">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center outline-none">
         <p className="text-zinc-600 text-lg">Comprobando tu sesión…</p>
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6 bg-zinc-50">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 bg-zinc-50 outline-none">
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight">Englove</h1>

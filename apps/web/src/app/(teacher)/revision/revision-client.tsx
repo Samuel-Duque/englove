@@ -9,10 +9,14 @@ import {
   StickerCode,
   ReviewListItemView,
   ReviewListResponse,
+  ReviewListResponseSchema,
   AttemptReviewDetailView,
+  AttemptReviewDetailViewSchema,
   GroupView,
   GroupListResponse,
+  GroupListResponseSchema,
   MediaPlaybackUrlResponse,
+  MediaPlaybackUrlResponseSchema,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
@@ -45,7 +49,10 @@ export function RevisionClient() {
   // Load groups for filter dropdown
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
+    queryFn: () =>
+      apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
+        schema: GroupListResponseSchema,
+      }),
   });
   const groups: GroupView[] = groupsQuery.data?.items ?? [];
 
@@ -59,12 +66,18 @@ export function RevisionClient() {
 
   const pendingQuery = useQuery({
     queryKey: ['reviews', 'queue', listQueryString],
-    queryFn: () => apiFetch<ReviewListResponse>(`/api/v1/reviews/queue?${listQueryString}`),
+    queryFn: () =>
+      apiFetch<ReviewListResponse>(`/api/v1/reviews/queue?${listQueryString}`, {
+        schema: ReviewListResponseSchema,
+      }),
     refetchInterval: POLLING_INTERVAL_MS,
   });
   const gradedQuery = useQuery({
     queryKey: ['reviews', 'graded', listQueryString],
-    queryFn: () => apiFetch<ReviewListResponse>(`/api/v1/reviews/graded?${listQueryString}`),
+    queryFn: () =>
+      apiFetch<ReviewListResponse>(`/api/v1/reviews/graded?${listQueryString}`, {
+        schema: ReviewListResponseSchema,
+      }),
     refetchInterval: POLLING_INTERVAL_MS,
   });
 
@@ -94,12 +107,18 @@ export function RevisionClient() {
     queryKey: ['teacher', 'review-detail', selectedAttemptId],
     queryFn: async () => {
       if (!selectedAttemptId) return null;
-      const data = await apiFetch<AttemptReviewDetailView>(`/api/v1/attempts/${selectedAttemptId}/review-detail`);
+      const data = await apiFetch<AttemptReviewDetailView>(
+        `/api/v1/attempts/${selectedAttemptId}/review-detail`,
+        { schema: AttemptReviewDetailViewSchema },
+      );
       let audio: string | null = null;
       let warning = false;
       if (data.activity.type === ActivityType.speaking && data.mediaAsset && data.mediaAsset.status !== 'deleted') {
         try {
-          const mediaRes = await apiFetch<MediaPlaybackUrlResponse>(`/api/v1/media/${data.mediaAsset.id}/url`);
+          const mediaRes = await apiFetch<MediaPlaybackUrlResponse>(
+            `/api/v1/media/${data.mediaAsset.id}/url`,
+            { schema: MediaPlaybackUrlResponseSchema },
+          );
           audio = mediaRes.url;
           warning = Boolean(mediaRes.compatibilityWarning || mediaRes.format !== 'converted');
         } catch {
@@ -141,6 +160,7 @@ export function RevisionClient() {
     try {
       const downloadRes = await apiFetch<MediaPlaybackUrlResponse>(
         `/api/v1/media/${detail.mediaAsset.id}/download-url`,
+        { schema: MediaPlaybackUrlResponseSchema },
       );
       window.open(downloadRes.url, '_blank');
     } catch (err: unknown) {
@@ -167,6 +187,7 @@ export function RevisionClient() {
         {
           method: 'POST',
           body: JSON.stringify(body),
+          schema: AttemptReviewDetailViewSchema,
         },
       ),
     onSuccess: (updated) => {
@@ -389,7 +410,7 @@ export function RevisionClient() {
             <span>
               {activeTab === 'pending' ? 'Entregas por calificar' : 'Historial de calificados'} ({currentList.length})
             </span>
-            {isLoadingList && <span className="text-blue-600 animate-pulse">Actualizando…</span>}
+            {isLoadingList && <span className="text-blue-700 font-medium animate-pulse">Actualizando…</span>}
           </div>
 
           {currentList.length === 0 ? (

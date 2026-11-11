@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Actividad en Curso',
 };
 
-export const instant = false;
-
 interface PageProps {
   params: Promise<{ attemptId: string }>;
 }

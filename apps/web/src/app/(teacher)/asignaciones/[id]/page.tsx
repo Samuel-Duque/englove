@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Detalle y seguimiento de la asignación.',
 };
 
-export const instant = false;
-
 export default async function AssignmentDetailPage({
   params,
 }: {

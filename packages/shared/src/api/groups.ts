@@ -1,16 +1,23 @@
-export interface GroupView {
-  id: string;
-  name: string;
-  archivedAt: string | null;
-  activeStudentCount: number;
-}
+import { z } from 'zod';
 
-export interface GroupListResponse {
-  items: GroupView[];
-  total: number;
-  offset: number;
-  limit: number;
-}
+export const GroupViewSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  archivedAt: z.string().nullable().optional(),
+  activeStudentCount: z.number().int().nonnegative().default(0),
+});
+
+export type GroupView = z.infer<typeof GroupViewSchema>;
+
+export const GroupListResponseSchema = z.object({
+  items: z.array(GroupViewSchema),
+  total: z.number().int(),
+  offset: z.number().int().optional(),
+  limit: z.number().int().optional(),
+});
+
+export type GroupListResponse = z.infer<typeof GroupListResponseSchema>;
 
 export interface GroupListQuery {
   offset?: number;
@@ -26,20 +33,26 @@ export interface UpdateGroupInput {
   name: string;
 }
 
-export interface MembershipView {
-  id: string;
-  groupId: string;
-  groupName: string;
-  joinedAt: string;
-  leftAt: string | null;
-}
+export const MembershipViewSchema = z.object({
+  id: z.string(),
+  groupId: z.string(),
+  groupName: z.string(),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  joinedAt: z.string(),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  leftAt: z.string().nullable(),
+});
 
-export interface MembershipListResponse {
-  items: MembershipView[];
-  total: number;
-  offset: number;
-  limit: number;
-}
+export type MembershipView = z.infer<typeof MembershipViewSchema>;
+
+export const MembershipListResponseSchema = z.object({
+  items: z.array(MembershipViewSchema),
+  total: z.number().int(),
+  offset: z.number().int().optional(),
+  limit: z.number().int().optional(),
+});
+
+export type MembershipListResponse = z.infer<typeof MembershipListResponseSchema>;
 
 export interface TransferStudentGroupInput {
   groupId: string;

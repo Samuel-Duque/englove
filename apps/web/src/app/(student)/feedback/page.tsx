@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Calificaciones, comentarios de tu profesora y stickers obtenidos en tus actividades.',
 };
 
-export const instant = false;
-
 export default function StudentFeedbackPage() {
   return (
     <Suspense

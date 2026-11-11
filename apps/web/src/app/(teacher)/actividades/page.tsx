@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Diseño y gestión de contenido pedagógico, ejercicios y microjuegos.',
 };
 
-export const instant = false;
-
 export default function ActivitiesCatalogPage() {
   return (
     <Suspense

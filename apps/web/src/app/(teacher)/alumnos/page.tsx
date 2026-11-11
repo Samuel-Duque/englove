@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Administración de alumnos, solicitudes de inscripción y cuentas bloqueadas.',
 };
 
-export const instant = false;
-
 export default function StudentsManagementPage() {
   return (
     <Suspense

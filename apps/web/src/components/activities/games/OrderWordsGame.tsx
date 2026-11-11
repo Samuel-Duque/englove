@@ -61,6 +61,7 @@ export function OrderWordsGame({
     }
     return [];
   });
+  const [liveStatus, setLiveStatus] = useState<string>('');
 
   const tokenMap = useMemo(() => {
     const map = new Map<string, { id: string; text: string }>();
@@ -80,6 +81,8 @@ export function OrderWordsGame({
     if (tokenIds.includes(tokenId)) return;
     const next = [...tokenIds, tokenId];
     setTokenIds(next);
+    const tok = tokenMap.get(tokenId);
+    setLiveStatus(`Palabra ${tok?.text ?? ''} añadida a la oración`);
     onEvent?.({ itemId: 'tokenIds', answer: next });
   };
 
@@ -88,12 +91,16 @@ export function OrderWordsGame({
     const next = [...tokenIds];
     next.splice(atIndex, 0, tokenId);
     setTokenIds(next);
+    const tok = tokenMap.get(tokenId);
+    setLiveStatus(`Palabra ${tok?.text ?? ''} insertada en la posición ${atIndex + 1}`);
     onEvent?.({ itemId: 'tokenIds', answer: next });
   };
 
   const handleRemoveToken = (tokenId: string) => {
     const next = tokenIds.filter((id) => id !== tokenId);
     setTokenIds(next);
+    const tok = tokenMap.get(tokenId);
+    setLiveStatus(`Palabra ${tok?.text ?? ''} devuelta al banco`);
     onEvent?.({ itemId: 'tokenIds', answer: next });
   };
 
@@ -112,6 +119,8 @@ export function OrderWordsGame({
     if (moved) {
       next.splice(toIndex, 0, moved);
       setTokenIds(next);
+      const tok = tokenMap.get(moved);
+      setLiveStatus(`Palabra ${tok?.text ?? ''} movida a la posición ${toIndex + 1}`);
       onEvent?.({ itemId: 'tokenIds', answer: next });
     }
   };
@@ -181,6 +190,11 @@ export function OrderWordsGame({
         </div>
       )}
 
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
+
       {config.instructions && (
         <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
@@ -221,7 +235,7 @@ export function OrderWordsGame({
           {tokenIds.length === 0 ? (
             <p
               className={`text-xs sm:text-sm font-semibold text-center select-none ${
-                isKids ? 'text-amber-900/60' : 'text-zinc-400'
+                isKids ? 'text-amber-950 font-medium' : 'text-zinc-400'
               }`}
             >
               Arrastra o toca palabras del banco hacia aquí para construir la frase.
@@ -304,8 +318,8 @@ export function OrderWordsGame({
           onClick={handleComplete}
           className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
             isKids
-              ? 'bg-amber-500 hover:bg-amber-600 text-white'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
           Comprobar y finalizar ✨
@@ -442,9 +456,9 @@ function DraggablePlacedToken({
             e.stopPropagation();
             onMoveToken(index, index - 1);
           }}
-          className="text-xs text-amber-700 hover:text-amber-900 px-1 font-bold cursor-pointer"
+          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
           title="Mover a la izquierda"
-          aria-label="Mover a la izquierda"
+          aria-label={`Mover ${text} a la izquierda`}
         >
           ←
         </button>
@@ -458,9 +472,9 @@ function DraggablePlacedToken({
             e.stopPropagation();
             onMoveToken(index, index + 1);
           }}
-          className="text-xs text-amber-700 hover:text-amber-900 px-1 font-bold cursor-pointer"
+          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
           title="Mover a la derecha"
-          aria-label="Mover a la derecha"
+          aria-label={`Mover ${text} a la derecha`}
         >
           →
         </button>
@@ -473,7 +487,7 @@ function DraggablePlacedToken({
           e.stopPropagation();
           onRemoveToken(id);
         }}
-        className="text-xs text-rose-600 hover:text-rose-800 font-black px-1.5 py-0.5 rounded-md ml-1 cursor-pointer"
+        className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-rose-600 hover:text-rose-800 font-black p-1 rounded-md ml-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500"
         title="Devolver al banco"
         aria-label={`Devolver ${text} al banco`}
       >

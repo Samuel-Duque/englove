@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Detalle, historial académico y gestión del estudiante.',
 };
 
-export const instant = false;
-
 export default async function StudentDetailPage({
   params,
 }: {

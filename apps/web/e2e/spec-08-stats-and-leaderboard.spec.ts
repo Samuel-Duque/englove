@@ -187,7 +187,7 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     // 1.2 Verificar KPIs y Alerta de inactividad de 14 días
     await expect(page.locator('p:has-text("4.2"), p:has-text("4,2")').first()).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=85%').first()).toBeVisible();
-    await expect(page.locator('text=Alertas de inactividad (últimas 2 semanas sin práctica)')).toBeVisible();
+    await expect(page.locator('text=Alumnos en riesgo de deserción o abandono')).toBeVisible();
     await expect(page.locator('text=Sebastián Inactivo')).toBeVisible();
     await expect(page.locator('text=16 días')).toBeVisible();
 
@@ -205,7 +205,7 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     await monthlyBtn.click();
 
     // 1.4 Cambiar a pestaña Leaderboard Privado y probar filtros
-    await page.click('button:has-text("Leaderboard Privado")');
+    await page.click('button:has-text("Leaderboard de Notas")');
     await expect(page.locator('text=Aviso de confidencialidad docente')).toBeVisible();
     await expect(page.locator('text=Ana Sofía')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=Santiago Ruiz')).toBeVisible();
@@ -293,6 +293,6 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     await expect(page.locator('text=Activa ✓').first()).toBeVisible();
     await expect(page.locator('text=Perdón aplicado 🛡️')).toBeVisible();
     await expect(page.locator('text=Colors and Animals')).toBeVisible();
-    await expect(page.locator('text=5.0')).toBeVisible();
+    await expect(page.locator('*:has-text("5,0"), *:has-text("5.0")').first()).toBeVisible();
   });
 });

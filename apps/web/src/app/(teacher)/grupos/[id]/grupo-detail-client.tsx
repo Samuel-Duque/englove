@@ -4,7 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GroupView, StudentListResponse } from '@englove/shared';
+import {
+  GroupView,
+  GroupViewSchema,
+  StudentListResponse,
+  StudentListResponseSchema,
+} from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { ConfirmDialog } from '../../../../components/ui/modal';
 
@@ -28,12 +33,18 @@ export function GrupoDetailClient({ id }: { id: string }) {
 
   const groupQuery = useQuery({
     queryKey: ['teacher', 'group', id],
-    queryFn: () => apiFetch<GroupView>(`/api/v1/groups/${id}`),
+    queryFn: () =>
+      apiFetch<GroupView>(`/api/v1/groups/${id}`, {
+        schema: GroupViewSchema,
+      }),
   });
 
   const membersQuery = useQuery({
     queryKey: ['teacher', 'group', id, 'members'],
-    queryFn: () => apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`),
+    queryFn: () =>
+      apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`, {
+        schema: StudentListResponseSchema,
+      }),
   });
 
   useEffect(() => {
@@ -47,6 +58,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
       apiFetch<GroupView>(`/api/v1/groups/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name }),
+        schema: GroupViewSchema,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'group', id], updated);
@@ -73,6 +85,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
     mutationFn: () =>
       apiFetch<GroupView>(`/api/v1/groups/${id}/archive`, {
         method: 'POST',
+        schema: GroupViewSchema,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'group', id], updated);

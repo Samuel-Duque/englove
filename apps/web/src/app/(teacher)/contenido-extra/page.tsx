@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Gestión docente de enlaces y recursos pedagógicos externos.',
 };
 
-export const instant = false;
-
 export default function ContenidoExtraPage() {
   return (
     <Suspense

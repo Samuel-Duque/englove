@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Diseñador de nuevas actividades pedagógicas para estudiantes.',
 };
 
-export const instant = false;
-
 export default function NuevaActividadPage() {
   return (
     <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando editor de actividad…</div>}>

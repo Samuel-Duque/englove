@@ -1,4 +1,3 @@
-import type { z } from '@englove/shared';
 import { checkAppMinVersion } from './pwa-manager';
 import { requestSharedRefresh } from './auth-session';
 
@@ -31,7 +30,7 @@ export const getApiBaseUrl = (): string => {
 export { requestSharedRefresh };
 
 export interface ApiFetchOptions<T = unknown> extends RequestInit {
-  schema?: z.ZodType<T>;
+  schema?: { parse: (val: unknown) => T };
 }
 
 export async function apiFetch<T>(

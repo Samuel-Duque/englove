@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Mi Progreso',
 };
 
-export const instant = false;
-
 export default function ProgresoPage() {
   return (
     <Suspense

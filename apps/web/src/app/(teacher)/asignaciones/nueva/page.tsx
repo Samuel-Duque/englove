@@ -7,8 +7,6 @@ export const metadata: Metadata = {
   description: 'Programa una nueva actividad para un grupo de estudiantes.',
 };
 
-export const instant = false;
-
 export default function NewAssignmentPage() {
   return (
     <Suspense

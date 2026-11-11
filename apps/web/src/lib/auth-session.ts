@@ -1,7 +1,8 @@
-import type { SessionView, StudentProfileView } from '@englove/shared';
+import { StudentProfileViewSchema, type SessionView, type StudentProfileView } from '@englove/shared';
 import { apiFetch } from './api';
 import { resumeOfflineQueueAfterAuth } from './offline-queue';
 import { syncUserSegment } from './user-segment';
+import { checkAppMinVersion } from './pwa-manager';
 
 let inFlightPromise: Promise<SessionView | null> | null = null;
 let cachedSession: SessionView | null = null;
@@ -36,6 +37,10 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
+      const minVersionSession = res.headers?.get?.('x-app-min-version');
+      if (minVersionSession && typeof window !== 'undefined') {
+        checkAppMinVersion(minVersionSession);
+      }
       if (res.status === 401) {
         cachedSession = null;
         return null;
@@ -91,6 +96,11 @@ export async function requestSharedRefresh(): Promise<boolean> {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
+
+      const minVersionRefresh = res.headers?.get?.('x-app-min-version');
+      if (minVersionRefresh && typeof window !== 'undefined') {
+        checkAppMinVersion(minVersionRefresh);
+      }
 
       if (res.status === 401) {
         cachedSession = null;
@@ -214,7 +224,9 @@ export async function fetchSharedProfile(force: boolean = false): Promise<Studen
 
   inFlightProfilePromise = (async () => {
     try {
-      const data = await apiFetch<StudentProfileView>('/api/v1/me');
+      const data = await apiFetch<StudentProfileView>('/api/v1/me', {
+        schema: StudentProfileViewSchema,
+      });
       cachedProfile = { data, timestamp: Date.now() };
       return data;
     } catch {

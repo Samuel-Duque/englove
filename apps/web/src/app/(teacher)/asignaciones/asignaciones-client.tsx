@@ -6,8 +6,10 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   AssignmentListResponse,
+  AssignmentListResponseSchema,
   AssignmentAvailability,
   GroupListResponse,
+  GroupListResponseSchema,
   ActivityType,
   formatBogotaDateTime,
 } from '@englove/shared';
@@ -70,7 +72,10 @@ export function AsignacionesClient() {
   // Load all groups (including archived ones for historical filter, SPEC-04 RF-9)
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'all'],
-    queryFn: () => apiFetch<GroupListResponse>('/api/v1/groups?limit=100'),
+    queryFn: () =>
+      apiFetch<GroupListResponse>('/api/v1/groups?limit=100', {
+        schema: GroupListResponseSchema,
+      }),
   });
 
   const assignmentsQuery = useQuery({
@@ -84,7 +89,9 @@ export function AsignacionesClient() {
         params.set('availability', selectedAvailability);
       }
       params.set('limit', '100');
-      return apiFetch<AssignmentListResponse>(`/api/v1/assignments?${params.toString()}`);
+      return apiFetch<AssignmentListResponse>(`/api/v1/assignments?${params.toString()}`, {
+        schema: AssignmentListResponseSchema,
+      });
     },
   });
 

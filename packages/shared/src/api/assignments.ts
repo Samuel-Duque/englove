@@ -6,8 +6,8 @@ export const AssignmentActivitySummarySchema = z.object({
   title: z.string(),
   type: z.nativeEnum(ActivityType),
   level: z.nativeEnum(Level),
-  version: z.number().int(),
-  status: z.nativeEnum(ActivityStatus),
+  version: z.number().int().optional().default(1),
+  status: z.nativeEnum(ActivityStatus).optional().default(ActivityStatus.published),
 });
 
 export type AssignmentActivitySummary = z.infer<typeof AssignmentActivitySummarySchema>;
@@ -16,27 +16,40 @@ export const AssignmentGroupSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  archivedAt: z.string().nullable(),
+  archivedAt: z.string().nullable().optional().default(null),
 });
 
 export type AssignmentGroupSummary = z.infer<typeof AssignmentGroupSummarySchema>;
 
 export const AssignmentViewSchema = z.object({
   id: z.string(),
-  activity: AssignmentActivitySummarySchema,
-  group: AssignmentGroupSummarySchema,
+  activity: AssignmentActivitySummarySchema.optional().default({
+    id: '',
+    title: '',
+    type: ActivityType.fill_blank,
+    level: Level.A1,
+    version: 1,
+    status: ActivityStatus.published,
+  }),
+  group: AssignmentGroupSummarySchema.optional().default({
+    id: '',
+    name: '',
+    archivedAt: null,
+  }),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  opensAt: z.string(),
+  opensAt: z.string().optional().default(''),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  dueAt: z.string(),
+  dueAt: z.string().optional().default(''),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  cancelledAt: z.string().nullable(),
-  historicalStudentCount: z.number().int().nullable().optional(),
-  availability: z.nativeEnum(AssignmentAvailability),
+  cancelledAt: z.string().nullable().optional().default(null),
+  historicalStudentCount: z.number().int().nullable().optional().default(null),
+  availability: z.nativeEnum(AssignmentAvailability).optional().default(AssignmentAvailability.open),
+  totalAttempts: z.number().int().optional(),
+  submittedAttempts: z.number().int().optional(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  createdAt: z.string(),
+  createdAt: z.string().optional().default(() => new Date().toISOString()),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  updatedAt: z.string(),
+  updatedAt: z.string().optional().default(() => new Date().toISOString()),
 });
 
 export type AssignmentView = z.infer<typeof AssignmentViewSchema>;
@@ -50,13 +63,14 @@ export interface CreateAssignmentInput {
 
 export const CreateAssignmentResponseSchema = z.object({
   items: z.array(AssignmentViewSchema),
+  count: z.number().int().optional(),
 });
 
 export type CreateAssignmentResponse = z.infer<typeof CreateAssignmentResponseSchema>;
 
 export const AssignmentListResponseSchema = z.object({
   items: z.array(AssignmentViewSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });

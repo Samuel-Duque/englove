@@ -35,21 +35,21 @@ export const ExternalResourceItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   url: z.string(),
-  description: z.string().nullable(),
-  level: z.nativeEnum(Level).nullable(),
-  position: z.number().int(),
-  createdBy: z.string(),
+  description: z.string().nullable().optional().default(null),
+  level: z.nativeEnum(Level).nullable().optional().default(null),
+  position: z.number().int().optional().default(0),
+  createdBy: z.string().optional().default(''),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  createdAt: z.string(),
+  createdAt: z.string().optional().default(() => new Date().toISOString()),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  updatedAt: z.string(),
+  updatedAt: z.string().optional().default(() => new Date().toISOString()),
 });
 
 export type ExternalResourceItem = z.infer<typeof ExternalResourceItemSchema>;
 
 export const ExternalResourceListResponseSchema = z.object({
   items: z.array(ExternalResourceItemSchema),
-  total: z.number().int().optional(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });

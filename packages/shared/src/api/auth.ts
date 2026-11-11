@@ -12,15 +12,17 @@ export type SessionUser = z.infer<typeof SessionUserSchema>;
 
 export const SessionStudentSchema = z.object({
   id: z.string(),
-  ageSegment: z.nativeEnum(AgeSegment),
-  canSwitchInterface: z.boolean(),
+  ageSegment: z.nativeEnum(AgeSegment).optional().default(AgeSegment.kids),
+  canSwitchInterface: z.boolean().optional().default(false),
+  level: z.string().nullable().optional(),
 });
 
 export type SessionStudent = z.infer<typeof SessionStudentSchema>;
 
 export const SessionViewSchema = z.object({
   user: SessionUserSchema,
-  student: SessionStudentSchema.nullable(),
+  student: SessionStudentSchema.nullable().optional().default(null),
+  organizationId: z.string().optional(),
 });
 
 export type SessionView = z.infer<typeof SessionViewSchema>;

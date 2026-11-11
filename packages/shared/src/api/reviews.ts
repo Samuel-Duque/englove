@@ -57,7 +57,7 @@ export const ReviewAssignmentViewSchema = z.object({
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
   dueAt: z.string(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  cancelledAt: z.string().nullable(),
+  cancelledAt: z.string().nullable().optional().default(null),
 });
 
 export type ReviewAssignmentView = z.infer<typeof ReviewAssignmentViewSchema>;
@@ -67,32 +67,32 @@ export const ReviewAttemptSummaryViewSchema = z.object({
   attemptNumber: z.number().int(),
   status: z.nativeEnum(AttemptStatus),
   // guardrails-ignore G-C02: campo de solo lectura en respuesta devuelta por el servidor
-  score: z.number().nullable(),
-  stars: z.number().int(),
+  score: z.number().nullable().optional().default(null),
+  stars: z.number().int().optional().default(0),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  finishedAt: z.string().nullable(),
+  finishedAt: z.string().nullable().optional().default(null),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  gradedAt: z.string().nullable(),
+  gradedAt: z.string().nullable().optional().default(null),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  retryGrantedAt: z.string().nullable(),
+  retryGrantedAt: z.string().nullable().optional().default(null),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  retryExtendUntil: z.string().nullable(),
+  retryExtendUntil: z.string().nullable().optional().default(null),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  effectiveDueAt: z.string(),
-  canGrantRetry: z.boolean(),
+  effectiveDueAt: z.string().optional().default(''),
+  canGrantRetry: z.boolean().optional().default(false),
 });
 
 export type ReviewAttemptSummaryView = z.infer<typeof ReviewAttemptSummaryViewSchema>;
 
 export const ReviewFeedbackViewSchema = z.object({
-  id: z.string(),
-  comment: z.string().nullable(),
-  stickers: z.array(StickerCodeSchema),
-  reviewerId: z.string(),
+  id: z.string().optional().default(''),
+  comment: z.string().nullable().optional().default(null),
+  stickers: z.array(StickerCodeSchema).default([]),
+  reviewerId: z.string().optional().default(''),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  createdAt: z.string(),
+  createdAt: z.string().optional().default(() => new Date().toISOString()),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  updatedAt: z.string(),
+  updatedAt: z.string().optional().default(() => new Date().toISOString()),
 });
 
 export type ReviewFeedbackView = z.infer<typeof ReviewFeedbackViewSchema>;
@@ -100,10 +100,10 @@ export type ReviewFeedbackView = z.infer<typeof ReviewFeedbackViewSchema>;
 export const ReviewMediaAssetViewSchema = z.object({
   id: z.string(),
   status: z.nativeEnum(MediaAssetStatus),
-  durationSeconds: z.number().nullable(),
-  isConverted: z.boolean(),
+  durationSeconds: z.number().nullable().optional().default(null),
+  isConverted: z.boolean().optional().default(false),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  retentionUntil: z.string().nullable(),
+  retentionUntil: z.string().nullable().optional().default(null),
 });
 
 export type ReviewMediaAssetView = z.infer<typeof ReviewMediaAssetViewSchema>;
@@ -114,15 +114,15 @@ export const ReviewListItemViewSchema = z.object({
   activity: ReviewActivityViewSchema,
   assignment: ReviewAssignmentViewSchema,
   attempt: ReviewAttemptSummaryViewSchema,
-  review: ReviewFeedbackViewSchema.nullable(),
-  mediaAsset: ReviewMediaAssetViewSchema.nullable(),
+  review: ReviewFeedbackViewSchema.nullable().optional().default(null),
+  mediaAsset: ReviewMediaAssetViewSchema.nullable().optional().default(null),
 });
 
 export type ReviewListItemView = z.infer<typeof ReviewListItemViewSchema>;
 
 export const ReviewListResponseSchema = z.object({
   items: z.array(ReviewListItemViewSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });
@@ -147,20 +147,22 @@ export const AttemptHistoryItemViewSchema = z.object({
   attemptNumber: z.number().int(),
   status: z.nativeEnum(AttemptStatus),
   // guardrails-ignore G-C02: campo de solo lectura en respuesta devuelta por el servidor
-  score: z.number().nullable(),
-  stars: z.number().int(),
+  score: z.number().nullable().optional().default(null),
+  stars: z.number().int().optional().default(0),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  finishedAt: z.string().nullable(),
+  finishedAt: z.string().nullable().optional().default(null),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  gradedAt: z.string().nullable(),
+  gradedAt: z.string().nullable().optional().default(null),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  retryGrantedAt: z.string().nullable(),
+  retryGrantedAt: z.string().nullable().optional().default(null),
   review: z
     .object({
-      comment: z.string().nullable(),
-      stickers: z.array(StickerCodeSchema),
+      comment: z.string().nullable().optional().default(null),
+      stickers: z.array(StickerCodeSchema).default([]),
     })
-    .nullable(),
+    .nullable()
+    .optional()
+    .default(null),
 });
 
 export type AttemptHistoryItemView = z.infer<typeof AttemptHistoryItemViewSchema>;
@@ -206,14 +208,14 @@ export const StudentFeedbackAttemptViewSchema = z.object({
   score: z.number(),
   stars: z.number().int(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  gradedAt: z.string(),
-  comment: z.string().nullable(),
+  gradedAt: z.string().optional().default(''),
+  comment: z.string().nullable().optional(),
   stickers: z
     .array(
       z.object({
-        code: StickerCodeSchema,
-        label: z.string(),
-        emoji: z.string(),
+        code: z.string(),
+        label: z.string().optional().default(''),
+        emoji: z.string().optional().default('⭐'),
       }),
     )
     .default([]),
@@ -228,7 +230,7 @@ export const StudentFeedbackItemViewSchema = z.object({
   latestAttempt: StudentFeedbackAttemptViewSchema,
   hasAvailableRetry: z.boolean(),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  effectiveDueAt: z.string(),
+  effectiveDueAt: z.string().optional().default(''),
   attempts: z.array(StudentFeedbackAttemptViewSchema).default([]),
 });
 
@@ -236,6 +238,7 @@ export type StudentFeedbackItemView = z.infer<typeof StudentFeedbackItemViewSche
 
 export const StudentFeedbackListResponseSchema = z.object({
   items: z.array(StudentFeedbackItemViewSchema),
+  total: z.number().int().optional(),
 });
 
 export type StudentFeedbackListResponse = z.infer<typeof StudentFeedbackListResponseSchema>;

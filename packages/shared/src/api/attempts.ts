@@ -50,7 +50,7 @@ export type StudentGameCard = z.infer<typeof StudentGameCardSchema>;
 
 export const StudentGamesListResponseSchema = z.object({
   items: z.array(StudentGameCardSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });
@@ -88,8 +88,8 @@ export type BadgeAwardView = z.infer<typeof BadgeAwardViewSchema>;
 
 export const CompletionViewSchema = z.object({
   attempt: AttemptViewSchema,
-  correction: z.record(z.string(), z.unknown()).nullable(),
-  newBadges: z.array(BadgeAwardViewSchema),
+  correction: z.record(z.string(), z.unknown()).nullable().optional().default(null),
+  newBadges: z.array(BadgeAwardViewSchema).optional().default([]),
 });
 
 export type CompletionView = z.infer<typeof CompletionViewSchema>;
@@ -122,7 +122,7 @@ export type AssignmentCard = z.infer<typeof AssignmentCardSchema>;
 
 export const AssignmentCardListResponseSchema = z.object({
   items: z.array(AssignmentCardSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });
@@ -167,21 +167,29 @@ export const StudentProgressActivityItemSchema = z.object({
   activityTitle: z.string().optional(),
   attemptNumber: z.number().int().optional(),
   // guardrails-ignore G-C02: campo de solo lectura en respuesta devuelta por el servidor
-  score: z.number(),
-  stars: z.number().int(),
+  score: z.number().nullable().optional().default(0),
+  stars: z.number().int().optional().default(0),
 });
 
 export type StudentProgressActivityItem = z.infer<typeof StudentProgressActivityItemSchema>;
 
 export const StudentProgressViewSchema = z.object({
-  activities: z.array(StudentProgressActivityItemSchema),
-  badges: z.array(BadgeAwardViewSchema),
-  streak: z.object({
-    weeks: z.number().int(),
-    forgivenessAvailable: z.boolean(),
-    activeWeeksSinceForgivenessUsed: z.number().int(),
-    periodKey: z.string().nullable(),
-  }),
+  activities: z.array(StudentProgressActivityItemSchema).default([]),
+  badges: z.array(BadgeAwardViewSchema).default([]),
+  streak: z
+    .object({
+      weeks: z.number().int().optional().default(0),
+      forgivenessAvailable: z.boolean().optional().default(false),
+      activeWeeksSinceForgivenessUsed: z.number().int().optional().default(0),
+      periodKey: z.string().nullable().optional().default(null),
+    })
+    .optional()
+    .default({
+      weeks: 0,
+      forgivenessAvailable: false,
+      activeWeeksSinceForgivenessUsed: 0,
+      periodKey: null,
+    }),
 });
 
 export type StudentProgressView = z.infer<typeof StudentProgressViewSchema>;

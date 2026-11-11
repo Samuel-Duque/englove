@@ -22,7 +22,7 @@ export type StudentView = z.infer<typeof StudentViewSchema>;
 
 export const StudentListResponseSchema = z.object({
   items: z.array(StudentViewSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });

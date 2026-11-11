@@ -12,7 +12,7 @@ export type GroupView = z.infer<typeof GroupViewSchema>;
 
 export const GroupListResponseSchema = z.object({
   items: z.array(GroupViewSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });
@@ -47,7 +47,7 @@ export type MembershipView = z.infer<typeof MembershipViewSchema>;
 
 export const MembershipListResponseSchema = z.object({
   items: z.array(MembershipViewSchema),
-  total: z.number().int(),
+  total: z.number().int().optional().default(0),
   offset: z.number().int().optional(),
   limit: z.number().int().optional(),
 });

@@ -65,7 +65,7 @@ export function NuevaAsignacionClient() {
         ),
         apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100'),
       ]);
-      setActivities(actData.items);
+      setActivities(actData.items.filter((a) => a.type !== ActivityType.game));
       setGroups(grpData.items);
 
       // Default dates: opens tomorrow at 08:00, due in 7 days at 18:00 (Bogota time)
@@ -390,7 +390,6 @@ export function NuevaAsignacionClient() {
                 <option value={ActivityType.fill_blank}>Rellenar huecos</option>
                 <option value={ActivityType.open_question}>Pregunta abierta</option>
                 <option value={ActivityType.speaking}>Speaking</option>
-                <option value={ActivityType.game}>Microjuego</option>
                 <option value={ActivityType.exam}>Examen</option>
               </select>
             </div>

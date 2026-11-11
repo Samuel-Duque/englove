@@ -183,7 +183,7 @@ export function ProgresoClient() {
                             {'★'.repeat(act.stars) + '☆'.repeat(3 - act.stars)}
                           </div>
                           <span className="text-xs font-black text-amber-950">
-                            {Number(act.score).toFixed(1)} / 5.0
+                            {Number(act.score).toFixed(1).replace('.', ',')} / 5,0
                           </span>
                         </div>
                       ) : (

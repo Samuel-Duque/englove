@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -11,7 +11,9 @@ import {
   calculateDragDropScore,
   calculateTimedChoiceScore,
   reconstructMemoryPlays,
-  scoreToStars,
+  scoreToGameStars,
+  getGameMotivationMessage,
+  AgeSegment,
   MatchSolution,
   OrderWordsSettings,
   OrderWordsSolution,
@@ -26,7 +28,6 @@ import { OrderWordsGame } from './games/OrderWordsGame';
 import { DragDropGame } from './games/DragDropGame';
 import { MemoryGame } from './games/MemoryGame';
 import { TimedChoiceGame } from './games/TimedChoiceGame';
-import { loadMotionTheme } from '../../lib/motion';
 
 export interface SimulatedResult {
   score: number;
@@ -37,11 +38,6 @@ export interface SimulatedResult {
 export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
   const { config, previewMode = false, onComplete } = props;
   const [simulatedResult, setSimulatedResult] = useState<SimulatedResult | null>(null);
-
-  // Dynamic chunk loading of age-specific motion presets (RF-10, ENG-086)
-  useEffect(() => {
-    void loadMotionTheme(props.theme || 'kids');
-  }, [props.theme]);
 
   // In previewMode, simulate scoring in-memory without making network calls
   const handlePreviewComplete = (finalAnswers: GameAnswers) => {
@@ -79,15 +75,14 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
     }
 
     const score = Math.round(fraction * 5 * 10) / 10;
-    const stars = scoreToStars(score);
+    const stars = scoreToGameStars(score);
+    const ageSegment = props.theme === 'teens' ? AgeSegment.teens : AgeSegment.kids;
+    const message = getGameMotivationMessage(score, ageSegment);
 
     setSimulatedResult({
       score,
       stars,
-      message:
-        score >= 3.0
-          ? '¡Excelente partida simulada!'
-          : 'Partida completada. Modo previsualización.',
+      message,
     });
 
     onComplete?.(finalAnswers);
@@ -150,21 +145,20 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
       )}
       {previewMode && (
         <div className="mb-4 space-y-2">
-          <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center shadow-xs">
-            👀 Vista previa: no se guardan respuestas (0 llamadas a la API)
+          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold text-center shadow-xs">
+            Modo de prueba — este intento no se guarda
           </div>
           {simulatedResult && (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center justify-between shadow-xs">
               <div>
                 <p className="text-xs font-black uppercase tracking-wider text-emerald-800">
-                  Resultado simulado en memoria:
+                  Resultado de prueba:
                 </p>
                 <p className="text-base font-extrabold">{simulatedResult.message}</p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black">{simulatedResult.score.toFixed(1)} / 5.0</span>
-                <div className="text-amber-500 text-lg">
-                  {'⭐'.repeat(simulatedResult.stars)}
+                <div className="text-amber-500 text-xl font-bold">
+                  {'★'.repeat(simulatedResult.stars) + '☆'.repeat(3 - simulatedResult.stars)}
                 </div>
               </div>
             </div>

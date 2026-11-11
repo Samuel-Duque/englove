@@ -26,6 +26,20 @@ export default function TerminosPage() {
           </p>
         </header>
 
+        <div
+          role="status"
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 text-sm flex items-start gap-3"
+        >
+          <span className="text-xl shrink-0" aria-hidden="true">
+            ⚠️
+          </span>
+          <div>
+            <strong className="font-bold">Aviso legal provisional:</strong> Este documento es un
+            borrador informativo para el piloto educativo de Englove y se encuentra pendiente de
+            validación jurídica definitiva antes del lanzamiento oficial.
+          </div>
+        </div>
+
         <section className="space-y-4 text-zinc-700 leading-relaxed text-sm sm:text-base">
           <h2 className="text-xl font-bold text-zinc-900">1. Propósito de la Plataforma</h2>
           <p>

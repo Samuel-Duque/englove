@@ -8,6 +8,7 @@ export interface UploadAudioBlobParams {
   origin: string;
   attemptId: string;
   blob: Blob;
+  attemptToken?: string;
   fetchFn?: FetchFn;
 }
 
@@ -30,14 +31,23 @@ export async function uploadAudioBlob({
   origin,
   attemptId,
   blob,
+  attemptToken,
   fetchFn = fetch,
 }: UploadAudioBlobParams): Promise<string> {
   const mimeType = blob.type || 'audio/webm';
   const input: MediaUploadUrlInput = { attemptId, mimeType, sizeBytes: blob.size };
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Origin: origin,
+  };
+  if (attemptToken) {
+    headers['x-attempt-token'] = attemptToken;
+  }
+
   let presignedRes = await fetchFn(`${apiUrl}/api/v1/media/upload-url`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: origin },
+    headers,
     credentials: 'include',
     body: JSON.stringify(input),
   });
@@ -47,7 +57,7 @@ export async function uploadAudioBlob({
     if (refreshed) {
       presignedRes = await fetchFn(`${apiUrl}/api/v1/media/upload-url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: origin },
+        headers,
         credentials: 'include',
         body: JSON.stringify(input),
       });

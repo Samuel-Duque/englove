@@ -17,6 +17,7 @@ import { AccessibleModal } from '../../../components/ui/modal';
 
 interface ActivityEditorProps {
   initialActivity?: ActivityEditor;
+  onActivityUpdated?: (activity: ActivityEditor) => void;
 }
 
 type GameMechanicType = 'match' | 'order_words' | 'drag_drop' | 'memory' | 'timed_choice';
@@ -35,15 +36,82 @@ function getStringProp(obj: unknown, key: string, fallback = ''): string {
   return fallback;
 }
 
+export function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export interface FormOption {
+  id: string;
+  text: string;
+}
+
+export interface FormBlank {
+  id: string;
+  options: FormOption[];
+  correctOptionId: string;
+}
+
 export interface FormSentenceItem {
+  id: string;
   prompt: string;
-  option1: string;
-  option2: string;
-  correctOption: 'opt1' | 'opt2';
+  blanks: FormBlank[];
   weight?: string;
 }
 
-function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
+export function buildSentencePromptWithMarkers(rawPrompt: string, blanks: FormBlank[]): string {
+  let prompt = rawPrompt.trim();
+  const blankIdSet = new Set(blanks.map((b) => b.id));
+  const usedBlankIds = new Set<string>();
+
+  // Find all markers in the prompt
+  const markers = prompt.match(/\{\{([^}]+)\}\}/g) || [];
+  let nextUnassignedIdx = 0;
+
+  const getNextUnassignedBlankId = (): string | null => {
+    while (nextUnassignedIdx < blanks.length) {
+      const b = blanks[nextUnassignedIdx++];
+      if (b && !usedBlankIds.has(b.id)) {
+        return b.id;
+      }
+    }
+    return null;
+  };
+
+  for (const m of markers) {
+    const inner = m.slice(2, -2).trim();
+    if (blankIdSet.has(inner) && !usedBlankIds.has(inner)) {
+      usedBlankIds.add(inner);
+    } else {
+      const targetId = getNextUnassignedBlankId();
+      if (targetId) {
+        prompt = prompt.replace(m, `{{${targetId}}}`);
+        usedBlankIds.add(targetId);
+      } else {
+        // Orphaned or duplicate marker with no blanks left: remove cleanly
+        prompt = prompt.replace(m, '');
+      }
+    }
+  }
+
+  // Ensure every blank has its marker in the prompt exactly once
+  for (const b of blanks) {
+    if (!usedBlankIds.has(b.id) && !prompt.includes(`{{${b.id}}}`)) {
+      prompt = `${prompt} {{${b.id}}}`.trim();
+      usedBlankIds.add(b.id);
+    }
+  }
+
+  return prompt.replace(/\s+/g, ' ').trim();
+}
+
+export function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
   const rec = asRecord(cfg);
   if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
     const akRec = asRecord(ak);
@@ -54,54 +122,86 @@ function parseInitialFillBlankItems(cfg: unknown, ak: unknown): FormSentenceItem
     for (const rawItem of rec['items']) {
       const item = asRecord(rawItem);
       if (!item) continue;
-      const itemId = typeof item['id'] === 'string' ? item['id'] : '';
+      const itemId = typeof item['id'] === 'string' && item['id'] ? item['id'] : generateUuid();
       const prompt = typeof item['prompt'] === 'string' ? item['prompt'] : '';
-      let opt1 = 'cat';
-      let opt2 = 'dog';
-      let correct: 'opt1' | 'opt2' = 'opt1';
+
+      const blanks: FormBlank[] = [];
+      const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
 
       if (Array.isArray(item['blanks']) && item['blanks'].length > 0) {
-        const blank = asRecord(item['blanks'][0]);
-        if (blank) {
-          const blankId = typeof blank['id'] === 'string' ? blank['id'] : '';
-          if (Array.isArray(blank['options'])) {
-            const o1 = asRecord(blank['options'][0]);
-            const o2 = asRecord(blank['options'][1]);
-            if (o1 && typeof o1['text'] === 'string') opt1 = o1['text'];
-            if (o2 && typeof o2['text'] === 'string') opt2 = o2['text'];
+        for (const rawBlank of item['blanks']) {
+          const blank = asRecord(rawBlank);
+          if (!blank) continue;
+          const blankId = typeof blank['id'] === 'string' && blank['id'] ? blank['id'] : generateUuid();
+          const options: FormOption[] = [];
 
-            const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
-            const correctOptId =
-              itemSol && typeof itemSol[blankId] === 'string' ? itemSol[blankId] : null;
-            if (o2 && correctOptId === o2['id']) {
-              correct = 'opt2';
+          if (Array.isArray(blank['options']) && blank['options'].length > 0) {
+            for (const rawOpt of blank['options']) {
+              const opt = asRecord(rawOpt);
+              if (!opt) continue;
+              const optId = typeof opt['id'] === 'string' && opt['id'] ? opt['id'] : generateUuid();
+              const optText = typeof opt['text'] === 'string' ? opt['text'] : '';
+              options.push({ id: optId, text: optText });
             }
           }
+
+          while (options.length < 2) {
+            options.push({ id: generateUuid(), text: options.length === 0 ? 'Opción A' : 'Opción B' });
+          }
+
+          const correctOptId =
+            (itemSol && typeof itemSol[blankId] === 'string' && itemSol[blankId]) ||
+            options[0]?.id ||
+            '';
+
+          blanks.push({
+            id: blankId,
+            options,
+            correctOptionId: correctOptId,
+          });
         }
       }
 
+      if (blanks.length === 0) {
+        const bId = generateUuid();
+        const o1 = { id: generateUuid(), text: 'cat' };
+        const o2 = { id: generateUuid(), text: 'dog' };
+        blanks.push({
+          id: bId,
+          options: [o1, o2],
+          correctOptionId: o1.id,
+        });
+      }
+
       items.push({
+        id: itemId,
         prompt,
-        option1: opt1,
-        option2: opt2,
-        correctOption: correct,
+        blanks,
       });
     }
 
     if (items.length > 0) return items;
   }
 
+  const b1 = generateUuid();
+  const o1 = { id: generateUuid(), text: 'cat' };
+  const o2 = { id: generateUuid(), text: 'dog' };
   return [
     {
-      prompt: 'The {{blank1}} is sleeping.',
-      option1: 'cat',
-      option2: 'dog',
-      correctOption: 'opt1',
+      id: generateUuid(),
+      prompt: `The {{${b1}}} is sleeping.`,
+      blanks: [
+        {
+          id: b1,
+          options: [o1, o2],
+          correctOptionId: o1.id,
+        },
+      ],
     },
   ];
 }
 
-function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
+export function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
   const rec = asRecord(cfg);
   if (rec && Array.isArray(rec['items']) && rec['items'].length > 0) {
     const akRec = asRecord(ak);
@@ -112,38 +212,62 @@ function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
     for (const rawItem of rec['items']) {
       const item = asRecord(rawItem);
       if (!item) continue;
-      const itemId = typeof item['id'] === 'string' ? item['id'] : '';
+      const itemId = typeof item['id'] === 'string' && item['id'] ? item['id'] : generateUuid();
       const prompt = typeof item['prompt'] === 'string' ? item['prompt'] : '';
       const weight = typeof item['weight'] === 'number' ? String(item['weight']) : '50';
-      let opt1 = 'goes';
-      let opt2 = 'go';
-      let correct: 'opt1' | 'opt2' = 'opt1';
+
+      const blanks: FormBlank[] = [];
+      const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
 
       if (Array.isArray(item['blanks']) && item['blanks'].length > 0) {
-        const blank = asRecord(item['blanks'][0]);
-        if (blank) {
-          const blankId = typeof blank['id'] === 'string' ? blank['id'] : '';
-          if (Array.isArray(blank['options'])) {
-            const o1 = asRecord(blank['options'][0]);
-            const o2 = asRecord(blank['options'][1]);
-            if (o1 && typeof o1['text'] === 'string') opt1 = o1['text'];
-            if (o2 && typeof o2['text'] === 'string') opt2 = o2['text'];
+        for (const rawBlank of item['blanks']) {
+          const blank = asRecord(rawBlank);
+          if (!blank) continue;
+          const blankId = typeof blank['id'] === 'string' && blank['id'] ? blank['id'] : generateUuid();
+          const options: FormOption[] = [];
 
-            const itemSol = akItems[itemId] ? asRecord(akItems[itemId]) : null;
-            const correctOptId =
-              itemSol && typeof itemSol[blankId] === 'string' ? itemSol[blankId] : null;
-            if (o2 && correctOptId === o2['id']) {
-              correct = 'opt2';
+          if (Array.isArray(blank['options']) && blank['options'].length > 0) {
+            for (const rawOpt of blank['options']) {
+              const opt = asRecord(rawOpt);
+              if (!opt) continue;
+              const optId = typeof opt['id'] === 'string' && opt['id'] ? opt['id'] : generateUuid();
+              const optText = typeof opt['text'] === 'string' ? opt['text'] : '';
+              options.push({ id: optId, text: optText });
             }
           }
+
+          while (options.length < 2) {
+            options.push({ id: generateUuid(), text: options.length === 0 ? 'goes' : 'go' });
+          }
+
+          const correctOptId =
+            (itemSol && typeof itemSol[blankId] === 'string' && itemSol[blankId]) ||
+            options[0]?.id ||
+            '';
+
+          blanks.push({
+            id: blankId,
+            options,
+            correctOptionId: correctOptId,
+          });
         }
       }
 
+      if (blanks.length === 0) {
+        const bId = generateUuid();
+        const o1 = { id: generateUuid(), text: 'goes' };
+        const o2 = { id: generateUuid(), text: 'go' };
+        blanks.push({
+          id: bId,
+          options: [o1, o2],
+          correctOptionId: o1.id,
+        });
+      }
+
       items.push({
+        id: itemId,
         prompt,
-        option1: opt1,
-        option2: opt2,
-        correctOption: correct,
+        blanks,
         weight,
       });
     }
@@ -151,25 +275,43 @@ function parseInitialExamItems(cfg: unknown, ak: unknown): FormSentenceItem[] {
     if (items.length > 0) return items;
   }
 
+  const b1 = generateUuid();
+  const o1a = { id: generateUuid(), text: 'cat' };
+  const o1b = { id: generateUuid(), text: 'dog' };
+
+  const b2 = generateUuid();
+  const o2a = { id: generateUuid(), text: 'goes' };
+  const o2b = { id: generateUuid(), text: 'go' };
+
   return [
     {
-      prompt: 'The {{blank1}} is sleeping.',
-      option1: 'cat',
-      option2: 'dog',
-      correctOption: 'opt1',
+      id: generateUuid(),
+      prompt: `The {{${b1}}} is sleeping.`,
+      blanks: [
+        {
+          id: b1,
+          options: [o1a, o1b],
+          correctOptionId: o1a.id,
+        },
+      ],
       weight: '50',
     },
     {
-      prompt: 'She {{blank1}} to school.',
-      option1: 'goes',
-      option2: 'go',
-      correctOption: 'opt1',
+      id: generateUuid(),
+      prompt: `She {{${b2}}} to school.`,
+      blanks: [
+        {
+          id: b2,
+          options: [o2a, o2b],
+          correctOptionId: o2a.id,
+        },
+      ],
       weight: '50',
     },
   ];
 }
 
-function balanceExamWeights(items: FormSentenceItem[]): FormSentenceItem[] {
+export function balanceExamWeights(items: FormSentenceItem[]): FormSentenceItem[] {
   if (items.length === 0) return items;
   const count = items.length;
   const base = Math.floor((100 / count) * 10) / 10;
@@ -184,16 +326,237 @@ function balanceExamWeights(items: FormSentenceItem[]): FormSentenceItem[] {
   });
 }
 
-
-function generateUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+export function buildFillBlankPayloadItems(fbItems: FormSentenceItem[]): {
+  items: Array<{
+    id: string;
+    prompt: string;
+    blanks: Array<{
+      id: string;
+      options: Array<{ id: string; text: string }>;
+    }>;
+  }>;
+  answerKeyItems: Record<string, Record<string, string>>;
+} {
+  if (fbItems.length < 1) {
+    throw new Error('La actividad debe tener al menos 1 oración');
   }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+
+  const itemsPayload: Array<{
+    id: string;
+    prompt: string;
+    blanks: Array<{
+      id: string;
+      options: Array<{ id: string; text: string }>;
+    }>;
+  }> = [];
+
+  const answerKeyItems: Record<string, Record<string, string>> = {};
+
+  for (const [idx, item] of fbItems.entries()) {
+    const trimmedPrompt = item.prompt.trim();
+    if (!trimmedPrompt) {
+      throw new Error(`La oración ${idx + 1} no puede tener texto vacío`);
+    }
+    if (!item.blanks || item.blanks.length === 0) {
+      throw new Error(`La oración ${idx + 1} debe tener al menos un espacio para completar`);
+    }
+
+    const itemId = item.id || generateUuid();
+    const blanksPayload: Array<{
+      id: string;
+      options: Array<{ id: string; text: string }>;
+    }> = [];
+    const itemAnswers: Record<string, string> = {};
+
+    for (const [bIdx, blank] of item.blanks.entries()) {
+      const blankId = blank.id || generateUuid();
+      if (!blank.options || blank.options.length < 2) {
+        throw new Error(
+          `El espacio ${bIdx + 1} de la oración ${idx + 1} debe tener al menos 2 opciones`,
+        );
+      }
+      if (blank.options.length > 6) {
+        throw new Error(
+          `El espacio ${bIdx + 1} de la oración ${idx + 1} no puede tener más de 6 opciones`,
+        );
+      }
+
+      const seenTexts = new Set<string>();
+      const optionsPayload: Array<{ id: string; text: string }> = [];
+
+      for (const [oIdx, opt] of blank.options.entries()) {
+        const optText = opt.text.trim();
+        if (!optText) {
+          throw new Error(
+            `La opción ${oIdx + 1} del espacio ${bIdx + 1} de la oración ${idx + 1} no puede estar vacía`,
+          );
+        }
+        const lower = optText.toLowerCase();
+        if (seenTexts.has(lower)) {
+          throw new Error(
+            `Las opciones del espacio ${bIdx + 1} de la oración ${idx + 1} deben ser diferentes entre sí`,
+          );
+        }
+        seenTexts.add(lower);
+        optionsPayload.push({
+          id: opt.id || generateUuid(),
+          text: optText,
+        });
+      }
+
+      const matchedOpt =
+        optionsPayload.find((o) => o.id === blank.correctOptionId) || optionsPayload[0];
+      if (!matchedOpt) {
+        throw new Error(
+          `Debes seleccionar la opción correcta para el espacio ${bIdx + 1} de la oración ${idx + 1}`,
+        );
+      }
+
+      blanksPayload.push({
+        id: blankId,
+        options: optionsPayload,
+      });
+      itemAnswers[blankId] = matchedOpt.id;
+    }
+
+    const promptWithMarkers = buildSentencePromptWithMarkers(
+      trimmedPrompt,
+      blanksPayload.map((b) => ({
+        id: b.id,
+        options: b.options,
+        correctOptionId: itemAnswers[b.id] ?? b.options[0]?.id ?? '',
+      })),
+    );
+
+    itemsPayload.push({
+      id: itemId,
+      prompt: promptWithMarkers,
+      blanks: blanksPayload,
+    });
+
+    answerKeyItems[itemId] = itemAnswers;
+  }
+
+  return { items: itemsPayload, answerKeyItems };
+}
+
+export function buildExamPayloadItems(examItems: FormSentenceItem[]): {
+  items: Array<{
+    id: string;
+    weight: number;
+    prompt: string;
+    blanks: Array<{
+      id: string;
+      options: Array<{ id: string; text: string }>;
+    }>;
+  }>;
+  answerKeyItems: Record<string, Record<string, string>>;
+} {
+  if (examItems.length < 1) {
+    throw new Error('El examen debe tener al menos 1 oración');
+  }
+
+  const itemsPayload: Array<{
+    id: string;
+    weight: number;
+    prompt: string;
+    blanks: Array<{
+      id: string;
+      options: Array<{ id: string; text: string }>;
+    }>;
+  }> = [];
+
+  const answerKeyItems: Record<string, Record<string, string>> = {};
+
+  for (const [idx, item] of examItems.entries()) {
+    const trimmedPrompt = item.prompt.trim();
+    if (!trimmedPrompt) {
+      throw new Error(`La oración ${idx + 1} no puede tener texto vacío`);
+    }
+    if (!item.blanks || item.blanks.length === 0) {
+      throw new Error(`La oración ${idx + 1} debe tener al menos un espacio para completar`);
+    }
+
+    const itemId = item.id || generateUuid();
+    const blanksPayload: Array<{
+      id: string;
+      options: Array<{ id: string; text: string }>;
+    }> = [];
+    const itemAnswers: Record<string, string> = {};
+
+    for (const [bIdx, blank] of item.blanks.entries()) {
+      const blankId = blank.id || generateUuid();
+      if (!blank.options || blank.options.length < 2) {
+        throw new Error(
+          `El espacio ${bIdx + 1} de la oración ${idx + 1} debe tener al menos 2 opciones`,
+        );
+      }
+      if (blank.options.length > 6) {
+        throw new Error(
+          `El espacio ${bIdx + 1} de la oración ${idx + 1} no puede tener más de 6 opciones`,
+        );
+      }
+
+      const seenTexts = new Set<string>();
+      const optionsPayload: Array<{ id: string; text: string }> = [];
+
+      for (const [oIdx, opt] of blank.options.entries()) {
+        const optText = opt.text.trim();
+        if (!optText) {
+          throw new Error(
+            `La opción ${oIdx + 1} del espacio ${bIdx + 1} de la oración ${idx + 1} no puede estar vacía`,
+          );
+        }
+        const lower = optText.toLowerCase();
+        if (seenTexts.has(lower)) {
+          throw new Error(
+            `Las opciones del espacio ${bIdx + 1} de la oración ${idx + 1} deben ser diferentes entre sí`,
+          );
+        }
+        seenTexts.add(lower);
+        optionsPayload.push({
+          id: opt.id || generateUuid(),
+          text: optText,
+        });
+      }
+
+      const matchedOpt =
+        optionsPayload.find((o) => o.id === blank.correctOptionId) || optionsPayload[0];
+      if (!matchedOpt) {
+        throw new Error(
+          `Debes seleccionar la opción correcta para el espacio ${bIdx + 1} de la oración ${idx + 1}`,
+        );
+      }
+
+      blanksPayload.push({
+        id: blankId,
+        options: optionsPayload,
+      });
+      itemAnswers[blankId] = matchedOpt.id;
+    }
+
+    const promptWithMarkers = buildSentencePromptWithMarkers(
+      trimmedPrompt,
+      blanksPayload.map((b) => ({
+        id: b.id,
+        options: b.options,
+        correctOptionId: itemAnswers[b.id] ?? b.options[0]?.id ?? '',
+      })),
+    );
+
+    const parsedWeight = parseFloat(item.weight || '0');
+
+    itemsPayload.push({
+      id: itemId,
+      weight: parsedWeight,
+      prompt: promptWithMarkers,
+      blanks: blanksPayload,
+    });
+
+    answerKeyItems[itemId] = itemAnswers;
+  }
+
+  return { items: itemsPayload, answerKeyItems };
 }
 
 function parseInitialMatchPairs(
@@ -360,7 +723,10 @@ function parseInitialTimedChoice(
   };
 }
 
-export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps) {
+export function ActivityEditorComponent({
+  initialActivity,
+  onActivityUpdated,
+}: ActivityEditorProps) {
   const router = useRouter();
   const isEditing = Boolean(initialActivity?.id);
   const initialCfg = initialActivity?.config;
@@ -372,6 +738,9 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
   const [level, setLevel] = useState<Level>(initialActivity?.level ?? Level.A1);
   const [type, setType] = useState<ActivityType>(
     initialActivity?.type ?? ActivityType.fill_blank,
+  );
+  const [currentStatus, setCurrentStatus] = useState<ActivityStatus>(
+    initialActivity?.status ?? ActivityStatus.draft,
   );
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewTheme, setPreviewTheme] = useState<'kids' | 'teens'>('kids');
@@ -398,6 +767,153 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
   const [examItems, setExamItems] = useState<FormSentenceItem[]>(() =>
     parseInitialExamItems(initialCfg, initialAk),
   );
+
+  const createDefaultBlank = (): FormBlank => {
+    const blankId = generateUuid();
+    const opt1Id = generateUuid();
+    const opt2Id = generateUuid();
+    return {
+      id: blankId,
+      options: [
+        { id: opt1Id, text: '' },
+        { id: opt2Id, text: '' },
+      ],
+      correctOptionId: opt1Id,
+    };
+  };
+
+  const createDefaultSentence = (weight?: string): FormSentenceItem => {
+    const b = createDefaultBlank();
+    return {
+      id: generateUuid(),
+      prompt: `The cat {{${b.id}}} sleeping.`,
+      blanks: [b],
+      ...(weight !== undefined ? { weight } : {}),
+    };
+  };
+
+  const handleAddBlank = (itemIdx: number, isExam: boolean) => {
+    const newBlank = createDefaultBlank();
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIdx) return it;
+        return {
+          ...it,
+          blanks: [...it.blanks, newBlank],
+          prompt: `${it.prompt} {{${newBlank.id}}}`.trim(),
+        };
+      });
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
+
+  const handleRemoveBlank = (itemIdx: number, blankIdx: number, isExam: boolean) => {
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIdx) return it;
+        const targetBlank = it.blanks[blankIdx];
+        const updatedBlanks = it.blanks.filter((_, bI) => bI !== blankIdx);
+        const updatedPrompt = targetBlank
+          ? it.prompt.replace(`{{${targetBlank.id}}}`, '').replace(/\s+/g, ' ').trim()
+          : it.prompt;
+        return {
+          ...it,
+          blanks: updatedBlanks,
+          prompt: updatedPrompt,
+        };
+      });
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
+
+  const handleAddOption = (itemIdx: number, blankIdx: number, isExam: boolean) => {
+    const newOpt: FormOption = { id: generateUuid(), text: '' };
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIdx) return it;
+        const updatedBlanks = it.blanks.map((b, bI) => {
+          if (bI !== blankIdx) return b;
+          if (b.options.length >= 6) return b;
+          return { ...b, options: [...b.options, newOpt] };
+        });
+        return { ...it, blanks: updatedBlanks };
+      });
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
+
+  const handleRemoveOption = (
+    itemIdx: number,
+    blankIdx: number,
+    optIdx: number,
+    isExam: boolean,
+  ) => {
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIdx) return it;
+        const updatedBlanks = it.blanks.map((b, bI) => {
+          if (bI !== blankIdx) return b;
+          if (b.options.length <= 2) return b;
+          const targetOpt = b.options[optIdx];
+          const updatedOptions = b.options.filter((_, oI) => oI !== optIdx);
+          let correctId = b.correctOptionId;
+          if (targetOpt && correctId === targetOpt.id) {
+            correctId = updatedOptions[0]?.id ?? '';
+          }
+          return { ...b, options: updatedOptions, correctOptionId: correctId };
+        });
+        return { ...it, blanks: updatedBlanks };
+      });
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
+
+  const handleOptionTextChange = (
+    itemIdx: number,
+    blankIdx: number,
+    optIdx: number,
+    text: string,
+    isExam: boolean,
+  ) => {
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIdx) return it;
+        const updatedBlanks = it.blanks.map((b, bI) => {
+          if (bI !== blankIdx) return b;
+          const updatedOptions = b.options.map((o, oI) => (oI === optIdx ? { ...o, text } : o));
+          return { ...b, options: updatedOptions };
+        });
+        return { ...it, blanks: updatedBlanks };
+      });
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
+
+  const handleCorrectOptionChange = (
+    itemIdx: number,
+    blankIdx: number,
+    optId: string,
+    isExam: boolean,
+  ) => {
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => {
+        if (idx !== itemIdx) return it;
+        const updatedBlanks = it.blanks.map((b, bI) => {
+          if (bI !== blankIdx) return b;
+          return { ...b, correctOptionId: optId };
+        });
+        return { ...it, blanks: updatedBlanks };
+      });
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
+
+  const handlePromptChange = (itemIdx: number, prompt: string, isExam: boolean) => {
+    const updateList = (prev: FormSentenceItem[]) =>
+      prev.map((it, idx) => (idx === itemIdx ? { ...it, prompt } : it));
+    if (isExam) setExamItems(updateList);
+    else setFbItems(updateList);
+  };
 
   // Open Question (RFC-01: multi-pregunta abierta)
   interface OqQuestionItem {
@@ -492,69 +1008,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
     let answerKey: unknown = null;
 
     if (type === ActivityType.fill_blank) {
-      if (fbItems.length < 1) {
-        throw new Error('La actividad debe tener al menos 1 oración');
-      }
-
-      const itemsPayload: Array<{
-        id: string;
-        prompt: string;
-        blanks: Array<{
-          id: string;
-          options: Array<{ id: string; text: string }>;
-        }>;
-      }> = [];
-
-      const answerKeyItems: Record<string, Record<string, string>> = {};
-
-      for (const [idx, item] of fbItems.entries()) {
-        if (!item.prompt.trim()) {
-          throw new Error(`La oración ${idx + 1} no puede tener texto vacío`);
-        }
-        if (!item.option1.trim() || !item.option2.trim()) {
-          throw new Error(`Las opciones de la oración ${idx + 1} no pueden estar vacías`);
-        }
-        if (item.option1.trim().toLowerCase() === item.option2.trim().toLowerCase()) {
-          throw new Error(`Las opciones de la oración ${idx + 1} deben ser diferentes entre sí`);
-        }
-
-        const itemId = generateUuid();
-        const blankId = generateUuid();
-        const opt1Id = generateUuid();
-        const opt2Id = generateUuid();
-
-        let promptWithMarker = item.prompt.trim();
-        if (/\{\{[^}]+\}\}/.test(promptWithMarker)) {
-          let replaced = false;
-          promptWithMarker = promptWithMarker.replace(/\{\{[^}]+\}\}/g, () => {
-            if (!replaced) {
-              replaced = true;
-              return `{{${blankId}}}`;
-            }
-            return '';
-          });
-        } else {
-          promptWithMarker = `${promptWithMarker} {{${blankId}}}`;
-        }
-
-        itemsPayload.push({
-          id: itemId,
-          prompt: promptWithMarker,
-          blanks: [
-            {
-              id: blankId,
-              options: [
-                { id: opt1Id, text: item.option1.trim() },
-                { id: opt2Id, text: item.option2.trim() },
-              ],
-            },
-          ],
-        });
-
-        answerKeyItems[itemId] = {
-          [blankId]: item.correctOption === 'opt1' ? opt1Id : opt2Id,
-        };
-      }
+      const { items: itemsPayload, answerKeyItems } = buildFillBlankPayloadItems(fbItems);
 
       config = {
         instructions: fbInstructions.trim() || undefined,
@@ -607,76 +1061,9 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
       };
       answerKey = null;
     } else if (type === ActivityType.exam) {
-      if (examItems.length < 1) {
-        throw new Error('El examen debe tener al menos 1 oración');
-      }
-
-      const itemsPayload: Array<{
-        id: string;
-        weight: number;
-        prompt: string;
-        blanks: Array<{
-          id: string;
-          options: Array<{ id: string; text: string }>;
-        }>;
-      }> = [];
-
-      const answerKeyItems: Record<string, Record<string, string>> = {};
-
-      for (const [idx, item] of examItems.entries()) {
-        if (!item.prompt.trim()) {
-          throw new Error(`La oración ${idx + 1} no puede tener texto vacío`);
-        }
-        if (!item.option1.trim() || !item.option2.trim()) {
-          throw new Error(`Las opciones de la oración ${idx + 1} no pueden estar vacías`);
-        }
-        if (item.option1.trim().toLowerCase() === item.option2.trim().toLowerCase()) {
-          throw new Error(`Las opciones de la oración ${idx + 1} deben ser diferentes entre sí`);
-        }
-
-        const itemId = generateUuid();
-        const blankId = generateUuid();
-        const opt1Id = generateUuid();
-        const opt2Id = generateUuid();
-
-        let promptWithMarker = item.prompt.trim();
-        if (/\{\{[^}]+\}\}/.test(promptWithMarker)) {
-          let replaced = false;
-          promptWithMarker = promptWithMarker.replace(/\{\{[^}]+\}\}/g, () => {
-            if (!replaced) {
-              replaced = true;
-              return `{{${blankId}}}`;
-            }
-            return '';
-          });
-        } else {
-          promptWithMarker = `${promptWithMarker} {{${blankId}}}`;
-        }
-
-        const weightVal = parseFloat(item.weight || '0') || 0;
-
-        itemsPayload.push({
-          id: itemId,
-          weight: weightVal,
-          prompt: promptWithMarker,
-          blanks: [
-            {
-              id: blankId,
-              options: [
-                { id: opt1Id, text: item.option1.trim() },
-                { id: opt2Id, text: item.option2.trim() },
-              ],
-            },
-          ],
-        });
-
-        answerKeyItems[itemId] = {
-          [blankId]: item.correctOption === 'opt1' ? opt1Id : opt2Id,
-        };
-      }
+      const { items: itemsPayload, answerKeyItems } = buildExamPayloadItems(examItems);
 
       config = {
-        instructions: fbInstructions.trim() || undefined,
         items: itemsPayload,
       };
 
@@ -928,6 +1315,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
             }),
           },
         );
+        setCurrentStatus(updated.status);
+        onActivityUpdated?.(updated);
         setSuccess('Actividad guardada correctamente');
         if (updated.weightsAdjusted) setWeightsAdjustedNotice(true);
       } else {
@@ -935,6 +1324,8 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
           method: 'POST',
           body: JSON.stringify(payload),
         });
+        setCurrentStatus(created.status);
+        onActivityUpdated?.(created);
         setSuccess('Actividad creada exitosamente');
         if (created.weightsAdjusted) setWeightsAdjustedNotice(true);
         router.push(`/actividades/${created.id}`);
@@ -959,9 +1350,14 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
     setSuccess(null);
 
     try {
-      await apiFetch<ActivityEditor>(`/api/v1/activities/${initialActivity.id}/publish`, {
-        method: 'POST',
-      });
+      const published = await apiFetch<ActivityEditor>(
+        `/api/v1/activities/${initialActivity.id}/publish`,
+        {
+          method: 'POST',
+        },
+      );
+      setCurrentStatus(ActivityStatus.published);
+      onActivityUpdated?.(published);
       setSuccess('¡Actividad publicada exitosamente! Ya está disponible en el catálogo.');
       router.refresh();
     } catch (err) {
@@ -978,8 +1374,6 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
       setIsSaving(false);
     }
   };
-
-  const currentStatus = initialActivity?.status ?? ActivityStatus.draft;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -1220,17 +1614,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
               </h3>
               <button
                 type="button"
-                onClick={() =>
-                  setFbItems([
-                    ...fbItems,
-                    {
-                      prompt: 'The {{blank1}} is sleeping.',
-                      option1: 'cat',
-                      option2: 'dog',
-                      correctOption: 'opt1',
-                    },
-                  ])
-                }
+                onClick={() => setFbItems([...fbItems, createDefaultSentence()])}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
               >
                 + Añadir oración
@@ -1238,7 +1622,10 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
             </div>
 
             {fbItems.map((item, idx) => (
-              <div key={idx} className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-3">
+              <div
+                key={item.id || idx}
+                className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-4"
+              >
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-zinc-800">Oración {idx + 1}</h4>
                   {fbItems.length > 1 && (
@@ -1248,101 +1635,128 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
                       aria-label={`Eliminar oración ${idx + 1}`}
                     >
-                      Eliminar
+                      Eliminar oración
                     </button>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor={`fb-prompt-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
-                    Texto con hueco: usa <code>&#123;&#123;blank1&#125;&#125;</code> para indicar el espacio
+                  <label
+                    htmlFor={`fb-prompt-${idx}`}
+                    className="block text-xs font-medium text-zinc-700 mb-1"
+                  >
+                    Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
                   </label>
-                  <input
+                  <textarea
                     id={`fb-prompt-${idx}`}
                     aria-label={`Texto con hueco oración ${idx + 1}`}
-                    type="text"
+                    rows={2}
                     value={item.prompt}
-                    onChange={(e) =>
-                      setFbItems(
-                        fbItems.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)),
-                      )
-                    }
+                    onChange={(e) => handlePromptChange(idx, e.target.value, false)}
                     className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor={`fb-opt1-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
-                      Opción 1
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id={`fb-opt1-${idx}`}
-                        aria-label={`Opción 1 oración ${idx + 1}`}
-                        type="text"
-                        value={item.option1}
-                        onChange={(e) =>
-                          setFbItems(
-                            fbItems.map((it, i) => (i === idx ? { ...it, option1: e.target.value } : it)),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`fb-correct-${idx}`}
-                          aria-label={`Marcar opción 1 como correcta para oración ${idx + 1}`}
-                          checked={item.correctOption === 'opt1'}
-                          onChange={() =>
-                            setFbItems(
-                              fbItems.map((it, i) =>
-                                i === idx ? { ...it, correctOption: 'opt1' } : it,
-                              ),
-                            )
-                          }
-                        />
-                        Correcta
-                      </label>
-                    </div>
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-700">
+                      Huecos de esta oración ({item.blanks.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleAddBlank(idx, false)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                    >
+                      + Añadir hueco
+                    </button>
                   </div>
 
-                  <div>
-                    <label htmlFor={`fb-opt2-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
-                      Opción 2
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id={`fb-opt2-${idx}`}
-                        aria-label={`Opción 2 oración ${idx + 1}`}
-                        type="text"
-                        value={item.option2}
-                        onChange={(e) =>
-                          setFbItems(
-                            fbItems.map((it, i) => (i === idx ? { ...it, option2: e.target.value } : it)),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`fb-correct-${idx}`}
-                          aria-label={`Marcar opción 2 como correcta para oración ${idx + 1}`}
-                          checked={item.correctOption === 'opt2'}
-                          onChange={() =>
-                            setFbItems(
-                              fbItems.map((it, i) =>
-                                i === idx ? { ...it, correctOption: 'opt2' } : it,
-                              ),
-                            )
-                          }
-                        />
-                        Correcta
-                      </label>
+                  {item.blanks.map((blank, bIdx) => (
+                    <div
+                      key={blank.id || bIdx}
+                      className="rounded-md border border-zinc-200 bg-white p-3 space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-zinc-800">
+                            Espacio {bIdx + 1}
+                          </span>
+                          <code className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-mono">
+                            &#123;&#123;{blank.id}&#125;&#125;
+                          </code>
+                        </div>
+                        {item.blanks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBlank(idx, bIdx, false)}
+                            className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                            aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
+                          >
+                            Eliminar espacio
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-zinc-600">
+                            Opciones ({blank.options.length}/6):
+                          </span>
+                          {blank.options.length < 6 && (
+                            <button
+                              type="button"
+                              onClick={() => handleAddOption(idx, bIdx, false)}
+                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                            >
+                              + Opción
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {blank.options.map((opt, oIdx) => (
+                            <div
+                              key={opt.id || oIdx}
+                              className="flex items-center gap-2 bg-zinc-50 p-2 rounded border border-zinc-200"
+                            >
+                              <input
+                                type="text"
+                                aria-label={`Opción ${oIdx + 1} espacio ${bIdx + 1} oración ${idx + 1}`}
+                                placeholder={`Opción ${oIdx + 1}`}
+                                value={opt.text}
+                                onChange={(e) =>
+                                  handleOptionTextChange(idx, bIdx, oIdx, e.target.value, false)
+                                }
+                                className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-900 bg-white"
+                              />
+                              <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer shrink-0">
+                                <input
+                                  type="radio"
+                                  name={`correct-fb-${item.id || idx}-${blank.id || bIdx}`}
+                                  aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
+                                  checked={blank.correctOptionId === opt.id}
+                                  onChange={() =>
+                                    handleCorrectOptionChange(idx, bIdx, opt.id, false)
+                                  }
+                                />
+                                Correcta
+                              </label>
+                              {blank.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOption(idx, bIdx, oIdx, false)}
+                                  className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer px-1"
+                                  aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -1391,16 +1805,7 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                 <button
                   type="button"
                   onClick={() => {
-                    const newItems: FormSentenceItem[] = [
-                      ...examItems,
-                      {
-                        prompt: 'She {{blank1}} to school.',
-                        option1: 'goes',
-                        option2: 'go',
-                        correctOption: 'opt1',
-                        weight: '0',
-                      },
-                    ];
+                    const newItems = [...examItems, createDefaultSentence('0')];
                     setExamItems(balanceExamWeights(newItems));
                   }}
                   className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
@@ -1411,7 +1816,10 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
             </div>
 
             {examItems.map((item, idx) => (
-              <div key={idx} className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-3">
+              <div
+                key={item.id || idx}
+                className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-4"
+              >
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-zinc-800">
                     Oración {idx + 1} (Peso: {item.weight || '0'}%)
@@ -1426,13 +1834,16 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                       className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
                       aria-label={`Eliminar oración ${idx + 1}`}
                     >
-                      Eliminar
+                      Eliminar oración
                     </button>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor={`exam-w${idx + 1}`} className="block text-xs font-medium text-zinc-700 mb-1">
+                  <label
+                    htmlFor={`exam-w${idx + 1}`}
+                    className="block text-xs font-medium text-zinc-700 mb-1"
+                  >
                     Peso de la oración (0-100%):
                   </label>
                   <input
@@ -1453,99 +1864,122 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
                 </div>
 
                 <div>
-                  <label htmlFor={`exam-prompt-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
-                    Texto con hueco: usa <code>&#123;&#123;blank1&#125;&#125;</code> para indicar el espacio
+                  <label
+                    htmlFor={`exam-prompt-${idx}`}
+                    className="block text-xs font-medium text-zinc-700 mb-1"
+                  >
+                    Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
                   </label>
-                  <input
+                  <textarea
                     id={`exam-prompt-${idx}`}
                     aria-label={`Texto con hueco oración ${idx + 1}`}
-                    type="text"
+                    rows={2}
                     value={item.prompt}
-                    onChange={(e) =>
-                      setExamItems(
-                        examItems.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)),
-                      )
-                    }
+                    onChange={(e) => handlePromptChange(idx, e.target.value, true)}
                     className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor={`exam-opt1-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
-                      Opción 1
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id={`exam-opt1-${idx}`}
-                        aria-label={`Opción 1 oración ${idx + 1}`}
-                        type="text"
-                        value={item.option1}
-                        onChange={(e) =>
-                          setExamItems(
-                            examItems.map((it, i) =>
-                              i === idx ? { ...it, option1: e.target.value } : it,
-                            ),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`exam-correct-${idx}`}
-                          aria-label={`Marcar opción 1 como correcta para oración ${idx + 1}`}
-                          checked={item.correctOption === 'opt1'}
-                          onChange={() =>
-                            setExamItems(
-                              examItems.map((it, i) =>
-                                i === idx ? { ...it, correctOption: 'opt1' } : it,
-                              ),
-                            )
-                          }
-                        />
-                        Correcta
-                      </label>
-                    </div>
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-700">
+                      Huecos de esta oración ({item.blanks.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleAddBlank(idx, true)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                    >
+                      + Añadir hueco
+                    </button>
                   </div>
 
-                  <div>
-                    <label htmlFor={`exam-opt2-${idx}`} className="block text-xs font-medium text-zinc-700 mb-1">
-                      Opción 2
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id={`exam-opt2-${idx}`}
-                        aria-label={`Opción 2 oración ${idx + 1}`}
-                        type="text"
-                        value={item.option2}
-                        onChange={(e) =>
-                          setExamItems(
-                            examItems.map((it, i) =>
-                              i === idx ? { ...it, option2: e.target.value } : it,
-                            ),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`exam-correct-${idx}`}
-                          aria-label={`Marcar opción 2 como correcta para oración ${idx + 1}`}
-                          checked={item.correctOption === 'opt2'}
-                          onChange={() =>
-                            setExamItems(
-                              examItems.map((it, i) =>
-                                i === idx ? { ...it, correctOption: 'opt2' } : it,
-                              ),
-                            )
-                          }
-                        />
-                        Correcta
-                      </label>
+                  {item.blanks.map((blank, bIdx) => (
+                    <div
+                      key={blank.id || bIdx}
+                      className="rounded-md border border-zinc-200 bg-white p-3 space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-zinc-800">
+                            Espacio {bIdx + 1}
+                          </span>
+                          <code className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-mono">
+                            &#123;&#123;{blank.id}&#125;&#125;
+                          </code>
+                        </div>
+                        {item.blanks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBlank(idx, bIdx, true)}
+                            className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                            aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
+                          >
+                            Eliminar espacio
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-zinc-600">
+                            Opciones ({blank.options.length}/6):
+                          </span>
+                          {blank.options.length < 6 && (
+                            <button
+                              type="button"
+                              onClick={() => handleAddOption(idx, bIdx, true)}
+                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                            >
+                              + Opción
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {blank.options.map((opt, oIdx) => (
+                            <div
+                              key={opt.id || oIdx}
+                              className="flex items-center gap-2 bg-zinc-50 p-2 rounded border border-zinc-200"
+                            >
+                              <input
+                                type="text"
+                                aria-label={`Opción ${oIdx + 1} espacio ${bIdx + 1} oración ${idx + 1}`}
+                                placeholder={`Opción ${oIdx + 1}`}
+                                value={opt.text}
+                                onChange={(e) =>
+                                  handleOptionTextChange(idx, bIdx, oIdx, e.target.value, true)
+                                }
+                                className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-900 bg-white"
+                              />
+                              <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer shrink-0">
+                                <input
+                                  type="radio"
+                                  name={`correct-exam-${item.id || idx}-${blank.id || bIdx}`}
+                                  aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
+                                  checked={blank.correctOptionId === opt.id}
+                                  onChange={() =>
+                                    handleCorrectOptionChange(idx, bIdx, opt.id, true)
+                                  }
+                                />
+                                Correcta
+                              </label>
+                              {blank.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOption(idx, bIdx, oIdx, true)}
+                                  className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer px-1"
+                                  aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -2288,26 +2722,37 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
             <h3 className="text-xl font-black text-amber-950">{title || 'Actividad sin título'}</h3>
 
             {type === ActivityType.fill_blank && (
-              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
+              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
                 <p className="text-xs font-bold text-zinc-500">
                   Oraciones con huecos ({fbItems.length})
                 </p>
                 {fbItems.map((it, idx) => (
                   <div
-                    key={idx}
-                    className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0 space-y-1"
+                    key={it.id || idx}
+                    className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
                   >
                     <p className="text-base text-zinc-800">
                       {idx + 1}. {it.prompt}
                     </p>
-                    <div className="flex gap-2 pt-1">
-                      <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
-                        A: {it.option1}
-                      </span>
-                      <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
-                        B: {it.option2}
-                      </span>
-                    </div>
+                    {it.blanks.map((b, bIdx) => (
+                      <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
+                        <p className="text-xs font-semibold text-zinc-600">Espacio {bIdx + 1}:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {b.options.map((opt) => (
+                            <span
+                              key={opt.id}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                opt.id === b.correctOptionId
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-amber-100 text-amber-900'
+                              }`}
+                            >
+                              {opt.text} {opt.id === b.correctOptionId ? '✓' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -2350,27 +2795,40 @@ export function ActivityEditorComponent({ initialActivity }: ActivityEditorProps
             )}
 
             {type === ActivityType.exam && (
-              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200">
+              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
                 <p className="text-xs font-bold text-zinc-500">
                   Ítems ponderados del examen ({examItems.length})
                 </p>
                 {examItems.map((it, idx) => (
                   <div
-                    key={idx}
-                    className="border-b border-amber-100 last:border-b-0 pb-2 last:pb-0"
+                    key={it.id || idx}
+                    className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
                   >
-                    <p className="text-sm text-zinc-800">
+                    <p className="text-sm font-medium text-zinc-800">
                       {idx + 1}. {it.prompt}{' '}
-                      <span className="text-xs text-zinc-500">({it.weight || '0'}%)</span>
+                      <span className="text-xs text-zinc-500 font-normal">
+                        ({it.weight || '0'}%)
+                      </span>
                     </p>
-                    <div className="flex gap-2 pt-1">
-                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
-                        A: {it.option1}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-xs">
-                        B: {it.option2}
-                      </span>
-                    </div>
+                    {it.blanks.map((b, bIdx) => (
+                      <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
+                        <p className="text-xs font-semibold text-zinc-600">Espacio {bIdx + 1}:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {b.options.map((opt) => (
+                            <span
+                              key={opt.id}
+                              className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                opt.id === b.correctOptionId
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-amber-50 text-amber-900 border border-amber-200'
+                              }`}
+                            >
+                              {opt.text} {opt.id === b.correctOptionId ? '✓' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>

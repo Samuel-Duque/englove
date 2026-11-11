@@ -48,20 +48,20 @@ function TrendBadge({
   if (direction === 'up') {
     return (
       <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-xs font-semibold">
-        ↑ +{delta.toFixed(1)}
+        ↑ +{delta.toFixed(1).replace('.', ',')}
       </span>
     );
   }
   if (direction === 'down') {
     return (
       <span className="inline-flex items-center gap-0.5 text-rose-700 bg-rose-50 px-2 py-0.5 rounded text-xs font-semibold">
-        ↓ {delta.toFixed(1)}
+        ↓ {delta.toFixed(1).replace('.', ',')}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-0.5 text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded text-xs font-medium">
-      → {delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}
+      → {delta >= 0 ? `+${delta.toFixed(1).replace('.', ',')}` : delta.toFixed(1).replace('.', ',')}
     </span>
   );
 }

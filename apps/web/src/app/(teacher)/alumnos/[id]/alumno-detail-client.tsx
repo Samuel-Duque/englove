@@ -52,6 +52,21 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // UNCONSUMED_RETRY_WARNING Modal state (P0-09, QA-07, Decision 131)
+  const [retryWarningModalOpen, setRetryWarningModalOpen] = useState(false);
+  const [affectedActivities, setAffectedActivities] = useState<
+    Array<
+      | string
+      | {
+          assignmentId: string;
+          activityId: string;
+          activityTitle: string;
+          effectiveDueAt: string;
+          attemptNumber: number;
+        }
+    >
+  >([]);
+
   const handleDeleteStudent = async () => {
     setIsDeletingStudent(true);
     setDeleteError(null);
@@ -109,8 +124,8 @@ export function AlumnoDetailClient({ id }: { id: string }) {
     loadStudentData();
   }, [loadStudentData]);
 
-  // Group transfer handler
-  const handleGroupTransfer = async () => {
+  // Group transfer handler (P0-09, QA-07, RF-9, Decision 131)
+  const handleGroupTransfer = async (confirmLostRetries = false) => {
     if (!selectedDestinationGroup || selectedDestinationGroup === student?.groupId) return;
 
     setIsTransferringGroup(true);
@@ -120,16 +135,39 @@ export function AlumnoDetailClient({ id }: { id: string }) {
     try {
       const updated = await apiFetch<StudentView>(`/api/v1/students/${id}/group`, {
         method: 'PUT',
-        body: JSON.stringify({ groupId: selectedDestinationGroup }),
+        body: JSON.stringify({
+          groupId: selectedDestinationGroup,
+          confirmLostRetries,
+        }),
       });
       setStudent(updated);
       setSuccess('Grupo actualizado exitosamente.');
+      setRetryWarningModalOpen(false);
+      setAffectedActivities([]);
       // Refresh memberships history
       const memData = await apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`);
       setMemberships(memData.items);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === 'GROUP_ARCHIVED') {
+        if (err.code === 'UNCONSUMED_RETRY_WARNING') {
+          const detailsObj = err.details as
+            | {
+                affectedActivities?: Array<
+                  | string
+                  | {
+                      assignmentId: string;
+                      activityId: string;
+                      activityTitle: string;
+                      effectiveDueAt: string;
+                      attemptNumber: number;
+                    }
+                >;
+              }
+            | undefined;
+          const acts = Array.isArray(detailsObj?.affectedActivities) ? detailsObj.affectedActivities : [];
+          setAffectedActivities(acts);
+          setRetryWarningModalOpen(true);
+        } else if (err.code === 'GROUP_ARCHIVED') {
           setError('El grupo de destino está archivado y no acepta alumnos.');
         } else if (err.code === 'STUDENT_NOT_APPROVED') {
           setError('El alumno debe estar aprobado para ser trasladado.');
@@ -491,7 +529,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
             </select>
             <button
               type="button"
-              onClick={handleGroupTransfer}
+              onClick={() => void handleGroupTransfer(false)}
               disabled={isTransferringGroup || selectedDestinationGroup === student.groupId}
               className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 min-h-[40px]"
             >
@@ -715,6 +753,79 @@ export function AlumnoDetailClient({ id }: { id: string }) {
             className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 text-xs shadow-xs disabled:opacity-50"
           >
             {isDeletingStudent ? 'Dando de baja…' : 'Confirmar baja definitiva'}
+          </button>
+        </div>
+      </AccessibleModal>
+
+      {/* Confirm Lost Retries Modal (P0-09, QA-07, RF-9, Decision 131) */}
+      <AccessibleModal
+        isOpen={retryWarningModalOpen}
+        onClose={() => {
+          if (!isTransferringGroup) {
+            setRetryWarningModalOpen(false);
+            setAffectedActivities([]);
+          }
+        }}
+        title="⚠️ Pérdida definitiva de reintentos"
+        maxWidthClass="max-w-lg"
+      >
+        <div className="text-xs text-zinc-700 space-y-3 leading-relaxed">
+          <p className="font-semibold text-zinc-900">
+            El alumno tiene reintentos concedidos pendientes en este grupo. Si confirmas el traslado,
+            <span className="text-rose-700 font-bold"> la pérdida de los reintentos concedidos será definitiva e irreversible</span>,
+            incluso si el alumno es trasladado de vuelta a este grupo en el futuro (QA-07).
+          </p>
+
+          {affectedActivities.length > 0 && (
+            <div className="border border-amber-200 bg-amber-50/70 rounded-xl p-3 space-y-1.5">
+              <p className="font-bold text-amber-950">Actividades con reintentos que se revocarán:</p>
+              <ul className="list-disc pl-4 space-y-1 text-zinc-800">
+                {affectedActivities.map((act, actIdx) => {
+                  const isString = typeof act === 'string';
+                  const key = !isString && (act as { assignmentId?: string }).assignmentId
+                    ? (act as { assignmentId: string }).assignmentId
+                    : String(actIdx);
+                  const title = isString
+                    ? act
+                    : (act as { activityTitle?: string }).activityTitle || 'Actividad';
+                  const attemptNum =
+                    !isString && (act as { attemptNumber?: number }).attemptNumber
+                      ? ` (Intento #${(act as { attemptNumber: number }).attemptNumber})`
+                      : '';
+                  return (
+                    <li key={key}>
+                      <span className="font-semibold">{title}</span>{attemptNum}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-zinc-600">
+            ¿Confirmas el traslado de grupo asumiendo la revocación permanente de estos reintentos?
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
+          <button
+            type="button"
+            disabled={isTransferringGroup}
+            onClick={() => {
+              setRetryWarningModalOpen(false);
+              setAffectedActivities([]);
+            }}
+            className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={isTransferringGroup}
+            onClick={() => handleGroupTransfer(true)}
+            className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 text-xs shadow-xs disabled:opacity-50"
+          >
+            {isTransferringGroup ? 'Trasladando…' : 'Confirmar traslado definitivo'}
           </button>
         </div>
       </AccessibleModal>

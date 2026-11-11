@@ -7,6 +7,8 @@ import {
   StudentGameCard,
   StudentGamesListResponse,
   GAME_MECHANIC_LABELS,
+  scoreToGameStars,
+  getGameMotivationMessage,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
@@ -231,7 +233,17 @@ export function JuegosClient() {
           {filteredGames.map((game) => {
             const isCompleted = game.status === 'completed';
             const isInProgress = game.status === 'in_progress';
-            const stars = game.bestStars ?? game.lastStars ?? 0;
+            const stars =
+              game.bestStars ??
+              (game.bestScore !== undefined && game.bestScore !== null
+                ? scoreToGameStars(game.bestScore)
+                : (game.lastStars ?? 0));
+            const motivationMessage =
+              game.bestScore !== undefined && game.bestScore !== null
+                ? getGameMotivationMessage(game.bestScore)
+                : stars > 0
+                  ? getGameMotivationMessage(stars === 3 ? 5.0 : stars === 2 ? 3.5 : 1.5)
+                  : null;
             const isStarting = startingGameId === game.id;
             const isSpeaking = speakingGameId === game.id;
 
@@ -287,6 +299,12 @@ export function JuegosClient() {
                         </span>
                       )}
                     </div>
+
+                    {motivationMessage && (
+                      <p className="text-xs font-semibold text-amber-900/80 leading-snug">
+                        {motivationMessage}
+                      </p>
+                    )}
                   </div>
                 </div>
 

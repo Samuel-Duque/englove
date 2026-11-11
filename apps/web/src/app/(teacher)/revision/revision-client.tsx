@@ -111,7 +111,7 @@ export function RevisionClient() {
       setDetail(data);
 
       // Initialize form fields
-      setScoreInput(data.attempt.score !== null ? data.attempt.score.toFixed(1) : '');
+      setScoreInput(data.attempt.score !== null ? data.attempt.score.toFixed(1).replace('.', ',') : '');
       setCommentInput(data.review?.comment || '');
       setSelectedStickers(data.review?.stickers || []);
       setAllowRetry(false);
@@ -193,13 +193,20 @@ export function RevisionClient() {
       };
 
       if (isPending) {
-        const parsedScore = parseFloat(scoreInput);
-        if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 5) {
-          setErrorMessage('Ingresa una calificación válida entre 0.0 y 5.0');
+        const trimmedScore = scoreInput.trim();
+        if (!/^\d+(?:[.,]\d+)?$/.test(trimmedScore)) {
+          setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
           setIsSubmitting(false);
           return;
         }
-        body.score = parsedScore;
+        const normalized = trimmedScore.replace(',', '.');
+        const parsedScore = parseFloat(normalized);
+        if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 5) {
+          setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
+          setIsSubmitting(false);
+          return;
+        }
+        body.score = Math.round(parsedScore * 10) / 10;
       }
 
       const updated = await apiFetch<AttemptReviewDetailView>(
@@ -214,7 +221,11 @@ export function RevisionClient() {
       setSuccessMessage('¡Calificación y retroalimentación guardadas exitosamente!');
       fetchList();
     } catch (err) {
-      setErrorMessage((err as ApiError)?.message || 'Error al guardar la revisión');
+      if (err instanceof ApiError && err.code === 'SCORE_OUT_OF_RANGE') {
+        setErrorMessage('La calificación debe estar entre 0,0 y 5,0.');
+      } else {
+        setErrorMessage((err as ApiError)?.message || 'Error al guardar la revisión');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -552,10 +563,12 @@ export function RevisionClient() {
                   <div className="space-y-3">
                     {detail.items.map((it, idx) => {
                       const isSpeaking = detail.activity.type === ActivityType.speaking;
-                      const rawAnswer =
-                        detail.answers[it.id] ??
-                        detail.answers['text'] ??
-                        detail.answers[detail.activity.id];
+                      const isMultiItem = detail.items.length > 1;
+                      const rawAnswer = isMultiItem
+                        ? detail.answers[it.id]
+                        : (detail.answers[it.id] ??
+                           detail.answers['text'] ??
+                           detail.answers[detail.activity.id]);
                       let displayAnswer: string | null = null;
                       if (rawAnswer !== undefined && rawAnswer !== null) {
                         if (
@@ -587,7 +600,7 @@ export function RevisionClient() {
                                 <span className="font-sans text-blue-900 font-semibold">
                                   🎙️ Grabación de voz entregada (reproduce o descarga el audio arriba).
                                 </span>
-                              ) : displayAnswer !== null ? (
+                              ) : displayAnswer !== null && displayAnswer.trim().length > 0 ? (
                                 displayAnswer
                               ) : (
                                 '(Sin respuesta registrada)'
@@ -624,13 +637,11 @@ export function RevisionClient() {
                   <div className="flex items-center gap-2">
                     <input
                       id="score-input"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="5"
+                      type="text"
+                      inputMode="decimal"
                       value={scoreInput}
                       onChange={(e) => setScoreInput(e.target.value)}
-                      placeholder="Ej. 4.5"
+                      placeholder="Ej. 4,5"
                       required
                       className="w-32 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />

@@ -45,5 +45,10 @@ export function ActividadDetailClient({ id }: { id: string }) {
     );
   }
 
-  return <ActivityEditorComponent initialActivity={activity} />;
+  return (
+    <ActivityEditorComponent
+      initialActivity={activity}
+      onActivityUpdated={(updated) => setActivity(updated)}
+    />
+  );
 }

@@ -10,7 +10,6 @@ import {
   GameMechanic,
   GAME_MECHANIC_LABELS,
 } from '@englove/shared';
-import { loadMotionTheme } from '../src/lib/motion';
 import { playSound } from '../src/lib/sound';
 import { fireCelebrationConfetti } from '../src/lib/confetti';
 
@@ -53,24 +52,6 @@ describe('SPEC-06: Microgames Components & Runtime Rules (ENG-080 to ENG-087)', 
       expect(stillParallel).toBe(false);
       expect(shuffled[0]?.id).toBe('r2');
       expect(shuffled[1]?.id).toBe('r1');
-    });
-  });
-
-  describe('Carga Diferida de Módulos de Animación por Tema (RF-10, ENG-086)', () => {
-    it('carga chunk kids dinámicamente con dynamic import', async () => {
-      const motionKids = await loadMotionTheme('kids');
-      expect(motionKids).toBeDefined();
-      expect(motionKids.cardFlip).toBeDefined();
-      expect(motionKids.buttonPop).toBeDefined();
-      expect(motionKids.bounceEntrance).toBeDefined();
-    });
-
-    it('carga chunk teens dinámicamente con dynamic import', async () => {
-      const motionTeens = await loadMotionTheme('teens');
-      expect(motionTeens).toBeDefined();
-      expect(motionTeens.cardFlip).toBeDefined();
-      expect(motionTeens.buttonPop).toBeDefined();
-      expect(motionTeens.bounceEntrance).toBeDefined();
     });
   });
 

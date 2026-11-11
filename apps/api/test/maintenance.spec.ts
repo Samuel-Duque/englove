@@ -205,10 +205,17 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
   });
 
   describe('RF-24: Revisión mensual de edad y alternancia de interfaz', () => {
+    const bogotaFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
     it('activa can_switch_interface = true al cumplir 11 años sin alterar el tema visual (age_segment)', async () => {
-      // Student is 11 years old
-      const elevenYearsAgo = new Date();
-      elevenYearsAgo.setFullYear(elevenYearsAgo.getFullYear() - 11);
+      // Student is 11 years old (civil date in UTC midnight matching Postgres @db.Date)
+      const [nowY, nowM, nowD] = bogotaFormatter.format(new Date()).split('-').map(Number);
+      const elevenYearsAgo = new Date(Date.UTC((nowY ?? 2026) - 11, (nowM ?? 1) - 1, nowD ?? 1));
 
       mockPrisma.student.findMany.mockResolvedValueOnce([
         {
@@ -231,8 +238,8 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
     it('no activa can_switch_interface si el alumno es menor de 11 años', async () => {
       // Student is 9 years old
-      const nineYearsAgo = new Date();
-      nineYearsAgo.setFullYear(nineYearsAgo.getFullYear() - 9);
+      const [nowY, nowM, nowD] = bogotaFormatter.format(new Date()).split('-').map(Number);
+      const nineYearsAgo = new Date(Date.UTC((nowY ?? 2026) - 9, (nowM ?? 1) - 1, nowD ?? 1));
 
       mockPrisma.student.findMany.mockResolvedValueOnce([
         {
@@ -250,12 +257,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
     it('evalúa fecha civil de Postgres @db.Date (UTC midnight) en America/Bogota sin desfase de un día (P2-05)', async () => {
       // Student born on exactly 11 years ago today in UTC
-      const nowBogota = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Bogota',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date());
+      const nowBogota = bogotaFormatter.format(new Date());
       const [nowY, nowM, nowD] = nowBogota.split('-').map(Number);
       const exactBirthDate = new Date(Date.UTC((nowY ?? 2026) - 11, (nowM ?? 1) - 1, nowD ?? 1));
 

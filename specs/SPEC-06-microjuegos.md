@@ -12,7 +12,7 @@
 
 Las Etapas 3 y 5 entregaron los esquemas Zod y el editor docente de las cinco mecánicas de microjuegos sobre `ActivityType = game` ([SPEC-03](./SPEC-03-gestor-de-contenidos.md)), junto con el motor de intentos, autocalificación, insignias y racha del portal del estudiante ([SPEC-05](./SPEC-05-portal-e-intentos.md)). En `SPEC-05`, el inicio de intentos sobre actividades `game` quedó resguardado tras el feature flag `games` hasta disponer de los componentes interactivos y calificadores de la Etapa 6.
 
-`SPEC-06` especifica los 5 microjuegos (`match`, `order_words`, `drag_drop`, `memory`, `timed_choice`) en React + CSS / Framer Motion bajo `ActivityRuntimeProps`, sus calificadores deterministas en servidor (`ScoringService` en escala `0.0–5.0`, validación de `min_plausible_seconds` y generación de un `Attempt` individual calificado por separado en cada partida según las decisiones 104 y 111), sonido con Web Audio API, confeti (`canvas-confetti`), carga diferida de animaciones (`motion/kids.ts` y `motion/teens.ts`) y la zona «Juegos» (`/juegos`) abierta 24/7 para práctica autónoma del estudiante sin `Assignment` ni límite de intentos (decisión 111) detrás del flag `games`. Las preguntas `Q-01` a `Q-04` quedaron cerradas por las decisiones 104 a 107 y 111.
+`SPEC-06` especifica los 5 microjuegos (`match`, `order_words`, `drag_drop`, `memory`, `timed_choice`) en React + CSS / animaciones Tailwind y Web Audio API bajo `ActivityRuntimeProps` (Decisión 105, sin Framer Motion), sus calificadores deterministas en servidor (`ScoringService` en escala `0.0–5.0`, validación de `min_plausible_seconds` y generación de un `Attempt` individual calificado por separado en cada partida según las decisiones 104 y 111), sonido con Web Audio API, confeti (`canvas-confetti`), optimización de animaciones y la zona «Juegos» (`/juegos`) abierta 24/7 para práctica autónoma del estudiante sin `Assignment` ni límite de intentos (decisión 111) detrás del flag `games`. Las preguntas `Q-01` a `Q-04` quedaron cerradas por las decisiones 104 a 107 y 111.
 
 ## 2. Alcance
 
@@ -142,7 +142,7 @@ El runner incorpora síntesis procedural nativa mediante Web Audio API para tres
 
 Tarea: `ENG-086`. Referencias: Decisión 67, `architecture §3.1`, `§3.3`, `pbp Etapa 6`.
 
-Las variantes de Framer Motion (`motion`) y presets de celebración se separan en `apps/web/src/lib/motion/kids.ts` y `apps/web/src/lib/motion/teens.ts` y se cargan con `next/dynamic` según el `ageSegment` activo.
+Las variantes de animación y presets de celebración se resuelven mediante CSS y Web Audio API (Decisión 105, sin Framer Motion) según el `ageSegment` activo.
 
 **Criterios de aceptación**:
 
@@ -253,7 +253,7 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (`CONTEXT §15`). `Q-01`, 
 
 | Pregunta cerrada | Decisión aceptada | Aplicada en |
 | --- | --- | --- |
-| `Q-01` — Nuevos intentos en `/juegos` para microjuegos ya calificados | **Decisiones 104 y 111:** los microjuegos nunca son un `Assignment`; viven abiertos 24/7 en `/juegos` para práctica autónoma y cada partida genera un `Attempt` individual (`assignment_id = null`, `activity_id` directo, `attempt_number = anterior + 1`, `previous_attempt_id`) con `graded` y `score` aparte sin límite de intentos, conservando la evolución del estudiante en el panel estadístico docente (`SPEC-08`) | `RF-7`, `RF-11`, `§4–§7`, `§9` |
+| `Q-01` — Nuevos intentos en `/juegos` para microjuegos ya calificados | **Decisiones 104 y 111:** los microjuegos nunca son un `Assignment`; viven abiertos 24/7 en `/juegos` para práctica autónoma y cada partida genera un `Attempt` individual (`assignment_id = null`, `activity_id` directo, `attempt_number = anterior + 1`, `previous_attempt_id`) con `graded` y `score` aparte sin límite de intentos (descartando intentos de prueba según la decisión 136). En el panel estadístico docente (`SPEC-08`), los juegos no alimentan promedios de notas académicas (Decisión 137), sino que se reportan en «Práctica en juegos» y en el ranking de juegos docente. | `RF-7`, `RF-11`, `§4–§7`, `§9` |
 | `Q-02` — Alternativa sin arrastre en `drag_drop` y `match` (Decisión 81) | **Decisión 105:** serie de interacción híbrida integrada de serie (`@atlaskit/pragmatic-drag-and-drop` + toque/clic en dos pasos origen → destino + teclado) | `RF-2`, `RF-4`, `§7`, `§9` |
 | `Q-03` — Recarga o corte de red en `timed_choice` (`SPEC-03 §4`) | **Decisión 106:** reiniciar el intento desde la primera pregunta (`índice 0`) y reiniciar el temporizador (`timeLimitSeconds`) para ser justos con el estudiante | `RF-6`, `RF-8`, `§4`, `§9` |
 
@@ -266,4 +266,5 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (`CONTEXT §15`). `Q-01`, 
 | 2026-10-25 | `En revisión` → `Aprobada` → `Verificada`; aprobación del líder del proyecto e implementación completa de ENG-080 a ENG-087 (scorers deterministas 0.0–5.0 en ScoringService, Attempt individual secuencial según Decisión 104, flag implausible_duration, 5 componentes de microjuegos bajo ActivityRuntimeProps, GameRenderer con simulación in-memory, audio Web Audio API, confeti, chunks diferidos kids/teens, zona /juegos) con 370/370 pruebas en verde en monorepo (58 shared, 236 api, 76 web) | Aprobación formal e implementación integral de la Etapa 6 de SDD |
 | 2026-10-26 | Actualización de dominio por **Decisión 111** (`Q-04` de `SPEC-07`): los microjuegos (`game`) nunca son un `Assignment`, sino un espacio de práctica autónoma abierto 24/7 en `/juegos` con intentos secuenciales ilimitados (`assignment_id = null`, `activity_id` directo) | Decisión 111 del líder del proyecto al aprobar `SPEC-07` |
 | 2026-11-08 | Alineación con Decisiones 130 y 136 de SPEC-11 (Etapa 12 / ENG-150): eliminación formal de endpoints con `Assignment` para juegos (`GET /me/games`, `POST /activities/:id/attempts`), esquema migrado `Attempt.activity_id` y descarte transaccional de intentos de prueba | Formalización e implementación en Etapa 12 |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-06) | Retiro de Framer Motion (decisión 105), descarte de intentos de juego de prueba (decisión 136), juegos sin aporte a notas académicas docentes (decisión 137), estrellas de práctica y catálogo /juegos autónomo |
 

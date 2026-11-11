@@ -27,13 +27,13 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
 
 - **`ENG-100` — Consultas agregadas, reglas de cálculo e índices (`< 500 ms`):**
   - Separación de fuentes (`Attempt` calificado para rendimiento; `ProgressEvent` + duraciones de `Attempt` para constancia, Decisión 71).
-  - Regla del último intento calificado (`MAX(attempt_number)` con `status = 'graded'`) en promedios agregados y serie completa por intento (`1..N`) en microjuegos individuales (`game`, Decisiones 25, 74 y 104).
+  - Regla del último intento calificado (`MAX(attempt_number)` con `status = 'graded'`) en promedios agregados y exclusión de microjuegos (`game`) de las notas académicas (Decisiones 25, 74, 104 y 137).
   - Universo de alumnos obligados por solape de `GroupMembership` con `[opens_at, due_at]` (Decisión 73), denominador congelado `Assignment.historical_student_count` en asignaciones cerradas (Decisión 34 §14), exclusión de asignaciones canceladas (`cancelled_at IS NOT NULL`) del cumplimiento conservando notas y eventos (Decisión 98), y filtro canónico `Assignment.activity.type !== 'game'` para excluir la práctica autónoma 24/7 del porcentaje de cumplimiento (Decisiones 111 y 113).
   - Recorte de duración a `expected_duration_seconds * 3`, marcas de plazo extendido y duración implausible (Decisiones 61 y 79), e índices compuestos verificados bajo `< 500 ms`.
 - **`ENG-101` — Vista general y vista por grupo con polling de 30 s:**
   - Endpoints `GET /api/v1/stats/overview` y `GET /api/v1/stats/groups/:id` con tendencia a **30 días** (`trend30d`) y **semanal** (`trend7d`, Decisión 112).
-- **`ENG-102` — Leaderboard privado para la profesora:**
-  - Endpoint `GET /api/v1/stats/leaderboard` protegido por `@Roles(Role.teacher)` (sin feature flags `stats` ni `leaderboard`, Decisiones 34 §7 y 41), con filtrado por grupo (`groupId`) y por grupos de nivel (`A1`, `A2`, `B1` o `B2`, Decisión 115).
+- **`ENG-102` — Leaderboard privado para la profesora y Ranking privado de juegos:**
+  - Endpoints `GET /api/v1/stats/leaderboard` y `GET /api/v1/stats/games-leaderboard` protegidos por `@Roles(Role.teacher)` (sin feature flags `stats` ni `leaderboard`, Decisiones 34 §7, 41 y 137), con filtrado por grupo (`groupId`), por grupos de nivel (`A1`, `A2`, `B1` o `B2`, Decisión 115) y exclusión total de `implausible_duration` en las métricas de fila del ranking de juegos (regla `QA-06`).
 - **`ENG-103` — Vista individual por estudiante y validación con la profesora:**
   - Endpoint `GET /api/v1/stats/students/:id` y vista `/estadisticas/estudiantes/[id]` con serie temporal contra el promedio del grupo, desgloses por `ActivityType` y `GameMechanic`, umbral `passing_score = 3.0`, calendario semanal ISO, racha vigente, mejor racha histórica y tiempo dedicado (diario, semanal y mensual).
 - **`ENG-104` — Job cada 3 días de resumen de pendientes por correo:**
@@ -87,7 +87,7 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
 8. **RF-8 — Leaderboard privado para la profesora y Ranking privado de juegos (`ENG-102`, ENG-162, Decisiones 115 y 137)**
    - **Dado** una petición a `GET /api/v1/stats/leaderboard` o `GET /api/v1/stats/games-leaderboard` con filtros opcionales por grupo (`groupId`), por grupos de nivel MCER (`level`: `A1`, `A2`, `B1` o `B2`) y por fechas (`from`, `to`),
    - **Cuando** el usuario autenticado tiene rol `teacher`,
-   - **Entonces** `leaderboard` devuelve `200 OK` con el ranking académico de estudiantes aprobados que cumplan el filtro (`rank`, promedio `0,0–5,0` sin `game`, actividades completadas, `currentStreakWeeks` y `badgesCount`), mientras que `games-leaderboard` devuelve el ranking privado por `gamePoints` y estrellas acumuladas (máximo 5 mejores partidas por juego); en ambos endpoints, si el usuario tiene rol `student`, responde `403 FORBIDDEN` (`AUTH_FORBIDDEN`).
+   - **Entonces** `leaderboard` devuelve `200 OK` con el ranking académico de estudiantes aprobados que cumplan el filtro (`rank`, promedio `0,0–5,0` sin `game`, actividades completadas, `currentStreakWeeks` y `badgesCount`), mientras que `games-leaderboard` devuelve el ranking privado por `gamePoints` y estrellas acumuladas (máximo 5 mejores partidas por juego), excluyendo de todas las métricas de fila cualquier intento con `implausible_duration` (regla `QA-06`); en ambos endpoints, si el usuario tiene rol `student`, responde `403 FORBIDDEN` (`AUTH_FORBIDDEN`).
 
 9. **RF-9 — Vista individual por estudiante: eje de rendimiento (`ENG-103`, Decisión 137)**
    - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/students/:id` con filtros opcionales `from`, `to`, `type` y `level`,
@@ -116,9 +116,9 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
    - **Constancia:** considera `ProgressEvent` con `type IN ('attempt_completed', 'audio_submitted')` para semanas activas, rachas, actividades completadas y alertas de inactividad, más `Attempt.finished_at - Attempt.started_at` para el tiempo dedicado. Una entrega en `pending_review` suma de inmediato en constancia (Decisión 100).
 2. **Escala `0,0–5,0`, redondeo y umbral de aprobación (Decisiones 20, 23 y 34 §5):**
    - Todos los promedios se calculan en el servidor y se redondean a 1 decimal (`Math.round(val * 10) / 10`). El umbral de aprobación es constante en el servidor en `3.0` (Decisiones 20 y 101): `score >= 3.0` es aprobada (`passed = true`).
-3. **Último intento calificado frente a serie individual en microjuegos (Decisiones 25, 74 y 104):**
+3. **Último intento calificado frente a serie individual en microjuegos (Decisiones 25, 74, 104 y 137):**
    - En los promedios agregados, cada par `(student_id, assignment_id)` aporta únicamente su intento con mayor `attempt_number` en `status = 'graded'`.
-   - En `scoreSeries` del estudiante (`RF-9`), se incluyen todos los intentos calificados (`attempt_number = 1..N`) de microjuegos (`game`) y el intento calificado vigente de asignaciones (con `usedExtendedDeadline = previous_attempt.retry_extend_until IS NOT NULL`).
+   - En `scoreSeries` del estudiante (`RF-9`), se incluyen los intentos calificados de asignaciones, excluyendo microjuegos (`game`), los cuales se reportan de forma independiente en `gamesPractice` y `games-leaderboard` sin contaminar notas académicas (Decisión 137).
 4. **Cumplimiento de asignaciones, denominador congelado y filtro de microjuegos (Decisiones 34 §14, 73, 98, 111 y 113):**
    - Universo de cumplimiento: asignaciones con `cancelled_at IS NULL` y `Activity.type !== 'game'`. Los microjuegos (`game`) nunca entran en el numerador ni en el denominador de finalización, sin alterar la nulabilidad de `Attempt.assignment_id` en Etapa 8.
    - Alumnos obligados: miembros del grupo con `joined_at <= due_at AND (left_at IS NULL OR left_at >= opens_at)`.
@@ -403,7 +403,7 @@ Bajo `apps/web/src/app/(teacher)/estadisticas/`:
 
 - **Unitarias y de integración (`apps/api/src/stats/stats.service.spec.ts`):**
   - Separación de fuentes y regla del último intento calificado (`MAX(attempt_number)` con `status = 'graded'`) en promedios agregados (`RF-1`).
-  - Serie individual de microjuegos (`game`) con todos los intentos `1..N` en `scoreSeries` y último intento calificado en agregados (`RF-1`, `RF-9`).
+  - Serie individual de microjuegos (`game`) en `gamesPractice`, exclusión de `game` de `scoreSeries` y último intento calificado de asignaciones en agregados (`RF-1`, `RF-9`).
   - Alumnos obligados por membresía solapada, denominador congelado `historical_student_count`, exclusión de canceladas del cumplimiento conservando notas y exclusión de `game` (`RF-2`).
   - Recorte de duración a `expected_duration_seconds * 3` y banderas `implausibleDuration` y `usedExtendedDeadline` (`RF-3`, `RF-9`).
   - `overview` por nivel, por grupo e `inactiveAlerts` de 14 días (`RF-5`).
@@ -416,7 +416,7 @@ Bajo `apps/web/src/app/(teacher)/estadisticas/`:
   - Paso 1: `GET /stats/overview` con regla del último intento calificado, alertas de inactividad de 14 días y exclusión de microjuegos y asignaciones canceladas de la tasa de finalización (`RF-1`, `RF-2`, `RF-5`).
   - Paso 2: `GET /stats/groups/:id` con cálculo simultáneo de tendencia cada 30 días (`trend30d`) y semanal (`trend7d`), además de ordenamiento (`RF-6`).
   - Paso 3: `GET /stats/leaderboard` con ordenamiento determinista y filtrado relacional en PostgreSQL por `groupId` y por niveles MCER (`RF-8`).
-  - Paso 4: `GET /stats/students/:id` con serie histórica completa (1..N en juegos, último en asignaciones), banderas de plazo extendido y duración implausible, y calendario ISO de 12 semanas (`RF-9`, `RF-10`).
+  - Paso 4: `GET /stats/students/:id` con serie histórica de asignaciones (excluyendo `game` de `scoreSeries`, reportado en `gamesPractice`), banderas de plazo extendido y duración implausible, y calendario ISO de 12 semanas (`RF-9`, `RF-10`).
   - Paso 5: Verificación directa de latencia en PostgreSQL real con volumen de 3 meses respondiendo los 4 endpoints en < 500 ms (`RF-4`).
   - Paso 6: Ejecución del job `teacher_pending_summary` con persistencia en `ScheduledJobRun` y ventana Bogotá de 3 días (`RF-12`).
 - **Benchmark de volumen (`apps/api/test/stats.performance.spec.ts`):**
@@ -449,3 +449,4 @@ No quedan preguntas abiertas bloqueantes. Las cuatro preguntas iniciales (`Q-01`
 | 2026-10-27 | Líder del proyecto / Agente IA | Cierre de `Q-01` a `Q-04` (Decisiones 112 a 115 de `CONTEXT.md` §14: tendencia a 30 días y semanal en grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtro por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado) y aprobación de `SPEC-08` (`Estado: Aprobada`). |
 | 2026-10-28 | Líder del proyecto / Agente IA | Verificación exhaustiva de la implementación de `SPEC-08` (`ENG-100` a `ENG-104`). Contratos compartidos (`@englove/shared`), índices en `Attempt` y `ProgressEvent`, `StatsService` y `StatsController`, cron cada 3 días de pendientes (`teacher_pending_summary`), vistas en Next.js (`/estadisticas` y `/estadisticas/estudiantes/[id]`), suites de pruebas completas (33 pruebas estadísticas en API + suite E2E de 7 pasos en PostgreSQL real Docker + 11 en web + presupuesto `< 500 ms`, 451/451 tests en monorepo) y guardrails validados con 0 errores (`Estado: Verificada`). |
 | 2026-11-08 | Líder del proyecto / Agente IA | Alineación de RF-1, RF-2, RF-4, RF-5, RF-6, RF-8, RF-9, RF-10 y RF-12 con la Decisión 137 (Etapa 12): exclusión de microjuegos de la nota académica, métricas de práctica autónoma («Práctica en juegos»), ranking privado de juegos (`GET /api/v1/stats/games-leaderboard`), omisión idempotente del cron de recordatorios cuando no hay pendientes y ajuste en el presupuesto de latencia; paso por revisión y re-verificación (`Estado: Verificada`). |
+| 2026-11-09 | Líder del proyecto / Agente IA | Alineación técnica con Etapa 12 y auditoría QA (WP-06): incorporación explícita de QA-06 (exclusión total de implausible_duration en métricas de games-leaderboard), confirmación de exclusión de microjuegos de notas académicas y de scoreSeries |

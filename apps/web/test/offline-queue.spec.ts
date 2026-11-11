@@ -249,6 +249,56 @@ describe('SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service', () => {
       expect(eventsDb[0]?.userId).toBe('user-new');
     });
 
+    it('purges orphaned events and uploads with missing or different userId (P0-05)', async () => {
+      // Enqueue event without userId
+      await enqueueEvent({
+        userId: '' as unknown as string,
+        attemptId: 'att-orphaned',
+        clientEventId: 'evt-orphaned',
+        eventType: 'answered',
+        payload: {},
+        attemptToken: 'tok-orphaned',
+      });
+      // Enqueue event for current user
+      await enqueueEvent({
+        userId: 'user-current',
+        attemptId: 'att-current',
+        clientEventId: 'evt-current',
+        eventType: 'answered',
+        payload: {},
+        attemptToken: 'tok-current',
+      });
+      // Enqueue upload without userId
+      const dummyBlob = new Blob(['data'], { type: 'audio/webm' });
+      await enqueueUpload({
+        attemptId: 'att-orphaned-up',
+        userId: '' as unknown as string,
+        blob: dummyBlob,
+        mimeType: 'audio/webm',
+        durationMs: 1000,
+        mediaId: null,
+      });
+      // Enqueue upload for current user
+      await enqueueUpload({
+        attemptId: 'att-current-up',
+        userId: 'user-current',
+        blob: dummyBlob,
+        mimeType: 'audio/webm',
+        durationMs: 1000,
+        mediaId: null,
+      });
+
+      expect(eventsDb).toHaveLength(2);
+      expect(uploadsDb).toHaveLength(2);
+
+      await purgeOtherUsersEntries('user-current');
+
+      expect(eventsDb).toHaveLength(1);
+      expect(eventsDb[0]?.userId).toBe('user-current');
+      expect(uploadsDb).toHaveLength(1);
+      expect(uploadsDb[0]?.userId).toBe('user-current');
+    });
+
     it('clears all offline queues completely on logout (RF-5)', async () => {
       await enqueueEvent({
         userId: 'user-1',

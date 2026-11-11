@@ -20,8 +20,8 @@ import { fireCelebrationConfetti } from '../../../../lib/confetti';
 import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
 import { setActiveAttemptState } from '../../../../lib/pwa-manager';
-import { enqueueEvent, enqueueUpload, triggerFlush } from '../../../../lib/offline-queue';
-import { fetchSharedProfile } from '../../../../lib/auth-session';
+import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb } from '../../../../lib/offline-queue';
+import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
 
 interface ActividadRunnerProps {
   attemptId: string;
@@ -39,7 +39,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [theme, setTheme] = useState<'kids' | 'teens'>('kids');
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string>('std-local');
+  const [currentUserId, setCurrentUserId] = useState<string>(() => {
+    return (typeof window !== 'undefined' && getSharedSession()?.user?.id) || '';
+  });
   const [hasTtsSupport, setHasTtsSupport] = useState(false);
 
   // Check TTS support (RF-22)
@@ -86,112 +88,86 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
   };
 
-  // IndexedDB persistence for offline recovery and failure retry (RF-11, RF-28, §7)
-  const saveLocalRecording = (id: string, blob: Blob): Promise<void> => {
-    if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve();
-    return new Promise((resolve) => {
-      try {
-        const req = window.indexedDB.open('englove_offline', 2);
-        req.onupgradeneeded = () => {
-          const db = req.result;
-          if (!db.objectStoreNames.contains('pendingUploads')) {
-            db.createObjectStore('pendingUploads', { keyPath: 'attemptId' });
-          }
-        };
-        req.onsuccess = () => {
-          try {
-            const db = req.result;
-            if (!db.objectStoreNames.contains('pendingUploads')) {
-              db.close();
-              return resolve();
-            }
-            const tx = db.transaction('pendingUploads', 'readwrite');
-            tx.objectStore('pendingUploads').put({ attemptId: id, blob, savedAt: Date.now() });
-            tx.oncomplete = () => { db.close(); resolve(); };
-            tx.onerror = () => { db.close(); resolve(); };
-          } catch {
-            resolve();
-          }
-        };
-        req.onerror = () => resolve();
-      } catch {
-        resolve();
+  // IndexedDB persistence for offline recovery and failure retry (RF-11, RF-28, §7, P0-05)
+  const saveLocalRecording = async (id: string, blob: Blob, userId: string): Promise<void> => {
+    const effectiveUserId = userId?.trim() || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
+    if (!effectiveUserId) {
+      console.warn('[actividad-runner] Attempted to save local recording without valid userId');
+      return;
+    }
+    try {
+      const db = await openOfflineDb();
+      if (!db.objectStoreNames.contains('pendingUploads')) {
+        db.close();
+        return;
       }
-    });
+      return new Promise<void>((resolve) => {
+        const tx = db.transaction('pendingUploads', 'readwrite');
+        tx.objectStore('pendingUploads').put({
+          attemptId: id,
+          userId: effectiveUserId,
+          blob,
+          mimeType: blob.type || 'audio/webm',
+          durationMs: 0,
+          mediaId: null,
+          createdAt: Date.now(),
+        });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); resolve(); };
+      });
+    } catch {
+      // Ignore
+    }
   };
 
-  const loadLocalRecording = (id: string): Promise<Blob | null> => {
-    if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve(null);
-    return new Promise((resolve) => {
-      try {
-        const req = window.indexedDB.open('englove_offline', 2);
-        req.onupgradeneeded = () => {
-          const db = req.result;
-          if (!db.objectStoreNames.contains('pendingUploads')) {
-            db.createObjectStore('pendingUploads', { keyPath: 'attemptId' });
-          }
-        };
-        req.onsuccess = () => {
-          try {
-            const db = req.result;
-            if (!db.objectStoreNames.contains('pendingUploads')) {
-              db.close();
-              return resolve(null);
+  const loadLocalRecording = async (id: string): Promise<Blob | null> => {
+    try {
+      const db = await openOfflineDb();
+      if (!db.objectStoreNames.contains('pendingUploads')) {
+        db.close();
+        return null;
+      }
+      return new Promise<Blob | null>((resolve) => {
+        const tx = db.transaction('pendingUploads', 'readonly');
+        const getReq = tx.objectStore('pendingUploads').get(id);
+        getReq.onsuccess = () => {
+          db.close();
+          const rec = getReq.result;
+          const activeUid = currentUserId || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
+          if (rec && rec.blob instanceof Blob) {
+            // Privacy check (P0-05): do not restore recording if belonging to another user
+            if (rec.userId && activeUid && rec.userId !== activeUid) {
+              resolve(null);
+            } else {
+              resolve(rec.blob);
             }
-            const tx = db.transaction('pendingUploads', 'readonly');
-            const getReq = tx.objectStore('pendingUploads').get(id);
-            getReq.onsuccess = () => {
-              db.close();
-              if (getReq.result && getReq.result.blob instanceof Blob) {
-                resolve(getReq.result.blob);
-              } else {
-                resolve(null);
-              }
-            };
-            getReq.onerror = () => { db.close(); resolve(null); };
-          } catch {
+          } else {
             resolve(null);
           }
         };
-        req.onerror = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
-    });
+        getReq.onerror = () => { db.close(); resolve(null); };
+      });
+    } catch {
+      return null;
+    }
   };
 
-  const clearLocalRecording = (id: string): Promise<void> => {
-    if (typeof window === 'undefined' || !('indexedDB' in window)) return Promise.resolve();
-    return new Promise((resolve) => {
-      try {
-        const req = window.indexedDB.open('englove_offline', 2);
-        req.onupgradeneeded = () => {
-          const db = req.result;
-          if (!db.objectStoreNames.contains('pendingUploads')) {
-            db.createObjectStore('pendingUploads', { keyPath: 'attemptId' });
-          }
-        };
-        req.onsuccess = () => {
-          try {
-            const db = req.result;
-            if (db.objectStoreNames.contains('pendingUploads')) {
-              const tx = db.transaction('pendingUploads', 'readwrite');
-              tx.objectStore('pendingUploads').delete(id);
-              tx.oncomplete = () => { db.close(); resolve(); };
-              tx.onerror = () => { db.close(); resolve(); };
-            } else {
-              db.close();
-              resolve();
-            }
-          } catch {
-            resolve();
-          }
-        };
-        req.onerror = () => resolve();
-      } catch {
-        resolve();
+  const clearLocalRecording = async (id: string): Promise<void> => {
+    try {
+      const db = await openOfflineDb();
+      if (!db.objectStoreNames.contains('pendingUploads')) {
+        db.close();
+        return;
       }
-    });
+      return new Promise<void>((resolve) => {
+        const tx = db.transaction('pendingUploads', 'readwrite');
+        tx.objectStore('pendingUploads').delete(id);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); resolve(); };
+      });
+    } catch {
+      // Ignore
+    }
   };
 
   // Load Attempt Runtime
@@ -206,8 +182,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           fetchSharedProfile().catch(() => null),
         ]);
         if (isMounted) {
-          if (profile?.user?.id) {
-            setCurrentUserId(profile.user.id);
+          const resolvedUserId = profile?.user?.id || getSharedSession()?.user?.id || '';
+          if (resolvedUserId) {
+            setCurrentUserId(resolvedUserId);
           }
           const ageSegment = profile?.student?.ageSegment ?? 'kids';
           setTheme(ageSegment);
@@ -337,7 +314,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         const mimeType = mediaRecorder.mimeType || preferredMime || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         setRecordedAudioBlob(audioBlob);
-        saveLocalRecording(attemptId, audioBlob);
+        saveLocalRecording(attemptId, audioBlob, currentUserId);
 
         // Stop all audio tracks
         stream.getTracks().forEach((track) => track.stop());
@@ -362,8 +339,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (timerIntervalRef.current) {
@@ -371,7 +348,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         timerIntervalRef.current = null;
       }
     }
-  };
+  }, []);
 
   const uploadAudioRecording = async (): Promise<string | null> => {
     if (!recordedAudioBlob) return mediaId;
@@ -470,7 +447,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         completeBody.answers = effectiveAnswers;
       }
 
-      const res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
+      let res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -481,10 +458,26 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         body: JSON.stringify(completeBody),
       });
 
+      if (!res.ok && res.status === 401) {
+        const refreshed = await requestSharedRefresh().catch(() => false);
+        if (refreshed) {
+          res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-attempt-token': attemptToken,
+              Origin: window.location.origin,
+            },
+            credentials: 'include',
+            body: JSON.stringify(completeBody),
+          });
+        }
+      }
+
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         if (res.status >= 400 && res.status < 500) {
-          setError(errData.message || 'Error al entregar la actividad');
+          setRunnerAlert(errData.message || 'Error al entregar la actividad');
           setIsSubmitting(false);
           return;
         }
@@ -514,8 +507,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           typeof crypto !== 'undefined' && crypto.randomUUID
             ? crypto.randomUUID()
             : `evt-comp-${Date.now()}`;
+        const effectiveUid = currentUserId || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
         await enqueueEvent({
-          userId: currentUserId,
+          userId: effectiveUid,
           attemptId,
           clientEventId: compEventId,
           eventType: 'completed',
@@ -528,7 +522,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
         if (recordedAudioBlob) {
           await enqueueUpload({
-            userId: currentUserId,
+            userId: effectiveUid,
             attemptId,
             blob: recordedAudioBlob,
             mimeType: recordedAudioBlob.type || 'audio/webm',
@@ -576,7 +570,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     );
   }
 
-  if (error || !runtime) {
+  if (!runtime) {
     return (
       <div className="py-12 max-w-lg mx-auto text-center bg-white p-8 rounded-2xl border border-rose-200 shadow-sm">
         <span className="text-4xl">⚠️</span>

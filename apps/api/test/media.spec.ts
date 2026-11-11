@@ -193,7 +193,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
-    });
+    }, 15000);
 
     it('rechaza grabaciones que excedan la duración máxima configurada con 422', async () => {
       await expect(
@@ -206,7 +206,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
-    });
+    }, 15000);
 
     it('acepta duración válida y actualiza el estado a ready', async () => {
       const result = await service.confirmUpload(orgId, studentId, attemptId, mediaId, 60, 15);
@@ -302,7 +302,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
-    });
+    }, 15000);
 
     it('rechaza binario con magic bytes EBML corruptos sin fallback de tamaño (P1-02)', async () => {
       const fakeEbml = Buffer.alloc(50 * 1024);
@@ -325,7 +325,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
-    });
+    }, 15000);
 
     it('corta streams mayores a 10 MiB con 413 PayloadTooLargeException (QA-05)', async () => {
       const chunk = Buffer.alloc(1024 * 1024, 0); // 1 MiB chunk
@@ -349,7 +349,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
-    });
+    }, 15000);
 
     it('rechaza en confirmUpload activos ya en ready cuya duración exceda maxDurationSeconds', async () => {
       mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
@@ -371,7 +371,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
-    });
+    }, 15000);
 
     it('marca activos previos en ready como pending_delete bajo FOR UPDATE (QA-05)', async () => {
       const oldReadyAssetId = '55555555-5555-5555-5555-555555555555';

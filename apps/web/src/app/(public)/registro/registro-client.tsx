@@ -62,8 +62,8 @@ export function RegistroClient() {
         });
 
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          const message = getAuthErrorMessage(data);
+          const data = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
+          const message = getAuthErrorMessage(data?.code);
           setErrorMessage(message);
           return;
         }

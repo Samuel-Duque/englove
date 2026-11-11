@@ -175,4 +175,32 @@ describe('RF-18: client-side storage hygiene on shared devices', () => {
     expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_offline');
     expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_storage');
   });
+
+  it('clears session_hint and englove_user_logged in document.cookie upon logout (P0-02, P0-05)', async () => {
+    let cookieVal = 'englove_stg_session_hint=1; englove_user_logged=1; other=abc';
+    const mockDoc = {
+      get cookie() {
+        return cookieVal;
+      },
+      set cookie(val: string) {
+        if (val.includes('max-age=0')) {
+          const name = val.split('=')[0]?.trim();
+          cookieVal = cookieVal
+            .split(';')
+            .filter((c) => !c.trim().startsWith(`${name}=`))
+            .join(';');
+        }
+      },
+    };
+    (globalThis as unknown as { document: unknown }).document = mockDoc;
+    (globalThis as unknown as { window: unknown }).window = {
+      sessionStorage: { clear: vi.fn() },
+    };
+
+    await clearSharedDeviceSession();
+
+    expect(cookieVal).not.toContain('englove_stg_session_hint');
+    expect(cookieVal).not.toContain('englove_user_logged');
+    delete (globalThis as unknown as { document?: unknown }).document;
+  });
 });

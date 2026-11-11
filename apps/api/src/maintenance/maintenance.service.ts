@@ -406,10 +406,27 @@ export class MaintenanceService {
 
           for (const st of students) {
             const birthD = new Date(st.birth_date);
-            // Civil date from Postgres @db.Date (UTC midnight) or local Date instance
-            const bYear = birthD.getUTCFullYear();
-            const bMonth = birthD.getUTCMonth() + 1;
-            const bDay = birthD.getUTCDate();
+            // Civil date: Postgres @db.Date returns UTC midnight (00:00:00.000Z).
+            // If hours/minutes/seconds are 0, it is a pure UTC civil date.
+            // If non-zero (e.g. local Date object created in test or mock), format in America/Bogota.
+            let bYear: number;
+            let bMonth: number;
+            let bDay: number;
+            if (
+              birthD.getUTCHours() === 0 &&
+              birthD.getUTCMinutes() === 0 &&
+              birthD.getUTCSeconds() === 0
+            ) {
+              bYear = birthD.getUTCFullYear();
+              bMonth = birthD.getUTCMonth() + 1;
+              bDay = birthD.getUTCDate();
+            } else {
+              const [by, bm, bd] = BOGOTA_DATE_FORMATTER.format(birthD).split('-').map(Number);
+              bYear = by ?? birthD.getUTCFullYear();
+              bMonth = bm ?? birthD.getUTCMonth() + 1;
+              bDay = bd ?? birthD.getUTCDate();
+            }
+
             let age = (nowYear ?? 2026) - bYear;
             if ((nowMonth ?? 1) < bMonth || ((nowMonth ?? 1) === bMonth && (nowDay ?? 1) < bDay)) {
               age--;

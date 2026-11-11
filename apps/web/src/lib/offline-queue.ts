@@ -96,7 +96,7 @@ export function subscribeOfflineStatus(listener: (status: OfflineStatus) => void
 }
 
 // IndexedDB Helper
-function openOfflineDb(): Promise<IDBDatabase> {
+export function openOfflineDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !('indexedDB' in window)) {
       return reject(new Error('IndexedDB not supported'));
@@ -258,7 +258,7 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
       eventsReq.onsuccess = () => {
         const events: PendingEventRecord[] = eventsReq.result || [];
         for (const ev of events) {
-          if (ev.userId && ev.userId !== currentUserId && ev.id !== undefined) {
+          if ((!ev.userId || ev.userId !== currentUserId) && ev.id !== undefined) {
             eventsStore.delete(ev.id);
           }
         }
@@ -271,7 +271,7 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
       uploadsReq.onsuccess = () => {
         const uploads: PendingUploadRecord[] = uploadsReq.result || [];
         for (const up of uploads) {
-          if (up.userId && up.userId !== currentUserId) {
+          if (!up.userId || up.userId !== currentUserId) {
             uploadsStore.delete(up.attemptId);
           }
         }
@@ -422,6 +422,15 @@ function scheduleBackoffRetry() {
 }
 
 /**
+ * Resumes the offline queue after successful authentication/token refresh (P0-03).
+ */
+export function resumeOfflineQueueAfterAuth(): void {
+  isQueuePausedDueToAuth = false;
+  resetBackoff();
+  void triggerFlush();
+}
+
+/**
  * Resets backoff counter upon successful network progress.
  */
 function resetBackoff() {
@@ -562,7 +571,7 @@ export async function executeFlush(activeUserId?: string): Promise<void> {
         const attemptToken = first.attemptToken;
 
         try {
-          const res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
+          let res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -578,6 +587,33 @@ export async function executeFlush(activeUserId?: string): Promise<void> {
               })),
             }),
           });
+
+          if (!res.ok && res.status === 401) {
+            try {
+              const { requestSharedRefresh } = await import('./auth-session');
+              const refreshed = await requestSharedRefresh();
+              if (refreshed) {
+                res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-attempt-token': attemptToken,
+                    Origin: (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    events: batch.map((ev) => ({
+                      clientEventId: ev.clientEventId,
+                      eventType: 'answer_changed',
+                      ...ev.payload,
+                    })),
+                  }),
+                });
+              }
+            } catch {
+              // Ignore refresh error
+            }
+          }
 
           if (res.ok) {
             // Success: remove these events from IndexedDB
@@ -705,7 +741,7 @@ export async function executeFlush(activeUserId?: string): Promise<void> {
             ...(compAnswers && Object.keys(compAnswers).length > 0 ? { answers: compAnswers } : {}),
           };
 
-          const completeRes = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
+          let completeRes = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -715,6 +751,27 @@ export async function executeFlush(activeUserId?: string): Promise<void> {
             credentials: 'include',
             body: JSON.stringify(completeBody),
           });
+
+          if (!completeRes.ok && completeRes.status === 401) {
+            try {
+              const { requestSharedRefresh } = await import('./auth-session');
+              const refreshed = await requestSharedRefresh();
+              if (refreshed) {
+                completeRes = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-attempt-token': completionEvent.attemptToken,
+                    Origin: (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify(completeBody),
+                });
+              }
+            } catch {
+              // Ignore refresh error
+            }
+          }
 
           if (completeRes.ok) {
             // Successfully completed: purge events & upload

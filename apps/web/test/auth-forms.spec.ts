@@ -26,6 +26,7 @@ describe('RF-20: formularios accesibles, mapeo de errores y políticas de autent
     expect(AUTH_ERROR_MAP.AUTH_UNAUTHORIZED).toBe(
       'Tu sesión terminó. Inicia sesión de nuevo',
     );
+    expect(AUTH_ERROR_MAP.AUTH_FORBIDDEN).toBe('No tienes acceso a esta sección');
     expect(AUTH_ERROR_MAP.FORBIDDEN).toBe('No tienes acceso a esta sección');
     expect(AUTH_ERROR_MAP.STUDENT_NOT_PENDING).toBe(
       'La solicitud ya no está pendiente. Actualiza la lista',
@@ -54,6 +55,27 @@ describe('RF-20: formularios accesibles, mapeo de errores y políticas de autent
     );
     expect(getAuthErrorMessage('UNKNOWN_CODE', 'Mensaje por defecto')).toBe(
       'Mensaje por defecto',
+    );
+  });
+
+  it('accepts error objects with code property from ApiError or server error responses (P0-07)', () => {
+    expect(getAuthErrorMessage({ code: 'AUTH_INVALID_CREDENTIALS' })).toBe(
+      'El correo o la contraseña no son correctos',
+    );
+    expect(getAuthErrorMessage({ code: 'AUTH_FORBIDDEN' })).toBe(
+      'No tienes acceso a esta sección',
+    );
+    expect(getAuthErrorMessage({ code: 'ACCOUNT_PENDING_APPROVAL' })).toBe(
+      'Tu cuenta está pendiente de aprobación por tu profesora',
+    );
+    expect(getAuthErrorMessage({ code: 'RATE_LIMITED' })).toBe(
+      'Has hecho varios intentos. Espera un momento y vuelve a intentar',
+    );
+    expect(getAuthErrorMessage({ code: 'UNKNOWN_ERROR_CODE' })).toBe(
+      'Ocurrió un error. Intenta de nuevo',
+    );
+    expect(getAuthErrorMessage({ code: 'UNKNOWN_ERROR_CODE' }, 'Fallback mensaje')).toBe(
+      'Fallback mensaje',
     );
   });
 

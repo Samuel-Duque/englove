@@ -13,10 +13,7 @@ import { MediaController } from './media.controller';
       useFactory: (config: ConfigService) => ({
         secret:
           config.get<string>('JWT_ATTEMPT_SECRET') ||
-          config.get<string>(
-            'JWT_SECRET',
-            'englove-dev-jwt-secret-min-32-chars-long-local-secret!',
-          ),
+          config.getOrThrow<string>('JWT_SECRET'),
       }),
     }),
   ],

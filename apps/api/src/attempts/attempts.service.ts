@@ -185,10 +185,13 @@ export class AttemptsService {
     private readonly mediaService: MediaService,
     private readonly featureFlagsService: FeatureFlagsService,
   ) {
-    this.jwtSecret = this.configService.get<string>(
-      'JWT_SECRET',
-      'englove-dev-jwt-secret-min-32-chars-long-local-secret!',
-    );
+    this.jwtSecret =
+      typeof this.configService.getOrThrow === 'function'
+        ? this.configService.getOrThrow<string>('JWT_SECRET')
+        : (this.configService.get<string>('JWT_SECRET') ?? '');
+    if (!this.jwtSecret) {
+      throw new Error('JWT_SECRET configuration is missing');
+    }
   }
 
   /**

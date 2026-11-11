@@ -407,7 +407,7 @@ flowchart TD
 | **`WP-03`** | Servidor / Media | `completeAttempt` transaccional, `POST /media/:id/confirm`, seeds, grupos | Completado | `media.spec.ts` (`AUDIO-01`), seeds limpias |
 | **`WP-04`** | Servidor / Gamificación | `ProgressEvent` en juegos, estrellas y mensajes, stats `< 500 ms` | Completado | `stats.performance.spec.ts` (`< 500 ms`) |
 | **`WP-05`** | Servidor / Calidad | 173 `as Type` eliminados, `MaintenanceService`, guardrails servidor | Completado | Monorepo servidor en verde, `check-guardrails.mjs` 0 errores |
-| **`WP-06`** | Cliente / Sesión | Specs cliente, `AccessibleModal` foco estable, higiene IDB, sesión web | Pendiente | Tests web en verde, modal sin saltos de foco |
+| **`WP-06`** | Cliente / Sesión | Specs cliente, `AccessibleModal` foco estable, higiene IDB, sesión web | Completado | Tests web en verde, modal sin saltos de foco |
 | **`WP-07`** | Cliente / PWA | Spike e instalación Serwist real con `vinext`, retiro de `sw.js` | Pendiente | Build worker `<= 3 MB`, `pnpm build` web (`Exit 0`) |
 | **`WP-08`** | Cliente / UI | Flujos estudiante y maestra, editor UUIDs, coma decimal, microjuegos | Pendiente | Tests UI en verde, editor sin truncar UUIDs |
 | **`WP-09`** | Cliente / TanStack | 20 vistas a TanStack Query, 168+ `as Type` fuera, guardrails web | Pendiente | `check-guardrails.mjs` 0 errores (`G-B04`, `G-C12`, `G-C13`) |

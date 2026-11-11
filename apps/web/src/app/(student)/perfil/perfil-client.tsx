@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { StudentProfileView } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { clearSharedProfile } from '../../../lib/auth-session';
 
 export function PerfilClient() {
   const [profile, setProfile] = useState<StudentProfileView | null>(null);
@@ -75,6 +76,7 @@ export function PerfilClient() {
         body: JSON.stringify({ ageSegment: newSegment }),
       });
 
+      clearSharedProfile();
       setThemeSuccess(`¡Interfaz actualizada a ${newSegment === 'kids' ? 'Kids' : 'Teens'}!`);
       // Reload profile and page to apply cookie
       window.location.reload();

@@ -9,16 +9,20 @@ import type {
   AssignmentCard,
   AssignmentCardListResponse,
   RuntimeView,
+  StudentProfileView,
 } from '@englove/shared';
-import { fetchSharedSession } from '../../lib/auth-session';
+import { apiFetch, ApiError } from '../../lib/api';
+import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh } from '../../lib/auth-session';
 import { getActivityTypeLabel } from '../../lib/activity-labels';
 import { TeacherNav } from '../../components/teacher-nav';
 import { StudentNav } from '../../components/student-nav';
+import { OfflineStatusBanner } from '../../components/offline-status-banner';
 import { AccessibleModal } from '../../components/ui/modal';
 
 export function InicioClient() {
   const router = useRouter();
   const [session, setSession] = useState<SessionView | null>(null);
+  const [profile, setProfile] = useState<StudentProfileView | null>(null);
   const [reminders, setReminders] = useState<RemindersResponse | null>(null);
   const [assignmentCards, setAssignmentCards] = useState<AssignmentCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,12 +31,18 @@ export function InicioClient() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [startingCardId, setStartingCardId] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
   const loadData = useCallback(async () => {
     try {
       setNetworkError(null);
-      const sessionData = await fetchSharedSession();
+      let sessionData = await fetchSharedSession();
+
+      if (!sessionData) {
+        // Tolerancia a 401: intenta refresco silencioso antes de redirigir (P0-02, P0-03)
+        const refreshed = await requestSharedRefresh().catch(() => false);
+        if (refreshed) {
+          sessionData = await fetchSharedSession();
+        }
+      }
 
       if (!sessionData) {
         router.replace('/login');
@@ -43,25 +53,21 @@ export function InicioClient() {
       // If teacher, fetch reminders from PendingSummaryService (RF-17)
       if (sessionData.user.role === 'teacher') {
         try {
-          const remindersRes = await fetch(`${apiUrl}/api/v1/dashboard/reminders`, {
-            credentials: 'include',
-          });
-          if (remindersRes.ok) {
-            const remindersData: RemindersResponse = await remindersRes.json();
-            setReminders(remindersData);
-          }
+          const remindersData = await apiFetch<RemindersResponse>('/api/v1/dashboard/reminders');
+          setReminders(remindersData);
         } catch {
           // Reminders load failure is non-blocking
         }
       } else if (sessionData.user.role === 'student') {
-        // If student, fetch student assignments cards
+        // If student, fetch student assignments cards and profile
         try {
-          const cardsRes = await fetch(`${apiUrl}/api/v1/me/assignments`, {
-            credentials: 'include',
-          });
-          if (cardsRes.ok) {
-            const cardsData: AssignmentCardListResponse = await cardsRes.json();
-            setAssignmentCards(cardsData.items || []);
+          const [cardsData, profileData] = await Promise.all([
+            apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments'),
+            fetchSharedProfile().catch(() => null),
+          ]);
+          setAssignmentCards(cardsData.items || []);
+          if (profileData) {
+            setProfile(profileData);
           }
         } catch {
           // Non-blocking
@@ -79,7 +85,7 @@ export function InicioClient() {
     }
 
     setIsLoading(false);
-  }, [apiUrl, router]);
+  }, [router]);
 
   useEffect(() => {
     loadData();
@@ -89,25 +95,16 @@ export function InicioClient() {
     setStartingCardId(assignmentId);
     setAttemptError(null);
     try {
-      const res = await fetch(`${apiUrl}/api/v1/assignments/${assignmentId}/attempts`, {
+      const data = await apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: window.location.origin,
-        },
-        credentials: 'include',
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setAttemptError(err.message || 'No se pudo iniciar el intento de la actividad.');
-        return;
-      }
-
-      const data: RuntimeView = await res.json();
       router.push(`/actividad/${data.attempt.id}`);
-    } catch {
-      setAttemptError('Error de conexión al iniciar el intento. Verifica tu red y reintenta.');
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setAttemptError(err.message || 'No se pudo iniciar el intento de la actividad.');
+      } else {
+        setAttemptError('Error de conexión al iniciar el intento. Verifica tu red y reintenta.');
+      }
     } finally {
       setStartingCardId(null);
     }
@@ -346,7 +343,9 @@ export function InicioClient() {
       <StudentNav
         studentName={session?.user.name}
         ageSegment={ageSegment}
+        level={profile?.student?.level}
       />
+      <OfflineStatusBanner />
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         {/* Modal for attempt errors */}

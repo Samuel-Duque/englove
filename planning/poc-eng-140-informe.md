@@ -35,6 +35,8 @@
 
 ### Comprobación 2 — `proxy.ts` y Cookies Compartidas
 
+> **Nota de arquitectura:** Conforme a Next.js 16 y las decisiones 81 y 85 de CONTEXT §14, la convención tradicional `middleware.ts` queda formalmente obsoleta y prohibida en Englove; toda intercepción ligera de rutas por rol se maneja exclusivamente a través de `proxy.ts`.
+
 - **Objetivo:** Comprobar que `proxy.ts` intercepta rutas protegidas basándose en cookies compartidas con `Domain=.englove.org`.
 - **Implementación de prueba:** `scratch/poc-eng-140/test-proxy.ts`.
 - **Resultados:**

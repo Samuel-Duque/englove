@@ -37,10 +37,13 @@ export class JwtAuthGuard implements CanActivate {
     private readonly prisma: PrismaService,
   ) {
     this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'englove_');
-    this.jwtSecret = this.configService.get<string>(
-      'JWT_SECRET',
-      'englove-dev-jwt-secret-min-32-chars-long-local-secret!',
-    );
+    this.jwtSecret =
+      typeof this.configService.getOrThrow === 'function'
+        ? this.configService.getOrThrow<string>('JWT_SECRET')
+        : (this.configService.get<string>('JWT_SECRET') ?? '');
+    if (!this.jwtSecret) {
+      throw new Error('JWT_SECRET configuration is missing');
+    }
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

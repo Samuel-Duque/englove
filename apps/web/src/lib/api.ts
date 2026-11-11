@@ -1,10 +1,12 @@
+import type { z } from '@englove/shared';
 import { checkAppMinVersion } from './pwa-manager';
-import { fetchSharedSession } from './auth-session';
+import { requestSharedRefresh } from './auth-session';
 
 export interface ApiErrorResponse {
   statusCode: number;
   code: string;
   message: string | string[];
+  details?: unknown;
 }
 
 export class ApiError extends Error {
@@ -12,6 +14,7 @@ export class ApiError extends Error {
     public readonly statusCode: number,
     public readonly code: string,
     message: string,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -25,28 +28,15 @@ export const getApiBaseUrl = (): string => {
   return process.env.API_URL || 'http://localhost:3001';
 };
 
-let refreshPromise: Promise<boolean> | null = null;
+export { requestSharedRefresh };
 
-export async function requestSharedRefresh(): Promise<boolean> {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-  refreshPromise = (async () => {
-    try {
-      const session = await fetchSharedSession(true);
-      return session !== null;
-    } catch {
-      return false;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-  return refreshPromise;
+export interface ApiFetchOptions<T = unknown> extends RequestInit {
+  schema?: z.ZodType<T>;
 }
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiFetchOptions<T> = {},
   isRetry: boolean = false,
 ): Promise<T> {
   const baseUrl = getApiBaseUrl();
@@ -57,8 +47,10 @@ export async function apiFetch<T>(
     headers.set('Content-Type', 'application/json');
   }
 
+  const { schema, ...fetchOptions } = options;
+
   const response = await fetch(url, {
-    ...options,
+    ...fetchOptions,
     headers,
     credentials: 'include',
   });
@@ -74,7 +66,8 @@ export async function apiFetch<T>(
     path.includes('/auth/login') ||
     path.includes('/auth/refresh') ||
     path.includes('/auth/logout') ||
-    path.includes('/auth/signup');
+    path.includes('/auth/signup') ||
+    path.includes('/auth/session');
 
   if (response.status === 401 && !isRetry && !isAuthRoute && typeof window !== 'undefined') {
     const refreshed = await requestSharedRefresh();
@@ -102,7 +95,11 @@ export async function apiFetch<T>(
     const msg = Array.isArray(errorData?.message)
       ? errorData?.message.join(', ')
       : errorData?.message || `Error ${response.status}: ${response.statusText}`;
-    throw new ApiError(response.status, errorData?.code || 'ERROR', msg);
+    throw new ApiError(response.status, errorData?.code || 'ERROR', msg, errorData?.details);
+  }
+
+  if (schema) {
+    return schema.parse(data);
   }
 
   return data as T;

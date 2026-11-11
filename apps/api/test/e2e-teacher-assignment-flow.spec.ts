@@ -12,50 +12,7 @@ import { ActivitiesService } from '../src/activities/activities.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
-import { execFileSync } from 'node:child_process';
-
-function getPostgresPort(): number {
-  const url = process.env.DATABASE_URL;
-  if (!url) return 5433;
-  try {
-    const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5433;
-  } catch {
-    return 5433;
-  }
-}
-
-function checkPortOpenSync(port: number): boolean {
-  try {
-    execFileSync(
-      process.execPath,
-      [
-        '-e',
-        `const net = require('net');
-        const s = new net.Socket();
-        s.setTimeout(2500);
-        s.once('connect', () => { s.destroy(); process.exit(0); });
-        s.once('timeout', () => { s.destroy(); process.exit(1); });
-        s.once('error', () => { s.destroy(); process.exit(1); });
-        s.connect(${port}, '127.0.0.1');`,
-      ],
-      { stdio: 'ignore', timeout: 6000 },
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function checkPostgresRunning(): boolean {
-  const configuredPort = getPostgresPort();
-  if (checkPortOpenSync(configuredPort)) return true;
-  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
-  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
-  return false;
-}
-
-const isPostgresAvailable = checkPostgresRunning();
+import { isPostgresAvailable } from './postgres-test-helper';
 
 describe.skipIf(!isPostgresAvailable)('SPEC-04 RF-16: Flujo docente de punta a punta en PostgreSQL real (ENG-053)', () => {
   let prisma: PrismaService;

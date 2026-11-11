@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import { execFileSync } from 'node:child_process';
+import { isPostgresAvailable } from './postgres-test-helper';
 import { Response, Request } from 'express';
 import {
   Role,
@@ -23,76 +21,6 @@ import { AllExceptionsFilter } from '../src/common/all-exceptions.filter';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { sanitizePinoReq } from '../src/app.module';
 import { GamificationService } from '../src/gamification/gamification.service';
-
-function loadEnvFile(): void {
-  try {
-    const envPath = path.resolve(__dirname, '../.env');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const [k, ...v] = trimmed.split('=');
-        if (k && v.length > 0) {
-          const key = k.trim();
-          let val = v.join('=').trim();
-          if (val.startsWith('"') && val.endsWith('"')) {
-            val = val.slice(1, -1);
-          }
-          if (!process.env[key]) {
-            process.env[key] = val;
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-}
-loadEnvFile();
-
-function getPostgresPort(): number {
-  const url = process.env.DATABASE_URL;
-  if (!url) return 5433;
-  try {
-    const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5433;
-  } catch {
-    return 5433;
-  }
-}
-
-function checkPortOpenSync(port: number): boolean {
-  try {
-    execFileSync(
-      process.execPath,
-      [
-        '-e',
-        `const net = require('net');
-        const s = new net.Socket();
-        s.setTimeout(2500);
-        s.once('connect', () => { s.destroy(); process.exit(0); });
-        s.once('timeout', () => { s.destroy(); process.exit(1); });
-        s.once('error', () => { s.destroy(); process.exit(1); });
-        s.connect(${port}, '127.0.0.1');`,
-      ],
-      { stdio: 'ignore', timeout: 6000 },
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function checkPostgresRunning(): boolean {
-  const configuredPort = getPostgresPort();
-  if (checkPortOpenSync(configuredPort)) return true;
-  if (configuredPort !== 5433 && checkPortOpenSync(5433)) return true;
-  if (configuredPort !== 5432 && checkPortOpenSync(5432)) return true;
-  return false;
-}
-
-const isPostgresAvailable = checkPostgresRunning();
 
 function createMockResponse(): {
   res: Response;

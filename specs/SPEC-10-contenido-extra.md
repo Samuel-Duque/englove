@@ -140,7 +140,7 @@ Tareas: `ENG-120`, `ENG-121`. Referencias: Decisiones 120 y 122, `CONTEXT §5.2`
 **Criterios de aceptación:**
 
 - **Dado** un alumno `kids` en `/extra` con soporte de Web Speech API, **Cuando** pulsa `🔊 Escuchar`, **Entonces** reproduce la consigna o descripción en español y detiene la locución al cancelar o salir de la ruta; sin soporte en el navegador, el control se omite sin error.
-- **Dado** `/contenido-extra` y `/extra` (`kids` y `teens`) evaluados con `@axe-core/playwright` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`), **Cuando** corre la suite, **Entonces** reporta `0` violaciones, cajas interactivas `>= 48 × 48 px` e indicador `:focus-visible` de `>= 2 px` con contraste `>= 3:1`.
+- **Dado** `/contenido-extra` y `/extra` (`kids` y `teens`) evaluados con `@axe-core/playwright` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), **Cuando** corre la suite, **Entonces** reporta `0` violaciones, cajas interactivas `>= 48 × 48 px` e indicador `:focus-visible` de `>= 2 px` con contraste `>= 3:1`.
 
 ## 4. Reglas de negocio
 
@@ -210,7 +210,7 @@ Se reutilizan **sin cambios de esquema ni migraciones DDL adicionales** (`T-03`)
 | RF-6 | Unitaria DOM + Playwright E2E | `RF-6`: tarjetas usan `<a href="https://..." target="_blank" rel="noopener noreferrer">`, cero marcos incrustados (`embed`, `object`), cero `dangerouslySetInnerHTML` y sin PII en la URL. |
 | RF-7 | Integración API + Playwright E2E | `RF-7`: listar y abrir recursos deja en `0` las nuevas filas de `Attempt`, `Review` y `ProgressEvent`, sin cambios en `/progreso` ni `/api/v1/stats/overview`. |
 | RF-8 | Seguridad API + unitaria `proxy.ts` y logout | `RF-8`: `student` recibe `403 FORBIDDEN` en mutaciones; `orgB` recibe `404 RESOURCE_NOT_FOUND` sobre `orgA`; `proxy.ts` redirige roles cruzados en `/contenido-extra` y `/extra`; `no-store` activo y logout vacía `queryClient`. |
-| RF-9 | Unitaria temas + `@axe-core/playwright` | `RF-9`: `🔊 Escuchar` operativo en `kids`; `0` violaciones `axe` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`), controles `>= 48 × 48 px` y `:focus-visible >= 2 px` en `/contenido-extra` y `/extra` (`kids` y `teens`). |
+| RF-9 | Unitaria temas + `@axe-core/playwright` | `RF-9`: `🔊 Escuchar` operativo en `kids`; `0` violaciones `axe` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), controles `>= 48 × 48 px` y `:focus-visible >= 2 px` en `/contenido-extra` y `/extra` (`kids` y `teens`). |
 
 ## 10. Fuera de alcance y decisiones diferidas
 
@@ -247,3 +247,4 @@ Sin pendientes `P-n` en `CONTEXT §15`. Las tres preguntas de diseño (`Q-01` a 
 | 2026-11-04 | Creación del borrador                                                                                                                | Tarea `SPEC-10` del taskboard   |
 | 2026-11-04 | Resolución de `Q-01` a `Q-03` (decisiones 124–126), definición de tareas técnicas `T-01` a `T-05` y paso de la spec a estado `Aprobada` | Aprobación del líder del proyecto |
 | 2026-11-04 | Implementación integral de `ENG-120` y `ENG-121`, suite Playwright E2E y axe (8/8), 537/537 tests y paso de la spec a `Verificada`   | Verificación completa de Etapa 10 |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-06) | Actualización de compuerta axe a WCAG 2.2 AA (wcag22aa, Decisión 133) y alineación con TanStack Query |

@@ -4,9 +4,15 @@ import React, { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
-import { fetchSharedSession } from '../../../lib/auth-session';
+import {
+  setSharedSession,
+  requestSharedRefresh,
+  clearSharedProfile,
+} from '../../../lib/auth-session';
+import { clearSharedFeatureFlags } from '../../../lib/feature-flags-client';
 import { purgeOtherUsersEntries } from '../../../lib/offline-queue';
 import { getQueryClient } from '../../../lib/query-client';
+import type { SessionView } from '@englove/shared';
 
 function isSafeNextDestination(next: string | null | undefined): boolean {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
@@ -45,12 +51,18 @@ export function LoginClient() {
     let isMounted = true;
 
     async function trySilentRefresh() {
-      // Only attempt silent refresh if there is a session hint (H12)
+      // Only attempt silent refresh if there is an active session hint (QA-02, P0-02)
       const hasSessionHint =
         typeof window !== 'undefined' &&
-        (document.cookie.includes('englove_session') ||
-          document.cookie.includes('access_token') ||
-          document.cookie.includes('englove_user_logged=1'));
+        document.cookie
+          .split(';')
+          .some((c) => {
+            const [key, val] = c.split('=').map((s) => s.trim());
+            return (
+              (key === 'session_hint' || key?.endsWith('_session_hint') || key?.includes('session_hint')) &&
+              val === '1'
+            );
+          });
 
       if (!hasSessionHint) {
         if (isMounted) setIsCheckingSession(false);
@@ -58,8 +70,8 @@ export function LoginClient() {
       }
 
       try {
-        const session = await fetchSharedSession();
-        if (session && isMounted) {
+        const refreshed = await requestSharedRefresh();
+        if (refreshed && isMounted) {
           const destination =
             nextParam && isSafeNextDestination(nextParam) ? nextParam : '/inicio';
           router.replace(destination);
@@ -98,20 +110,24 @@ export function LoginClient() {
         });
 
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          const message = getAuthErrorMessage(data);
+          const data = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
+          const message = getAuthErrorMessage(data?.code);
           setErrorMessage(message);
           return;
         }
 
-        const data = await res.json();
+        const data: SessionView = await res.json();
 
         // RF-5 / ISSUE-09 hygiene: Purge offline queue events from any other user
         if (data.user?.id) {
-          purgeOtherUsersEntries(data.user.id).catch((purgeErr) => {
+          await purgeOtherUsersEntries(data.user.id).catch((purgeErr) => {
             console.warn('[Login] Offline queue purge notice:', purgeErr);
           });
         }
+
+        setSharedSession(data);
+        clearSharedProfile();
+        clearSharedFeatureFlags();
 
         // Reset query cache to avoid showing stale data from previous user
         getQueryClient().clear();
@@ -218,8 +234,9 @@ export function LoginClient() {
           </Link>
         </div>
 
-        {/* Development Quick Credentials Picker */}
-        {process.env.NODE_ENV !== 'production' && (
+        {/* Development Quick Credentials Picker (P2-02, T2.1) */}
+        {(process.env.NEXT_PUBLIC_APP_ENV === 'local' ||
+          process.env.APP_ENV === 'local') && (
           <div className="mt-8 pt-6 border-t border-zinc-200">
             <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
               Credenciales de prueba (Dev)

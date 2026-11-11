@@ -28,6 +28,8 @@ Para la evaluación empírica se utilizaron tres perfiles de dispositivo y red s
 
 ## 2. Medición de Rendimiento en Tablet Real (RF-23)
 
+> **Nota de actualización técnica (Etapa 12 / QA-01 / Decisión 135):** El service worker manual estático (`public/sw.js` con versión fija) evaluado en esta etapa fue superado por la decisión vigente de integrar Serwist real con precache versionado por hash en el pipeline de build (QA-01).
+
 De acuerdo con SPEC-09 §4 y CONTEXT §11.2, se auditaron las tres métricas Core Web Vitals en la tablet Android de 3 GB de RAM ejecutando Chrome estable:
 
 | Métrica | Pantalla / Contexto | Umbral de Referencia | Valor Medido (P75) | Valor Medido (Mediana) | Veredicto |

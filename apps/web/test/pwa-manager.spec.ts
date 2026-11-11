@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   isVersionOlder,
   getPwaUpdateState,
@@ -6,6 +6,7 @@ import {
   setActiveAttemptState,
   dismissUpdateNotice,
   applyUpdate,
+  registerServiceWorker,
   _resetPwaManagerState,
 } from '../src/lib/pwa-manager';
 
@@ -112,6 +113,109 @@ describe('SPEC-09 RF-6, RF-7, RF-8, RF-9: PWA Update Manager', () => {
         (globalThis as unknown as { window: unknown }).window = prevWindow;
       }
       vi.useRealTimers();
+    });
+  });
+
+  describe('registerServiceWorker lifecycle', () => {
+    const originalWindow = globalThis.window;
+    const originalDocument = globalThis.document;
+    const originalNavigatorDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      if (originalWindow === undefined) {
+        delete (globalThis as unknown as { window?: unknown }).window;
+      } else {
+        globalThis.window = originalWindow;
+      }
+      if (originalDocument === undefined) {
+        delete (globalThis as unknown as { document?: unknown }).document;
+      } else {
+        globalThis.document = originalDocument;
+      }
+      if (originalNavigatorDesc) {
+        Object.defineProperty(globalThis, 'navigator', originalNavigatorDesc);
+      }
+    });
+
+    it('does not register in non-production environments', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const registerSpy = vi.fn().mockResolvedValue({} as ServiceWorkerRegistration);
+      globalThis.window = {} as unknown as Window & typeof globalThis;
+      Object.defineProperty(globalThis, 'navigator', {
+        value: {
+          serviceWorker: { register: registerSpy },
+        },
+        configurable: true,
+        writable: true,
+      });
+
+      registerServiceWorker();
+      expect(registerSpy).not.toHaveBeenCalled();
+    });
+
+    it('registers immediately if document.readyState is already complete in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const registerSpy = vi.fn().mockReturnValue(new Promise(() => {}));
+      const addEventListenerSpy = vi.fn();
+
+      globalThis.window = {
+        addEventListener: addEventListenerSpy,
+      } as unknown as Window & typeof globalThis;
+
+      globalThis.document = {
+        readyState: 'complete',
+      } as unknown as Document;
+
+      Object.defineProperty(globalThis, 'navigator', {
+        value: {
+          serviceWorker: {
+            register: registerSpy,
+            addEventListener: vi.fn(),
+          },
+        },
+        configurable: true,
+        writable: true,
+      });
+
+      registerServiceWorker();
+      expect(registerSpy).toHaveBeenCalledWith('/sw.js', { scope: '/' });
+      expect(addEventListenerSpy).not.toHaveBeenCalledWith('load', expect.any(Function));
+    });
+
+    it('waits for window load event if document is still loading in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const registerSpy = vi.fn().mockReturnValue(new Promise(() => {}));
+      let loadCallback: (() => void) | undefined;
+      const addEventListenerSpy = vi.fn().mockImplementation((ev, cb) => {
+        if (ev === 'load') loadCallback = cb;
+      });
+
+      globalThis.window = {
+        addEventListener: addEventListenerSpy,
+      } as unknown as Window & typeof globalThis;
+
+      globalThis.document = {
+        readyState: 'loading',
+      } as unknown as Document;
+
+      Object.defineProperty(globalThis, 'navigator', {
+        value: {
+          serviceWorker: {
+            register: registerSpy,
+            addEventListener: vi.fn(),
+          },
+        },
+        configurable: true,
+        writable: true,
+      });
+
+      registerServiceWorker();
+      expect(registerSpy).not.toHaveBeenCalled();
+      expect(loadCallback).toBeDefined();
+
+      loadCallback?.();
+      expect(registerSpy).toHaveBeenCalledWith('/sw.js', { scope: '/' });
     });
   });
 });

@@ -1,6 +1,7 @@
 import type { SessionView, StudentProfileView } from '@englove/shared';
 import { apiFetch } from './api';
 import { resumeOfflineQueueAfterAuth } from './offline-queue';
+import { syncUserSegment } from './user-segment';
 
 let inFlightPromise: Promise<SessionView | null> | null = null;
 let cachedSession: SessionView | null = null;
@@ -45,6 +46,16 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
       }
       const data: SessionView = await res.json();
       cachedSession = data;
+      try {
+        if (typeof window !== 'undefined' && 'localStorage' in window) {
+          const segment = (data.user?.role === 'teacher' || data.user?.role === 'admin')
+            ? 'teacher'
+            : (data.student?.ageSegment ?? 'kids');
+          syncUserSegment(segment);
+        }
+      } catch {
+        // Ignorar si localStorage está bloqueado
+      }
       return data;
     } catch (err: unknown) {
       cachedSession = null;
@@ -97,6 +108,10 @@ export async function requestSharedRefresh(): Promise<boolean> {
       try {
         if (typeof window !== 'undefined' && 'localStorage' in window) {
           window.localStorage.setItem(TAB_SYNC_KEY, String(lastSuccessfulRefresh));
+          const segment = (data.user?.role === 'teacher' || data.user?.role === 'admin')
+            ? 'teacher'
+            : (data.student?.ageSegment ?? 'kids');
+          syncUserSegment(segment);
         }
       } catch {
         // Ignorar si localStorage está bloqueado
@@ -170,6 +185,10 @@ export function setSharedSession(session: SessionView): void {
   try {
     if (typeof window !== 'undefined' && 'localStorage' in window) {
       window.localStorage.setItem(TAB_SYNC_KEY, String(lastSuccessfulRefresh));
+      const segment = (session.user?.role === 'teacher' || session.user?.role === 'admin')
+        ? 'teacher'
+        : (session.student?.ageSegment ?? 'kids');
+      syncUserSegment(segment);
     }
   } catch {
     // Ignorar si localStorage está bloqueado
@@ -227,6 +246,7 @@ export function clearSharedSession(): void {
   try {
     if (typeof window !== 'undefined' && 'localStorage' in window) {
       window.localStorage.removeItem(TAB_SYNC_KEY);
+      syncUserSegment(null);
     }
   } catch {
     // Ignorar si localStorage está bloqueado

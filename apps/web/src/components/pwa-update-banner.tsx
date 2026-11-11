@@ -9,6 +9,11 @@ import {
   dismissUpdateNotice,
   registerServiceWorker,
 } from '../lib/pwa-manager';
+import {
+  resolveUserSegment,
+  isTeensOrTeacherSegment,
+  USER_SEGMENT_EVENT,
+} from '../lib/user-segment';
 
 export function PwaUpdateBanner() {
   const state = useSyncExternalStore(
@@ -17,26 +22,34 @@ export function PwaUpdateBanner() {
     getPwaUpdateState,
   );
 
-  const [isTeensOrPanel, setIsTeensOrPanel] = useState(false);
+  const [isTeensOrPanel, setIsTeensOrPanel] = useState(() =>
+    isTeensOrTeacherSegment(resolveUserSegment()),
+  );
 
   useEffect(() => {
     // Register SW on load in production
     registerServiceWorker();
 
-    try {
-      const storedTheme = localStorage.getItem('englove_segment') || localStorage.getItem('theme');
-      const docTheme = document.documentElement.getAttribute('data-theme');
-      if (storedTheme === 'teens' || docTheme === 'teens') {
-        setIsTeensOrPanel(true);
-      }
-    } catch {
-      // Ignore
-    }
+    const updateSegment = () => {
+      const segment = resolveUserSegment();
+      setIsTeensOrPanel(isTeensOrTeacherSegment(segment));
+    };
+
+    updateSegment();
+
+    window.addEventListener('storage', updateSegment);
+    window.addEventListener(USER_SEGMENT_EVENT, updateSegment);
+    return () => {
+      window.removeEventListener('storage', updateSegment);
+      window.removeEventListener(USER_SEGMENT_EVENT, updateSegment);
+    };
   }, []);
 
   if (!state.shouldShowBanner) {
     return null;
   }
+
+  const effectiveTeensOrPanel = isTeensOrPanel || isTeensOrTeacherSegment(resolveUserSegment());
 
   return (
     <aside
@@ -51,7 +64,7 @@ export function PwaUpdateBanner() {
           </div>
           <div>
             <p className="text-sm font-semibold text-zinc-100">
-              {isTeensOrPanel
+              {effectiveTeensOrPanel
                 ? 'Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.'
                 : '¡Englove tiene novedades! Toca Actualizar para verlas.'}
             </p>
@@ -75,7 +88,7 @@ export function PwaUpdateBanner() {
             className="inline-flex items-center justify-center gap-2 min-h-[48px] min-w-[48px] px-5 py-2.5 text-xs sm:text-sm font-bold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-zinc-950 rounded-xl shadow-sm transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span>{isTeensOrPanel ? 'Reiniciar y actualizar' : 'Actualizar'}</span>
+            <span>{effectiveTeensOrPanel ? 'Reiniciar y actualizar' : 'Actualizar'}</span>
           </button>
         </div>
       </div>

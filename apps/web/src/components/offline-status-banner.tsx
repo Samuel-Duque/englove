@@ -7,28 +7,41 @@ import {
   triggerFlush,
   type OfflineStatus,
 } from '../lib/offline-queue';
+import {
+  resolveUserSegment,
+  isTeensOrTeacherSegment,
+  USER_SEGMENT_EVENT,
+} from '../lib/user-segment';
 
-export function OfflineStatusBanner() {
-  const [status, setStatus] = useState<OfflineStatus>({
-    isOffline: false,
-    pendingCount: 0,
-    isFlushing: false,
-    lastSyncedAt: null,
-    justFlushed: false,
-  });
+export interface OfflineStatusBannerProps {
+  initialStatus?: OfflineStatus;
+}
 
-  const [isTeensOrPanel, setIsTeensOrPanel] = useState(false);
+export function OfflineStatusBanner({ initialStatus }: OfflineStatusBannerProps = {}) {
+  const [status, setStatus] = useState<OfflineStatus>(() =>
+    initialStatus ?? {
+      isOffline: false,
+      pendingCount: 0,
+      isFlushing: false,
+      lastSyncedAt: null,
+      justFlushed: false,
+    },
+  );
+
+  const [isTeensOrPanel, setIsTeensOrPanel] = useState(() =>
+    isTeensOrTeacherSegment(resolveUserSegment()),
+  );
 
   useEffect(() => {
-    try {
-      const storedTheme = localStorage.getItem('englove_segment') || localStorage.getItem('theme');
-      const docTheme = document.documentElement.getAttribute('data-theme');
-      if (storedTheme === 'teens' || docTheme === 'teens') {
-        setIsTeensOrPanel(true);
-      }
-    } catch {
-      // Ignore
-    }
+    const updateSegment = () => {
+      const segment = resolveUserSegment();
+      setIsTeensOrPanel(isTeensOrTeacherSegment(segment));
+    };
+
+    updateSegment();
+
+    window.addEventListener('storage', updateSegment);
+    window.addEventListener(USER_SEGMENT_EVENT, updateSegment);
 
     const unsubscribe = subscribeOfflineStatus((newStatus) => {
       setStatus(newStatus);
@@ -38,9 +51,13 @@ export function OfflineStatusBanner() {
     void triggerFlush();
 
     return () => {
+      window.removeEventListener('storage', updateSegment);
+      window.removeEventListener(USER_SEGMENT_EVENT, updateSegment);
       unsubscribe();
     };
   }, []);
+
+  const effectiveTeensOrPanel = isTeensOrPanel || isTeensOrTeacherSegment(resolveUserSegment());
 
   // When successfully flushed, show confirmation for a brief period (§7)
   if (status.justFlushed && !status.isOffline) {
@@ -52,7 +69,7 @@ export function OfflineStatusBanner() {
       >
         <CheckCircle2 className="w-4 h-4 text-emerald-200" aria-hidden="true" />
         <span>
-          {isTeensOrPanel ? 'Tus respuestas pendientes se enviaron.' : '¡Enviado!'}
+          {effectiveTeensOrPanel ? 'Tus respuestas pendientes se enviaron.' : '¡Enviado!'}
         </span>
       </div>
     );
@@ -74,7 +91,7 @@ export function OfflineStatusBanner() {
           )}
           <span>
             {status.isOffline
-              ? isTeensOrPanel
+              ? effectiveTeensOrPanel
                 ? 'Sin conexión. Tus respuestas se guardan en este dispositivo.'
                 : 'Sin internet. Tus respuestas se guardan aquí mientras tanto.'
               : `${status.pendingCount} elemento(s) pendiente(s) de sincronizar…`}

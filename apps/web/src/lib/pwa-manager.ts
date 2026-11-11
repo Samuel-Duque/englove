@@ -135,7 +135,7 @@ export function registerServiceWorker(): void {
   // Prevent multiple registrations
   if (swRegistration) return;
 
-  window.addEventListener('load', () => {
+  const startRegistration = () => {
     navigator.serviceWorker
       .register('/sw.js', { scope: '/' })
       .then((registration) => {
@@ -185,7 +185,13 @@ export function registerServiceWorker(): void {
         }
       });
     }
-  });
+  };
+
+  if (typeof document !== 'undefined' && document.readyState === 'complete') {
+    startRegistration();
+  } else {
+    window.addEventListener('load', startRegistration);
+  }
 }
 
 // For testing purposes

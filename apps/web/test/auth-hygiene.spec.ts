@@ -203,4 +203,35 @@ describe('RF-18: client-side storage hygiene on shared devices', () => {
     expect(cookieVal).not.toContain('englove_user_logged');
     delete (globalThis as unknown as { document?: unknown }).document;
   });
+
+  it('preserves Serwist static precache and deletes runtime caches from CacheStorage on logout (RF-5, RF-18, Decisión 135)', async () => {
+    const deletedCaches: string[] = [];
+    const mockCaches = {
+      keys: vi.fn().mockResolvedValue([
+        'serwist-precache-v2-https://englove.edu/',
+        'englove-static-v1',
+        'static-image-assets',
+        'google-fonts',
+      ]),
+      delete: vi.fn().mockImplementation((name: string) => {
+        deletedCaches.push(name);
+        return Promise.resolve(true);
+      }),
+    };
+
+    (globalThis as unknown as { window: unknown }).window = {
+      caches: mockCaches,
+      sessionStorage: { clear: vi.fn() },
+    };
+
+    await clearSharedDeviceSession();
+
+    expect(mockCaches.keys).toHaveBeenCalled();
+    // Static precaches are preserved
+    expect(deletedCaches).not.toContain('serwist-precache-v2-https://englove.edu/');
+    expect(deletedCaches).not.toContain('englove-static-v1');
+    // Runtime caches are deleted
+    expect(deletedCaches).toContain('static-image-assets');
+    expect(deletedCaches).toContain('google-fonts');
+  });
 });

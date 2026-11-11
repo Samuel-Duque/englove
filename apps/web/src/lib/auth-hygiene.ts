@@ -119,14 +119,21 @@ export async function clearSharedDeviceSession(
     }
   }
 
-  // Clear non-static entries from Cache Storage (RF-5)
+  // Clear non-static entries from Cache Storage (RF-5, RF-18, Decisión 135)
+  // Preserves static precache (serwist precache or englove-static)
   if (typeof window !== 'undefined' && 'caches' in window) {
     try {
-      const keys = await caches.keys();
+      const cacheStorage = window.caches;
+      const keys = await cacheStorage.keys();
       await Promise.all(
         keys.map(async (key) => {
-          if (!key.startsWith('englove-static-')) {
-            await caches.delete(key);
+          const isPrecache =
+            key.includes('-precache-') ||
+            key.startsWith('serwist-precache') ||
+            key.startsWith('englove-precache') ||
+            key.startsWith('englove-static-');
+          if (!isPrecache) {
+            await cacheStorage.delete(key);
           }
         }),
       );

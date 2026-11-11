@@ -2,25 +2,39 @@
 
 import React, { useEffect, useState } from 'react';
 import { WifiOff, RefreshCw } from 'lucide-react';
+import {
+  resolveUserSegment,
+  isTeensOrTeacherSegment,
+  USER_SEGMENT_EVENT,
+} from '../../lib/user-segment';
 
 export function OfflineClient() {
-  const [isTeensOrTeacher, setIsTeensOrTeacher] = useState(false);
+  const [isTeensOrTeacher, setIsTeensOrTeacher] = useState(() =>
+    isTeensOrTeacherSegment(resolveUserSegment()),
+  );
 
   useEffect(() => {
-    try {
-      const storedTheme = localStorage.getItem('englove_segment') || localStorage.getItem('theme');
-      const docTheme = document.documentElement.getAttribute('data-theme');
-      if (storedTheme === 'teens' || docTheme === 'teens') {
-        setIsTeensOrTeacher(true);
-      }
-    } catch {
-      // Fallback to default
-    }
+    const updateSegment = () => {
+      const segment = resolveUserSegment();
+      setIsTeensOrTeacher(isTeensOrTeacherSegment(segment));
+    };
+
+    updateSegment();
+
+    window.addEventListener('storage', updateSegment);
+    window.addEventListener(USER_SEGMENT_EVENT, updateSegment);
+    return () => {
+      window.removeEventListener('storage', updateSegment);
+      window.removeEventListener(USER_SEGMENT_EVENT, updateSegment);
+    };
   }, []);
 
   const handleRetry = () => {
     window.location.reload();
   };
+
+  const effectiveTeensOrTeacher =
+    isTeensOrTeacher || isTeensOrTeacherSegment(resolveUserSegment());
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-amber-50 text-zinc-900">
@@ -29,7 +43,7 @@ export function OfflineClient() {
           <WifiOff className="w-8 h-8" aria-hidden="true" />
         </div>
 
-        {isTeensOrTeacher ? (
+        {effectiveTeensOrTeacher ? (
           <>
             <h1 className="text-2xl font-bold mb-3 text-zinc-900">Sin conexión</h1>
             <p className="text-zinc-600 mb-8 text-base">

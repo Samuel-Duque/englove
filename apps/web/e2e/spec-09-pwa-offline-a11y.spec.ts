@@ -416,6 +416,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
   });
 
   test('RF-19: Auditoría de accesibilidad con axe en pantallas públicas y autenticadas con tag wcag22aa (T7.4)', async ({ page, context }) => {
+    test.setTimeout(180_000); // 3 minutes for 20-route comprehensive axe scan on dev server
     const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] as const;
 
     // 1. Pantallas públicas: /login, /offline, /registro, /recuperar-contrasena
@@ -584,7 +585,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     await page.route('**/api/v1/assignments*', async (route) => {
       await route.fulfill({ status: 200, json: { items: [], total: 0 } });
     });
-    await page.route('**/api/v1/reviews/pending*', async (route) => {
+    await page.route('**/api/v1/reviews*', async (route) => {
       await route.fulfill({ status: 200, json: { items: [], total: 0 } });
     });
     await page.route('**/api/v1/stats*', async (route) => {
@@ -608,6 +609,9 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     for (const teacherRoute of ['/inicio', '/actividades', '/asignaciones', '/revision', '/estadisticas', '/grupos', '/alumnos']) {
       await page.goto(teacherRoute);
       await page.waitForLoadState('domcontentloaded');
+      if (teacherRoute === '/revision') {
+        await page.waitForSelector('.animate-pulse', { state: 'detached', timeout: 5000 }).catch(() => {});
+      }
       const teacherAxe = await new AxeBuilder({ page }).withTags([...wcagTags]).analyze();
       expect(teacherAxe.violations).toEqual([]);
     }

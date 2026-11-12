@@ -1,5 +1,10 @@
 # Plan de Implementación 1 de 2 — Servidor, Datos, Seguridad, Infraestructura y Gobernanza SDD
 
+> [!IMPORTANT]
+> **DOCUMENTO HISTÓRICO / ARCHIVADO**
+> Este plan de implementación ha sido **100 % implementado y verificado en la Etapa 12 (`SPEC-11`)**.
+> **Los agentes de IA no deben usar este documento como tareas pendientes ni como fuente de nuevas decisiones.** La única fuente de verdad técnica y de producto del proyecto es [`.agents/CONTEXT.md`](../.agents/CONTEXT.md).
+
 - **Fuente única:** [`planning/auditoria-post-spec-11.md`](auditoria-post-spec-11.md) (commit auditado `develop` @ `b4d04d3`; decisiones `QA-01` a `QA-08` cerradas el 2026-11-09). Este plan no usa ningún otro documento como fuente de hallazgos.
 - **Complemento:** [`plan-implementacion-auditoria-2-cliente-y-cierre.md`](plan-implementacion-auditoria-2-cliente-y-cierre.md). Entre ambos planes se cubre el 100 % de la auditoría (42 hallazgos: 10 `P0`, 15 `P1`, 11 `P2`, 6 `P3`; `QA-01`..`QA-08`; §2, §3, §4, §6, §7 y §8).
 - **Criterio de división:** por **capa y tipo de tarea**. Este plan agrupa gobernanza SDD (decisiones y specs), pipeline e infraestructura, API NestJS, base de datos, seguridad, multimedia, intentos, evaluación, gamificación, estadísticas, mantenimiento, seeds y las skills propias en lo que toca al servidor. El Plan 2 agrupa todo lo que ocurre en el navegador (apps/web), PWA, accesibilidad, TanStack Query, E2E y el cierre documental.

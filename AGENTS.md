@@ -18,7 +18,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 5. `planning/taskboard.md` — tareas.
 6. `specs/` — especificaciones (`SPEC-00` creada; `SPEC-01` a `SPEC-11` Verificadas).
 
-Insumos históricos de la Etapa 12 (100% subsanados y verificados bajo `SPEC-11`): `AUDITORIA.md` (auditoría del 2026-11-05) y `testing-issues/` (ISSUE-01 a ISSUE-10 y RFC-01).
+Insumos históricos de la Etapa 12 (100% subsanados y verificados bajo `SPEC-11`): `AUDITORIA.md` (auditoría del 2026-11-05), `testing-issues/` (ISSUE-01 a ISSUE-10 y RFC-01) y los planes archivados `planning/plan-implementacion-auditoria-1-servidor-y-fundacion.md` y `planning/plan-implementacion-auditoria-2-cliente-y-cierre.md` (documentos históricos/archivados; los agentes no deben usarlos como tareas pendientes ni como fuente de nuevas decisiones; la fuente única de verdad es `.agents/CONTEXT.md`).
 
 Otros documentos: `planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-modelo-de-datos.md`, `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
 

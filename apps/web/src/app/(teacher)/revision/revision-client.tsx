@@ -410,7 +410,7 @@ export function RevisionClient() {
             <span>
               {activeTab === 'pending' ? 'Entregas por calificar' : 'Historial de calificados'} ({currentList.length})
             </span>
-            {isLoadingList && <span className="text-blue-700 font-medium animate-pulse">Actualizando…</span>}
+            {isLoadingList && <span className="text-blue-800 font-medium animate-pulse">Actualizando…</span>}
           </div>
 
           {currentList.length === 0 ? (

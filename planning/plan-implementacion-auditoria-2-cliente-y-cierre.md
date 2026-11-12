@@ -1,5 +1,10 @@
 # Plan de Implementación 2 de 2 — Cliente Web, PWA, Accesibilidad, TanStack Query, E2E y Cierre Documental
 
+> [!IMPORTANT]
+> **DOCUMENTO HISTÓRICO / ARCHIVADO**
+> Este plan de implementación ha sido **100 % implementado y verificado en la Etapa 12 (`SPEC-11`)**.
+> **Los agentes de IA no deben usar este documento como tareas pendientes ni como fuente de nuevas decisiones.** La única fuente de verdad técnica y de producto del proyecto es [`.agents/CONTEXT.md`](../.agents/CONTEXT.md).
+
 - **Fuente única:** [`planning/auditoria-post-spec-11.md`](auditoria-post-spec-11.md) (commit auditado `develop` @ `b4d04d3`; decisiones `QA-01` a `QA-08` cerradas el 2026-11-09). Este plan no usa ningún otro documento como fuente de hallazgos.
 - **Complemento:** [`plan-implementacion-auditoria-1-servidor-y-fundacion.md`](plan-implementacion-auditoria-1-servidor-y-fundacion.md). Entre ambos planes se cubre el 100 % de la auditoría (42 hallazgos, `QA-01`..`QA-08`, §2, §3, §4, §6, §7 y §8).
 - **Criterio de división:** por **capa y tipo de tarea**. Este plan agrupa todo lo que ocurre en `apps/web`: sesión y offline del navegador, Serwist, flujos de estudiante y docente, TanStack Query, `as Type` en web, WCAG 2.2 AA, E2E Playwright. También agrupa el cierre documental (specs restantes, documentos de `planning/`, `CONTEXT`/`AGENTS`), los pendientes operativos y legales, y la verificación global final.

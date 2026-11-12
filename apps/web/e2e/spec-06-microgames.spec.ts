@@ -148,6 +148,9 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
       });
     });
 
+    let persistedPairs: Record<string, string> = {
+      '11111111-1111-4111-8111-111111111111': '33333333-3333-4333-8333-333333333333',
+    };
     await page.route('**/api/v1/attempts/att-game-1', async (route) => {
       await route.fulfill({
         status: 200,
@@ -188,7 +191,7 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
               },
             },
           },
-          answers: {},
+          answers: { pairs: persistedPairs },
           mediaId: null,
           correction: null,
           attemptToken: 'mock-attempt-token',
@@ -211,8 +214,16 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     await expect(page.locator('text=Une los colores en español con su traducción.').first()).toBeVisible();
     await expect(page.locator('text=Rojo')).toBeVisible();
     await expect(page.locator('text=Azul')).toBeVisible();
-    await expect(page.locator('text=Red')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Red', exact: true })).toBeVisible();
     await expect(page.locator('text=Blue')).toBeVisible();
+    // La respuesta ya persistida debe estar visible al reanudar y al recargar.
+    await expect(page.getByText('1 de 2 parejas formadas')).toBeVisible();
+    await page.reload();
+    await expect(page.getByText('1 de 2 parejas formadas')).toBeVisible();
+    await page.getByRole('link', { name: 'Juegos', exact: true }).click();
+    persistedPairs = { ...persistedPairs, '22222222-2222-4222-8222-222222222222': '44444444-4444-4444-8444-444444444444' };
+    await page.locator('a:has-text("Reanudar partida"), a:has-text("Continuar juego")').click();
+    await expect(page.getByText('2 de 2 parejas formadas')).toBeVisible();
 
     // 6. Completar partida
     await page.route('**/api/v1/attempts/att-game-1/complete', async (route) => {

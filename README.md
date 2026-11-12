@@ -221,6 +221,8 @@ cp .env.example .env
 > [!NOTE]
 > Las variables en `.env.example` vienen listas para el entorno local con MinIO (emulación local de Cloudflare R2 con el bucket `englove-dev`) y Mailpit (servidor SMTP local e interfaz web de inspección de correos en `http://localhost:8025`).
 
+Al iniciar la API desde `apps/api`, revisa también `apps/api/.env`: sus variables de R2 deben apuntar a MinIO local (`R2_ENDPOINT=http://localhost:9000`) y coincidir con las credenciales y el bucket del `.env` raíz. Un archivo antiguo con valores de ejemplo para R2 puede generar URLs inaccesibles. Con los servicios iniciados, `node scripts/check-local-audio.mjs` comprueba la configuración local, el bucket y las herramientas de audio sin subir archivos.
+
 ### 4. Instalar dependencias
 
 Instala todas las dependencias del monorepo de forma limpia mediante pnpm:

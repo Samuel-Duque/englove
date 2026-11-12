@@ -236,6 +236,38 @@ export async function enqueueUpload(
   });
 }
 
+/** Recupera la última respuesta pendiente por ítem para el usuario y el intento activos. */
+export async function getPendingAttemptAnswers(userId: string, attemptId: string): Promise<Record<string, unknown>> {
+  if (!hasActiveIdentity(userId)) return {};
+  const generation = identityGeneration;
+  try {
+    const db = await openOfflineDb();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(EVENTS_STORE, "readonly");
+      const request = tx.objectStore(EVENTS_STORE).getAll();
+      let answers: Record<string, unknown> = {};
+      request.onsuccess = () => {
+        const events: PendingEventRecord[] = request.result || [];
+        for (const event of events) {
+          if (event.userId !== userId || event.attemptId !== attemptId || event.eventType !== "answered") continue;
+          const itemId = event.payload.itemId;
+          if (typeof itemId === "string" && ["pairs", "tokenIds", "placements", "selections", "choices"].includes(itemId)) {
+            answers[itemId] = event.payload.answer;
+          }
+        }
+      };
+      tx.oncomplete = () => {
+        db.close();
+        if (generation !== identityGeneration || !hasActiveIdentity(userId)) answers = {};
+        resolve(answers);
+      };
+      tx.onerror = () => { db.close(); resolve({}); };
+    });
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Gets total pending items (events + uploads)
  */

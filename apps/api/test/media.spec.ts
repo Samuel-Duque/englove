@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Readable } from 'node:stream';
+import { spawnSync } from 'node:child_process';
 import { MediaService } from '../src/media/media.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -181,6 +182,18 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
   });
 
   describe('confirmUpload y validación de duración (RF-14)', () => {
+    it('ERR-04: mide un WebM válido sin metadato de duración mediante sus paquetes', async () => {
+      const audio = spawnSync('ffmpeg', [
+        '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3',
+        '-c:a', 'libopus', '-f', 'webm', 'pipe:1',
+      ], { maxBuffer: 2_000_000 });
+      expect(audio.status).toBe(0);
+      vi.spyOn(service['s3Client'], 'send').mockResolvedValueOnce({ Body: Readable.from(audio.stdout) } as never);
+      const duration = await service['probeDuration']('test.webm');
+      expect(duration).toBeGreaterThanOrEqual(2.9);
+      expect(duration).toBeLessThan(3.2);
+    }, 15000);
+
     // guardrails-ignore G-C06: prueba de duracion minima segun SPEC-05 RF-14
     it('rechaza grabaciones menores a 2 segundos con 422', async () => {
       await expect(

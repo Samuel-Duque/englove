@@ -6,6 +6,7 @@ import {
   ActivityType,
   ActivityStatus,
   AttemptStatus,
+  ProgressEventType,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { seedMinimal } from './seed';
@@ -176,7 +177,7 @@ export async function seedVolume() {
     const daysAgo = (i % 90) + 1;
     const attemptTime = new Date(now - daysAgo * 24 * 3600 * 1000);
 
-    await prisma.attempt.upsert({
+    const attempt = await prisma.attempt.upsert({
       where: { id: attemptId },
       update: {},
       create: {
@@ -193,6 +194,21 @@ export async function seedVolume() {
         payload: { answers: { '22222222-2222-4222-9222-222222222101': '33333333-3333-4333-9333-333333333101' } },
       },
     });
+    if (attempt.finished_at) {
+      await prisma.progressEvent.upsert({
+        where: { id: `61000000-0000-4000-9000-${(i + 1).toString().padStart(12, '0')}` },
+        update: { occurred_at: attempt.finished_at },
+        create: {
+          id: `61000000-0000-4000-9000-${(i + 1).toString().padStart(12, '0')}`,
+          organization_id: org.id,
+          student_id: s.id,
+          attempt_id: attempt.id,
+          type: ProgressEventType.attempt_completed,
+          value: attempt.score,
+          occurred_at: attempt.finished_at,
+        },
+      });
+    }
   }
 
   return { studentCount: createdStudents.length };

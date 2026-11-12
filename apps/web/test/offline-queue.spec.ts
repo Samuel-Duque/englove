@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   enqueueEvent,
+  getPendingAttemptAnswers,
   enqueueUpload,
   getPendingCount,
   hasPendingWork,
@@ -18,6 +19,17 @@ describe("SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service", () => {
   let uploadsDb: PendingUploadRecord[] = [];
   let autoIncId = 1;
   let mockDb: any;
+
+  it("reanuda únicamente las respuestas pendientes del alumno y del intento activos", async () => {
+    eventsDb.push(
+      { id: 1, userId: "user-1", attemptId: "game-1", clientEventId: "one", eventType: "answered", payload: { itemId: "placements", answer: { a: "x" } }, attemptToken: "token", createdAt: 1 },
+      { id: 2, userId: "user-1", attemptId: "game-1", clientEventId: "two", eventType: "answered", payload: { itemId: "placements", answer: {} }, attemptToken: "token", createdAt: 2 },
+      { id: 3, userId: "user-1", attemptId: "game-2", clientEventId: "three", eventType: "answered", payload: { itemId: "pairs", answer: { b: "y" } }, attemptToken: "token", createdAt: 3 },
+      { id: 4, userId: "user-2", attemptId: "game-1", clientEventId: "four", eventType: "answered", payload: { itemId: "pairs", answer: { c: "z" } }, attemptToken: "token", createdAt: 4 },
+    );
+    expect(await getPendingAttemptAnswers("user-1", "game-1")).toEqual({ placements: {} });
+    expect(await getPendingAttemptAnswers("user-2", "game-1")).toEqual({});
+  });
 
   beforeEach(async () => {
     suspendOfflineQueue();

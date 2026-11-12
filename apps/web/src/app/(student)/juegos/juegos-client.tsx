@@ -16,6 +16,7 @@ import {
 import { apiFetch, ApiError } from '../../../lib/api';
 import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
 import { fetchSharedProfile } from '../../../lib/auth-session';
+import { speak } from '../../../lib/speech';
 
 export function JuegosClient() {
   const router = useRouter();
@@ -95,14 +96,8 @@ export function JuegosClient() {
       setSpeakingGameId(null);
       return;
     }
-    window.speechSynthesis.cancel();
-    const text = game.title;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-CO';
-    utterance.onend = () => setSpeakingGameId(null);
-    utterance.onerror = () => setSpeakingGameId(null);
     setSpeakingGameId(game.id);
-    window.speechSynthesis.speak(utterance);
+    speak(game.title, () => setSpeakingGameId(null));
   };
 
   const handleStartGame = (game: StudentGameCard) => {

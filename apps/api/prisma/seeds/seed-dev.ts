@@ -669,7 +669,7 @@ export async function seedDev() {
   for (let idx = 0; idx < gameDefinitions.length; idx++) {
     const def = gameDefinitions[idx]!;
     const attemptId = `40000000-0000-4000-8000-00000000002${idx + 1}`;
-    await prisma.attempt.upsert({
+    const gameAttempt = await prisma.attempt.upsert({
       where: { id: attemptId },
       update: {
         score: 5.0,
@@ -691,11 +691,26 @@ export async function seedDev() {
         payload: { answers: {} },
       },
     });
+    if (gameAttempt.finished_at) {
+      await prisma.progressEvent.upsert({
+        where: { id: `61000000-0000-4000-8000-00000000002${idx + 1}` },
+        update: { occurred_at: gameAttempt.finished_at },
+        create: {
+          id: `61000000-0000-4000-8000-00000000002${idx + 1}`,
+          organization_id: org.id,
+          student_id: firstStudent.id,
+          attempt_id: gameAttempt.id,
+          type: ProgressEventType.attempt_completed,
+          value: gameAttempt.score,
+          occurred_at: gameAttempt.finished_at,
+        },
+      });
+    }
   }
 
   // Attempts: graded, pending_review, abandoned
   // 1. Graded attempt
-  await prisma.attempt.upsert({
+  const gradedAttempt = await prisma.attempt.upsert({
     where: { id: '40000000-0000-4000-8000-000000000001' },
     update: {
       graded_at: new Date(now.getTime() - 3 * 24 * 3600 * 1000),
@@ -801,6 +816,27 @@ export async function seedDev() {
       retry_extend_until: new Date(now.getTime() + 5 * 24 * 3600 * 1000), // unconsumed future deadline!
     },
   });
+
+  for (const [eventId, attempt, type] of [
+    ['61000000-0000-4000-8000-000000000001', gradedAttempt, ProgressEventType.attempt_completed],
+    ['61000000-0000-4000-8000-000000000002', pendingAttempt, ProgressEventType.audio_submitted],
+    ['61000000-0000-4000-8000-000000000004', attemptWithRetry, ProgressEventType.attempt_completed],
+  ] as const) {
+    if (!attempt.finished_at) continue;
+    await prisma.progressEvent.upsert({
+      where: { id: eventId },
+      update: { occurred_at: attempt.finished_at },
+      create: {
+        id: eventId,
+        organization_id: org.id,
+        student_id: attempt.student_id,
+        attempt_id: attempt.id,
+        type,
+        value: type === ProgressEventType.audio_submitted ? 1 : attempt.score,
+        occurred_at: attempt.finished_at,
+      },
+    });
+  }
 
   // Streaks: active and forgiven (ProgressEvent with type streak_week)
   await prisma.progressEvent.upsert({

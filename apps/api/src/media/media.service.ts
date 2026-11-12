@@ -1004,18 +1004,36 @@ export class MediaService implements OnModuleInit {
             '-v',
             'error',
             '-show_entries',
-            'format=duration',
+            'format=duration:packet=duration_time',
+            '-select_streams',
+            'a:0',
             '-of',
-            'default=noprint_wrappers=1:nokey=1',
+            'compact=p=0:nk=0',
             tempFile,
           ],
           { shell: false },
         );
 
-        let output = '';
+        let pending = '';
+        let formatDuration = 0;
+        let packetDuration = 0;
+        let audioPackets = 0;
+        const consumeLine = (line: string) => {
+          for (const field of line.split('|')) {
+            const [key, raw] = field.split('=');
+            if (key === 'duration_time') audioPackets++;
+            const value = Number(raw);
+            if (!Number.isFinite(value) || value <= 0) continue;
+            if (key === 'duration') formatDuration = value;
+            if (key === 'duration_time') packetDuration += value;
+          }
+        };
         let stderr = '';
         proc.stdout.on('data', (d) => {
-          output += d.toString();
+          pending += d.toString();
+          const lines = pending.split('\n');
+          pending = lines.pop() || '';
+          for (const line of lines) consumeLine(line);
         });
         proc.stderr.on('data', (d) => {
           if (stderr.length < 4096) {
@@ -1047,9 +1065,10 @@ export class MediaService implements OnModuleInit {
           if (killTimer) clearTimeout(killTimer);
           if (killed) return;
           if (code === 0) {
-            const parsed = parseFloat(output.trim());
-            if (!isNaN(parsed) && parsed > 0) {
-              resolve(parsed);
+            consumeLine(pending);
+            const measured = formatDuration || packetDuration;
+            if (audioPackets > 0 && measured > 0) {
+              resolve(measured);
               return;
             }
           }

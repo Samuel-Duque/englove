@@ -25,11 +25,13 @@ import {
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { GameRenderer } from '../../../../components/activities/GameRenderer';
+import { CorrectionFeedback } from '../../../../components/activities/CorrectionFeedback';
 import { fireCelebrationConfetti } from '../../../../lib/confetti';
 import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
 import { setActiveAttemptState } from '../../../../lib/pwa-manager';
-import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb } from '../../../../lib/offline-queue';
+import { speak } from '../../../../lib/speech';
+import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb, getPendingAttemptAnswers } from '../../../../lib/offline-queue';
 import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
 
 function isRecord(val: unknown): val is Record<string, unknown> {
@@ -232,18 +234,24 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const {
     data: attemptData,
     isLoading,
+    isFetching,
     error: queryError,
   } = useQuery({
     queryKey: ['attempt', attemptId],
     queryFn: async () => {
-      const [data, profile] = await Promise.all([
+      const profile = await fetchSharedProfile().catch(() => null);
+      const userId = profile?.user?.id || getSharedSession()?.user?.id || '';
+      const pendingAnswers = await getPendingAttemptAnswers(userId, attemptId);
+      const [data, savedRec] = await Promise.all([
         apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`, {
           schema: RuntimeViewSchema,
         }),
-        fetchSharedProfile().catch(() => null),
+        loadLocalRecording(attemptId),
       ]);
-      const savedRec = await loadLocalRecording(attemptId);
-      return { data, profile, savedRec };
+      const restoredData = data.activity.type === ActivityType.game
+        ? { ...data, answers: { ...data.answers, ...pendingAnswers } }
+        : data;
+      return { data: restoredData, profile, savedRec };
     },
     staleTime: 0,
     retry: false,
@@ -262,7 +270,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           : null;
 
   useEffect(() => {
-    if (!attemptData || initializedAttemptRef.current === attemptId) {
+    if (!attemptData || (attemptData.data.activity.type === ActivityType.game && isFetching) || initializedAttemptRef.current === attemptId) {
       return;
     }
 
@@ -302,7 +310,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       recordingDurationRef.current = Math.max(2, restoredSec);
       setRecordingSeconds(Math.max(2, restoredSec));
     }
-  }, [attemptData, attemptId]);
+  }, [attemptData, attemptId, isFetching]);
 
   // Persistent event emitter (RF-10, Decision 37)
   const sendEvent = useCallback(
@@ -348,13 +356,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   // Text-To-Speech for Kids prompts (RF-22)
   const speakText = (text: string) => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      // Spanish vs English detection (RF-22)
-      const isSpanish = /[áéíóúñ¿¡]|(\b(selecciona|completa|escucha|arrastra|responde|elige|traduce|escribe|une|haz|marca|graba|instrucción|pregunta|oración)\b)/i.test(text);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = isSpanish ? 'es-CO' : 'en-US';
-      utterance.rate = 0.85;
-      window.speechSynthesis.speak(utterance);
+      speak(text);
     }
   };
 
@@ -750,7 +752,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     playAgainMutation.mutate(activity.id);
   };
 
-  if (isLoading) {
+  if (isLoading || (runtime?.activity.type === ActivityType.game && isFetching)) {
     return (
       <div className="py-20 text-center">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
@@ -891,24 +893,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                 Retroalimentación de respuestas:
               </h4>
               <div className="space-y-1.5 text-xs">
-                {Object.entries(completion.correction).map(([itemId, blanks]) => {
-                  if (!isRecord(blanks)) return null;
-                  return (
-                    <div key={itemId} className="space-y-1">
-                      {Object.entries(blanks).map(([blankId, res], bIdx) => {
-                        const isCorrect = isRecord(res) && res.correct === true;
-                        return (
-                          <div key={blankId} className="flex items-center gap-2">
-                            <span>{isCorrect ? '✅' : '❌'}</span>
-                            <span className="font-semibold text-zinc-800">
-                              Espacio {bIdx + 1}: {isCorrect ? 'Correcto' : 'Incorrecto'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                <CorrectionFeedback correction={completion.correction} />
               </div>
             </div>
           )}
@@ -1396,7 +1381,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         {activity.type === ActivityType.game && isGamePublicConfig(activity.config) && (
           <GameRenderer
             config={activity.config}
-            initialState={isGameAnswers(answers) ? answers : {}}
+            initialState={isGameAnswers(runtime.answers) ? runtime.answers : {}}
             onEvent={(event) => {
               if ('itemId' in event && 'answer' in event) {
                 handleAnswerChange(event.itemId, event.answer);

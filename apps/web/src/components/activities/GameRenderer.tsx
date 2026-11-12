@@ -28,6 +28,7 @@ import { OrderWordsGame } from './games/OrderWordsGame';
 import { DragDropGame } from './games/DragDropGame';
 import { MemoryGame } from './games/MemoryGame';
 import { TimedChoiceGame } from './games/TimedChoiceGame';
+import { speak } from '../../lib/speech';
 
 export interface SimulatedResult {
   score: number;
@@ -134,13 +135,8 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
 
   const handleSpeakPrompt = () => {
     if (!promptToSpeak || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(promptToSpeak);
-    utterance.lang = 'en-US';
-    utterance.onend = () => setIsPlayingTts(false);
-    utterance.onerror = () => setIsPlayingTts(false);
     setIsPlayingTts(true);
-    window.speechSynthesis.speak(utterance);
+    speak(promptToSpeak, () => setIsPlayingTts(false));
   };
 
   return (

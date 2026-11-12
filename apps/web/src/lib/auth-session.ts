@@ -1,26 +1,87 @@
-import { StudentProfileViewSchema, type SessionView, type StudentProfileView } from '@englove/shared';
-import { apiFetch } from './api';
-import { resumeOfflineQueueAfterAuth } from './offline-queue';
-import { syncUserSegment } from './user-segment';
-import { checkAppMinVersion } from './pwa-manager';
+import {
+  StudentProfileViewSchema,
+  type SessionView,
+  type StudentProfileView,
+} from "@englove/shared";
+import { apiFetch } from "./api";
+import {
+  resumeOfflineQueueAfterAuth,
+  purgeOtherUsersEntries,
+  suspendOfflineQueue,
+} from "./offline-queue";
+import { syncUserSegment } from "./user-segment";
+import { checkAppMinVersion } from "./pwa-manager";
 
 let inFlightPromise: Promise<SessionView | null> | null = null;
 let cachedSession: SessionView | null = null;
 
 let inFlightProfilePromise: Promise<StudentProfileView | null> | null = null;
-let cachedProfile: { data: StudentProfileView; timestamp: number } | null = null;
+let cachedProfile: { data: StudentProfileView; timestamp: number } | null =
+  null;
 
 let refreshPromise: Promise<boolean> | null = null;
 let lastSuccessfulRefresh = 0;
 
-const TAB_SYNC_KEY = 'englove_tab_sync_ts';
+const TAB_SYNC_KEY = "englove_tab_sync_ts";
 const PROFILE_CACHE_TTL_MS = 60 * 1000;
+const LOGOUT_PENDING_KEY = "englove_logout_pending";
+let logoutPendingInMemory = false;
+let sessionGeneration = 0;
+
+/** A UI lock only: revocation and authorization remain server responsibilities. */
+export function isLogoutPending(): boolean {
+  if (typeof window === "undefined") return false;
+  if (logoutPendingInMemory) return true;
+  try {
+    if (window.localStorage?.getItem(LOGOUT_PENDING_KEY) === "1") return true;
+  } catch {
+    /* The host cookie remains available when storage is blocked. */
+  }
+  return (
+    typeof document !== "undefined" &&
+    (document.cookie ?? "")
+      .split(";")
+      .some((cookie) => cookie.trim() === `${LOGOUT_PENDING_KEY}=1`)
+  );
+}
+
+export function markLogoutPending(): void {
+  logoutPendingInMemory = true;
+  clearSharedSession();
+  try {
+    window.localStorage?.setItem(LOGOUT_PENDING_KEY, "1");
+  } catch {
+    /* Cookie fallback. */
+  }
+  if (typeof document !== "undefined") {
+    document.cookie = `${LOGOUT_PENDING_KEY}=1; path=/; max-age=31536000; SameSite=Lax${window.location?.protocol === "https:" ? "; Secure" : ""}`;
+  }
+}
+
+export function confirmLogoutComplete(): void {
+  logoutPendingInMemory = false;
+  try {
+    window.localStorage?.removeItem(LOGOUT_PENDING_KEY);
+  } catch {
+    /* Cookie fallback. */
+  }
+  if (typeof document !== "undefined")
+    document.cookie = `${LOGOUT_PENDING_KEY}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+export async function settleSharedRefresh(): Promise<void> {
+  await refreshPromise;
+}
 
 /**
  * Consulta la sesión actual de forma pasiva y de solo lectura vía GET /api/v1/auth/session (P0-03, QA-02).
  * No rota ni consume el refresh_token.
  */
-export async function fetchSharedSession(force: boolean = false): Promise<SessionView | null> {
+export async function fetchSharedSession(
+  force: boolean = false,
+): Promise<SessionView | null> {
+  if (isLogoutPending()) return null;
+  const generation = sessionGeneration;
   if (!force && cachedSession) {
     return cachedSession;
   }
@@ -28,17 +89,17 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
     return inFlightPromise;
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
   inFlightPromise = (async () => {
     try {
       const res = await fetch(`${apiUrl}/api/v1/auth/session`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
-      const minVersionSession = res.headers?.get?.('x-app-min-version');
-      if (minVersionSession && typeof window !== 'undefined') {
+      const minVersionSession = res.headers?.get?.("x-app-min-version");
+      if (minVersionSession && typeof window !== "undefined") {
         checkAppMinVersion(minVersionSession);
       }
       if (res.status === 401) {
@@ -50,12 +111,16 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
         throw new Error(`SERVER_ERROR_${res.status}`);
       }
       const data: SessionView = await res.json();
+      if (generation !== sessionGeneration || isLogoutPending()) return null;
+      await purgeOtherUsersEntries(data.user.id);
+      if (generation !== sessionGeneration || isLogoutPending()) return null;
       cachedSession = data;
       try {
-        if (typeof window !== 'undefined' && 'localStorage' in window) {
-          const segment = (data.user?.role === 'teacher' || data.user?.role === 'admin')
-            ? 'teacher'
-            : (data.student?.ageSegment ?? 'kids');
+        if (typeof window !== "undefined" && "localStorage" in window) {
+          const segment =
+            data.user?.role === "teacher" || data.user?.role === "admin"
+              ? "teacher"
+              : (data.student?.ageSegment ?? "kids");
           syncUserSegment(segment);
         }
       } catch {
@@ -64,11 +129,11 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
       return data;
     } catch (err: unknown) {
       cachedSession = null;
-      if (err instanceof Error && err.message.startsWith('SERVER_ERROR_')) {
+      if (err instanceof Error && err.message.startsWith("SERVER_ERROR_")) {
         throw err;
       }
       // If network unreachable, throw NETWORK_ERROR so UI does not enter redirect loop
-      throw new Error('NETWORK_ERROR', { cause: err });
+      throw new Error("NETWORK_ERROR", { cause: err });
     } finally {
       inFlightPromise = null;
     }
@@ -83,22 +148,25 @@ export async function fetchSharedSession(force: boolean = false): Promise<Sessio
  * con fallback single-flight en memoria.
  */
 export async function requestSharedRefresh(): Promise<boolean> {
+  if (isLogoutPending()) return false;
+  const generation = sessionGeneration;
   const performRefresh = async (): Promise<boolean> => {
+    if (isLogoutPending() || generation !== sessionGeneration) return false;
     // Si otra pestaña o llamada refrescó en los últimos 2 segundos, no rotar de nuevo
     if (Date.now() - lastSuccessfulRefresh < 2000 && cachedSession) {
       return true;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
     try {
       const res = await fetch(`${apiUrl}/api/v1/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
 
-      const minVersionRefresh = res.headers?.get?.('x-app-min-version');
-      if (minVersionRefresh && typeof window !== 'undefined') {
+      const minVersionRefresh = res.headers?.get?.("x-app-min-version");
+      if (minVersionRefresh && typeof window !== "undefined") {
         checkAppMinVersion(minVersionRefresh);
       }
 
@@ -113,14 +181,21 @@ export async function requestSharedRefresh(): Promise<boolean> {
       }
 
       const data: SessionView = await res.json();
+      if (generation !== sessionGeneration || isLogoutPending()) return false;
+      await purgeOtherUsersEntries(data.user.id);
+      if (generation !== sessionGeneration || isLogoutPending()) return false;
       cachedSession = data;
       lastSuccessfulRefresh = Date.now();
       try {
-        if (typeof window !== 'undefined' && 'localStorage' in window) {
-          window.localStorage.setItem(TAB_SYNC_KEY, String(lastSuccessfulRefresh));
-          const segment = (data.user?.role === 'teacher' || data.user?.role === 'admin')
-            ? 'teacher'
-            : (data.student?.ageSegment ?? 'kids');
+        if (typeof window !== "undefined" && "localStorage" in window) {
+          window.localStorage.setItem(
+            TAB_SYNC_KEY,
+            String(lastSuccessfulRefresh),
+          );
+          const segment =
+            data.user?.role === "teacher" || data.user?.role === "admin"
+              ? "teacher"
+              : (data.student?.ageSegment ?? "kids");
           syncUserSegment(segment);
         }
       } catch {
@@ -138,12 +213,13 @@ export async function requestSharedRefresh(): Promise<boolean> {
   };
 
   if (
-    typeof navigator !== 'undefined' &&
-    'locks' in navigator &&
-    typeof navigator.locks?.request === 'function'
+    typeof navigator !== "undefined" &&
+    "locks" in navigator &&
+    typeof navigator.locks?.request === "function"
   ) {
     try {
-      return await navigator.locks.request('englove_auth_refresh', async () => {
+      return await navigator.locks.request("englove_auth_refresh", async () => {
+        if (isLogoutPending() || generation !== sessionGeneration) return false;
         // 1. Memoria local de esta pestaña
         if (Date.now() - lastSuccessfulRefresh < 2000 && cachedSession) {
           return true;
@@ -152,8 +228,10 @@ export async function requestSharedRefresh(): Promise<boolean> {
         // 2. Coordinación inter-pestañas: si otra pestaña ya refrescó recientemente (dentro de 3 s),
         // comprobamos pasivamente con fetchSharedSession(true) sobre la nueva cookie sin volver a rotar
         try {
-          if (typeof window !== 'undefined' && 'localStorage' in window) {
-            const lastTabRefresh = Number(window.localStorage.getItem(TAB_SYNC_KEY) || 0);
+          if (typeof window !== "undefined" && "localStorage" in window) {
+            const lastTabRefresh = Number(
+              window.localStorage.getItem(TAB_SYNC_KEY) || 0,
+            );
             if (Date.now() - lastTabRefresh < 3000) {
               const freshSession = await fetchSharedSession(true);
               if (freshSession) {
@@ -189,15 +267,18 @@ export async function requestSharedRefresh(): Promise<boolean> {
 }
 
 export function setSharedSession(session: SessionView): void {
+  if (isLogoutPending()) return;
+  void purgeOtherUsersEntries(session.user.id);
   cachedSession = session;
   inFlightPromise = null;
   lastSuccessfulRefresh = Date.now();
   try {
-    if (typeof window !== 'undefined' && 'localStorage' in window) {
+    if (typeof window !== "undefined" && "localStorage" in window) {
       window.localStorage.setItem(TAB_SYNC_KEY, String(lastSuccessfulRefresh));
-      const segment = (session.user?.role === 'teacher' || session.user?.role === 'admin')
-        ? 'teacher'
-        : (session.student?.ageSegment ?? 'kids');
+      const segment =
+        session.user?.role === "teacher" || session.user?.role === "admin"
+          ? "teacher"
+          : (session.student?.ageSegment ?? "kids");
       syncUserSegment(segment);
     }
   } catch {
@@ -206,16 +287,24 @@ export function setSharedSession(session: SessionView): void {
 }
 
 export function getSharedSession(): SessionView | null {
-  return cachedSession;
+  return isLogoutPending() ? null : cachedSession;
 }
 
 /**
  * Obtiene el perfil del usuario autenticado deduplicando peticiones concurrentes
  * y reutilizando la respuesta en memoria para evitar saturar el rate limiter (ISSUE-09).
  */
-export async function fetchSharedProfile(force: boolean = false): Promise<StudentProfileView | null> {
+export async function fetchSharedProfile(
+  force: boolean = false,
+): Promise<StudentProfileView | null> {
+  if (isLogoutPending()) return null;
+  const generation = sessionGeneration;
   const now = Date.now();
-  if (!force && cachedProfile && now - cachedProfile.timestamp < PROFILE_CACHE_TTL_MS) {
+  if (
+    !force &&
+    cachedProfile &&
+    now - cachedProfile.timestamp < PROFILE_CACHE_TTL_MS
+  ) {
     return cachedProfile.data;
   }
   if (inFlightProfilePromise) {
@@ -224,9 +313,12 @@ export async function fetchSharedProfile(force: boolean = false): Promise<Studen
 
   inFlightProfilePromise = (async () => {
     try {
-      const data = await apiFetch<StudentProfileView>('/api/v1/me', {
+      const data = await apiFetch<StudentProfileView>("/api/v1/me", {
         schema: StudentProfileViewSchema,
       });
+      if (isLogoutPending() || generation !== sessionGeneration) return null;
+      await purgeOtherUsersEntries(data.user.id);
+      if (isLogoutPending() || generation !== sessionGeneration) return null;
       cachedProfile = { data, timestamp: Date.now() };
       return data;
     } catch {
@@ -240,6 +332,7 @@ export async function fetchSharedProfile(force: boolean = false): Promise<Studen
 }
 
 export function setSharedProfile(profile: StudentProfileView): void {
+  if (isLogoutPending()) return;
   cachedProfile = { data: profile, timestamp: Date.now() };
   inFlightProfilePromise = null;
 }
@@ -250,13 +343,15 @@ export function clearSharedProfile(): void {
 }
 
 export function clearSharedSession(): void {
+  sessionGeneration++;
+  suspendOfflineQueue();
   cachedSession = null;
   inFlightPromise = null;
   cachedProfile = null;
   inFlightProfilePromise = null;
   lastSuccessfulRefresh = 0;
   try {
-    if (typeof window !== 'undefined' && 'localStorage' in window) {
+    if (typeof window !== "undefined" && "localStorage" in window) {
       window.localStorage.removeItem(TAB_SYNC_KEY);
       syncUserSegment(null);
     }

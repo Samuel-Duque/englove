@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StudentsService } from '../src/students/students.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { MailService } from '../src/mail/mail.service';
@@ -34,6 +34,25 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
   };
   let mockMailService: { sendMail: MockFn };
   let mockMediaService: { deleteFile: MockFn };
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.student.delete,
+      mockPrisma.user.delete,
+      mockPrisma.assignment.update,
+      mockPrisma.auditLog.update,
+      mockPrisma.review.deleteMany,
+      mockPrisma.attempt.deleteMany,
+      mockPrisma.mediaAsset.deleteMany,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockMailService = {
@@ -155,7 +174,7 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
 
     expect(mockPrisma.assignment.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: assignmentId },
+        where: { id: assignmentId, organization_id: orgId },
         data: { historical_student_count: 3 }, // 3 distinct students
       }),
     );
@@ -166,7 +185,7 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
 
     expect(mockPrisma.auditLog.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'log-1' },
+        where: { id: 'log-1', organization_id: orgId },
         data: {
           target_student_id: null,
           details: {
@@ -194,8 +213,8 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
     expect(mockPrisma.attempt.deleteMany).toHaveBeenCalled();
     expect(mockPrisma.groupMembership.deleteMany).toHaveBeenCalled();
     expect(mockPrisma.mediaAsset.deleteMany).toHaveBeenCalled();
-    expect(mockPrisma.student.delete).toHaveBeenCalledWith({ where: { id: studentId } });
-    expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: studentUserId } });
+    expect(mockPrisma.student.delete).toHaveBeenCalledWith({ where: { id: studentId, organization_id: orgId } });
+    expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: studentUserId, organization_id: orgId } });
   });
 
   it('lanza NotFoundException si el estudiante no existe o pertenece a otra organización', async () => {

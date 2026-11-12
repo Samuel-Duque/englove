@@ -321,13 +321,13 @@ export class StudentsService {
     await this.prisma.$transaction(async (tx) => {
       if (dto.name !== undefined && dto.name.trim() !== '') {
         await tx.user.update({
-          where: { id: student.user_id },
+          where: { id: student.user_id, organization_id: organizationId },
           data: { name: dto.name.trim() },
         });
       }
 
       await tx.student.update({
-        where: { id: student.id },
+        where: { id: student.id, organization_id: organizationId },
         data: {
           birth_date: birthDateToUpdate,
           level: dto.level,
@@ -515,7 +515,7 @@ export class StudentsService {
       // Delete User, cascading to Student, sessions and tokens without orphans (RF-10, Decision 77)
       const userClient = 'user' in tx && tx.user ? tx.user : this.prisma.user;
       await userClient.delete({
-        where: { id: student.user_id },
+        where: { id: student.user_id, organization_id: organizationId },
       });
     };
 
@@ -546,7 +546,7 @@ export class StudentsService {
     }
 
     await this.prisma.user.update({
-      where: { id: student.user_id },
+      where: { id: student.user_id, organization_id: organizationId },
       data: {
         failed_login_count: 0,
         locked_until: null,
@@ -841,7 +841,7 @@ export class StudentsService {
 
       if (currentActive) {
         await tx.groupMembership.update({
-          where: { id: currentActive.id },
+          where: { id: currentActive.id, organization_id: organizationId },
           data: { left_at: now },
         });
       }
@@ -914,7 +914,7 @@ export class StudentsService {
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.user.update({
-          where: { id: student.user_id },
+          where: { id: student.user_id, organization_id: organizationId },
           data: { email: normalizedEmail },
         });
 
@@ -1040,7 +1040,7 @@ export class StudentsService {
 
         const distinctStudentIds = new Set(overlappingMemberships.map((m) => m.student_id));
         await this.prisma.assignment.update({
-          where: { id: assignment.id },
+          where: { id: assignment.id, organization_id: organizationId },
           data: { historical_student_count: distinctStudentIds.size },
         });
       }
@@ -1080,7 +1080,7 @@ export class StudentsService {
         }
 
         await tx.auditLog.update({
-          where: { id: log.id },
+          where: { id: log.id, organization_id: organizationId },
           data: {
             target_student_id: null,
             details: redactedDetails,
@@ -1127,11 +1127,11 @@ export class StudentsService {
       });
 
       await tx.student.delete({
-        where: { id: studentId },
+        where: { id: studentId, organization_id: organizationId },
       });
 
       await tx.user.delete({
-        where: { id: student.user_id },
+        where: { id: student.user_id, organization_id: organizationId },
       });
     });
   }

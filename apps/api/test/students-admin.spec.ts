@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   NotFoundException,
   BadRequestException,
@@ -25,6 +25,21 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
   let service: StudentsService;
   let mockPrisma: any;
   let mockMailService: any;
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.student.update,
+      mockPrisma.user.update,
+      mockPrisma.groupMembership.update,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockMailService = {
@@ -189,7 +204,7 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
       expect(result.groupId).toBe(groupBId);
       expect(mockPrisma.groupMembership.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'mem-old' },
+          where: { id: 'mem-old', organization_id: orgId },
           data: { left_at: expect.any(Date) },
         }),
       );
@@ -462,7 +477,7 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
 
       // Updates user email
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: studentUserId },
+        where: { id: studentUserId, organization_id: orgId },
         data: { email: newEmail },
       });
 

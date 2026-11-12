@@ -189,7 +189,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
@@ -202,7 +202,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
@@ -214,7 +214,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       expect(result.status).toBe(MediaAssetStatus.ready);
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: expect.objectContaining({
             status: MediaAssetStatus.ready,
             duration_seconds: 15,
@@ -280,6 +280,16 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
   });
 
   describe('AUDIO-01: Pruebas de regresión de validación de audio (SPEC-11 §9, P1-02, QA-05)', () => {
+    it('TEN-01 filtra por organización y alumno las mutaciones de confirmación', async () => {
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60, 1),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
+        where: { id: mediaId, organization_id: orgId, student_id: studentId },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+    });
+
     it('rechaza binario no-audio con magic bytes OggS sin fallback de tamaño (P1-02, SPEC-11 §9)', async () => {
       // 24 KB file starting with OggS magic bytes but containing non-audio garbage
       const fakeOgg = Buffer.alloc(24 * 1024);
@@ -298,7 +308,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
@@ -321,7 +331,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
@@ -345,7 +355,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );
@@ -367,7 +377,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
 
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mediaId },
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         }),
       );

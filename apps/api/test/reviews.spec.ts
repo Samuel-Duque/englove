@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReviewsService } from '../src/reviews/reviews.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
@@ -34,6 +34,22 @@ describe('SPEC-07: ReviewsService — Calificación, feedback, retención y nuev
   let mockGamification: any;
   let mockMail: any;
   let mockConfig: any;
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.attempt.update,
+      mockPrisma.review.update,
+      mockPrisma.mediaAsset.updateMany,
+      mockPrisma.attempt.updateMany,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockPrisma = {
@@ -263,7 +279,7 @@ describe('SPEC-07: ReviewsService — Calificación, feedback, retención y nuev
 
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: attemptId },
+          where: { id: attemptId, organization_id: orgId },
           data: expect.objectContaining({
             score: expect.any(Object),
             status: AttemptStatus.graded,

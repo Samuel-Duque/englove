@@ -534,7 +534,7 @@ export class ReviewsService {
 
         // Update attempt
         await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             score: new Prisma.Decimal(roundedScore),
             graded_at: now,
@@ -552,7 +552,7 @@ export class ReviewsService {
         if (existingReview) {
           const reviewTarget = tx.review ?? this.prisma.review;
           await reviewTarget.update({
-            where: { id: existingReview.id },
+            where: { id: existingReview.id, organization_id: organizationId },
             data: {
               reviewer_id: reviewerId,
               comment: rawComment.length > 0 ? rawComment : null,
@@ -662,7 +662,7 @@ export class ReviewsService {
         if (existingReview) {
           const reviewTarget = tx.review ?? this.prisma.review;
           await reviewTarget.update({
-            where: { id: existingReview.id },
+            where: { id: existingReview.id, organization_id: organizationId },
             data: {
               reviewer_id: reviewerId,
               comment: rawComment.length > 0 ? rawComment : null,

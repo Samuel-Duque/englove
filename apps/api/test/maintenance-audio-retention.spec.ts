@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MaintenanceService } from '../src/maintenance/maintenance.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { MediaService } from '../src/media/media.service';
+import { ConfigService } from '@nestjs/config';
 import {
   MediaAssetStatus,
   JobRunStatus,
@@ -162,5 +163,30 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
         data: expect.objectContaining({ status: JobRunStatus.done }),
       }),
     );
+  });
+
+  it('AUD-03 mantiene pending_delete con S3 local caído y borra al recuperarse', async () => {
+    const localMedia = new MediaService(new PrismaService(), new ConfigService({ APP_ENV: 'local' }));
+    mockMediaService.deleteFile = localMedia.deleteFile.bind(localMedia);
+    const send = vi.spyOn(localMedia['s3Client'], 'send')
+      .mockRejectedValueOnce(new Error('MinIO no disponible')).mockResolvedValueOnce(undefined);
+    mockPrisma.mediaAsset.findMany.mockResolvedValue([{
+      id: 'asset-local', organization_id: orgId, key: 'synthetic/local.webm',
+      converted_key: null, status: MediaAssetStatus.pending_delete,
+    }]);
+    await service.runAudioRetention(periodKey, new Date('2026-10-26T02:00:00Z'));
+    expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
+      where: { id: 'asset-local' }, data: { status: MediaAssetStatus.pending_delete },
+    });
+    expect(mockPrisma.mediaAsset.update).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: MediaAssetStatus.deleted }),
+    }));
+    const recoveredAt = new Date('2026-10-27T02:00:00Z');
+    await service.runAudioRetention('2026-10-27', recoveredAt);
+    expect(mockPrisma.mediaAsset.update).toHaveBeenLastCalledWith({
+      where: { id: 'asset-local' },
+      data: { status: MediaAssetStatus.deleted, deleted_at: recoveredAt },
+    });
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

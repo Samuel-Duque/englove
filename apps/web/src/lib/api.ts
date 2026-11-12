@@ -1,5 +1,5 @@
-import { checkAppMinVersion } from './pwa-manager';
-import { requestSharedRefresh } from './auth-session';
+import { checkAppMinVersion } from "./pwa-manager";
+import { requestSharedRefresh, isLogoutPending } from "./auth-session";
 
 export interface ApiErrorResponse {
   statusCode: number;
@@ -16,15 +16,15 @@ export class ApiError extends Error {
     public readonly details?: unknown,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
 export const getApiBaseUrl = (): string => {
-  if (typeof window !== 'undefined') {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  if (typeof window !== "undefined") {
+    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
   }
-  return process.env.API_URL || 'http://localhost:3001';
+  return process.env.API_URL || "http://localhost:3001";
 };
 
 export { requestSharedRefresh };
@@ -38,12 +38,23 @@ export async function apiFetch<T>(
   options: ApiFetchOptions<T> = {},
   isRetry: boolean = false,
 ): Promise<T> {
+  if (isLogoutPending() && !path.startsWith("/api/v1/auth/")) {
+    throw new ApiError(
+      401,
+      "LOGOUT_PENDING",
+      "No se pudo confirmar el cierre de sesión. Reintenta cuando haya conexión.",
+    );
+  }
   const baseUrl = getApiBaseUrl();
-  const url = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers = new Headers(options.headers);
-  if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
-    headers.set('Content-Type', 'application/json');
+  if (
+    !headers.has("Content-Type") &&
+    options.body &&
+    typeof options.body === "string"
+  ) {
+    headers.set("Content-Type", "application/json");
   }
 
   const { schema, ...fetchOptions } = options;
@@ -51,24 +62,33 @@ export async function apiFetch<T>(
   const response = await fetch(url, {
     ...fetchOptions,
     headers,
-    credentials: 'include',
+    credentials: "include",
   });
 
+  if (isLogoutPending() && !path.startsWith("/api/v1/auth/")) {
+    throw new ApiError(401, "LOGOUT_PENDING", "Cierre de sesión pendiente.");
+  }
+
   // Check minimum required version header from API (RF-7)
-  const minVersion = response.headers.get('x-app-min-version');
-  if (minVersion && typeof window !== 'undefined') {
+  const minVersion = response.headers.get("x-app-min-version");
+  if (minVersion && typeof window !== "undefined") {
     checkAppMinVersion(minVersion);
   }
 
   // Single-flight refresh on 401 (RF-2)
   const isAuthRoute =
-    path.includes('/auth/login') ||
-    path.includes('/auth/refresh') ||
-    path.includes('/auth/logout') ||
-    path.includes('/auth/signup') ||
-    path.includes('/auth/session');
+    path.includes("/auth/login") ||
+    path.includes("/auth/refresh") ||
+    path.includes("/auth/logout") ||
+    path.includes("/auth/signup") ||
+    path.includes("/auth/session");
 
-  if (response.status === 401 && !isRetry && !isAuthRoute && typeof window !== 'undefined') {
+  if (
+    response.status === 401 &&
+    !isRetry &&
+    !isAuthRoute &&
+    typeof window !== "undefined"
+  ) {
     const refreshed = await requestSharedRefresh();
     if (refreshed) {
       return apiFetch<T>(path, options, true);
@@ -81,8 +101,8 @@ export async function apiFetch<T>(
   }
 
   let data: unknown;
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
     try {
       data = await response.json();
     } catch {
@@ -91,19 +111,21 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
-    let errorCode = 'ERROR';
+    let errorCode = "ERROR";
     let errorMessage = `Error ${response.status}: ${response.statusText}`;
     let errorDetails: unknown;
-    if (typeof data === 'object' && data !== null) {
-      const code = Reflect.get(data, 'code');
-      if (typeof code === 'string') errorCode = code;
-      const message = Reflect.get(data, 'message');
+    if (typeof data === "object" && data !== null) {
+      const code = Reflect.get(data, "code");
+      if (typeof code === "string") errorCode = code;
+      const message = Reflect.get(data, "message");
       if (Array.isArray(message)) {
-        errorMessage = message.filter((m): m is string => typeof m === 'string').join(', ');
-      } else if (typeof message === 'string') {
+        errorMessage = message
+          .filter((m): m is string => typeof m === "string")
+          .join(", ");
+      } else if (typeof message === "string") {
         errorMessage = message;
       }
-      errorDetails = Reflect.get(data, 'details');
+      errorDetails = Reflect.get(data, "details");
     }
     throw new ApiError(response.status, errorCode, errorMessage, errorDetails);
   }

@@ -110,5 +110,5 @@ describe('WP-09: Regresiones de redirecciones, cero as Type y limpieza web', () 
     });
 
     expect(unexpected).toEqual([]);
-  });
+  }, 30_000); // QA-01: presupuesto propio para recorrer el AST de todo src.
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -61,6 +61,19 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
   };
   let mockMediaService: { confirmUpload: MockFn };
   let mockFeatureFlagsService: { isEnabled: MockFn };
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.attempt.update,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockPrisma = {
@@ -377,7 +390,7 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
       expect(response.acceptedEventIds).toContain('ev-2');
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: attemptId },
+          where: { id: attemptId, organization_id: orgId },
           data: {
             payload: {
               answers: { 'item-1': 'cat', 'item-2': 'dog' },
@@ -433,7 +446,7 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
 
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: attemptId },
+          where: { id: attemptId, organization_id: orgId },
           data: expect.objectContaining({
             payload: {
               answers: {

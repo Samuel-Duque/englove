@@ -612,7 +612,7 @@ Eliminados por la decisión 34: `ConsentStatus`, `ConsentMethod` (§2) y `Regist
 Un único flujo para todos los roles.
 
 1. `POST /auth/login` con correo y contraseña, **sin identificador de organización**: como el correo es globalmente único (decisión 59), identifica una sola cuenta y la organización sale de `User.organization_id`. Hash con argon2id. Correo inexistente o contraseña incorrecta devuelven siempre el mismo `401 AUTH_INVALID_CREDENTIALS`, incluso si la cuenta real está bloqueada (decisión 94). Solo tras verificar la contraseña se comprueba bloqueo y, después, aprobación; no se emiten cookies hasta superar ambos.
-2. La API responde con dos cookies `HttpOnly; Secure; SameSite=Lax; Domain=.<dominio>` (Decidido, decisión 58; §8.2): `access_token` (15 min, `Path=/`) y `refresh_token` (`Path=/api/v1/auth/refresh`, rotativo) con duración según rol: **30 días profesora, 90 días alumno**. Con `Domain=.<dominio>`, el `access_token` también llega a `app.<dominio>`, donde el `proxy.ts` lo usa solo para redirigir; el `refresh_token`, por su `Path`, solo viaja al endpoint de refresh de la API. El "Recuérdame" de CONTEXT §4 es implícito para el alumno.
+2. La API emite `access_token` (15 min, `Path=/`) y `refresh_token` rotativo (30 días profesora / 90 días alumno, `Path=/api/v1/auth`), ambos HttpOnly, y `session_hint=1` no HttpOnly, sin PII y con la misma duración del refresh (decisiones 139 y 145). Comparten prefijo de entorno, `SameSite=Lax` y `Secure` salvo en `local`; fuera de local usan `Domain=.<dominio>` (§8.2). El hint solo permite intentar recuperación silenciosa: no acredita identidad ni autoriza operaciones. El path del refresh permite enviarlo tanto a refresh como a logout. `GET /api/v1/auth/session` consulta la sesión de acceso sin rotar el refresh; la rotación se coordina entre pestañas con `navigator.locks` y fallback. El frontend nunca lee los tokens HttpOnly.
 3. El login crea una `AuthSession` (decisión 68): su `id` es el `sid` del JWT y guarda el hash del refresh emitido, que lleva el `sid` y un secreto aleatorio. El frontend nunca lee los tokens. Al expirar el acceso, llama a `POST /auth/refresh`; la API emite un par nuevo, sustituye `refresh_token_hash` y fija `rotated_at`.
 4. Reutilización de un refresh ya rotado (el `sid` existe pero el hash no coincide con el vigente) → se fija `revoked_at` en toda la familia de sesión y se exige login de nuevo.
 5. `POST /auth/logout` revoca la familia (`revoked_at`) y borra las cookies.
@@ -740,12 +740,15 @@ sequenceDiagram
   A->>A: INSERT MediaAsset (pending_upload, mime_type)
   A-->>S: mediaId, uploadUrl (10 min)
   S->>R2: PUT uploadUrl (Blob)
-  S->>A: POST /attempts/:id/complete { mediaId }
+  S->>A: POST /media/:id/confirm (x-attempt-token)
   A->>R2: HEAD objeto (existe y tamaño coincide)
   A->>A: ffprobe → duration_seconds; valida 2 s ≤ d ≤ max_duration_seconds
-  A->>A: MediaAsset ready, Attempt pending_review, ProgressEvent audio_submitted
+  A->>A: MediaAsset ready y encola transcodificación serial (decisión 142)
+  A-->>S: audio confirmado
+  S->>A: POST /attempts/:id/complete { mediaId }
+  A->>A: valida audio ready; Attempt pending_review, ProgressEvent audio_submitted
   A-->>S: ok
-  A->>A: encola transcodificación (ffmpeg → MP4/AAC)
+  A->>A: procesa transcodificación (ffmpeg → MP4/AAC)
   A->>R2: PUT <assetId>_converted.mp4; DELETE raw
   A->>A: MediaAsset.converted_key actualizado
 ```
@@ -821,7 +824,7 @@ El panel consulta `GET /stats/students/:id`, `GET /stats/groups/:id`, `GET /stat
 
 Las cookies de sesión requieren que frontend y API compartan dominio registrable: `app.<dominio>` (Cloudflare) y `api.<dominio>` (Render). Así `SameSite=Lax` funciona y las peticiones `fetch` entre subdominios llevan la cookie. Una cookie host-only emitida por `api.<dominio>` no sería visible para `app.<dominio>`, y el `proxy.ts` de Next.js necesita verla para redirigir por rol (§3.1); por eso **las cookies se comparten entre los subdominios del mismo entorno** (decisión 58), sin BFF ni rewrite obligatorio. Configuración:
 
-- Atributos: `Domain=.<dominio>`, `Secure`, `HttpOnly`, `SameSite=Lax` (más el `Path` de cada cookie, §7.1). En `local` no se fija `Domain`: las cookies host-only de `localhost` ya se comparten entre los puertos de web y API.
+- Atributos: `Domain=.<dominio>`, `SameSite=Lax` y `Secure` obligatorio en staging/producción. Los tokens son HttpOnly; `session_hint` es la excepción explícita no HttpOnly y sin PII (decisión 139). En `local` no se fija `Domain` y `Secure=false` permite HTTP local (decisión 145); se conserva el `Path` de cada cookie (§7.1).
 - **Separación entre entornos.** Staging (`app-staging.` / `api-staging.`) y producción (`app.` / `api.`) cuelgan de la misma raíz, así que una cookie con `Domain=.<dominio>` de un entorno también viajaría al otro. Para que no choquen, el nombre de cada cookie lleva un prefijo por entorno (`COOKIE_PREFIX`, por ejemplo `englove_stg_` en staging y `englove_` o vacío en producción, coherente con `render.yaml` y `SPEC-11`) y cada entorno firma sus JWT con secretos distintos, de modo que un token de un entorno nunca es válido en el otro.
 - **Subdominios bajo control.** El dominio raíz y todos sus subdominios son del proyecto. No se publica ningún subdominio no controlado (por ejemplo, un CNAME a un servicio de terceros que permita alojar contenido ajeno): una vulnerabilidad en otro subdominio pondría en riesgo una cookie compartida. Cualquier subdominio nuevo se registra en la tarea de dominio (ENG-003).
 - **La autorización no depende de la cookie en el frontend.** El `proxy.ts` solo redirige; la API valida en cada petición JWT, rol, familia de sesión (`sid`) y tenant (§4.3).
@@ -1089,7 +1092,7 @@ Resultado: un informe breve en [`planning/poc-eng-140-informe.md`](./poc-eng-140
 | A6  | La clave de respuestas no viaja al cliente en tipos calificados; sí en microjuegos                                                               | §5.3        |
 | A7  | `Attempt.payload` con `clientEventId`; sin tabla de eventos de intento                                                                           | §6.2        |
 | A8  | Versionado de actividades por duplicación cuando existen intentos                                                                                | §6.4        |
-| A9  | Subida de audio directa al bucket con URL firmada y confirmación en `complete`                                                                   | §7.6        |
+| A9  | Subida de audio directa al bucket con URL firmada y confirmación previa en `POST /media/:id/confirm` (decisión 142)                                                                   | §7.6        |
 | A10 | Serwist para PWA; cola offline en IndexedDB; sin Background Sync                                                                                 | §10         |
 | A11 | Rachas: una semana inactiva perdonada, dos consecutivas rompen. **Sustituida por el algoritmo de 4 reglas de la decisión 34 §9**                 | §9.3        |
 | A12 | Sentry sin PII para errores de frontend                                                                                                          | §12         |
@@ -1232,7 +1235,7 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
 - Re-registro tras rechazo: ratificado como comportamiento previsto; al rechazar un alumno en `pending_approval` se eliminan completamente sus datos (`Student` y `User`), por lo que ese correo queda habilitado para registrarse nuevamente si fue un error (decisiones 59 y 77).
 - Cerradas el 2026-10-20 (decisiones 93 y 94, SPEC-02): Q-01 delimita rechazo de pendientes en Etapa 2 y baja general completa en Etapa 5; Q-02 precisa credenciales inválidas uniformes, bloqueo solo tras contraseña correcta y reinicio del ciclo al vencer (§7.1, §8.4). No quedan preguntas funcionales bloqueantes de SPEC-02; sus prerrequisitos operativos se siguen en su §11.
 - Cerradas el 2026-10-21 (decisiones 95 a 97, SPEC-03): Q-01 el archivo de actividades no cancela asignaciones y admite restauración al catálogo (la cancelación de asignaciones la define SPEC-04); Q-02 un grupo solo se archiva sin miembros vigentes; Q-03 pesos de examen por mayor resto (§4.4, §6.4, §13).
-- Cerradas el 2026-10-22 (decisiones 98 y 99, SPEC-04): Q-01 fija cancelación definitiva sin destruir trabajo previo; Q-02 define una sola activa por tenant, actividad concreta y grupo, incluidas futuras no solapadas (§6.4). SPEC-04 pasa a Verificada el 2026-10-22 tras auditoría integral y verificación completa de ENG-050 a ENG-053 (254/254 tests en monorepo). SPEC-03 conserva su verificación técnica; el cierre global de Etapa 3/H1 queda pendiente de SPEC-05 al menos En revisión y evidencia operativa de staging/onboarding.
+- Cerradas el 2026-10-22 (decisiones 98 y 99, SPEC-04): Q-01 fija cancelación definitiva sin destruir trabajo previo; Q-02 define una sola activa por tenant, actividad concreta y grupo, incluidas futuras no solapadas (§6.4). SPEC-04 pasa a Verificada el 2026-10-22 tras auditoría integral y verificación completa de ENG-050 a ENG-053 (254/254 tests en monorepo). SPEC-03 conserva su verificación técnica; el cierre global de Etapa 3/H1 queda pendiente de evidencia operativa de staging/onboarding; la dependencia técnica de SPEC-05 ya está cumplida (`Verificada`).
 - Cerradas el 2026-10-10 (decisiones 83 y 84): pendientes de CONTEXT §15 formalizados por el líder del proyecto:
   - **P-1 — Inicio antes de `opens_at`** (cierra SPEC-05): `409 ATTEMPT_NOT_OPEN` sin crear el intento, con la fecha de apertura en el mensaje (§3.6, §7.5).
   - **P-2 — Comentario en autocalificados** (cierra SPEC-07): obligatorio solo en revisión manual; opcional en fichas, exámenes y microjuegos (§7.7).

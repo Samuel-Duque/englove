@@ -10,10 +10,8 @@ describe('SPEC-11 RF-7, SPEC-09 RF-3, RF-4, Decisión 118, 135: Serwist Service 
     expect(fs.existsSync(swPath)).toBe(true);
   });
 
-  it('keeps service worker bundle size well below 3 MB worker limit', () => {
+  it('QA-03: keeps the client Service Worker below its independent 100 KiB budget', () => {
     const stats = fs.statSync(swPath);
-    const sizeInMb = stats.size / (1024 * 1024);
-    expect(sizeInMb).toBeLessThan(3.0);
     // Real build is ~41 KB
     expect(stats.size).toBeLessThan(100 * 1024);
   });

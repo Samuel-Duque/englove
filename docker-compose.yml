@@ -24,8 +24,9 @@ services:
 
   # MinIO emulador S3 para Cloudflare R2 en local (RF-15, decisión 134)
   # Bucket privado: las URLs prefirmadas se validan con firma estricta (sin acceso anónimo, regla G-B10)
+  # Nota: se usa el mirror pgsty/minio y pgsty/mc tras la restricción de Docker Hub para minio oficial
   minio:
-    image: minio/minio:latest
+    image: pgsty/minio:latest
     container_name: englove-minio
     restart: unless-stopped
     ports:
@@ -39,7 +40,7 @@ services:
       - englove_miniodata:/data
 
   minio-init:
-    image: minio/mc:latest
+    image: pgsty/mc:latest
     container_name: englove-minio-init
     depends_on:
       - minio

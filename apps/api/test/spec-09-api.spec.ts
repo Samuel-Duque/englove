@@ -126,7 +126,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
       ).rejects.toThrow(ConflictException);
 
       expect(updateMock).toHaveBeenCalledWith({
-        where: { id: attemptId },
+        where: { id: attemptId, organization_id: orgId },
         data: {
           status: AttemptStatus.abandoned,
           flags: ['offline_sync'],
@@ -175,7 +175,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
       ).rejects.toThrow(ConflictException);
 
       expect(updateMock).toHaveBeenCalledWith({
-        where: { id: attemptId },
+        where: { id: attemptId, organization_id: orgId },
         data: {
           status: AttemptStatus.abandoned,
           flags: ['offline_sync'], // Not duplicated
@@ -274,7 +274,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
       ).rejects.toThrow(ConflictException);
 
       expect(updateMock).toHaveBeenCalledWith({
-        where: { id: attemptId },
+        where: { id: attemptId, organization_id: orgId },
         data: {
           status: AttemptStatus.abandoned,
           flags: ['offline_sync'],
@@ -327,7 +327,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
       ).rejects.toThrow(ConflictException);
 
       expect(updateMock).toHaveBeenCalledWith({
-        where: { id: attemptId },
+        where: { id: attemptId, organization_id: orgId, student_id: studentId },
         data: {
           status: AttemptStatus.abandoned,
           flags: ['offline_sync'],

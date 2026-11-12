@@ -152,7 +152,7 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
             type="button"
             onClick={handleSpeakPrompt}
             aria-label="Escuchar enunciado en inglés"
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="shrink-0 inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
           >
             <span>{isPlayingTts ? '🔊 Reproduciendo…' : '🔊 Escuchar'}</span>
           </button>

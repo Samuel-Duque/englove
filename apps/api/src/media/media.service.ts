@@ -97,14 +97,17 @@ export class MediaService implements OnModuleInit {
     // Recovery routine on startup (Decision 64, Decision 84, SPEC-05 RF-14)
     try {
       // guardrails-ignore G-A06: recuperacion de arranque entre organizaciones en instancia unica
-      const pendingConversions = await this.prisma.mediaAsset.findMany({
-        where: {
-          status: MediaAssetStatus.ready,
-          converted_key: null,
-          transcode_failed_at: null,
-          transcode_attempts: { lt: 3 },
-        },
-      });
+      const pendingConversions = await TenantContext.runBypass(() =>
+        // guardrails-ignore G-A06: consulta global limitada a pendientes bajo bypass del worker de recuperación
+        this.prisma.mediaAsset.findMany({
+          where: {
+            status: MediaAssetStatus.ready,
+            converted_key: null,
+            transcode_failed_at: null,
+            transcode_attempts: { lt: 3 },
+          },
+        }),
+      );
 
       for (const asset of pendingConversions) {
         this.enqueueTranscode(asset.id);
@@ -113,7 +116,8 @@ export class MediaService implements OnModuleInit {
         this.logger.log(`Recuperación de arranque: ${pendingConversions.length} conversiones encoladas`);
       }
     } catch {
-      // Non-fatal if DB not ready during early init
+      // El arranque continúa, pero la recuperación pendiente debe ser observable sin datos del proveedor.
+      this.logger.error('No se pudieron recuperar las conversiones de audio pendientes al arrancar');
     }
   }
 
@@ -234,7 +238,7 @@ export class MediaService implements OnModuleInit {
           : [...currentFlags, 'offline_sync'];
 
         await this.prisma.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId, student_id: studentId },
           data: {
             status: 'abandoned',
             flags: newFlags,
@@ -381,7 +385,7 @@ export class MediaService implements OnModuleInit {
             : [...currentFlags, 'offline_sync'];
 
           await this.prisma.attempt.update({
-            where: { id: attempt.id },
+            where: { id: attempt.id, organization_id: organizationId, student_id: studentId },
             data: {
               status: 'abandoned',
               flags: newFlags,
@@ -456,7 +460,7 @@ export class MediaService implements OnModuleInit {
       const dur = asset.duration_seconds ?? 0;
       if (dur < 2) {
         await this.prisma.mediaAsset.update({
-          where: { id: asset.id },
+          where: { id: asset.id, organization_id: organizationId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         });
         throw new UnprocessableEntityException({
@@ -467,7 +471,7 @@ export class MediaService implements OnModuleInit {
       }
       if (dur > maxDurationSeconds) {
         await this.prisma.mediaAsset.update({
-          where: { id: asset.id },
+          where: { id: asset.id, organization_id: organizationId, student_id: studentId },
           data: { status: MediaAssetStatus.pending_delete },
         });
         throw new UnprocessableEntityException({
@@ -512,7 +516,7 @@ export class MediaService implements OnModuleInit {
     if (actualSize > 10 * 1024 * 1024) {
       await this.deleteFile(asset.key);
       await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: { status: MediaAssetStatus.pending_delete },
       });
       throw new PayloadTooLargeException({
@@ -534,7 +538,7 @@ export class MediaService implements OnModuleInit {
         await this.deleteFile(asset.key).catch(() => {});
       }
       await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: { status: MediaAssetStatus.pending_delete },
       });
       throw err;
@@ -542,7 +546,7 @@ export class MediaService implements OnModuleInit {
 
     if (duration < 2) {
       await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: { status: MediaAssetStatus.pending_delete },
       });
       throw new UnprocessableEntityException({
@@ -555,7 +559,7 @@ export class MediaService implements OnModuleInit {
 
     if (duration > maxDurationSeconds) {
       await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: { status: MediaAssetStatus.pending_delete },
       });
       throw new UnprocessableEntityException({
@@ -588,7 +592,7 @@ export class MediaService implements OnModuleInit {
       }
 
       return await tx.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: {
           status: MediaAssetStatus.ready,
           duration_seconds: Math.round(duration),
@@ -686,20 +690,12 @@ export class MediaService implements OnModuleInit {
   }
 
   async deleteFile(key: string): Promise<void> {
-    try {
-      await this.s3Client.send(
-        new DeleteObjectCommand({
-          Bucket: this.bucketName,
-          Key: key,
-        }),
-      );
-    } catch (err: unknown) {
-      if (this.configService.get<string>('APP_ENV') === 'local') {
-        this.logger.warn(`deleteFile simulado en local para key: ${key}`);
-        return;
-      }
-      throw err;
-    }
+    await this.s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      }),
+    );
   }
 
   private enqueueTranscode(assetId: string): void {
@@ -720,21 +716,23 @@ export class MediaService implements OnModuleInit {
       try {
         // guardrails-ignore G-A06: procesamiento serial de transcodificación en background worker sin contexto HTTP
         await TenantContext.runBypass(() => this.transcodeAsset(assetId));
-      } catch (err: unknown) {
-        const errMessage = err instanceof Error ? err.message : String(err);
-        this.logger.error(`Error transcodificando asset ${assetId}: ${errMessage}`);
+      } catch {
+        this.logger.error(`Error transcodificando asset ${assetId}`);
         // Re-enqueue if transcode_attempts < 3 (P1-03)
         try {
-          // guardrails-ignore G-A11: consulta de intentos de transcodificación por ID interno de asset
-          const current = await this.prisma.mediaAsset.findUnique({
-            where: { id: assetId },
-            select: { transcode_attempts: true, transcode_failed_at: true },
-          });
+          // guardrails-ignore G-A06: reintento del worker serial con ID interno, fuera del contexto HTTP
+          const current = await TenantContext.runBypass(() =>
+            // guardrails-ignore G-A11: consulta de intentos de transcodificación por ID interno de asset
+            this.prisma.mediaAsset.findUnique({
+              where: { id: assetId },
+              select: { transcode_attempts: true, transcode_failed_at: true },
+            }),
+          );
           if (current && current.transcode_attempts < 3 && !current.transcode_failed_at) {
             this.transcodeQueue.push(assetId);
           }
         } catch {
-          // ignore
+          this.logger.error(`No se pudo comprobar el reintento de transcodificación del asset ${assetId}`);
         }
       }
     }
@@ -754,14 +752,14 @@ export class MediaService implements OnModuleInit {
 
     if (asset.transcode_attempts >= 3) {
       await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: asset.organization_id },
         data: { transcode_failed_at: new Date() },
       });
       return;
     }
 
     await this.prisma.mediaAsset.update({
-      where: { id: asset.id },
+      where: { id: asset.id, organization_id: asset.organization_id },
       data: { transcode_attempts: { increment: 1 } },
     });
 
@@ -869,7 +867,7 @@ export class MediaService implements OnModuleInit {
 
       // Persist converted_key
       await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
+        where: { id: asset.id, organization_id: asset.organization_id },
         data: { converted_key: convertedKey },
       });
 
@@ -878,7 +876,7 @@ export class MediaService implements OnModuleInit {
     } catch (err: unknown) {
       if (asset.transcode_attempts + 1 >= 3) {
         await this.prisma.mediaAsset.update({
-          where: { id: asset.id },
+          where: { id: asset.id, organization_id: asset.organization_id },
           data: { transcode_failed_at: new Date() },
         });
       }

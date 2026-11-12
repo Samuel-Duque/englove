@@ -953,7 +953,7 @@ export class AttemptsService {
       const finalProcessedEventIds = Array.from(processedSet).slice(-500);
 
       await tx.attempt.update({
-        where: { id: attempt.id },
+        where: { id: attempt.id, organization_id: organizationId },
         data: {
           payload: toPrismaJson({
             answers,
@@ -1213,7 +1213,7 @@ export class AttemptsService {
 
       if (activity.type === ActivityType.speaking) {
         updatedAttempt = await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.pending_review,
@@ -1223,7 +1223,7 @@ export class AttemptsService {
         isAudioSubmitted = true;
       } else if (activity.type === ActivityType.open_question) {
         updatedAttempt = await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.pending_review,
@@ -1254,7 +1254,7 @@ export class AttemptsService {
         scoreForEvent = scoreResult.score;
 
         updatedAttempt = await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.graded,
@@ -1297,7 +1297,7 @@ export class AttemptsService {
         scoreForEvent = scoreResult.score;
 
         updatedAttempt = await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             payload: toPrismaJson(updatedPayload),
             status: AttemptStatus.graded,
@@ -1350,7 +1350,7 @@ export class AttemptsService {
         };
 
         updatedAttempt = await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             payload: toPrismaJson(gamePayload),
             status: AttemptStatus.graded,
@@ -1363,7 +1363,7 @@ export class AttemptsService {
       } else {
         // Default / fallback
         updatedAttempt = await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             status: AttemptStatus.pending_review,
             finished_at: now,
@@ -1776,7 +1776,7 @@ export class AttemptsService {
   private async checkLateSubmissionAndMarkOfflineSync(
     attempt: { id: string; status: AttemptStatus; flags: string[] },
     completeUntil: Date,
-    _organizationId: string,
+    organizationId: string,
   ): Promise<void> {
     if (new Date() > completeUntil) {
       if (
@@ -1789,7 +1789,7 @@ export class AttemptsService {
           : [...currentFlags, 'offline_sync'];
 
         await this.prisma.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             status: AttemptStatus.abandoned,
             flags: newFlags,

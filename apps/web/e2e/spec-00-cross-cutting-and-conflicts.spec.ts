@@ -431,6 +431,14 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
       });
     });
 
+    // QA-02: no mezclar una sesión ficticia con /me o flags reales que devuelvan 401.
+    await page.route('**/api/v1/me', (route) =>
+      route.fulfill({ status: 200, json: studentDec95Session }),
+    );
+    await page.route('**/api/v1/feature-flags', (route) =>
+      route.fulfill({ status: 200, json: { flags: { games: true, extra_content: false } } }),
+    );
+
     await page.route('**/api/v1/me/assignments', async (route) => {
       await route.fulfill({
         status: 200,

@@ -561,7 +561,7 @@ export class ActivitiesService {
         });
       }
       await tx.activity.update({
-        where: { id: activity.id },
+        where: { id: activity.id, organization_id: organizationId },
         data: {
           title: trimmedTitle,
           level: dto.level,
@@ -574,7 +574,7 @@ export class ActivitiesService {
         switch (activity.type) {
           case ActivityType.fill_blank:
             await tx.fillBlankDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
                 config: toPrismaJson(validConfig),
                 answer_key: toPrismaJson(validAnswerKey),
@@ -584,7 +584,7 @@ export class ActivitiesService {
 
           case ActivityType.open_question:
             await tx.openQuestionDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
                 config: toPrismaJson(validConfig),
               },
@@ -598,7 +598,7 @@ export class ActivitiesService {
             const minDuration = parsedSpk.success ? parsedSpk.data.minDurationSeconds : 2;
             const maxDuration = parsedSpk.success ? parsedSpk.data.maxDurationSeconds : 120;
             await tx.speakingDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
                 prompt,
                 example_url: exampleUrl ?? null,
@@ -611,7 +611,7 @@ export class ActivitiesService {
 
           case ActivityType.game:
             await tx.gameDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
                 config: toPrismaJson(validConfig),
                 answer_key: toPrismaJson(validAnswerKey),
@@ -621,7 +621,7 @@ export class ActivitiesService {
 
           case ActivityType.exam:
             await tx.examDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
                 config: toPrismaJson(validConfig),
                 answer_key: toPrismaJson(validAnswerKey),
@@ -677,7 +677,7 @@ export class ActivitiesService {
     this.validateActivityContent(activity.type, config, answerKey, true);
 
     await this.prisma.activity.update({
-      where: { id: activity.id },
+      where: { id: activity.id, organization_id: organizationId },
       data: {
         status: ActivityStatus.published,
       },
@@ -828,7 +828,7 @@ export class ActivitiesService {
     }
 
     await this.prisma.activity.update({
-      where: { id: activity.id },
+      where: { id: activity.id, organization_id: organizationId },
       data: {
         status: ActivityStatus.archived,
       },
@@ -872,7 +872,7 @@ export class ActivitiesService {
     this.validateActivityContent(activity.type, config, answerKey, true);
 
     await this.prisma.activity.update({
-      where: { id: activity.id },
+      where: { id: activity.id, organization_id: organizationId },
       data: {
         status: ActivityStatus.published,
       },
@@ -924,7 +924,7 @@ export class ActivitiesService {
       }
 
       await tx.activity.delete({
-        where: { id: activity.id },
+        where: { id: activity.id, organization_id: organizationId },
       });
     });
   }

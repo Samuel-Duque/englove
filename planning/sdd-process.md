@@ -4,7 +4,9 @@
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
-> Última actualización: 2026-11-08. [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) y la **Etapa 12 «Calidad y remediación»** se encuentran **Completadas y Verificadas** (decisiones 127 a 137 de CONTEXT §14 formalizadas); todas las tareas de la etapa (ENG-143, ENG-150 a ENG-162 y DOC-09) están en `Hecho` con 566/566 tests en el monorepo y 0 errores en guardrails. `SPEC-01` a `SPEC-11` figuran en `Verificada`. Habilita el paso a la infraestructura de staging y posterior lanzamiento.
+> Estado vigente: [CONTEXT](../.agents/CONTEXT.md), [índice de specs](../specs/README.md) y [taskboard](./taskboard.md). Los conteos de pruebas son registros históricos fechados, no pruebas ejecutadas de nuevo.
+>
+> Registro histórico: 2026-11-08. [`SPEC-11`](../specs/SPEC-11-calidad-y-correcciones.md) y la **Etapa 12 «Calidad y remediación»** se encuentran **Completadas y Verificadas** (decisiones 127 a 137 de CONTEXT §14 formalizadas); todas las tareas de la etapa (ENG-143, ENG-150 a ENG-162 y DOC-09) están en `Hecho` con 566/566 tests en el monorepo y 0 errores en guardrails. `SPEC-01` a `SPEC-11` figuran en `Verificada`. Habilita el paso a la infraestructura de staging y posterior lanzamiento.
 >
 > Actualización anterior: 2026-10-27. SPEC-01 a SPEC-07 figuran Verificadas y [SPEC-08](../specs/SPEC-08-estadisticas.md) figura `Aprobada` por el líder del proyecto tras cerrar Q-01 a Q-04 mediante las Decisiones 112 a 115 de CONTEXT §14 (tendencia cada 30 días y semanal en vista de grupo, filtro canónico de `game`, ventana exacta de 3 días en `ScheduledJobRun` y filtrado por grupos `A1`, `A2`, `B1`, `B2` en el leaderboard privado); tareas de Etapa 7 (ENG-090 a ENG-096) en Hecho con 407/407 tests monorepo (58 shared, 265 api, 84 web) y suite E2E de revisión y nuevo intento en PostgreSQL real con Docker. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales.
 >
@@ -90,7 +92,7 @@ specs/
 ├── SPEC-08-estadisticas.md
 ├── SPEC-09-pwa-offline-a11y.md
 ├── SPEC-10-contenido-extra.md
-└── SPEC-11-calidad-y-correcciones.md # Etapa 12: Calidad, correcciones y verificación (Aprobada)
+└── SPEC-11-calidad-y-correcciones.md # Etapa 12: Calidad, correcciones y verificación (Verificada)
 ```
 
 - La numeración sigue las etapas de `pbp-development.md`. Si una etapa necesita más de una spec, se usa un sufijo: `SPEC-05a`, `SPEC-05b`.
@@ -194,6 +196,8 @@ flowchart LR
 | **Implementada** | Todas las tareas ENG que cubre están en Hecho en el taskboard.                            | Quien cierra la última tarea                           |
 | **Verificada**   | Las pruebas de §9 pasan en CI y, si aplica, la profesora validó la capacidad en staging.  | Quien ejecuta la verificación                          |
 | **Obsoleta**     | Reemplazada por otra spec. Se conserva por trazabilidad con enlace a la que la sustituye. | Quien crea la sustituta                                |
+
+**Lectura de evidencias (GOV-01).** Conservar por separado los resultados técnicos fechados y las aceptaciones operativas exigidas en cada spec/hito. El estado histórico `Verificada` no acredita por sí solo onboarding, tablets reales ni aceptación docente en staging. H1/H2/H3 y lanzamiento siguen sujetos a las evidencias pendientes del taskboard; esta aclaración no cambia estados ni sustituye sus criterios de aceptación.
 
 Reglas de transición:
 

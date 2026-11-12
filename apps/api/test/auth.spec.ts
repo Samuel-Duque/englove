@@ -702,7 +702,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       // Unlock
       await studentsService.unlockStudent(orgId, studentId);
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: studentUserId },
+        where: { id: studentUserId, organization_id: orgId },
         data: { locked_until: null, failed_login_count: 0 },
       });
     });
@@ -1069,7 +1069,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       await studentsService.rejectStudent(orgId, studentId);
 
       expect(mockPrisma.user.delete).toHaveBeenCalledWith({
-        where: { id: studentUserId },
+        where: { id: studentUserId, organization_id: orgId },
       });
     });
 

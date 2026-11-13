@@ -70,7 +70,7 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
 
     // Verify DB updated to deleted
     expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
-      where: { id: 'asset-1' },
+      where: { id: 'asset-1', organization_id: orgId },
       data: {
         status: MediaAssetStatus.deleted,
         deleted_at: simulatedNow,
@@ -106,7 +106,7 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
 
     expect(mockMediaService.deleteFile).toHaveBeenCalledWith('audio/orphan.webm');
     expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
-      where: { id: 'asset-orphan' },
+      where: { id: 'asset-orphan', organization_id: orgId },
       data: {
         status: MediaAssetStatus.deleted,
         deleted_at: simulatedNow,
@@ -144,13 +144,13 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
 
     // Failing asset updated to pending_delete
     expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
-      where: { id: 'asset-failing' },
+      where: { id: 'asset-failing', organization_id: orgId },
       data: { status: MediaAssetStatus.pending_delete },
     });
 
     // Succeeding asset updated to deleted
     expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
-      where: { id: 'asset-succeeding' },
+      where: { id: 'asset-succeeding', organization_id: orgId },
       data: {
         status: MediaAssetStatus.deleted,
         deleted_at: simulatedNow,
@@ -176,7 +176,7 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
     }]);
     await service.runAudioRetention(periodKey, new Date('2026-10-26T02:00:00Z'));
     expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
-      where: { id: 'asset-local' }, data: { status: MediaAssetStatus.pending_delete },
+      where: { id: 'asset-local', organization_id: orgId }, data: { status: MediaAssetStatus.pending_delete },
     });
     expect(mockPrisma.mediaAsset.update).not.toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: MediaAssetStatus.deleted }),
@@ -184,7 +184,7 @@ describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', 
     const recoveredAt = new Date('2026-10-27T02:00:00Z');
     await service.runAudioRetention('2026-10-27', recoveredAt);
     expect(mockPrisma.mediaAsset.update).toHaveBeenLastCalledWith({
-      where: { id: 'asset-local' },
+      where: { id: 'asset-local', organization_id: orgId },
       data: { status: MediaAssetStatus.deleted, deleted_at: recoveredAt },
     });
     expect(send).toHaveBeenCalledTimes(2);

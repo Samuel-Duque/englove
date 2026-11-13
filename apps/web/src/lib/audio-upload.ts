@@ -2,7 +2,7 @@ import type {
   MediaUploadUrlInput,
   MediaUploadUrlResponse,
 } from "@englove/shared";
-import { requestSharedRefresh } from "./api";
+import { ApiError, requestSharedRefresh } from "./api";
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -79,7 +79,11 @@ export async function uploadAudioBlob({
   }
 
   if (!presignedRes.ok) {
-    throw new Error("UPLOAD_URL_REJECTED");
+    const error: unknown = await presignedRes.json().catch(() => null);
+    signal?.throwIfAborted();
+    const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+      ? error.code : "UPLOAD_URL_REJECTED";
+    throw new ApiError(presignedRes.status, code, "No se pudo preparar la subida de audio");
   }
 
   const presignedData: unknown = await presignedRes.json();

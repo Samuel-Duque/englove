@@ -27,5 +27,7 @@ if (fs.existsSync(envPath)) {
 export default defineConfig({
   test: {
     globals: true,
+    // Evita que decenas de pools de suites simultáneas saturen PostgreSQL y falseen presupuestos de latencia.
+    maxWorkers: 2,
   },
 });

@@ -10,6 +10,7 @@ import {
   AgeSegment,
 } from '@englove/shared';
 import { StatsService } from '../src/stats/stats.service';
+import { mockStatsConfiguration } from './stats-config.fixture';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { StudentsService } from '../src/students/students.service';
@@ -143,7 +144,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
     let statsService: StatsService;
 
     beforeEach(() => {
-      statsService = new StatsService(mockPrisma, mockGamificationService);
+      statsService = new StatsService(mockPrisma, mockGamificationService, mockStatsConfiguration());
     });
 
     it('ranks students with 6 deterministic tie-breakers and returns GamesLeaderboardResponse', async () => {
@@ -300,7 +301,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
     let statsService: StatsService;
 
     beforeEach(() => {
-      statsService = new StatsService(mockPrisma, mockGamificationService);
+      statsService = new StatsService(mockPrisma, mockGamificationService, mockStatsConfiguration());
     });
 
     it('getGroupStats includes gamesPractice metrics aggregated for the group', async () => {
@@ -958,7 +959,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
     let statsService: StatsService;
 
     beforeEach(() => {
-      statsService = new StatsService(mockPrisma, mockGamificationService);
+      statsService = new StatsService(mockPrisma, mockGamificationService, mockStatsConfiguration());
     });
 
     it('excludes flagged attempts from points, stars, count, and practice duration', async () => {
@@ -1016,7 +1017,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
     let statsService: StatsService;
 
     beforeEach(() => {
-      statsService = new StatsService(mockPrisma, mockGamificationService);
+      statsService = new StatsService(mockPrisma, mockGamificationService, mockStatsConfiguration());
     });
 
     it('groupAverageScore averages multiple students correctly and computeGamesPractice includes order_words', async () => {

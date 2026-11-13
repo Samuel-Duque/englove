@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StatsService } from '../src/stats/stats.service';
+import { mockStatsConfiguration } from './stats-config.fixture';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { GamificationService } from '../src/gamification/gamification.service';
 import {
@@ -63,6 +64,7 @@ describe('SPEC-08: StatsService — Estadísticas de rendimiento y constancia (E
     service = new StatsService(
       mockPrisma as unknown as PrismaService,
       mockGamification as unknown as GamificationService,
+      mockStatsConfiguration(),
     );
   });
 

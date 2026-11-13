@@ -2,6 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 import { uploadAudioBlob } from "../src/lib/audio-upload";
 
 describe("SPEC-05 RF-13 (ENG-074): subida de audio devuelve el mediaId del contrato", () => {
+  it.each([400, 404, 409, 413, 422, 429, 500])("OFF-01: conserva status y code de upload-url (%i)", async (status) => {
+    await expect(uploadAudioBlob({
+      apiUrl: "https://api.example", origin: "https://app.example", attemptId: "att-1",
+      blob: new Blob(["audio"]),
+      fetchFn: async () => new Response(JSON.stringify({code: "ATTEMPT_CLOSED", message: "cerrada"}), {status}),
+    })).rejects.toMatchObject({statusCode: status, code: "ATTEMPT_CLOSED"});
+  });
   it("OFF-01: cancelling an old account upload prevents the subsequent PUT", async () => {
     const controller = new AbortController();
     const fetchMock = vi.fn().mockImplementation(async () => {

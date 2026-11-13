@@ -178,7 +178,7 @@ export class GroupsService {
     }
 
     const updated = await this.prisma.group.update({
-      where: { id: group.id },
+      where: { id: group.id, organization_id: organizationId },
       data: { name: trimmedName },
       include: {
         _count: {
@@ -248,7 +248,7 @@ export class GroupsService {
       }
 
       const updated = await tx.group.update({
-        where: { id: group.id },
+        where: { id: group.id, organization_id: organizationId },
         data: {
           archived_at: new Date(),
         },
@@ -302,7 +302,7 @@ export class GroupsService {
       }
 
       await tx.group.delete({
-        where: { id: group.id },
+        where: { id: group.id, organization_id: organizationId },
       });
     });
   }

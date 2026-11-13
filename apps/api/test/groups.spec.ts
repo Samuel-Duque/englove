@@ -243,7 +243,7 @@ describe('SPEC-03: Gestor de Contenidos — GroupsService (ENG-040)', () => {
 
       await expect(service.deleteGroup(orgId, groupId)).resolves.toBeUndefined();
       expect(mockPrisma.group.delete).toHaveBeenCalledWith({
-        where: { id: groupId },
+        where: { id: groupId, organization_id: orgId },
       });
     });
   });

@@ -31,7 +31,7 @@ import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
 import { setActiveAttemptState } from '../../../../lib/pwa-manager';
 import { speak } from '../../../../lib/speech';
-import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb, getPendingAttemptAnswers } from '../../../../lib/offline-queue';
+import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb, getPendingAttemptAnswers, getOfflineUserId } from '../../../../lib/offline-queue';
 import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
 
 function isRecord(val: unknown): val is Record<string, unknown> {
@@ -143,31 +143,23 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     blob: Blob,
     userId: string,
     durationSec: number = 0,
+    uploadedMediaId: string | null = null,
   ): Promise<void> => {
-    const effectiveUserId = userId?.trim() || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
+    const effectiveUserId = userId?.trim() || getOfflineUserId() || '';
     if (!effectiveUserId) {
       console.warn('[actividad-runner] Attempted to save local recording without valid userId');
       return;
     }
     try {
-      const db = await openOfflineDb();
-      if (!db.objectStoreNames.contains('pendingUploads')) {
-        db.close();
-        return;
-      }
-      return new Promise<void>((resolve) => {
-        const tx = db.transaction('pendingUploads', 'readwrite');
-        tx.objectStore('pendingUploads').put({
+      await enqueueUpload({
           attemptId: id,
           userId: effectiveUserId,
           blob,
           mimeType: blob.type || 'audio/webm',
           durationMs: Math.max(0, Math.round(durationSec * 1000)),
-          mediaId: null,
-          createdAt: Date.now(),
-        });
-        tx.oncomplete = () => { db.close(); resolve(); };
-        tx.onerror = () => { db.close(); resolve(); };
+          mediaId: uploadedMediaId,
+          attemptToken: runtime?.attemptToken ?? undefined,
+          isDraft: true,
       });
     } catch {
       // Ignore
@@ -176,29 +168,31 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   const loadLocalRecording = async (
     id: string,
-  ): Promise<{ blob: Blob; durationMs: number } | null> => {
+    userId: string,
+  ): Promise<{ blob: Blob; durationMs: number; mediaId: string | null } | null> => {
+    if (!userId || userId !== getOfflineUserId()) return null;
     try {
       const db = await openOfflineDb();
       if (!db.objectStoreNames.contains('pendingUploads')) {
         db.close();
         return null;
       }
-      return new Promise<{ blob: Blob; durationMs: number } | null>((resolve) => {
+      return new Promise<{ blob: Blob; durationMs: number; mediaId: string | null } | null>((resolve) => {
         const tx = db.transaction('pendingUploads', 'readonly');
         const getReq = tx.objectStore('pendingUploads').get(id);
         getReq.onsuccess = () => {
           db.close();
           const rec = getReq.result;
-          const activeUid = currentUserId || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
           if (rec && rec.blob instanceof Blob) {
             // Privacy check (P0-05): do not restore recording if belonging to another user
-            if (rec.userId && activeUid && rec.userId !== activeUid) {
+            if (rec.userId !== userId || userId !== getOfflineUserId()) {
               resolve(null);
             } else {
               resolve({
                 blob: rec.blob,
                 durationMs:
                   typeof rec.durationMs === 'number' && rec.durationMs > 0 ? rec.durationMs : 0,
+                mediaId: typeof rec.mediaId === 'string' ? rec.mediaId : null,
               });
             }
           } else {
@@ -246,7 +240,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`, {
           schema: RuntimeViewSchema,
         }),
-        loadLocalRecording(attemptId),
+        loadLocalRecording(attemptId, userId),
       ]);
       const restoredData = data.activity.type === ActivityType.game
         ? { ...data, answers: { ...data.answers, ...pendingAnswers } }
@@ -305,6 +299,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     // Restore pending local audio blob if any
     if (savedRec && !data.mediaId) {
       setRecordedAudioBlob(savedRec.blob);
+      setMediaId(savedRec.mediaId);
       const restoredSec =
         savedRec.durationMs > 0 ? Math.round(savedRec.durationMs / 1000) : 5;
       recordingDurationRef.current = Math.max(2, restoredSec);
@@ -480,6 +475,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   };
 
   const uploadAudioRecording = async (blobOverride?: Blob): Promise<string | null> => {
+    const uploadUserId = currentUserId || getOfflineUserId();
+    if (!uploadUserId || uploadUserId !== getOfflineUserId()) return null;
     const blobToUpload = blobOverride ?? recordedAudioBlob;
     if (!blobToUpload) return mediaId;
     const minSec =
@@ -507,15 +504,19 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         blob: blobToUpload,
         attemptToken: token,
       });
+      if (uploadUserId !== getOfflineUserId()) return null;
 
       // Confirm immediate audio processing with POST /media/:id/confirm (P1-03, QA-05, T4.3)
       const confirmed = await confirmMediaUpload(uploadedMediaId, token);
+      if (uploadUserId !== getOfflineUserId()) return null;
       if (!confirmed) {
         setMediaId(null);
         setUploadProgress(null);
         return null;
       }
 
+      await saveLocalRecording(attemptId, blobToUpload, uploadUserId, recordingDurationRef.current, uploadedMediaId);
+      if (uploadUserId !== getOfflineUserId()) return null;
       setMediaId(uploadedMediaId);
       setUploadProgress(null);
       setUploadError(null);

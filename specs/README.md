@@ -19,7 +19,7 @@
 | [SPEC-05](./SPEC-05-portal-e-intentos.md) | Portal e intentos | Verificada | 5 — Portal del estudiante | ENG-039, ENG-060 a ENG-073 |
 | [SPEC-06](./SPEC-06-microjuegos.md) | Microjuegos | Verificada | 6 — Microjuegos | ENG-080 a ENG-087 |
 | [SPEC-07](./SPEC-07-revision-y-feedback.md) | Revisión, feedback, nuevo intento y retención de audios | Verificada | 7 — Calificación, feedback y nuevo intento | ENG-090 a ENG-096 |
-| [SPEC-08](./SPEC-08-estadisticas.md) | Estadísticas de rendimiento y constancia | Verificada | 8 — Estadísticas y leaderboard | ENG-100 a ENG-104 |
+| [SPEC-08](./SPEC-08-estadisticas.md) | Estadísticas de rendimiento y constancia | Implementada (enmienda NEG-01; re-verificación pendiente) | 8 — Estadísticas y leaderboard | ENG-100 a ENG-104 |
 | [SPEC-09](./SPEC-09-pwa-offline-a11y.md) | PWA, offline y accesibilidad | Verificada | 9 — PWA, offline y accesibilidad | ENG-110 a ENG-113 |
 | [SPEC-10](./SPEC-10-contenido-extra.md) | Contenido extra | Verificada | 10 — Contenido extra | ENG-120, ENG-121 |
 | [SPEC-11](./SPEC-11-calidad-y-correcciones.md) | Calidad, correcciones y verificación | Verificada | 12 — Calidad y remediación | ENG-143, ENG-150 a ENG-162, DOC-09 |

@@ -1,5 +1,7 @@
 # Englove — Taskboard
 
+> Seguimiento vigente de auditoría (2026-11-12): [correcciones y evidencia](./remediacion-auditoria-2026-11-12.md). Los estados y conteos del cierre anterior se conservan como registro histórico. ENG-015 tiene implementación de promoción serializada y compuertas locales; su primera ejecución cloud depende del aprovisionamiento ENG-003/004. La enmienda NEG-01 de SPEC-08 requiere re-verificación en CI; no se cierran aquí tareas de lanzamiento ni aceptación operativa.
+
 > **Propósito.** Estado operativo del trabajo: qué está hecho, qué sigue, qué está bloqueado y por qué. Las tareas se agrupan por las etapas de [`pbp-development.md`](./pbp-development.md), siguen la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y el proceso SDD de [`sdd-process.md`](./sdd-process.md). Las decisiones de producto viven en `.agents/CONTEXT.md`; este tablero no las redefine.
 >
 > Última actualización: 2026-11-08. [SPEC-11 Calidad, correcciones y verificación](../specs/SPEC-11-calidad-y-correcciones.md) y la **Etapa 12 «Calidad y remediación»** se encuentran **Completadas y Verificadas** (decisiones 127 a 137 de CONTEXT §14). Todas sus tareas técnicas (`ENG-143`, `ENG-150` a `ENG-162` y `DOC-09`) pasan a `Hecho` con 729/729 pruebas pasando en el monorepo (68 shared, 426 api, 235 web), 0 errores en guardrails, typecheck y linter limpios. Habilita la preparación final de la **Etapa 11 (Lanzamiento)**. Resumen: 122 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 8 Backlog (Total 135).

@@ -96,7 +96,7 @@ export function validateActivityPayload(
       const parsedConfig = OpenQuestionConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de pregunta abierta inválida',
         );
       }
@@ -112,7 +112,7 @@ export function validateActivityPayload(
       const parsedConfig = SpeakingConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de speaking inválida',
         );
       }
@@ -128,14 +128,14 @@ export function validateActivityPayload(
       const parsedConfig = FillBlankConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de fill_blank inválida',
         );
       }
       const parsedKey = FillBlankAnswerKeySchema.safeParse(answerKey);
       if (!parsedKey.success) {
         throw new ActivityValidationError(
-          parsedKey.error.errors[0]?.message ?? 'Clave de fill_blank inválida',
+          parsedKey.error.issues[0]?.message ?? 'Clave de fill_blank inválida',
         );
       }
 
@@ -194,7 +194,7 @@ export function validateActivityPayload(
       if (!parsedConfig.success) {
         if (
           isPublishing &&
-          parsedConfig.error.errors.some((e) => e.code === 'too_small')
+          parsedConfig.error.issues.some((e) => e.code === 'too_small')
         ) {
           throw new ActivityValidationError(
             'Agrega al menos dos ítems para publicar',
@@ -202,7 +202,7 @@ export function validateActivityPayload(
           );
         }
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de examen inválida',
         );
       }
@@ -226,7 +226,7 @@ export function validateActivityPayload(
         const parsedKey = ExamAnswerKeySchema.safeParse(answerKey);
         if (!parsedKey.success) {
           throw new ActivityValidationError(
-            parsedKey.error.errors[0]?.message ?? 'Clave de examen inválida',
+            parsedKey.error.issues[0]?.message ?? 'Clave de examen inválida',
           );
         }
         validAnswerKey = parsedKey.data;
@@ -297,14 +297,14 @@ export function validateActivityPayload(
       const parsedConfig = GameConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de microjuego inválida',
         );
       }
       const parsedKey = GameAnswerKeySchema.safeParse(answerKey);
       if (!parsedKey.success) {
         throw new ActivityValidationError(
-          parsedKey.error.errors[0]?.message ?? 'Clave de microjuego inválida',
+          parsedKey.error.issues[0]?.message ?? 'Clave de microjuego inválida',
         );
       }
 

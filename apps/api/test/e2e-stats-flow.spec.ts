@@ -11,6 +11,7 @@ import {
   Role,
 } from '@englove/shared';
 import { StatsService } from '../src/stats/stats.service';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 import { GamificationService } from '../src/gamification/gamification.service';
 import { MaintenanceService } from '../src/maintenance/maintenance.service';
 import { PendingSummaryService } from '../src/dashboard/pending-summary.service';
@@ -51,7 +52,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
       await prisma.$connect();
 
     const gamificationService = new GamificationService(prisma);
-    statsService = new StatsService(prisma, gamificationService);
+    statsService = new StatsService(prisma, gamificationService, new FeatureFlagsService(prisma));
 
     const configService = new ConfigService({ APP_ENV: 'local' });
     const pendingSummaryService = new PendingSummaryService(prisma, {} as any);
@@ -78,6 +79,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
     await prisma.group.deleteMany({ where: { organization_id: orgId } });
     await prisma.student.deleteMany({ where: { organization_id: orgId } });
     await prisma.user.deleteMany({ where: { organization_id: orgId } });
+    await prisma.featureFlag.deleteMany({ where: { organization_id: orgId } });
     await prisma.organization.deleteMany({ where: { id: orgId } });
 
     // 1. Organization
@@ -88,6 +90,11 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
         slug: 'org-e2e-stats',
       },
     });
+
+    await prisma.featureFlag.createMany({ data: [
+      {organization_id: orgId, key: 'games', enabled: false, config: {passing_score: 3, retention_days: 30, pending_upload_ttl_days: 7, ungraded_reminder_days: 3}},
+      {organization_id: orgId, key: 'extra_content', enabled: false, config: {}},
+    ]});
 
     // 2. Teacher
     await prisma.user.create({
@@ -426,6 +433,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
       await prisma.group.deleteMany({ where: { organization_id: orgId } });
       await prisma.student.deleteMany({ where: { organization_id: orgId } });
       await prisma.user.deleteMany({ where: { organization_id: orgId } });
+      await prisma.featureFlag.deleteMany({ where: { organization_id: orgId } });
       await prisma.organization.deleteMany({ where: { id: orgId } });
       await prisma.$disconnect();
     } catch {}

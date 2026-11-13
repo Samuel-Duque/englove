@@ -105,7 +105,7 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 |                           | Pragmatic Drag and Drop | `^1.5.0`              | Motor accesible de arrastrar y soltar para ejercicios           |
 |                           | vinext / Wrangler       | `^1.2.1` / `^4.149.0` | Adaptador y CLI para despliegue en Cloudflare Workers           |
 | **Backend (`apps/api`)**  | NestJS                  | `^11.0.11`            | Arquitectura modular orientada a servicios, guards y DI         |
-|                           | Express                 | `^5.0.0`              | Servidor HTTP subyacente para el framework NestJS               |
+|                           | Express                 | `^5.3.0`              | Servidor HTTP subyacente para el framework NestJS               |
 |                           | Prisma ORM              | `^7.0.0`              | Mapeo objeto-relacional y migraciones tipadas                   |
 |                           | `@prisma/adapter-pg`    | `^7.10.1`             | Adaptador nativo PostgreSQL para poolers y servidor             |
 |                           | Argon2                  | `^0.41.1`             | Algoritmo resistente para hash seguro de contraseñas            |
@@ -115,7 +115,7 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 |                           | Resend SDK              | `^4.1.2`              | Envío de correos transaccionales institucionales                |
 | **Tipado y Compartido**   | `@englove/shared`       | `0.0.1`               | Contratos de actividad, enums canónicos y DTOs comunes          |
 |                           | TypeScript              | `~5.9.3`              | Tipado estricto sin comodines `any` en todo el repositorio      |
-|                           | Zod                     | `^3.24.2`             | Validación de esquemas estructurales de actividades y DTOs      |
+|                           | Zod                     | `^4.6.6`              | Validación de esquemas estructurales de actividades y DTOs      |
 | **Base de Datos & Infra** | PostgreSQL              | `18`                  | Base de datos relacional (Neon en la nube / Docker en local)    |
 |                           | Cloudflare R2           | S3 Compatible         | Almacenamiento seguro de objetos multimedia privados            |
 |                           | ffmpeg / ffprobe        | Binario del SO        | Validación técnica, métricas de decibelios y transcodificación  |
@@ -301,21 +301,20 @@ El script `pnpm seed:dev` provee las siguientes cuentas listas para probar los d
 
 ## Pruebas, calidad y guardrails
 
-La plataforma garantiza estabilidad, integridad de arquitectura y cumplimiento normativo mediante múltiples barreras de calidad automatizadas:
+La plataforma dispone de comprobaciones automatizadas de código, contratos, persistencia y accesibilidad. Sus resultados acreditan el alcance ejecutado y no garantizan ausencia de bugs ni aceptación operativa:
 
 ```bash
-# Ejecutar suite de pruebas completa (566 tests en verde)
+# Ejecutar las pruebas; para integrar PostgreSQL se necesita una base aislada migrada
 pnpm test
 # Ejecutar auditoría automatizada de reglas invariantes
 pnpm guardrails
 ```
 
-- **Suite de pruebas:** **566 pruebas automáticas** en verde en todo el monorepo (Vitest):
-  - `packages/shared`: 65 tests (validación estricta de esquemas Zod, contratos y DTOs).
-  - `apps/api`: 353 tests (controladores, guards, servicios de scoring, media, review, ranking de microjuegos y flujos E2E con PostgreSQL real).
-  - `apps/web`: 148 tests (flujos docentes, portal de alumnos, componentes de microjuegos, protección estricta de cookies prefijadas en proxy y formularios).
+- **Evidencia fechada:** [auditoría del 12 de noviembre](./planning/auditoria-general-2026-11-12.md) y [estado de su remediación](./planning/remediacion-auditoria-2026-11-12.md). Los conteos pertenecen al snapshot y las ejecuciones de cada informe.
+- `packages/shared` verifica esquemas y contratos; `apps/api`, controladores, guards, servicios y flujos PostgreSQL; `apps/web`, helpers y componentes reales. Playwright cubre navegador con parte de la API simulada; no sustituye pruebas integrales contra staging.
+- CI exige PostgreSQL disponible y falla ante errores E2E. Para exigir PostgreSQL también en local: `REQUIRE_POSTGRES_TESTS=1`; nunca apuntar fixtures o migraciones de test a una base con datos reales.
 - **Verificación de guardrails (`pnpm guardrails`):** Script auditor (`check-guardrails.mjs`) que analiza estáticamente el código para prevenir desviaciones críticas de arquitectura:
-  - Cero consultas sin filtro explícito por `organization_id` (anti-IDOR).
+  - Señales de consultas sin filtro explícito por `organization_id` (requieren revisión semántica anti-IDOR).
   - Cero cálculo de notas en el frontend.
   - Cero creación de timestamps en el cliente.
   - Prohibición estricta de `prisma db push` en producción.
@@ -325,7 +324,7 @@ pnpm guardrails
 
 ## Metodología y estado del proyecto
 
-Englove sigue estrictamente la metodología **Spec-Driven Development (SDD)**: _ninguna línea de código de producción se escribe sin una especificación previa aprobada y verificada_.
+Englove sigue **Spec-Driven Development (SDD)**: el código de producción requiere una especificación previa aprobada. La implementación se verifica después conforme al proceso y sus criterios de aceptación.
 Para conocer en detalle el proceso y las especificaciones activas:
 
 - [Proceso SDD y ciclo de vida](./planning/sdd-process.md)
@@ -343,12 +342,12 @@ Para conocer en detalle el proceso y las especificaciones activas:
 | [SPEC-05](./specs/SPEC-05-portal-e-intentos.md)    | Portal del alumno y resolución de intentos            | **Verificada** | Etapa 5 |
 | [SPEC-06](./specs/SPEC-06-microjuegos.md)          | Microjuegos formativos autónomos                      | **Verificada** | Etapa 6 |
 | [SPEC-07](./specs/SPEC-07-revision-y-feedback.md)  | Revisión docente, retroalimentación y nuevo intento   | **Verificada** | Etapa 7 |
-| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Verificada** | Etapa 8 |
+| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Implementada** (enmienda NEG-01; re-verificación CI pendiente) | Etapa 8 |
 | [SPEC-09](./specs/SPEC-09-pwa-offline-a11y.md)     | PWA, offline y accesibilidad                          | **Verificada** | Etapa 9 |
 | [SPEC-10](./specs/SPEC-10-contenido-extra.md)      | Contenido extra                                       | **Verificada** | Etapa 10 |
 | [SPEC-11](./specs/SPEC-11-calidad-y-correcciones.md) | Calidad, correcciones y verificación                  | **Verificada** | Etapa 12 |
 
-La Etapa 12 «Calidad y remediación» (decisiones 127 a 137 de [`CONTEXT.md`](./.agents/CONTEXT.md) §14) se encuentra completada y verificada, corrigiendo los hallazgos de `AUDITORIA.md` y de `testing-issues/` antes de cerrar la Etapa 11.
+El cierre histórico de Etapa 12 consta en SPEC-11. Las correcciones de la auditoría posterior del 2026-11-12 se registran por separado en su informe de remediación; no constituyen aceptación operativa ni cierre de Etapa 11.
 
 ---
 
@@ -370,8 +369,10 @@ Todo colaborador y agente de desarrollo en Englove debe respetar las siguientes 
 
 La plataforma está optimizada para operar con alta disponibilidad y costos contenidos:
 
-- **Frontend (`apps/web`):** Desplegado como **Cloudflare Worker** mediante `vinext`, logrando latencias perimetrales mínimas y renderizado Server Components (RSC) de alto rendimiento.
-- **Backend API (`apps/api`):** Alojado en **Render** como contenedor Docker en instancia única dedicada, con gestión segura de memoria para la cola de `ffmpeg`.
+- **Frontend (`apps/web`):** Destino previsto: **Cloudflare Workers** mediante `vinext`. El build y el empaquetado local no acreditan un despliegue cloud.
+- **Backend API (`apps/api`):** Destino previsto: **Render**, contenedor Docker en instancia única, con cola serial de `ffmpeg`.
+
+El aprovisionamiento y la aceptación operativa siguen el [taskboard](./planning/taskboard.md). La promoción a staging queda documentada en [despliegue-staging.md](./planning/despliegue-staging.md); no se declara infraestructura creada ni producción operativa por existir el workflow.
 - **Base de datos:** **PostgreSQL 18** gestionado en **Neon**, utilizando endpoint con PgBouncer para runtime y conexión directa para migraciones estructuradas de Prisma.
 - **Almacenamiento multimedia:** **Cloudflare R2** para la retención y entrega privada de archivos de audio e imágenes sin costos de egreso de datos.
 - **Correo transaccional:** **Resend** para notificaciones críticas, alertas de entrega y recuperación de accesos.

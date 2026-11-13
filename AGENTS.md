@@ -1,6 +1,6 @@
 # Englove — Guía para agentes
 
-Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. El proyecto avanza por etapas bajo Spec-Driven Development (Etapas 0–10 implementadas; SPEC-01 a SPEC-11 Verificadas; Etapa 12 «Calidad y remediación» completada y verificada bajo las decisiones 127 a 137). Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales antes de cerrar la Etapa 11 (Lanzamiento). No se escribe código de producción sin una spec aprobada en `specs/`.
+Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. La base funcional de las etapas 1–10 está implementada bajo Spec-Driven Development, con verificación histórica de SPEC-01 a SPEC-11; el aprovisionamiento de Etapa 0 sigue el taskboard. La auditoría del 2026-11-12 y su remediación están en `planning/auditoria-general-2026-11-12.md` y `planning/remediacion-auditoria-2026-11-12.md`; la enmienda NEG-01 de SPEC-08 requiere re-verificación en CI. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding y tablets reales antes de cerrar la Etapa 11. No se escribe código de producción sin spec aprobada; consultar estados vigentes en `specs/README.md`.
 
 ## Dónde está cada cosa
 
@@ -8,7 +8,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 1. `.agents/CONTEXT.md` — fuente única de verdad.
    - §2.4: lo que queda **fuera del piloto**.
-   - §14: registro de decisiones (1–137).
+   - §14: registro de decisiones (1–145).
    - §15: pendientes abiertos (sin P-n abiertos para el piloto; preguntas Q-01 a Q-08 de SPEC-11 todas decididas).
    - §16: **convenciones obligatorias para agentes**.
    - §17: **glosario** del dominio.
@@ -16,7 +16,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 3. `planning/sdd-process.md` — proceso SDD y plantilla de spec (§5).
 4. `planning/pbp-development.md` — etapas e hitos.
 5. `planning/taskboard.md` — tareas.
-6. `specs/` — especificaciones (`SPEC-00` creada; `SPEC-01` a `SPEC-11` Verificadas).
+6. `specs/` — contratos y estados actuales; la verificación histórica no sustituye re-verificar una enmienda ni aceptar staging.
 
 Insumos históricos de la Etapa 12 (100% subsanados y verificados bajo `SPEC-11`): `AUDITORIA.md` (auditoría del 2026-11-05), `testing-issues/` (ISSUE-01 a ISSUE-10 y RFC-01) y los planes archivados `planning/plan-implementacion-auditoria-1-servidor-y-fundacion.md` y `planning/plan-implementacion-auditoria-2-cliente-y-cierre.md` (documentos históricos/archivados; los agentes no deben usarlos como tareas pendientes ni como fuente de nuevas decisiones; la fuente única de verdad es `.agents/CONTEXT.md`).
 

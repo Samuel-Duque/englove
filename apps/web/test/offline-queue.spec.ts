@@ -161,6 +161,47 @@ describe("SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service", () => {
     vi.restoreAllMocks();
   });
 
+  it.each([400, 404, 409, 413, 422])('OFF-01: rechazo terminal %i de audio no bloquea el siguiente intento', async (status) => {
+    Object.assign(window, {location: {origin: 'http://localhost:3000'}});
+    for (const attemptId of ['closed', 'valid']) {
+      await enqueueUpload({attemptId, userId: 'user-1', blob: new Blob(['audio']), mimeType: 'audio/webm',
+        durationMs: 3000, mediaId: null, attemptToken: `token-${attemptId}`});
+    }
+    const requests: string[] = [];
+    globalThis.fetch = vi.fn<typeof fetch>(async (input, options) => {
+      const url = String(input);
+      requests.push(url);
+      if (url.endsWith('/upload-url')) {
+        const body = JSON.parse(String(options?.body));
+        return body.attemptId === 'closed'
+          ? new Response(JSON.stringify({code: 'ATTEMPT_CLOSED'}), {status})
+          : new Response(JSON.stringify({mediaId: 'valid-media', uploadUrl: 'https://r2.example/put'}));
+      }
+      return new Response('{}');
+    });
+    await executeFlush('user-1');
+    expect(uploadsDb.some(upload => upload.attemptId === 'closed')).toBe(false);
+    expect(requests).toContain('https://r2.example/put');
+    expect(requests.some(url => url.includes('/valid-media/confirm'))).toBe(true);
+  });
+
+  it('OFF-01: no compite con el grabador y reutiliza el audio confirmado al entregar', async () => {
+    Object.assign(window, {location: {origin: 'http://localhost:3000'}});
+    await enqueueUpload({attemptId: 'draft', userId: 'user-1', blob: new Blob(['audio']), mimeType: 'audio/webm',
+      durationMs: 3000, mediaId: 'confirmed-media', attemptToken: 'token', isDraft: true});
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response('{}'));
+    globalThis.fetch = fetchMock;
+    await executeFlush('user-1');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await enqueueEvent({attemptId: 'draft', userId: 'user-1', clientEventId: 'complete', eventType: 'completed',
+      payload: {mediaId: 'confirmed-media'}, attemptToken: 'token'});
+    await executeFlush('user-1');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, expect.stringContaining('/confirmed-media/confirm'), expect.anything());
+    expect(fetchMock).toHaveBeenNthCalledWith(2, expect.stringContaining('/draft/complete'), expect.anything());
+    expect(uploadsDb).toHaveLength(0);
+  });
+
   describe("RF-10: Persistent answer queue and local storage", () => {
     it("persists answered event in pendingEvents and assigns auto-increment ID", async () => {
       const id = await enqueueEvent({

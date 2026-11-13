@@ -296,6 +296,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       student: { id: 'std-e2e-open', level: 'A2', ageSegment: 'teens', canSwitchInterface: false },
       organizationId: 'org-e2e',
     };
+    await page.route('**/api/v1/me', route => route.fulfill({status: 200, json: sessionPayload2}));
 
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
@@ -381,6 +382,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       student: { id: 'std-e2e-spk', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
       organizationId: 'org-e2e',
     };
+    await page.route('**/api/v1/me', route => route.fulfill({status: 200, json: sessionPayload3}));
 
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
@@ -422,8 +424,12 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       });
     });
 
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let uploadRequests = 0;
     // Mock media upload-url and R2 PUT
     await page.route('**/api/v1/media/upload-url', async (route) => {
+      uploadRequests++;
       await route.fulfill({
         status: 201,
         json: {
@@ -509,8 +515,17 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
 
     await expect(page.locator('text=Grabación lista para enviar')).toBeVisible();
 
+    // OFF-01: apertura directa, borrador confirmado y recarga no duplican assets.
+    await expect(page.locator('button:has-text("Entregar actividad")')).toBeEnabled();
+    expect(uploadRequests).toBe(1);
+    await page.reload();
+    await expect(page.locator('text=Grabación lista para enviar')).toBeVisible();
+    await expect(page.locator('button:has-text("Entregar actividad")')).toBeEnabled();
+
     // Entregar actividad oral
     await page.click('button:has-text("Entregar actividad")');
     await expect(page.locator('text=¡Actividad entregada con éxito!')).toBeVisible({ timeout: 5000 });
+    expect(uploadRequests).toBe(1);
+    expect(pageErrors).toEqual([]);
   });
 });

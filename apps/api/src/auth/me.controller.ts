@@ -115,7 +115,7 @@ export class MeController {
     }
 
     const updated = await this.prisma.student.update({
-      where: { id: student.id },
+      where: { id: student.id, organization_id: user.organizationId },
       data: { age_segment: dto.ageSegment },
       include: { user: true },
     });

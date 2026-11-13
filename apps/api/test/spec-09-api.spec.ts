@@ -6,6 +6,7 @@ import { AppMinVersionMiddleware } from '../src/common/middleware/app-min-versio
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { MediaService } from '../src/media/media.service';
 import { StatsService } from '../src/stats/stats.service';
+import { mockStatsConfiguration } from './stats-config.fixture';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ScoringService } from '../src/scoring/scoring.service';
 import { GamificationService } from '../src/gamification/gamification.service';
@@ -413,7 +414,7 @@ describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', (
         getBogotaIsoWeekKey: vi.fn().mockReturnValue('2026-W44'),
       } as unknown as GamificationService;
 
-      const statsService = new StatsService(prismaMock, gamificationMock);
+      const statsService = new StatsService(prismaMock, gamificationMock, mockStatsConfiguration());
 
       const stats = await statsService.getStudentStats(orgId, studentId, {});
       expect(stats.consistency.offlineUndeliveredAttempts).toHaveLength(2);

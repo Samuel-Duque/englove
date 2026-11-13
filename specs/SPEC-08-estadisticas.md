@@ -2,12 +2,12 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Verificada |
+| Estado | Implementada |
 | Etapa | 8 — Estadísticas y leaderboard |
 | Tareas | ENG-100, ENG-101, ENG-102, ENG-103, ENG-104 |
 | Referencias | `.agents/CONTEXT.md` §5.1, §5.3, §5.4, §12.8, §14 (Decisiones 20, 23, 25, 34, 41, 61, 66, 71, 73, 74, 76, 79, 98, 100, 104, 110–115); `planning/architecture-overview.md` §6, §7.8, §9.3, §9.4; `planning/pbp-development.md` (Etapa 8); `specs/SPEC-01-scaffold.md` a `specs/SPEC-07-revision-y-feedback.md` |
-| Aprobada por / fecha | Líder del proyecto / 2026-10-27 |
-| Verificada por / fecha | Líder del proyecto / 2026-10-28 (re-verificada 2026-11-08) |
+| Aprobada por / fecha | Líder del proyecto / 2026-10-27; corrección NEG-01 autorizada al solicitar corregir los hallazgos el 2026-11-12 |
+| Verificada por / fecha | Histórica: 2026-10-28 y 2026-11-08. Re-verificación de NEG-01 pendiente de CI |
 
 ## 1. Contexto y objetivo
 
@@ -35,7 +35,7 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
 - **`ENG-102` — Leaderboard privado para la profesora y Ranking privado de juegos:**
   - Endpoints `GET /api/v1/stats/leaderboard` y `GET /api/v1/stats/games-leaderboard` protegidos por `@Roles(Role.teacher)` (sin feature flags `stats` ni `leaderboard`, Decisiones 34 §7, 41 y 137), con filtrado por grupo (`groupId`), por grupos de nivel (`A1`, `A2`, `B1` o `B2`, Decisión 115) y exclusión total de `implausible_duration` en las métricas de fila del ranking de juegos (regla `QA-06`).
 - **`ENG-103` — Vista individual por estudiante y validación con la profesora:**
-  - Endpoint `GET /api/v1/stats/students/:id` y vista `/estadisticas/estudiantes/[id]` con serie temporal contra el promedio del grupo, desgloses por `ActivityType` y `GameMechanic`, umbral `passing_score = 3.0`, calendario semanal ISO, racha vigente, mejor racha histórica y tiempo dedicado (diario, semanal y mensual).
+  - Endpoint `GET /api/v1/stats/students/:id` y vista `/estadisticas/estudiantes/[id]` con serie temporal contra el promedio del grupo, desgloses por `ActivityType` y `GameMechanic`, umbral organizacional `passing_score` (valor inicial 3,0), calendario semanal ISO, racha vigente, mejor racha histórica y tiempo dedicado (diario, semanal y mensual).
 - **`ENG-104` — Job cada 3 días de resumen de pendientes por correo:**
   - Cron a las `08:00 America/Bogota` con `ScheduledJobRun` (`job_key = 'teacher_pending_summary'`, Decisión 114), consultando `PendingSummaryService` y enviando `'teacher-pending-summary'` vía `MailService` solo cuando existan pendientes.
 
@@ -92,7 +92,7 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
 9. **RF-9 — Vista individual por estudiante: eje de rendimiento (`ENG-103`, Decisión 137)**
    - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/students/:id` con filtros opcionales `from`, `to`, `type` y `level`,
    - **Cuando** el servidor genera el bloque `performance` del estudiante,
-   - **Entonces** devuelve la serie cronológica de intentos calificados de asignaciones (`scoreSeries`, excluyendo `game`), el promedio del grupo del alumno (`groupAverageScore`), los promedios por `ActivityType` asignable y `Level`, y la distribución respecto a `passing_score = 3.0` (`>= 3.0` vs. `< 3.0`), mientras que los microjuegos se reportan en `gamesPractice` con estrellas y puntos de juego (Decisión 137).
+   - **Entonces** devuelve la serie cronológica de intentos calificados de asignaciones (`scoreSeries`, excluyendo `game`), el promedio del grupo del alumno (`groupAverageScore`), los promedios por `ActivityType` asignable y `Level`, y la distribución respecto a `games.config.passing_score` de la organización (`score >= passing_score` vs. `score < passing_score`), mientras que los microjuegos se reportan en `gamesPractice` con estrellas y puntos de juego (Decisiones 83, 132 y 137).
 
 10. **RF-10 — Vista individual por estudiante: eje de constancia y Práctica en juegos (`ENG-103`, ENG-162, Decisión 137)**
     - **Dado** una profesora autenticada que solicita `GET /api/v1/stats/students/:id`,
@@ -115,7 +115,7 @@ Las preguntas abiertas `Q-01` a `Q-04` quedaron cerradas y aprobadas mediante la
    - **Rendimiento:** solo considera `Attempt` con `status = 'graded'` y `score IS NOT NULL`.
    - **Constancia:** considera `ProgressEvent` con `type IN ('attempt_completed', 'audio_submitted')` para semanas activas, rachas, actividades completadas y alertas de inactividad, más `Attempt.finished_at - Attempt.started_at` para el tiempo dedicado. Una entrega en `pending_review` suma de inmediato en constancia (Decisión 100).
 2. **Escala `0,0–5,0`, redondeo y umbral de aprobación (Decisiones 20, 23 y 34 §5):**
-   - Todos los promedios se calculan en el servidor y se redondean a 1 decimal (`Math.round(val * 10) / 10`). El umbral de aprobación es constante en el servidor en `3.0` (Decisiones 20 y 101): `score >= 3.0` es aprobada (`passed = true`).
+   - Todos los promedios se calculan en el servidor y se redondean a 1 decimal (`Math.round(val * 10) / 10`). El umbral se obtiene mediante `FeatureFlagsService.getConfiguration(organizationId)` de `games.config.passing_score` (Decisiones 83 y 132), con configuración inicial 3,0. Aplica aunque `games.enabled` sea `false`; se devuelve como `performance.passingScore`. No modifica los tramos de estrellas ni puntos de los microjuegos.
 3. **Último intento calificado frente a serie individual en microjuegos (Decisiones 25, 74, 104 y 137):**
    - En los promedios agregados, cada par `(student_id, assignment_id)` aporta únicamente su intento con mayor `attempt_number` en `status = 'graded'`.
    - En `scoreSeries` del estudiante (`RF-9`), se incluyen los intentos calificados de asignaciones, excluyendo microjuegos (`game`), los cuales se reportan de forma independiente en `gamesPractice` y `games-leaderboard` sin contaminar notas académicas (Decisión 137).
@@ -389,7 +389,7 @@ Bajo `apps/web/src/app/(teacher)/estadisticas/`:
    - **Pestaña Leaderboard privado (`leaderboard`):** aviso de privacidad docente, filtros rápidos por **grupos de nivel (`Todos`, `A1`, `A2`, `B1`, `B2`)** y selector de grupo (`groupId`, Decisión 115), y tabla de ranking.
 2. **Ficha de estudiante (`estudiantes/[id]/page.tsx`, `/estadisticas/estudiantes/[id]`):**
    - Filtros por fechas, tipo de actividad y nivel MCER.
-   - **Rendimiento:** serie temporal de notas (`0,0–5,0`) contra el promedio del grupo (`groupAverageScore`) y el umbral `3,0`, marcando plazo extendido o duración implausible; conteo de aprobadas (`>= 3,0`) vs. por mejorar (`< 3,0`); y desgloses por `ActivityType`, `GameMechanic` y `Level`.
+   - **Rendimiento:** serie temporal de notas (`0,0–5,0`) contra el promedio del grupo (`groupAverageScore`) y el umbral efectivo `performance.passingScore`, marcando plazo extendido o duración implausible; conteo de aprobadas vs. por mejorar; y desgloses por `ActivityType`, `GameMechanic` y `Level`.
    - **Constancia:** racha vigente, mejor racha histórica (`bestStreakWeeks`), perdón semanal, tasa de finalización, calendario de 12 semanas ISO y barras de tiempo dedicado por **Día**, **Semana** o **Mes**.
 3. **Estados vacíos, carga y error:** ausencia de notas como `—` (nunca `0,0`), `Skeleton` inicial y botón `Reintentar ahora` ante fallo de red.
 
@@ -409,7 +409,7 @@ Bajo `apps/web/src/app/(teacher)/estadisticas/`:
   - `overview` por nivel, por grupo e `inactiveAlerts` de 14 días (`RF-5`).
   - `groups/:id` verificando tanto la comparación de tendencia cada **30 días** (`trend30d`) como la comparación **semanal** (`trend7d`) y ordenamiento (`RF-6`).
   - `leaderboard` con ordenamiento determinista y filtrado por grupo (`groupId`) y por grupos de nivel (`A1`, `A2`, `B1`, `B2`) (`RF-8`).
-  - `students/:id` con desgloses por `ActivityType`, `GameMechanic` y `Level`, umbral `3.0`, calendario semanal, `bestStreakWeeks` y tiempo diario/semanal/mensual (`RF-9`, `RF-10`).
+  - `students/:id` con desgloses por `ActivityType`, `GameMechanic` y `Level`, umbral organizacional efectivo, calendario semanal, `bestStreakWeeks` y tiempo diario/semanal/mensual (`RF-9`, `RF-10`). La regresión `stats-passing-score.postgres.spec.ts` prueba dos tenants con la misma nota y umbrales distintos, juegos apagados y rechazo de acceso cruzado (NEG-01).
 - **Seguridad y validaciones (`apps/api/src/stats/stats.controller.spec.ts`):**
   - Rol `student` recibe `403 FORBIDDEN` en `/leaderboard` y demás rutas de `/stats/*` (`RF-8`); `groupId` o `studentId` ajeno devuelve `404 NOT_FOUND` y `from > to` devuelve `400 VALIDATION_ERROR` (`RF-11`).
 - **Suite integral E2E en PostgreSQL real con Docker (`apps/api/test/e2e-stats-flow.spec.ts`):**
@@ -450,3 +450,4 @@ No quedan preguntas abiertas bloqueantes. Las cuatro preguntas iniciales (`Q-01`
 | 2026-10-28 | Líder del proyecto / Agente IA | Verificación exhaustiva de la implementación de `SPEC-08` (`ENG-100` a `ENG-104`). Contratos compartidos (`@englove/shared`), índices en `Attempt` y `ProgressEvent`, `StatsService` y `StatsController`, cron cada 3 días de pendientes (`teacher_pending_summary`), vistas en Next.js (`/estadisticas` y `/estadisticas/estudiantes/[id]`), suites de pruebas completas (33 pruebas estadísticas en API + suite E2E de 7 pasos en PostgreSQL real Docker + 11 en web + presupuesto `< 500 ms`, 451/451 tests en monorepo) y guardrails validados con 0 errores (`Estado: Verificada`). |
 | 2026-11-08 | Líder del proyecto / Agente IA | Alineación de RF-1, RF-2, RF-4, RF-5, RF-6, RF-8, RF-9, RF-10 y RF-12 con la Decisión 137 (Etapa 12): exclusión de microjuegos de la nota académica, métricas de práctica autónoma («Práctica en juegos»), ranking privado de juegos (`GET /api/v1/stats/games-leaderboard`), omisión idempotente del cron de recordatorios cuando no hay pendientes y ajuste en el presupuesto de latencia; paso por revisión y re-verificación (`Estado: Verificada`). |
 | 2026-11-09 | Líder del proyecto / Agente IA | Alineación técnica con Etapa 12 y auditoría QA (WP-06): incorporación explícita de QA-06 (exclusión total de implausible_duration en métricas de games-leaderboard), confirmación de exclusión de microjuegos de notas académicas y de scoreSeries |
+| 2026-11-12 | Líder del proyecto / Agente IA | Corrección NEG-01 solicitada en conversación: paso por revisión y aprobación de la alineación con las decisiones 83/132. Umbral por organización, efectivo aun con juegos deshabilitados, sin cambiar estrellas. Re-verificación pendiente; evidencia histórica preservada. |

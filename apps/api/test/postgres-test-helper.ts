@@ -3,6 +3,9 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 
 export function loadEnvFile(): void {
+  if (process.env.CI === 'true' && !process.env.DATABASE_URL) {
+    throw new Error('CI-02: CI requiere una DATABASE_URL explícita de pruebas');
+  }
   if (process.env.DATABASE_URL) return;
   try {
     const envPath = path.resolve(__dirname, '../.env');
@@ -89,3 +92,6 @@ export function checkPostgresRunning(): boolean {
 }
 
 export const isPostgresAvailable = checkPostgresRunning();
+if ((process.env.CI === 'true' || process.env.REQUIRE_POSTGRES_TESTS === '1') && !isPostgresAvailable) {
+  throw new Error('CI-02: PostgreSQL de pruebas es obligatorio y no está disponible');
+}

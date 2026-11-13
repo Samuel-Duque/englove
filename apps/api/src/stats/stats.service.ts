@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GamificationService, type StreakState } from '../gamification/gamification.service';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import {
   ActivityType,
   ApprovalStatus,
@@ -50,11 +51,10 @@ const bogotaDayFormatter = new Intl.DateTimeFormat('en-CA', {
 
 @Injectable()
 export class StatsService {
-  private readonly defaultPassingScore = 3.0;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
+    private readonly featureFlagsService: FeatureFlagsService,
   ) {}
 
   private async computeStreak(
@@ -1113,6 +1113,8 @@ export class StatsService {
     const activeGroup = activeMembership?.group ?? (student.memberships ?? [])[0]?.group ?? null;
 
     // Optional query filters
+    const { config } = await this.featureFlagsService.getConfiguration(organizationId);
+    const passingScore = config.passing_score;
     const typeFilter = query.type;
     const levelFilter = query.level;
 
@@ -1176,7 +1178,7 @@ export class StatsService {
         level: act.level,
         attemptNumber: att.attempt_number,
         score: Number(att.score),
-        passed: Number(att.score) >= this.defaultPassingScore,
+        passed: Number(att.score) >= passingScore,
         gradedAt: att.graded_at!.toISOString(),
         usedExtendedDeadline: Boolean(att.previous_attempt?.retry_extend_until),
         // guardrails-ignore G-C06: bandera de duracion calculada en servidor, no telemetria de terceros
@@ -1531,7 +1533,7 @@ export class StatsService {
         level: levelFilter ?? null,
       },
       performance: {
-        passingScore: this.defaultPassingScore,
+        passingScore,
         studentAverageScore,
         groupAverageScore,
         totalGradedActivities,

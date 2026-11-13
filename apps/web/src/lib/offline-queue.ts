@@ -7,6 +7,7 @@
  */
 
 import { uploadAudioBlob } from "./audio-upload";
+import { ApiError } from "./api";
 import { isLogoutPending } from "./auth-session";
 
 export interface PendingEventRecord {
@@ -21,6 +22,8 @@ export interface PendingEventRecord {
 }
 
 export interface PendingUploadRecord {
+  // Un borrador del grabador no se sube en paralelo al envío directo; Entregar lo encola.
+  isDraft?: boolean;
   attemptId: string;
   userId: string;
   blob: Blob;
@@ -673,7 +676,8 @@ export async function executeFlush(activeUserId: string): Promise<void> {
 
     if (!isCurrent()) return;
     const events = rawEvents.filter((e) => e.userId === activeUserId);
-    const uploads = rawUploads.filter((u) => u.userId === activeUserId);
+    const uploads = rawUploads.filter((u) => u.userId === activeUserId &&
+      (!u.isDraft || events.some(event => event.attemptId === u.attemptId && event.eventType === "completed")));
 
     if (events.length === 0 && uploads.length === 0) {
       isFlushingInternal = false;
@@ -889,22 +893,17 @@ export async function executeFlush(activeUserId: string): Promise<void> {
           });
           hadSuccess = true;
         } catch (uploadErr: unknown) {
-          const errMsg = String(uploadErr);
-          if (
-            // guardrails-ignore G-C06: constante de error de duracion de audio de SPEC-05/SPEC-09
-            errMsg.includes("AUDIO_IMPLAUSIBLE_DURATION") ||
-            // guardrails-ignore G-C06: constante de error de duracion de audio de SPEC-05/SPEC-09
-            errMsg.includes("AUDIO_EXCEEDS_MAX_DURATION") ||
-            errMsg.includes("413") ||
-            errMsg.includes("422") ||
-            errMsg.includes("400")
-          ) {
+          if (!isCurrent()) return;
+          const status = uploadErr instanceof ApiError ? uploadErr.statusCode : undefined;
+          if (status === 401) {
+            isQueuePausedDueToAuth = true;
+            return;
+          } else if (status === 400 || status === 413 || status === 422) {
             await discardAudioBlob(attemptId);
-          } else if (
-            errMsg.includes("ATTEMPT_CLOSED") ||
-            errMsg.includes("409")
-          ) {
+            continue;
+          } else if (status === 404 || status === 409) {
             await purgeAttemptFromQueue(attemptId);
+            continue;
           } else {
             hadError = true;
             if (isCurrent()) scheduleBackoffRetry();

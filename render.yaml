@@ -9,6 +9,7 @@ services:
     dockerContext: .
     plan: free
     numInstances: 1
+    autoDeployTrigger: 'off'
     healthCheckPath: /health
     envVars:
       - key: APP_ENV

@@ -108,7 +108,7 @@ export class MaintenanceService {
 
         // Failed or stale running job: resume
         await this.prisma.scheduledJobRun.update({
-          where: { id: existingJob.id },
+          where: { id: existingJob.id, organization_id: org.id },
           data: { status: JobRunStatus.running, started_at: now },
         });
       } else {
@@ -194,7 +194,7 @@ export class MaintenanceService {
             }
             if (now > completeUntil) {
               await this.prisma.attempt.update({
-                where: { id: att.id },
+                where: { id: att.id, organization_id: org.id },
                 data: { status: AttemptStatus.abandoned },
               });
             }
@@ -221,7 +221,7 @@ export class MaintenanceService {
               }
             }
             await this.prisma.mediaAsset.update({
-              where: { id: media.id },
+              where: { id: media.id, organization_id: org.id },
               data: { status: MediaAssetStatus.deleted, deleted_at: new Date() },
             });
           }
@@ -435,7 +435,7 @@ export class MaintenanceService {
             if (age >= 11 && !st.can_switch_interface) {
               // RF-24: Activa permiso sin cambiar tema (age_segment intacto)
               await this.prisma.student.update({
-                where: { id: st.id },
+                where: { id: st.id, organization_id: org.id },
                 data: { can_switch_interface: true },
               });
             }
@@ -520,7 +520,7 @@ export class MaintenanceService {
           }
 
           await this.prisma.scheduledJobRun.update({
-            where: { id: existingJob.id },
+            where: { id: existingJob.id, organization_id: org.id },
             data: { status: JobRunStatus.running, started_at: now },
           });
         } else {
@@ -573,7 +573,7 @@ export class MaintenanceService {
                 }
 
                 await this.prisma.mediaAsset.update({
-                  where: { id: media.id },
+                  where: { id: media.id, organization_id: org.id },
                   data: {
                     status: MediaAssetStatus.deleted,
                     deleted_at: now,
@@ -585,7 +585,7 @@ export class MaintenanceService {
                 );
                 try {
                   await this.prisma.mediaAsset.update({
-                    where: { id: media.id },
+                    where: { id: media.id, organization_id: org.id },
                     data: { status: MediaAssetStatus.pending_delete },
                   });
                 } catch {
@@ -687,7 +687,7 @@ export class MaintenanceService {
             }
 
             await this.prisma.scheduledJobRun.update({
-              where: { id: existingJob.id },
+              where: { id: existingJob.id, organization_id: org.id },
               data: { status: JobRunStatus.running, started_at: now },
             });
           } else {

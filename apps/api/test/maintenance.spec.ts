@@ -115,7 +115,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'attempt-expired' },
+          where: { id: 'attempt-expired', organization_id: orgId },
           data: { status: AttemptStatus.abandoned },
         }),
       );
@@ -155,7 +155,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'game-attempt-expired' },
+          where: { id: 'game-attempt-expired', organization_id: orgId },
           data: { status: AttemptStatus.abandoned },
         }),
       );
@@ -197,7 +197,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       expect(mockMediaService.deleteFile).toHaveBeenCalledWith('org/student/att/rec.mp4');
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'media-to-purge' },
+          where: { id: 'media-to-purge', organization_id: orgId },
           data: expect.objectContaining({ status: MediaAssetStatus.deleted }),
         }),
       );
@@ -230,7 +230,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       expect(mockPrisma.student.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: studentId },
+          where: { id: studentId, organization_id: orgId },
           data: { can_switch_interface: true },
         }),
       );
@@ -274,7 +274,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       expect(mockPrisma.student.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: studentId },
+          where: { id: studentId, organization_id: orgId },
           data: { can_switch_interface: true },
         }),
       );

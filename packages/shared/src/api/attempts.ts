@@ -229,7 +229,7 @@ export interface MediaUploadUrlResponse {
   id?: string;
 }
 
-export const MediaUploadUrlResponseSchema: z.ZodType<MediaUploadUrlResponse, z.ZodTypeDef, unknown> = z
+export const MediaUploadUrlResponseSchema: z.ZodType<MediaUploadUrlResponse> = z
   .object({
     mediaId: z.string().optional(),
     id: z.string().optional(),
@@ -264,7 +264,7 @@ export interface MediaConfirmResponse {
   id?: string;
 }
 
-export const MediaConfirmResponseSchema: z.ZodType<MediaConfirmResponse, z.ZodTypeDef, unknown> = z
+export const MediaConfirmResponseSchema: z.ZodType<MediaConfirmResponse> = z
   .object({
     mediaId: z.string().optional(),
     id: z.string().optional(),

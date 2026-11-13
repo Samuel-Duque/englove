@@ -5,7 +5,7 @@
     "build": {
       "env": ["CLOUDFLARE_ENV", "API_URL", "COOKIE_PREFIX", "NEXT_PUBLIC_*"],
       "dependsOn": ["^build", "db:generate"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
     },
     "lint": {
       "dependsOn": ["^build"]

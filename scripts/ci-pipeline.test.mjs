@@ -39,3 +39,12 @@ test('OPS-01: promoción serializada, condicionada y construida para staging', (
   for (const key of ['CLOUDFLARE_ENV', 'API_URL', 'COOKIE_PREFIX']) assert.ok(turbo.tasks.build.env.includes(key));
   assert.equal(parse(readFileSync(new URL('../render.yaml', import.meta.url), 'utf8')).services[0].autoDeployTrigger, 'off');
 });
+test('SUPPLY-01: GitHub Actions y contenedores locales quedan fijados por digest/commit SHA inmutable', () => {
+  for (const job of Object.values(workflow.jobs)) {
+    for (const step of job.steps ?? []) {
+      if (typeof step.uses === 'string') {
+        assert.match(step.uses, /^[^@]+@[0-9a-f]{40}$/, `La acción ${step.uses} debe estar fijada por SHA de 40 caracteres`);
+      }
+    }
+  }
+});

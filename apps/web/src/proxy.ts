@@ -7,6 +7,45 @@ interface DecodedJwt {
 }
 
 /**
+ * Construye la política CSP y cabeceras HTTP de defensa para todas las respuestas
+ * emitidas por proxy.ts (incluyendo Worker/SSR y redirecciones de rol).
+ */
+function buildContentSecurityPolicy(): string {
+  const appEnv = process.env.NEXT_PUBLIC_APP_ENV || process.env.APP_ENV || "local";
+  const isLocal = appEnv === "local";
+  const localHttpSources = isLocal
+    ? " http://localhost:3001 http://127.0.0.1:3001 http://localhost:9000 http://127.0.0.1:9000"
+    : "";
+  const localMediaSources = isLocal ? " http://localhost:9000 http://127.0.0.1:9000" : "";
+  const localWsSources = isLocal ? " ws:" : "";
+  const localScriptEval = isLocal ? " 'unsafe-eval'" : "";
+
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${localScriptEval}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    `img-src 'self' data: blob: https:${localMediaSources}`,
+    `media-src 'self' blob: https:${localMediaSources}`,
+    `connect-src 'self' https: wss:${localHttpSources}${localWsSources}`,
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
+function withSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy());
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  return response;
+}
+
+/**
  * Extracts payload fields from a JWT payload without cryptographic verification (Decision A45 & A75).
  * Only used for perimeter UI routing/redirection in proxy.ts; business authorization remains in NestJS.
  */
@@ -51,7 +90,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       pathname,
     )
   ) {
-    return NextResponse.next();
+    return withSecurityHeaders(NextResponse.next());
   }
 
   // Session cookie detection: strictly with prefix convention (Decision 58, RF-2)
@@ -104,12 +143,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     ) {
       loginUrl.searchParams.set("next", nextCandidate);
     }
-    return NextResponse.redirect(loginUrl);
+    return withSecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
   // If authenticated and visiting root or public auth routes, redirect to /inicio (H11)
   if (isSessionValid && (isPublicAuthRoute || pathname === "/")) {
-    return NextResponse.redirect(new URL("/inicio", request.url));
+    return withSecurityHeaders(NextResponse.redirect(new URL("/inicio", request.url)));
   }
 
   // Role segregation redirection (Decisions A45, A75, H9)
@@ -132,7 +171,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         pathname === "/contenido-extra" ||
         pathname.startsWith("/contenido-extra/");
       if (isTeacherRoute) {
-        return NextResponse.redirect(new URL("/inicio", request.url));
+        return withSecurityHeaders(NextResponse.redirect(new URL("/inicio", request.url)));
       }
     } else if (role === "teacher") {
       const isStudentRoute =
@@ -149,10 +188,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         pathname === "/extra" ||
         pathname.startsWith("/extra/");
       if (isStudentRoute) {
-        return NextResponse.redirect(new URL("/inicio", request.url));
+        return withSecurityHeaders(NextResponse.redirect(new URL("/inicio", request.url)));
       }
     }
   }
 
-  return NextResponse.next();
+  return withSecurityHeaders(NextResponse.next());
 }

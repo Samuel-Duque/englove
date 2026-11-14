@@ -46,7 +46,7 @@ describe.runIf(enabled)('DAT-01: migración original con transacción operativa 
   }
 
   async function beginAuditedMigration(): Promise<void> {
-    await client.query('BEGIN');
+    await client.query('SAVEPOINT dat01_attempt');
     await client.query("SET LOCAL statement_timeout = '15s'");
     await client.query("SET LOCAL lock_timeout = '5s'");
     await client.query('LOCK TABLE activities, assignments, attempts, progress_events, badge_awards IN SHARE ROW EXCLUSIVE MODE');
@@ -61,23 +61,15 @@ describe.runIf(enabled)('DAT-01: migración original con transacción operativa 
 
   beforeAll(async () => {
     const adminUrl = localAdminUrl(process.env.AUDIT_MIGRATION_ADMIN_URL || '');
-    const database = `englove_audit_migration_${randomUUID().replaceAll('-', '')}`;
-    const admin = new Client({ connectionString: adminUrl.href, connectionTimeoutMillis: 5000 });
-    await admin.connect();
-    try {
-      // Identificador generado internamente con alfabeto cerrado; jamás un nombre de BD existente.
-      await admin.query(`CREATE DATABASE "${database}"`);
-    } finally {
-      await admin.end();
-    }
-    console.log(`DAT-01 scratch database retained for parent cleanup: ${database}`);
-    const databaseUrl = new URL(adminUrl);
-    databaseUrl.pathname = `/${database}`;
-    client = new Client({ connectionString: databaseUrl.href, connectionTimeoutMillis: 5000 });
+    const schema = `dat01_mig_${randomUUID().replaceAll('-', '')}`;
+    client = new Client({ connectionString: adminUrl.href, connectionTimeoutMillis: 5000 });
     client.on('notice', (notice) => { if (notice.message) notices.push(notice.message); });
     await client.connect();
     await client.query('BEGIN');
     try {
+      // Esquema efímero dentro de transacción controlada: ROLLBACK final elimina el esquema y fixtures sin dejar bases huérfanas.
+      await client.query(`CREATE SCHEMA "${schema}"`);
+      await client.query(`SET LOCAL search_path TO "${schema}"`);
       for (const name of ['20261020000000_init', '20261022000000_add_assignment_cancelled_at', '20261027000000_stats_indexes']) {
         await client.query(readFileSync(resolve(__dirname, `../prisma/migrations/${name}/migration.sql`), 'utf8'));
       }
@@ -106,7 +98,6 @@ describe.runIf(enabled)('DAT-01: migración original con transacción operativa 
           INSERT INTO badge_awards(organization_id,student_id,badge_rule_id) VALUES(org,student,rule);
         END LOOP;
       END $$`);
-      await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -114,20 +105,28 @@ describe.runIf(enabled)('DAT-01: migración original con transacción operativa 
     originalSnapshot = await snapshot();
   }, 30000);
 
-  afterAll(async () => { await client?.end(); });
+  afterAll(async () => {
+    try {
+      await client?.query('ROLLBACK');
+    } catch {
+      // Sin transacción activa
+    }
+    await client?.end();
+  });
 
   it('revierte datos y DDL al fallar después de ejecutar el SQL original', async () => {
     await beginAuditedMigration();
     await expect(client.query('SELECT 1 / 0')).rejects.toThrow();
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK TO SAVEPOINT dat01_attempt');
+    await client.query('RELEASE SAVEPOINT dat01_attempt');
     expect(await snapshot()).toEqual(originalSnapshot);
-    const columns = await client.query("SELECT 1 FROM information_schema.columns WHERE table_name='attempts' AND column_name='activity_id'");
+    const columns = await client.query("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name='attempts' AND column_name='activity_id'");
     expect(columns.rowCount).toBe(0);
   });
 
   it('registra conteos y conserva otros tipos, tenants y badges al confirmar', async () => {
     await beginAuditedMigration();
-    await client.query('COMMIT');
+    await client.query('RELEASE SAVEPOINT dat01_attempt');
     const result = await client.query(`SELECT
       (SELECT count(*)::int FROM assignments) assignments,
       (SELECT count(*)::int FROM attempts) attempts,

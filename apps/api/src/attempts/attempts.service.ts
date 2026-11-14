@@ -285,116 +285,178 @@ export class AttemptsService {
       });
     }
 
-    // Check existing attempts for this student on this assignment
-    const existingAttempts = await this.prisma.attempt.findMany({
-      where: {
-        assignment_id: assignmentId,
-        student_id: studentId,
-        organization_id: organizationId,
-      },
-      orderBy: { attempt_number: 'desc' },
-      include: { next_attempt: true },
-    });
-
-    const now = new Date();
-    let attemptNumber = 1;
-    let previousAttemptId: string | null = null;
-    let effectiveDueAt = assignment.due_at;
-
-    const latestAttempt = existingAttempts[0];
-    if (latestAttempt) {
-      if (assignment.activity.type === ActivityType.game) {
-        // Decision 104: For games, if latest is in_progress, prevent duplicate
-        if (latestAttempt.status === AttemptStatus.in_progress) {
-          throw new ConflictException({
-            statusCode: 409,
-            code: 'ATTEMPT_ALREADY_EXISTS',
-            message: 'Ya existe un intento en curso para este microjuego',
-          });
-        }
-        // Completed/abandoned game within open window: create new individual attempt (attempt_number + 1)
-        attemptNumber = latestAttempt.attempt_number + 1;
-        previousAttemptId = latestAttempt.id;
-        effectiveDueAt = assignment.due_at;
-      } else {
-        // Check for unconsumed retry authorization (RF-4, Decision 61, 74)
-        const hasUnconsumedRetry =
-          latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt;
-
-        if (!hasUnconsumedRetry) {
-          throw new ConflictException({
-            statusCode: 409,
-            code: 'ATTEMPT_ALREADY_EXISTS',
-            message: 'Ya existe un intento para esta asignación',
-          });
-        }
-
-        attemptNumber = latestAttempt.attempt_number + 1;
-        previousAttemptId = latestAttempt.id;
-        effectiveDueAt = latestAttempt.retry_extend_until ?? assignment.due_at;
+    const runStartTx = async <T>(
+      fn: (tx: PrismaService | Prisma.TransactionClient) => Promise<T>,
+    ): Promise<T> => {
+      if (typeof this.prisma.$transaction === 'function') {
+        return this.prisma.$transaction(fn);
       }
-    }
+      return fn(this.prisma);
+    };
 
-    // Time window validation (RF-3, Decision 84)
-    if (now < assignment.opens_at) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'ATTEMPT_NOT_OPEN',
-        message: `Esta actividad abre el ${assignment.opens_at.toISOString()}`,
-      });
-    }
+    const { attempt, lockedActivity, effectiveDueAt, completeUntil, gameAnswerKey } =
+      await runStartTx(async (tx) => {
+        if (typeof tx.$queryRaw === 'function') {
+          // C-04: Serializar creación de intento frente a updateActivity mediante bloqueo de fila en activities
+          await tx.$queryRaw`
+            SELECT id, status
+            FROM activities
+            WHERE id = ${assignment.activity.id}::uuid
+              AND organization_id = ${organizationId}::uuid
+            FOR UPDATE
+          `;
+        }
 
-    if (now > effectiveDueAt) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'ATTEMPT_CLOSED',
-        message: 'La actividad ya está cerrada',
-      });
-    }
+        const freshActivity =
+          tx.activity && typeof tx.activity.findFirst === 'function'
+            ? await tx.activity.findFirst({
+                where: { id: assignment.activity.id, organization_id: organizationId },
+                include: {
+                  fill_blank_detail: true,
+                  open_question_detail: true,
+                  speaking_detail: true,
+                  game_detail: true,
+                  exam_detail: true,
+                },
+              })
+            : undefined;
 
-    // Atomically create Attempt (RF-3, RF-4, Decision 74, 104)
-    let attempt;
-    try {
-      attempt = await this.prisma.attempt.create({
-        data: {
-          organization_id: organizationId,
-          assignment_id: assignmentId,
-          student_id: studentId,
-          attempt_number: attemptNumber,
-          previous_attempt_id: previousAttemptId,
-          status: AttemptStatus.in_progress,
-          started_at: now,
-          payload: { answers: {}, processedEventIds: [] },
-          flags: [],
-        },
-      });
-    } catch (err: unknown) {
-      if (getErrorCode(err) === 'P2002') {
-        throw new ConflictException({
-          statusCode: 409,
-          code: 'ATTEMPT_ALREADY_EXISTS',
-          message: 'Ya existe un intento en curso o creado para esta autorización',
+        if (freshActivity === null) {
+          throw new NotFoundException({
+            statusCode: 404,
+            code: 'ACTIVITY_NOT_FOUND',
+            message: 'Actividad no encontrada',
+          });
+        }
+
+        const currentActivity = freshActivity ?? assignment.activity;
+        if (currentActivity.status !== ActivityStatus.published) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ACTIVITY_NOT_AVAILABLE',
+            message: 'La actividad no está disponible',
+          });
+        }
+
+        // Check existing attempts for this student on this assignment under the activity lock
+        const existingAttempts = await tx.attempt.findMany({
+          where: {
+            assignment_id: assignmentId,
+            student_id: studentId,
+            organization_id: organizationId,
+          },
+          orderBy: { attempt_number: 'desc' },
+          include: { next_attempt: true },
         });
-      }
-      throw err;
-    }
 
-    const completeUntil = new Date(effectiveDueAt.getTime() + 24 * 60 * 60 * 1000);
-    const token = this.generateAttemptToken(attempt.id, studentId, organizationId, completeUntil);
+        const now = new Date();
+        let attemptNumber = 1;
+        let previousAttemptId: string | null = null;
+        let computedDueAt = assignment.due_at;
 
-    let gameAnswerKey: unknown;
-    if (assignment.activity.type === ActivityType.game) {
-      const gameDetailWithKey = await this.prisma.gameDetail.findFirst({
-        where: { organization_id: organizationId, activity_id: assignment.activity.id },
-        // guardrails-ignore G-C04: lectura controlada de answer_key para toPublicConfig en RuntimeView de microjuegos (SPEC-06 §4)
-        select: { mechanic: true, config: true, answer_key: true },
+        const latestAttempt = existingAttempts[0];
+        if (latestAttempt) {
+          if (currentActivity.type === ActivityType.game) {
+            // Decision 104: For games, if latest is in_progress, prevent duplicate
+            if (latestAttempt.status === AttemptStatus.in_progress) {
+              throw new ConflictException({
+                statusCode: 409,
+                code: 'ATTEMPT_ALREADY_EXISTS',
+                message: 'Ya existe un intento en curso para este microjuego',
+              });
+            }
+            // Completed/abandoned game within open window: create new individual attempt (attempt_number + 1)
+            attemptNumber = latestAttempt.attempt_number + 1;
+            previousAttemptId = latestAttempt.id;
+            computedDueAt = assignment.due_at;
+          } else {
+            // Check for unconsumed retry authorization (RF-4, Decision 61, 74)
+            const hasUnconsumedRetry =
+              latestAttempt.retry_granted_at !== null && !latestAttempt.next_attempt;
+
+            if (!hasUnconsumedRetry) {
+              throw new ConflictException({
+                statusCode: 409,
+                code: 'ATTEMPT_ALREADY_EXISTS',
+                message: 'Ya existe un intento para esta asignación',
+              });
+            }
+
+            attemptNumber = latestAttempt.attempt_number + 1;
+            previousAttemptId = latestAttempt.id;
+            computedDueAt = latestAttempt.retry_extend_until ?? assignment.due_at;
+          }
+        }
+
+        // Time window validation (RF-3, Decision 84)
+        if (now < assignment.opens_at) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ATTEMPT_NOT_OPEN',
+            message: `Esta actividad abre el ${assignment.opens_at.toISOString()}`,
+          });
+        }
+
+        if (now > computedDueAt) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ATTEMPT_CLOSED',
+            message: 'La actividad ya está cerrada',
+          });
+        }
+
+        // Atomically create Attempt (RF-3, RF-4, Decision 74, 104)
+        let createdAttempt;
+        try {
+          createdAttempt = await tx.attempt.create({
+            data: {
+              organization_id: organizationId,
+              assignment_id: assignmentId,
+              student_id: studentId,
+              attempt_number: attemptNumber,
+              previous_attempt_id: previousAttemptId,
+              status: AttemptStatus.in_progress,
+              started_at: now,
+              payload: { answers: {}, processedEventIds: [] },
+              flags: [],
+            },
+          });
+        } catch (err: unknown) {
+          if (getErrorCode(err) === 'P2002') {
+            throw new ConflictException({
+              statusCode: 409,
+              code: 'ATTEMPT_ALREADY_EXISTS',
+              message: 'Ya existe un intento en curso o creado para esta autorización',
+            });
+          }
+          throw err;
+        }
+
+        const computedCompleteUntil = new Date(computedDueAt.getTime() + 24 * 60 * 60 * 1000);
+        let detailKey: unknown;
+        if (currentActivity.type === ActivityType.game && tx.gameDetail?.findFirst) {
+          const gameDetailWithKey = await tx.gameDetail.findFirst({
+            where: { organization_id: organizationId, activity_id: currentActivity.id },
+            // guardrails-ignore G-C04: lectura controlada de answer_key para toPublicConfig en RuntimeView de microjuegos (SPEC-06 §4)
+            select: { mechanic: true, config: true, answer_key: true },
+          });
+          detailKey = gameDetailWithKey?.answer_key;
+        }
+
+        return {
+          attempt: createdAttempt,
+          lockedActivity: currentActivity,
+          effectiveDueAt: computedDueAt,
+          completeUntil: computedCompleteUntil,
+          gameAnswerKey: detailKey,
+        };
       });
-      gameAnswerKey = gameDetailWithKey?.answer_key;
-    }
+
+    const token = this.generateAttemptToken(attempt.id, studentId, organizationId, completeUntil);
 
     return this.buildRuntimeView(
       attempt,
-      assignment,
+      { ...assignment, activity: lockedActivity },
       effectiveDueAt,
       completeUntil,
       token,
@@ -549,79 +611,141 @@ export class AttemptsService {
       });
     }
 
-    // SPEC-11 §5.1 / T4.1: Eliminar intentos previos in_progress sin lanzar 409 para permitir reinicios limpios
-    await this.prisma.attempt.deleteMany({
-      where: {
-        activity_id: activityId,
-        student_id: studentId,
-        organization_id: organizationId,
-        status: AttemptStatus.in_progress,
-      },
-    });
-
-    const existingAttempts = await this.prisma.attempt.findMany({
-      where: {
-        activity_id: activityId,
-        student_id: studentId,
-        organization_id: organizationId,
-      },
-      orderBy: { attempt_number: 'desc' },
-    });
-
-    const latest = existingAttempts[0];
-
-    const now = new Date();
-    const attemptNumber = (latest?.attempt_number ?? 0) + 1;
-    const previousAttemptId = latest?.id ?? null;
-
-    let attempt;
-    try {
-      attempt = await this.prisma.attempt.create({
-        data: {
-          organization_id: organizationId,
-          assignment_id: null,
-          activity_id: activityId,
-          student_id: studentId,
-          attempt_number: attemptNumber,
-          previous_attempt_id: previousAttemptId,
-          status: AttemptStatus.in_progress,
-          started_at: now,
-          payload: { answers: {}, processedEventIds: [] },
-          flags: [],
-        },
-      });
-    } catch (err: unknown) {
-      if (getErrorCode(err) === 'P2002') {
-        throw new ConflictException({
-          statusCode: 409,
-          code: 'ATTEMPT_ALREADY_EXISTS',
-          message: 'Ya existe un intento para esta autorización',
-        });
+    const runGameStartTx = async <T>(
+      fn: (tx: PrismaService | Prisma.TransactionClient) => Promise<T>,
+    ): Promise<T> => {
+      if (typeof this.prisma.$transaction === 'function') {
+        return this.prisma.$transaction(fn);
       }
-      throw err;
-    }
+      return fn(this.prisma);
+    };
 
-    // T4.1 / Decisión 60: Acotar la duración de attemptToken a 24 horas (en lugar de 365 días)
-    const effectiveDueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const completeUntil = effectiveDueAt;
+    const { attempt, lockedActivity, effectiveDueAt, completeUntil, gameDetailWithKey } =
+      await runGameStartTx(async (tx) => {
+        if (typeof tx.$queryRaw === 'function') {
+          // C-04: Bloqueo de fila común sobre activities para serializar edición frente al primer intento
+          await tx.$queryRaw`
+            SELECT id, status
+            FROM activities
+            WHERE id = ${activityId}::uuid
+              AND organization_id = ${organizationId}::uuid
+            FOR UPDATE
+          `;
+        }
+
+        const freshActivity =
+          tx.activity && typeof tx.activity.findFirst === 'function'
+            ? await tx.activity.findFirst({
+                where: {
+                  id: activityId,
+                  organization_id: organizationId,
+                },
+                include: {
+                  game_detail: true,
+                },
+              })
+            : undefined;
+
+        if (freshActivity === null) {
+          throw new NotFoundException({
+            statusCode: 404,
+            code: 'ACTIVITY_NOT_FOUND',
+            message: 'Actividad no encontrada',
+          });
+        }
+
+        const currentActivity = freshActivity ?? activity;
+        if (currentActivity.type !== ActivityType.game || currentActivity.status !== ActivityStatus.published) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ACTIVITY_NOT_AVAILABLE',
+            message: 'La actividad no es un microjuego publicado',
+          });
+        }
+
+        // SPEC-11 §5.1 / T4.1: Eliminar intentos previos in_progress sin lanzar 409 para permitir reinicios limpios
+        await tx.attempt.deleteMany({
+          where: {
+            activity_id: activityId,
+            student_id: studentId,
+            organization_id: organizationId,
+            status: AttemptStatus.in_progress,
+          },
+        });
+
+        const existingAttempts = await tx.attempt.findMany({
+          where: {
+            activity_id: activityId,
+            student_id: studentId,
+            organization_id: organizationId,
+          },
+          orderBy: { attempt_number: 'desc' },
+        });
+
+        const latest = existingAttempts[0];
+
+        const now = new Date();
+        const attemptNumber = (latest?.attempt_number ?? 0) + 1;
+        const previousAttemptId = latest?.id ?? null;
+
+        let createdAttempt;
+        try {
+          createdAttempt = await tx.attempt.create({
+            data: {
+              organization_id: organizationId,
+              assignment_id: null,
+              activity_id: activityId,
+              student_id: studentId,
+              attempt_number: attemptNumber,
+              previous_attempt_id: previousAttemptId,
+              status: AttemptStatus.in_progress,
+              started_at: now,
+              payload: { answers: {}, processedEventIds: [] },
+              flags: [],
+            },
+          });
+        } catch (err: unknown) {
+          if (getErrorCode(err) === 'P2002') {
+            throw new ConflictException({
+              statusCode: 409,
+              code: 'ATTEMPT_ALREADY_EXISTS',
+              message: 'Ya existe un intento para esta autorización',
+            });
+          }
+          throw err;
+        }
+
+        // T4.1 / Decisión 60: Acotar la duración de attemptToken a 24 horas (en lugar de 365 días)
+        const computedDueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const detail = tx.gameDetail?.findFirst
+          ? await tx.gameDetail.findFirst({
+              where: { organization_id: organizationId, activity_id: activityId },
+              // guardrails-ignore G-C04: lectura controlada de answer_key para toPublicConfig en RuntimeView de microjuegos (SPEC-06 §4)
+              select: { mechanic: true, config: true, answer_key: true },
+            })
+          : null;
+
+        return {
+          attempt: createdAttempt,
+          lockedActivity: currentActivity,
+          effectiveDueAt: computedDueAt,
+          completeUntil: computedDueAt,
+          gameDetailWithKey: detail,
+        };
+      });
+
     const token = this.generateAttemptToken(attempt.id, studentId, organizationId, completeUntil);
-
-    const gameDetailWithKey = await this.prisma.gameDetail.findFirst({
-      where: { organization_id: organizationId, activity_id: activityId },
-      // guardrails-ignore G-C04: lectura controlada de answer_key para toPublicConfig en RuntimeView de microjuegos (SPEC-06 §4)
-      select: { mechanic: true, config: true, answer_key: true },
-    });
 
     return {
       attempt: this.mapAttemptView(attempt, effectiveDueAt, completeUntil),
       activity: {
-        id: activity.id,
-        title: activity.title,
-        type: activity.type,
-        level: activity.level,
+        id: lockedActivity.id,
+        title: lockedActivity.title,
+        type: lockedActivity.type,
+        level: lockedActivity.level,
         config: toPublicConfig(
-          activity.type,
-          gameDetailWithKey?.config ?? activity.game_detail?.config ?? {},
+          lockedActivity.type,
+          gameDetailWithKey?.config ?? lockedActivity.game_detail?.config ?? {},
           gameDetailWithKey?.answer_key,
         ),
       },

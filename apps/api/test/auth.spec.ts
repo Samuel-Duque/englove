@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createHmac, randomBytes } from 'node:crypto';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -355,8 +356,10 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       expect(res.cookie).toHaveBeenCalledTimes(3);
     });
 
-    it('revoca la familia de sesión completa si se detecta reuso de token rotado', async () => {
-      const oldSecret = 'already-rotated-secret';
+    it('revoca la familia de sesión completa si se detecta reuso acreditado de token rotado', async () => {
+      const nonce = randomBytes(24).toString('hex');
+      const mac = createHmac('sha256', JWT_SECRET).update(`${sessionId}:${nonce}`).digest('hex');
+      const oldSecret = `${nonce}-${mac}`;
       const currentSecret = 'newest-secret';
       const currentHash = hashSha256(currentSecret);
 
@@ -366,6 +369,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         user_id: teacherId,
         refresh_token_hash: currentHash, // current hash in DB does not match oldSecret
         expires_at: new Date(Date.now() + 100000),
+        rotated_at: new Date(),
         revoked_at: null,
       };
 
@@ -398,10 +402,48 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
 
       // Verify session was revoked in DB
       expect(mockPrisma.authSession.update).toHaveBeenCalledWith({
-        where: { id: sessionId },
+        where: { id: sessionId, organization_id: orgId },
         data: { revoked_at: expect.any(Date) },
       });
       // Verify cookies were cleared
+      expect(res.clearCookie).toHaveBeenCalled();
+    });
+
+    it('C-01: no revoca una sesión activa si refresh recibe un SID conocido con secreto arbitrario inválido', async () => {
+      const currentSecret = 'valid-active-secret';
+      const currentHash = hashSha256(currentSecret);
+
+      const sessionRecord = {
+        id: sessionId,
+        organization_id: orgId,
+        user_id: teacherId,
+        refresh_token_hash: currentHash,
+        expires_at: new Date(Date.now() + 100000),
+        rotated_at: new Date(),
+        revoked_at: null,
+      };
+
+      const mockPrisma = {
+        authSession: {
+          findFirst: vi.fn().mockResolvedValue(sessionRecord),
+          update: vi.fn(),
+        },
+      } as unknown as PrismaService;
+
+      const authService = new AuthService(
+        mockPrisma,
+        mockConfigService,
+        jwtService,
+        mockMailService,
+        rateLimiter,
+      );
+
+      const res = createMockResponse();
+      await expect(
+        authService.refresh(`${sessionId}.arbitrary-forged-secret`, res),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockPrisma.authSession.update).not.toHaveBeenCalled();
       expect(res.clearCookie).toHaveBeenCalled();
     });
 

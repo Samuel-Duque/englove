@@ -312,4 +312,43 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const res = await proxy(req);
     expect(res.headers.get("location")).toBeNull();
   });
+
+  it("aplica cabeceras de seguridad HTTP y CSP en rutas públicas, autenticadas y redirecciones", async () => {
+    const prevPublicEnv = process.env.NEXT_PUBLIC_APP_ENV;
+    const prevAppEnv = process.env.APP_ENV;
+    try {
+      process.env.NEXT_PUBLIC_APP_ENV = "staging";
+      process.env.APP_ENV = "staging";
+
+      const publicRes = await proxy(new NextRequest("http://localhost:3000/login"));
+      expect(publicRes.headers.get("x-frame-options")).toBe("DENY");
+      expect(publicRes.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(publicRes.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+      const stagingCsp = publicRes.headers.get("content-security-policy") ?? "";
+      expect(stagingCsp).toContain("frame-ancestors 'none'");
+      expect(stagingCsp).toContain("object-src 'none'");
+      expect(stagingCsp).not.toContain("http://localhost:3001");
+      expect(stagingCsp).not.toContain("'unsafe-eval'");
+
+      const redirectRes = await proxy(new NextRequest("http://localhost:3000/inicio"));
+      expect(redirectRes.status).toBe(307);
+      expect(redirectRes.headers.get("x-frame-options")).toBe("DENY");
+      expect(redirectRes.headers.get("content-security-policy")).toContain("default-src 'self'");
+
+      process.env.NEXT_PUBLIC_APP_ENV = "local";
+      const localAuthRes = await proxy(
+        new NextRequest("http://localhost:3000/inicio", {
+          headers: { cookie: "englove_access_token=valid-token" },
+        }),
+      );
+      expect(localAuthRes.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(localAuthRes.headers.get("content-security-policy")).toContain("http://localhost:3001");
+      expect(localAuthRes.headers.get("content-security-policy")).toContain("http://127.0.0.1:9000");
+    } finally {
+      if (prevPublicEnv === undefined) delete process.env.NEXT_PUBLIC_APP_ENV;
+      else process.env.NEXT_PUBLIC_APP_ENV = prevPublicEnv;
+      if (prevAppEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevAppEnv;
+    }
+  });
 });

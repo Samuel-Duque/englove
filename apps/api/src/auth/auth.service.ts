@@ -1,12 +1,5 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ForbiddenException,
-  ConflictException,
-  BadRequestException,
-  HttpException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, ConflictException, BadRequestException, HttpException, UnprocessableEntityException } from '@nestjs/common';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
@@ -96,6 +89,8 @@ export class AuthService {
   private readonly jwtSecret: string;
   private readonly webBaseUrl: string;
   private readonly appEnv: string;
+  // Registro acotado en memoria de hashes rotados por sesión para acreditar replays (C-01)
+  private readonly rotatedSessionHashesBySid = new Map<string, Set<string>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -127,6 +122,55 @@ export class AuthService {
 
   private async verifyPassword(hash: string, plain: string): Promise<boolean> {
     return argonSemaphore.run(() => argon2.verify(hash, plain));
+  }
+
+  private generateSessionRefreshSecret(sid: string): string {
+    const nonce = randomBytes(24).toString('hex');
+    const mac = createHmac('sha256', this.jwtSecret)
+      .update(`${sid}:${nonce}`)
+      .digest('hex');
+    return `${nonce}-${mac}`;
+  }
+
+  private hasValidSessionSecretHmac(sid: string, secret: string): boolean {
+    const separatorIdx = secret.indexOf('-');
+    if (separatorIdx <= 0 || separatorIdx === secret.length - 1) {
+      return false;
+    }
+    const nonce = secret.slice(0, separatorIdx);
+    const mac = secret.slice(separatorIdx + 1);
+    if (!/^[0-9a-f]{48}$/i.test(nonce) || !/^[0-9a-f]{64}$/i.test(mac)) {
+      return false;
+    }
+    const expectedMac = createHmac('sha256', this.jwtSecret)
+      .update(`${sid}:${nonce}`)
+      .digest();
+    const actualMac = Buffer.from(mac, 'hex');
+    if (actualMac.length !== expectedMac.length) {
+      return false;
+    }
+    return timingSafeEqual(actualMac, expectedMac);
+  }
+
+  private recordRotatedSessionHash(sid: string, tokenHash: string): void {
+    let hashes = this.rotatedSessionHashesBySid.get(sid);
+    if (!hashes) {
+      if (this.rotatedSessionHashesBySid.size >= 10000) {
+        const oldestKey = this.rotatedSessionHashesBySid.keys().next().value;
+        if (oldestKey !== undefined) {
+          this.rotatedSessionHashesBySid.delete(oldestKey);
+        }
+      }
+      hashes = new Set<string>();
+      this.rotatedSessionHashesBySid.set(sid, hashes);
+    }
+    hashes.add(tokenHash);
+    if (hashes.size > 64) {
+      const oldestHash = hashes.values().next().value;
+      if (oldestHash !== undefined) {
+        hashes.delete(oldestHash);
+      }
+    }
   }
 
   setSessionCookies(
@@ -450,14 +494,16 @@ export class AuthService {
         }
       }
 
-      // Create session (RF-1, Decision 68)
+      // Create session (RF-1, Decision 68, C-01)
       const sessionDays = user.role === Role.teacher ? 30 : 90;
       const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
-      const secret = generateRandomSecret(32);
+      const sessionId = randomUUID();
+      const secret = this.generateSessionRefreshSecret(sessionId);
       const secretHash = hashSha256(secret);
 
       const session = await this.prisma.authSession.create({
         data: {
+          id: sessionId,
           organization_id: user.organization_id,
           user_id: user.id,
           refresh_token_hash: secretHash,
@@ -528,14 +574,23 @@ export class AuthService {
     const incomingHash = hashSha256(secret);
 
     if (incomingHash !== session.refresh_token_hash) {
-      // Reuse detected! Revoke the entire session family (RF-3, Decision 68)
-      // guardrails-ignore G-A06: revocación de familia de sesiones por detección de reuso de token (RF-3)
-      await TenantContext.runBypass(() =>
-        this.prisma.authSession.update({
-          where: { id: sid },
-          data: { revoked_at: new Date() },
-        }),
-      );
+      const wasRotatedInMemory =
+        this.rotatedSessionHashesBySid.get(sid)?.has(incomingHash) ?? false;
+      const isAccreditedReplay =
+        wasRotatedInMemory ||
+        (Boolean(session.rotated_at) && this.hasValidSessionSecretHmac(sid, secret));
+
+      if (isAccreditedReplay) {
+        // Reuse detected! Revoke the entire session family (RF-3, Decision 68, C-01)
+        this.rotatedSessionHashesBySid.delete(sid);
+        await TenantContext.run({ organizationId: session.organization_id }, () =>
+          this.prisma.authSession.update({
+            where: { id: sid, organization_id: session.organization_id },
+            data: { revoked_at: new Date() },
+          }),
+        );
+      }
+
       this.clearSessionCookies(res);
       throw new UnauthorizedException({
         statusCode: 401,
@@ -591,8 +646,8 @@ export class AuthService {
       }
     }
 
-    // Rotate refresh token: generate new secret and update hash atomically (RF-3, §4)
-    const newSecret = generateRandomSecret(32);
+    // Rotate refresh token: generate new secret bound to sid and update hash atomically (RF-3, §4, C-01)
+    const newSecret = this.generateSessionRefreshSecret(sid);
     const newHash = hashSha256(newSecret);
 
     const updateResult = await this.prisma.authSession.updateMany({
@@ -611,6 +666,7 @@ export class AuthService {
 
     if (updateResult.count === 0) {
       // Concurrent rotation winner already rotated, or session revoked! Revoke family (RF-3)
+      this.rotatedSessionHashesBySid.delete(sid);
       await this.prisma.authSession.updateMany({
         where: { id: sid, organization_id: session.organization_id, revoked_at: null },
         data: { revoked_at: new Date() },
@@ -622,6 +678,8 @@ export class AuthService {
         message: 'Tu sesión terminó. Inicia sesión de nuevo',
       });
     }
+
+    this.recordRotatedSessionHash(sid, incomingHash);
 
     const updatedSession = { ...session, refresh_token_hash: newHash };
     this.setSessionCookies(res, user, student, updatedSession, newSecret);
@@ -682,6 +740,7 @@ export class AuthService {
                 data: { revoked_at: new Date() },
               });
             });
+            this.rotatedSessionHashesBySid.delete(existingSession.id);
             sessionRevoked = true;
           }
         } catch {

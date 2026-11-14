@@ -193,10 +193,26 @@ export class MaintenanceService {
               completeUntil = new Date(att.started_at.getTime() + 24 * 60 * 60 * 1000);
             }
             if (now > completeUntil) {
-              await this.prisma.attempt.update({
-                where: { id: att.id, organization_id: org.id },
-                data: { status: AttemptStatus.abandoned },
-              });
+              // C-05: Transición condicional garantizando que no sobrescriba intentos entregados/calificados concurrentemente
+              if (typeof this.prisma.attempt.updateMany === 'function') {
+                await this.prisma.attempt.updateMany({
+                  where: {
+                    id: att.id,
+                    organization_id: org.id,
+                    status: AttemptStatus.in_progress,
+                  },
+                  data: { status: AttemptStatus.abandoned },
+                });
+              } else {
+                await this.prisma.attempt.update({
+                  where: {
+                    id: att.id,
+                    organization_id: org.id,
+                    status: AttemptStatus.in_progress,
+                  },
+                  data: { status: AttemptStatus.abandoned },
+                });
+              }
             }
           }
         }

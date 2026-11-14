@@ -109,4 +109,32 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
       '127.0.0.1:8025:8025',
     ]);
   });
+
+  it('SUPPLY-01: docker-compose.yml fija imágenes de servicios con digest @sha256 inmutable (sin :latest)', () => {
+    const composePath = path.resolve(process.cwd(), '../../docker-compose.yml');
+    const compose = fs.readFileSync(composePath, 'utf8');
+    expect(compose).toContain('pgsty/minio@sha256:');
+    expect(compose).toContain('pgsty/mc@sha256:');
+    expect(compose).toContain('axllent/mailpit@sha256:');
+    expect(compose).not.toMatch(/image:\s+\S+:latest\b/);
+  });
+
+  it('SEED-01: seedMinimal exige PILOT_TEACHER_PASSWORD explícita fuera del entorno local', async () => {
+    const { seedMinimal } = await import('../prisma/seeds/seed');
+    const prevEnv = process.env.APP_ENV;
+    const prevPass = process.env.PILOT_TEACHER_PASSWORD;
+    try {
+      process.env.APP_ENV = 'staging';
+      delete process.env.PILOT_TEACHER_PASSWORD;
+      await expect(seedMinimal()).rejects.toThrow(/PILOT_TEACHER_PASSWORD/);
+
+      process.env.PILOT_TEACHER_PASSWORD = 'short';
+      await expect(seedMinimal()).rejects.toThrow(/PILOT_TEACHER_PASSWORD/);
+    } finally {
+      if (prevEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevEnv;
+      if (prevPass === undefined) delete process.env.PILOT_TEACHER_PASSWORD;
+      else process.env.PILOT_TEACHER_PASSWORD = prevPass;
+    }
+  });
 });

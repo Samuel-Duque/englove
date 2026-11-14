@@ -292,6 +292,9 @@ El límite sí rechaza el cuerpo: no se demostró procesamiento ni caída. Como 
 
 **No se suman a los 12 anteriores ni se presentan como explotaciones logradas.** Algunas condiciones son realistas, pero falta demostrar la cadena completa. «Difícil» no significa «imposible» ni acredita presencia en producción.
 
+> [!NOTE]
+> Actualización posterior (cierre de segunda ronda, ver §11): `C-01` a `C-06` y los puntos de «Endurecimiento observado» quedaron remediados y verificados en código y pruebas locales reales (PostgreSQL, MinIO, `ffprobe`/`ffmpeg` y guardrails). Las filas siguientes conservan la descripción original observada durante la auditoría.
+
 | ID | Riesgo y evidencia | Condición o prueba pendiente | Recomendación |
 |---|---|---|---|
 | C-01 | SID conocido permite revocar sesión con refresh incorrecto. `auth.service.ts:510–538`. API/DB reales: sesión 200 → refresh incorrecto 401 → sesión 401. | El SID vino de la fixture propia del auditor. **No se encontró una filtración de SID ajeno**; cookies HttpOnly y UUID no adivinable. No es toma de cuenta. | Distinguir replay acreditado de un secreto anteriormente emitido frente a secreto arbitrario inválido; no revocar solo por conocer identificador. |
@@ -471,24 +474,36 @@ Se remediaron los hallazgos `RT-01` a `RT-12` siguiendo las recomendaciones de e
 - **RT-11 (dependencias de audio y error 503 por procesador indisponible):** instalado `Gyan.FFmpeg` 9.0.2 (`ffmpeg.exe` y `ffprobe.exe` en PATH) con diagnóstico verde en `scripts/check-local-audio.mjs`; actualizado `MediaService.probeDuration` y `confirmUpload` (`apps/api/src/media/media.service.ts`) para devolver `503 AUDIO_PROCESSOR_UNAVAILABLE` ante `ENOENT`/`EACCES` sin culpar al alumno (`422 AUDIO_IMPLAUSIBLE_DURATION`) ni marcar el asset para borrado. Verificado con prueba real de `ENOENT` en `apps/api/test/media.spec.ts`.
 - **RT-12 (normalización de errores del parser JSON y límite de payload):** actualizado `AllExceptionsFilter` (`apps/api/src/common/all-exceptions.filter.ts`) para mapear únicamente errores tipados del parser `body-parser` (`entity.too.large` → `413 PAYLOAD_TOO_LARGE`, `entity.parse.failed` → `400 VALIDATION_ERROR`, `encoding.unsupported`/`charset.unsupported` → `415 UNSUPPORTED_MEDIA_TYPE`), sin reclasificar excepciones internas ajenas que expongan `status` 4xx. Verificado con petición HTTP real >1 MiB, JSON inválido y error ajeno con `status: 403` en `apps/api/test/all-exceptions.filter.spec.ts`.
 
-### Verificación ejecutada tras las correcciones
+#### Segunda ronda de cierre (`C-01` a `C-06`, endurecimiento y `DAT-01`)
 
-- `node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs --all`: 0 errores.
-- `node scripts/check-no-db-push.mjs`: OK.
-- `node scripts/check-local-audio.mjs`: `ffmpeg` y `ffprobe` disponibles; bucket S3 local autenticado disponible.
-- `pnpm lint`, `pnpm typecheck`, `pnpm build`: exit 0 en todo el monorepo.
-- `pnpm --filter @englove/shared test`: 5 archivos / 69 tests aprobados.
-- `REQUIRE_POSTGRES_TESTS=1 pnpm --filter @englove/api test`: 48 archivos aprobados, 469 tests aprobados, 2 omitidos (`audit-migration-procedure.postgres.spec.ts`, reservados a `RUN_AUDIT_MIGRATION_POSTGRES=1`).
-- `pnpm --filter @englove/web test`: 28 archivos / 279 tests aprobados (incluyendo `wp09-regressions.spec.ts` con cero aserciones `as Type`).
-- `HEADLESS=true pnpm --filter @englove/web test:e2e`: 52/52 tests Playwright aprobados en Chromium real (con API interceptada en los flujos de frontend).
+- **C-01 (no DoS en `refresh` ante secreto inválido):** en `apps/api/src/auth/auth.service.ts`, cada secreto de refresh se vincula con HMAC al `sid` y se mantiene un registro acotado de hashes rotados en memoria; un secreto arbitrario devuelve `401 AUTH_UNAUTHORIZED` sin revocar la `AuthSession`, mientras el replay acreditado revoca la familia usando `TenantContext.run` y `organization_id` explícito (sin `runBypass`). Verificado en `apps/api/test/auth.spec.ts` y PostgreSQL real (`apps/api/test/wp02-security-regression.postgres.spec.ts`).
+- **C-02 y C-03 (clave S3 inmutable y contrato exclusivo de audio en `ffprobe`/`ffmpeg`):** en `apps/api/src/media/media.service.ts`, `probeDuration` verifica flujo único de audio en `ffprobe` (rechazando contenedores con vídeo o múltiples pistas), calcula SHA-256 en streaming y promueve el archivo válido a `_confirmed_<hash16>`, valida tamaño/hash antes de transcodificar con `ffmpeg` (`-threads 1 -map 0:a:0 -vn -sn -dn -fs 10485760`) y garantiza cierre seguro de descriptores de lectura (`closeReadStreamSafely`). Verificado en `apps/api/test/media.spec.ts` y en PostgreSQL + MinIO + `ffprobe`/`ffmpeg` reales (`apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`).
+- **C-04 (serialización de edición y creación de intento):** añadido bloqueo pesimista `SELECT ... FOR UPDATE` sobre `activities` y re-lectura dentro de transacción en `ActivitiesService.updateActivity`/`deleteActivity` (`apps/api/src/activities/activities.service.ts`) y `AttemptsService.startAttempt`/`startGameAttempt` (`apps/api/src/attempts/attempts.service.ts`). Verificado con prueba de bloqueo y carrera concurrente en PostgreSQL real (`apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`).
+- **C-05 (abandono condicional en mantenimiento):** `MaintenanceService.runIdentityMaintenance` (`apps/api/src/maintenance/maintenance.service.ts`) transiciona a `abandoned` con `updateMany` condicionado a `status: AttemptStatus.in_progress`. Verificado en `apps/api/test/maintenance.spec.ts` y prueba intercalada real con `completeAttempt` en PostgreSQL (`apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`).
+- **C-06 (bloqueo de URLs firmadas para `pending_delete` y estados no `ready`):** `MediaService.getPlaybackUrl` y `getDownloadUrl` exigen `status === MediaAssetStatus.ready` (devolviendo `404 MEDIA_NOT_FOUND` en caso contrario), y `transcodeAsset` persiste `converted_key` de forma condicional sobre `status: ready`. Verificado en `apps/api/test/media.spec.ts` y `apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`.
+- **Endurecimiento de semilla, cabeceras del Worker y pinning de supply chain:**
+  - `apps/api/prisma/seeds/seed.ts` exige `PILOT_TEACHER_PASSWORD` explícita (`>= 8` caracteres) fuera de `local` (`apps/api/test/config.spec.ts`).
+  - `apps/web/src/proxy.ts` inyecta `Content-Security-Policy` (restringiendo orígenes loopback y `'unsafe-eval'` a `local`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: strict-origin-when-cross-origin` (`apps/web/test/proxy-routing.spec.ts`, compilación `@englove/web` y `audit-session-regressions.spec.ts`).
+  - `docker-compose.yml` fija `pgsty/minio`, `pgsty/mc` y `axllent/mailpit` por digest `@sha256:`, y `.github/workflows/ci.yml` fija todas las acciones por SHA de 40 caracteres (`scripts/ci-pipeline.test.mjs`, `apps/api/test/config.spec.ts`).
+- **Aislamiento de `DAT-01` sin bases huérfanas:** `apps/api/test/audit-migration-procedure.postgres.spec.ts` ejecuta la prueba dentro de un esquema efímero con `SAVEPOINT` y `ROLLBACK` final en PostgreSQL, verificado con `RUN_AUDIT_MIGRATION_POSTGRES=1` sin crear bases temporales persistentes.
+
+### Verificación ejecutada tras las correcciones (cierre completo)
+
+- `node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs`: `0` errores, `0` avisos, `2` suprimidos.
+- `node --test scripts/ci-pipeline.test.mjs`: `5/5` tests aprobados.
+- `pnpm --filter @englove/shared test`: `5` archivos / `69` tests aprobados.
+- `REQUIRE_POSTGRES_TESTS=1 RUN_AUDIT_MIGRATION_POSTGRES=1 AUDIT_MIGRATION_ADMIN_URL=postgresql://postgres:postgres@127.0.0.1:5433/postgres pnpm --filter @englove/api test`: `48` archivos / `482` tests aprobados, `0` fallos, `0` errores no capturados (incluyendo `DAT-01`, PostgreSQL, MinIO y `ffprobe`/`ffmpeg` reales).
+- `pnpm --filter @englove/api build` y `pnpm --filter @englove/web build`: exit `0`.
+- `pnpm --filter @englove/web test`: `29` archivos / `285` tests aprobados.
+- `HEADLESS=true pnpm --filter @englove/web exec playwright test e2e/audit-session-regressions.spec.ts --reporter=list`: `4/4` tests aprobados en Chromium real.
+- `pnpm lint` y `pnpm typecheck`: exit `0` en todo el monorepo.
 
 ### Qué queda pendiente
 
-- **Sección 5 (`C-01` a `C-06` y «Endurecimiento observado»):** excluida intencionalmente del alcance por instrucción explícita; no se efectuaron cambios sobre ninguno de sus ítems.
-- **Evidencia operativa en staging/producción cloud:** comprobar en el entorno real detrás de Cloudflare/Render la resolución efectiva de `req.ip` con `TRUST_PROXY`, así como pruebas con R2 y Resend reales y ejecución destructiva aislada de `audit-migration-procedure.postgres.spec.ts` (`RUN_AUDIT_MIGRATION_POSTGRES=1`).
-- **Entorno local previo y host multiusuario:** si existe un proceso API iniciado antes de instalar `ffmpeg`/`ffprobe`, debe reiniciarse desde una consola con el `PATH` actualizado; en equipos compartidos entre múltiples cuentas del sistema operativo local, Mailpit continúa sin autenticación HTTP propia aunque ahora solo escucha en `127.0.0.1:8025`.
+- **Sección 5 (`C-01` a `C-06`) y endurecimiento local:** remediados y verificados localmente (ver subsección «Segunda ronda de cierre» arriba); permanece únicamente la verificación de cabeceras reales emitidas por el Worker en el despliegue de staging y el seguimiento de `deepmerge` (`4.3.1` vigente en npm a la espera de `4.3.2`).
+- **Evidencia operativa en CI remoto, staging y Etapa 11:** ejecutar el pipeline en GitHub Actions remoto (incluyendo re-verificación de `SPEC-08` / `NEG-01`), aprovisionar staging, comprobar en entorno real Cloudflare/Render la resolución efectiva de `req.ip`, pruebas con **Cloudflare R2** y **Resend** reales, pruebas `k6`, restauración Neon, Sentry y validación con **tablets y micrófono reales**.
 
-### Preguntas abiertas
+### Decisiones cerradas (originalmente abiertas)
 
-1. En despliegue sobre Render detrás de Cloudflare, ¿conviene fijar un número explícito de saltos en `TRUST_PROXY` (por ejemplo `1` o `2` tras verificar la cabecera que reenvía la IP del cliente en staging) o mantener `'loopback, linklocal, uniquelocal'`?
-2. Si varios desarrolladores comparten un mismo host de trabajo local, ¿se desea exigir autenticación básica opcional en Mailpit (`MP_UI_AUTH`) desde `docker-compose.yml` además de la restricción a `127.0.0.1` y las credenciales configurables por `.env`?
+1. **`TRUST_PROXY` detrás de Cloudflare + Render:** se mantiene `'loopback, linklocal, uniquelocal'` en `resolveTrustProxySetting` (`false` en `local`) y, de observarse IP de proxy en el primer smoke real de staging, se ajustará mediante la variable `TRUST_PROXY` en Render sin modificar código.
+2. **Autenticación HTTP en Mailpit local (`MP_UI_AUTH`):** se mantiene sin contraseña en `127.0.0.1:8025` para desarrollo individual local, sujeta a reevaluación si se usa un host compartido multiusuario.

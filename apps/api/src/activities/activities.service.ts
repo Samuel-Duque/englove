@@ -543,6 +543,24 @@ export class ActivitiesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        // C-04: Bloqueo de fila común sobre activities para serializar edición frente al primer intento
+        const lockedRows = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+          SELECT id, status
+          FROM activities
+          WHERE id = ${id}::uuid
+            AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        if (Array.isArray(lockedRows) && lockedRows.length > 0 && lockedRows[0]?.status === ActivityStatus.archived) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ACTIVITY_NOT_EDITABLE',
+            message: 'Esta actividad no se puede editar porque ya está archivada',
+          });
+        }
+      }
+
       const attemptsCount = await tx.attempt.count({
         where: {
           organization_id: organizationId,
@@ -883,6 +901,17 @@ export class ActivitiesService {
 
   async deleteActivity(organizationId: string, id: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        // C-04: Bloqueo de fila común sobre activities antes de validar dependencias para borrado
+        await tx.$queryRaw`
+          SELECT id
+          FROM activities
+          WHERE id = ${id}::uuid
+            AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+      }
+
       const activity = await tx.activity.findFirst({
         where: {
           id,

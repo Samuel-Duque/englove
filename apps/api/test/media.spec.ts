@@ -260,6 +260,30 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       mockPrisma.mediaAsset.findFirst.mockResolvedValue(null);
       await expect(service.getPlaybackUrl(orgId, 'missing-id')).rejects.toThrow(NotFoundException);
     });
+
+    it('C-06: rechaza getPlaybackUrl y getDownloadUrl con 404 para assets pending_delete o pending_upload', async () => {
+      for (const status of [
+        MediaAssetStatus.pending_delete,
+        MediaAssetStatus.pending_upload,
+        MediaAssetStatus.deleted,
+      ]) {
+        mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+          id: mediaId,
+          organization_id: orgId,
+          status,
+          key: 'raw/audio.webm',
+        });
+        await expect(service.getPlaybackUrl(orgId, mediaId)).rejects.toThrow(NotFoundException);
+
+        mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+          id: mediaId,
+          organization_id: orgId,
+          status,
+          key: 'raw/audio.webm',
+        });
+        await expect(service.getDownloadUrl(orgId, mediaId)).rejects.toThrow(NotFoundException);
+      }
+    });
   });
 
   describe('deleteFile (RF-14, RF-26)', () => {
@@ -576,5 +600,220 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
         }),
       );
     });
+
+    it('C-03: rechaza MP4 con stream de video en confirmUpload y marca pending_delete', async () => {
+      const videoMp4 = spawnSync(
+        'ffmpeg',
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-f',
+          'lavfi',
+          '-i',
+          'testsrc=duration=3:size=64x64:rate=10',
+          '-f',
+          'lavfi',
+          '-i',
+          'sine=frequency=440:duration=3',
+          '-c:v',
+          'mpeg4',
+          '-c:a',
+          'aac',
+          '-movflags',
+          'frag_keyframe+empty_moov',
+          '-f',
+          'mp4',
+          'pipe:1',
+        ],
+        { maxBuffer: 5_000_000 },
+      );
+      expect(videoMp4.status).toBe(0);
+
+      mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.pending_upload,
+        key: `${orgId}/${studentId}/${attemptId}/${mediaId}.mp4`,
+        size_bytes: BigInt(videoMp4.stdout.length),
+      });
+
+      vi.spyOn(service['s3Client'], 'send')
+        .mockResolvedValueOnce({ ContentLength: videoMp4.stdout.length } as never)
+        .mockResolvedValueOnce({ Body: Readable.from(videoMp4.stdout) } as never);
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
+      ).rejects.toThrow(UnprocessableEntityException);
+
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mediaId, organization_id: orgId, student_id: studentId },
+          data: { status: MediaAssetStatus.pending_delete },
+        }),
+      );
+    }, 15000);
+
+    it('C-03: transcodeAsset transcodifica únicamente audio válido usando -map 0:a:0 -vn -sn -dn -threads 1 -fs 10485760', async () => {
+      const audio = spawnSync(
+        'ffmpeg',
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-f',
+          'lavfi',
+          '-i',
+          'sine=frequency=440:duration=3',
+          '-c:a',
+          'libopus',
+          '-f',
+          'webm',
+          'pipe:1',
+        ],
+        { maxBuffer: 2_000_000 },
+      );
+      expect(audio.status).toBe(0);
+
+      const { createHash } = await import('node:crypto');
+      const prefix = createHash('sha256').update(audio.stdout).digest('hex').slice(0, 16);
+      const confirmedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_confirmed_${prefix}.webm`;
+
+      mockPrisma.mediaAsset.findUnique.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.ready,
+        key: confirmedKey,
+        converted_key: null,
+        transcode_failed_at: null,
+        transcode_attempts: 0,
+      });
+
+      const getS3CommandInput = (cmd: unknown): { Body?: unknown } | undefined => {
+        if (typeof cmd === 'object' && cmd !== null && 'input' in cmd) {
+          const input = cmd.input;
+          if (typeof input === 'object' && input !== null) {
+            return input;
+          }
+        }
+        return undefined;
+      };
+
+      const sendSpy = vi.spyOn(service['s3Client'], 'send').mockImplementation(async (cmd: unknown) => {
+        const input = getS3CommandInput(cmd);
+        if (!input?.Body) {
+          return { Body: Readable.from(audio.stdout) } as never;
+        }
+        return {} as never;
+      });
+
+      await service['transcodeAsset'](mediaId);
+
+      expect(mockPrisma.mediaAsset.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: mediaId,
+            organization_id: orgId,
+            status: MediaAssetStatus.ready,
+          },
+          data: {
+            converted_key: `${orgId}/${studentId}/${attemptId}/${mediaId}_converted.mp4`,
+          },
+        }),
+      );
+      expect(sendSpy).toHaveBeenCalled();
+    }, 15000);
+
+    it('C-02: confirmUpload promueve bytes validados a clave inmutable _confirmed_<hash> y rechaza reconfirmación si el objeto confirmado falta o cambió', async () => {
+      const audio = spawnSync(
+        'ffmpeg',
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-f',
+          'lavfi',
+          '-i',
+          'sine=frequency=440:duration=3',
+          '-c:a',
+          'libopus',
+          '-f',
+          'webm',
+          'pipe:1',
+        ],
+        { maxBuffer: 2_000_000 },
+      );
+      expect(audio.status).toBe(0);
+
+      const stagingKey = `${orgId}/${studentId}/${attemptId}/${mediaId}.webm`;
+      mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.pending_upload,
+        key: stagingKey,
+        size_bytes: BigInt(audio.stdout.length),
+      });
+
+      const getS3CommandKey = (cmd: unknown): string => {
+        if (typeof cmd === 'object' && cmd !== null && 'input' in cmd) {
+          const input = cmd.input;
+          if (typeof input === 'object' && input !== null && 'Key' in input && typeof input.Key === 'string') {
+            return input.Key;
+          }
+        }
+        return '';
+      };
+
+      const sentKeys: string[] = [];
+      vi.spyOn(service['s3Client'], 'send')
+        .mockResolvedValueOnce({ ContentLength: audio.stdout.length } as never) // HeadObject
+        .mockResolvedValueOnce({ Body: Readable.from(audio.stdout) } as never) // GetObject in probeDuration
+        .mockImplementationOnce(async (cmd: unknown) => {
+          sentKeys.push(getS3CommandKey(cmd));
+          return {} as never;
+        }) // PutObject confirmedKey
+        .mockImplementationOnce(async (cmd: unknown) => {
+          sentKeys.push(getS3CommandKey(cmd));
+          return {} as never;
+        }); // DeleteObject stagingKey
+
+      await service.confirmUpload(orgId, studentId, attemptId, mediaId, 60);
+
+      expect(sentKeys[0]).toMatch(new RegExp(`^${orgId}/${studentId}/${attemptId}/${mediaId}_confirmed_[0-9a-f]{16}\\.webm$`));
+      expect(sentKeys[1]).toBe(stagingKey);
+      expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            key: sentKeys[0],
+            status: MediaAssetStatus.ready,
+          }),
+        }),
+      );
+
+      // En rama ready, debe validar que el objeto confirmado existe y mantiene ContentLength intacto
+      mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.ready,
+        key: sentKeys[0],
+        size_bytes: BigInt(audio.stdout.length),
+        duration_seconds: 3,
+      });
+      vi.spyOn(service['s3Client'], 'send').mockResolvedValueOnce({
+        ContentLength: audio.stdout.length + 123,
+      } as never);
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
+      ).rejects.toThrow(ConflictException);
+    }, 15000);
   });
 });

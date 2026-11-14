@@ -20,7 +20,7 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -64,6 +64,10 @@ export class MediaService implements OnModuleInit {
   private readonly bucketName: string;
   private readonly transcodeQueue: string[] = [];
   private readonly jwtSecret: string;
+  private readonly frozenProbeByKey = new Map<
+    string,
+    { confirmedKey: string; sha256: string; byteLength: number }
+  >();
   private isProcessingQueue = false;
 
   constructor(
@@ -481,6 +485,39 @@ export class MediaService implements OnModuleInit {
           message: 'La grabación supera el tiempo permitido',
         });
       }
+      if (
+        forcedDurationSeconds === undefined &&
+        typeof asset.key === 'string' &&
+        this.extractConfirmedHashPrefix(asset.key) !== null
+      ) {
+        try {
+          const headRes = await this.s3Client.send(
+            new HeadObjectCommand({
+              Bucket: this.bucketName,
+              Key: asset.key,
+            }),
+          );
+          if (Number(headRes?.ContentLength ?? -1) !== Number(asset.size_bytes)) {
+            throw new ConflictException({
+              statusCode: 409,
+              code: 'MEDIA_NOT_AVAILABLE',
+              message: 'El archivo de audio confirmado no está disponible',
+            });
+          }
+        } catch (err: unknown) {
+          if (err instanceof ConflictException) {
+            throw err;
+          }
+          if (this.isS3NotFoundError(err)) {
+            throw new ConflictException({
+              statusCode: 409,
+              code: 'MEDIA_NOT_AVAILABLE',
+              message: 'El archivo de audio confirmado no está disponible',
+            });
+          }
+          throw err;
+        }
+      }
       return asset;
     }
 
@@ -549,7 +586,13 @@ export class MediaService implements OnModuleInit {
       throw err;
     }
 
+    const frozen = this.frozenProbeByKey.get(asset.key);
+    this.frozenProbeByKey.delete(asset.key);
+
     if (duration < 2) {
+      if (frozen) {
+        await this.deleteFile(frozen.confirmedKey).catch(() => {});
+      }
       await this.prisma.mediaAsset.update({
         where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: { status: MediaAssetStatus.pending_delete },
@@ -563,6 +606,9 @@ export class MediaService implements OnModuleInit {
     }
 
     if (duration > maxDurationSeconds) {
+      if (frozen) {
+        await this.deleteFile(frozen.confirmedKey).catch(() => {});
+      }
       await this.prisma.mediaAsset.update({
         where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: { status: MediaAssetStatus.pending_delete },
@@ -599,6 +645,7 @@ export class MediaService implements OnModuleInit {
       return await tx.mediaAsset.update({
         where: { id: asset.id, organization_id: organizationId, student_id: studentId },
         data: {
+          ...(frozen ? { key: frozen.confirmedKey, size_bytes: BigInt(frozen.byteLength) } : {}),
           status: MediaAssetStatus.ready,
           duration_seconds: Math.round(duration),
         },
@@ -620,7 +667,12 @@ export class MediaService implements OnModuleInit {
       },
     });
 
-    if (!asset || asset.status === MediaAssetStatus.deleted) {
+    if (
+      !asset ||
+      asset.status === MediaAssetStatus.deleted ||
+      asset.status === MediaAssetStatus.pending_delete ||
+      asset.status !== MediaAssetStatus.ready
+    ) {
       throw new NotFoundException({
         statusCode: 404,
         code: 'MEDIA_NOT_FOUND',
@@ -662,7 +714,12 @@ export class MediaService implements OnModuleInit {
       },
     });
 
-    if (!asset || asset.status === MediaAssetStatus.deleted) {
+    if (
+      !asset ||
+      asset.status === MediaAssetStatus.deleted ||
+      asset.status === MediaAssetStatus.pending_delete ||
+      asset.status !== MediaAssetStatus.ready
+    ) {
       throw new NotFoundException({
         statusCode: 404,
         code: 'MEDIA_NOT_FOUND',
@@ -694,6 +751,45 @@ export class MediaService implements OnModuleInit {
     };
   }
 
+  private isS3NotFoundError(err: unknown): boolean {
+    const s3Name = isRecord(err) && typeof err.name === 'string' ? err.name : undefined;
+    const metadata = isRecord(err) && isRecord(err.$metadata) ? err.$metadata : undefined;
+    const httpStatus = typeof metadata?.httpStatusCode === 'number' ? metadata.httpStatusCode : undefined;
+    return s3Name === 'NoSuchKey' || s3Name === 'NotFound' || httpStatus === 404;
+  }
+
+  private extractConfirmedHashPrefix(key: string): string | null {
+    const match = /_confirmed_([0-9a-f]{16})(?:\.[^.]+)?$/i.exec(key);
+    return match?.[1] ? match[1].toLowerCase() : null;
+  }
+
+  private toConfirmedKey(stagingKey: string, sha256Hex: string): string {
+    if (this.extractConfirmedHashPrefix(stagingKey) !== null) {
+      return stagingKey;
+    }
+    const prefix = sha256Hex.slice(0, 16).toLowerCase();
+    return /\.[^.]+$/.test(stagingKey)
+      ? stagingKey.replace(/(\.[^.]+)$/, `_confirmed_${prefix}$1`)
+      : `${stagingKey}_confirmed_${prefix}`;
+  }
+
+  private toStagingKey(confirmedOrStagingKey: string): string {
+    return confirmedOrStagingKey.replace(/_confirmed_[0-9a-f]{16}(?=(\.[^.]+)?$)/i, '');
+  }
+
+  private toConvertedKey(key: string): string {
+    const baseKey = this.toStagingKey(key);
+    return /\.[^.]+$/.test(baseKey)
+      ? baseKey.replace(/\.[^.]+$/, '_converted.mp4')
+      : `${baseKey}_converted.mp4`;
+  }
+
+  private inferContentTypeFromKey(key: string): string {
+    if (/\.mp4$/i.test(key)) return 'audio/mp4';
+    if (/\.ogg$/i.test(key)) return 'audio/ogg';
+    return 'audio/webm';
+  }
+
   async deleteFile(key: string): Promise<void> {
     try {
       await this.s3Client.send(
@@ -703,13 +799,21 @@ export class MediaService implements OnModuleInit {
         }),
       );
     } catch (err: unknown) {
-      const s3Name = isRecord(err) && typeof err.name === 'string' ? err.name : undefined;
-      const metadata = isRecord(err) && isRecord(err.$metadata) ? err.$metadata : undefined;
-      const httpStatus = typeof metadata?.httpStatusCode === 'number' ? metadata.httpStatusCode : undefined;
-      if (s3Name === 'NoSuchKey' || s3Name === 'NotFound' || httpStatus === 404) {
-        return;
+      if (!this.isS3NotFoundError(err)) {
+        throw err;
       }
-      throw err;
+    }
+
+    const stagingKey = this.toStagingKey(key);
+    if (stagingKey !== key) {
+      await this.s3Client
+        .send(
+          new DeleteObjectCommand({
+            Bucket: this.bucketName,
+            Key: stagingKey,
+          }),
+        )
+        .catch(() => {});
     }
   }
 
@@ -778,7 +882,7 @@ export class MediaService implements OnModuleInit {
       data: { transcode_attempts: { increment: 1 } },
     });
 
-    const convertedKey = asset.key.replace(/\.[^.]+$/, '_converted.mp4');
+    const convertedKey = this.toConvertedKey(asset.key);
 
     // Attempt ffmpeg conversion if ffmpeg command exists
     const ffmpegAvailable = await this.checkFfmpegAvailable();
@@ -800,12 +904,21 @@ export class MediaService implements OnModuleInit {
         }),
       );
 
+      const sha256 = createHash('sha256');
       if (getRes.Body) {
         if (isReadableStream(getRes.Body)) {
-          await pipeline(getRes.Body, fs.createWriteStream(rawLocalPath));
+          const hashTransform = new Transform({
+            transform(chunk: Buffer, _encoding, callback) {
+              sha256.update(chunk);
+              callback(null, chunk);
+            },
+          });
+          await pipeline(getRes.Body, hashTransform, fs.createWriteStream(rawLocalPath));
         } else if (isByteArrayTransformable(getRes.Body)) {
           const bytes = await getRes.Body.transformToByteArray();
-          fs.writeFileSync(rawLocalPath, Buffer.from(bytes));
+          const buf = Buffer.from(bytes);
+          sha256.update(buf);
+          fs.writeFileSync(rawLocalPath, buf);
         } else {
           fs.writeFileSync(rawLocalPath, Buffer.from([]));
         }
@@ -813,18 +926,37 @@ export class MediaService implements OnModuleInit {
         fs.writeFileSync(rawLocalPath, Buffer.from([]));
       }
 
-      // Run ffmpeg structured without shell with 60s timeout, draining stderr/stdout and escalating to SIGKILL (Rule G-C07, SPEC-11 RF-5, P1-03)
+      const downloadedSha256 = sha256.digest('hex');
+      const expectedPrefix = this.extractConfirmedHashPrefix(asset.key);
+      if (expectedPrefix && !downloadedSha256.startsWith(expectedPrefix)) {
+        await this.prisma.mediaAsset.update({
+          where: { id: asset.id, organization_id: asset.organization_id },
+          data: { status: MediaAssetStatus.pending_delete },
+        });
+        throw new Error('Confirmed media digest mismatch before transcode');
+      }
+
+      // Run ffmpeg structured without shell with audio-only mapping/limits and 60s timeout (C-03, Rule G-C07, SPEC-11 RF-5, P1-03)
       await new Promise<void>((resolve, reject) => {
         const proc = spawn('ffmpeg', [
           '-y',
+          '-threads',
+          '1',
           '-i',
           rawLocalPath,
+          '-map',
+          '0:a:0',
+          '-vn',
+          '-sn',
+          '-dn',
           '-c:a',
           'aac',
           '-b:a',
           '64k',
           '-ac',
           '1',
+          '-fs',
+          '10485760',
           convertedLocalPath,
         ], { shell: false });
 
@@ -870,21 +1002,43 @@ export class MediaService implements OnModuleInit {
       // Upload converted mp4 to R2 via stream (Rule G-C07)
       const convertedStat = fs.statSync(convertedLocalPath);
       const convertedStream = fs.createReadStream(convertedLocalPath);
-      await this.s3Client.send(
-        new PutObjectCommand({
-          Bucket: this.bucketName,
-          Key: convertedKey,
-          ContentType: 'audio/mp4',
-          Body: convertedStream,
-          ContentLength: convertedStat.size,
-        }),
-      );
-
-      // Persist converted_key
-      await this.prisma.mediaAsset.update({
-        where: { id: asset.id, organization_id: asset.organization_id },
-        data: { converted_key: convertedKey },
+      convertedStream.on('error', () => {
+        // Error esperado si el descriptor se destruye antes de completar lectura
       });
+      try {
+        await this.s3Client.send(
+          new PutObjectCommand({
+            Bucket: this.bucketName,
+            Key: convertedKey,
+            ContentType: 'audio/mp4',
+            Body: convertedStream,
+            ContentLength: convertedStat.size,
+          }),
+        );
+      } finally {
+        await this.closeReadStreamSafely(convertedStream);
+      }
+
+      // Persist converted_key solo si el activo permanece ready (borrándose no convierte ni vuelve a ready)
+      if (typeof this.prisma.mediaAsset.updateMany === 'function') {
+        const persisted = await this.prisma.mediaAsset.updateMany({
+          where: {
+            id: asset.id,
+            organization_id: asset.organization_id,
+            status: MediaAssetStatus.ready,
+          },
+          data: { converted_key: convertedKey },
+        });
+        if (persisted.count === 0) {
+          await this.deleteFile(convertedKey).catch(() => {});
+          return;
+        }
+      } else {
+        await this.prisma.mediaAsset.update({
+          where: { id: asset.id, organization_id: asset.organization_id },
+          data: { converted_key: convertedKey },
+        });
+      }
 
       // Delete raw object ONLY AFTER converted is uploaded and persisted (Decision 64, SPEC-05 RF-14)
       await this.deleteFile(asset.key);
@@ -915,6 +1069,25 @@ export class MediaService implements OnModuleInit {
     }
   }
 
+  private async closeReadStreamSafely(stream: fs.ReadStream): Promise<void> {
+    if (stream.closed) return;
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+      stream.once('close', done);
+      stream.once('error', done);
+      stream.destroy();
+      if (stream.closed) {
+        done();
+      }
+    });
+  }
+
   private async checkFfmpegAvailable(): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       const proc = spawn('ffmpeg', ['-version'], { shell: false });
@@ -935,6 +1108,7 @@ export class MediaService implements OnModuleInit {
         }),
       );
 
+      const sha256 = createHash('sha256');
       let downloadedBytes = 0;
       const MAX_BYTES = 10 * 1024 * 1024; // 10 MiB
       const byteCounter = new Transform({
@@ -950,6 +1124,7 @@ export class MediaService implements OnModuleInit {
             );
             return;
           }
+          sha256.update(chunk);
           callback(null, chunk);
         },
       });
@@ -966,7 +1141,9 @@ export class MediaService implements OnModuleInit {
               message: 'El archivo de audio supera 10 MB',
             });
           }
-          fs.writeFileSync(tempFile, Buffer.from(bytes));
+          const buf = Buffer.from(bytes);
+          sha256.update(buf);
+          fs.writeFileSync(tempFile, buf);
         }
       }
 
@@ -1019,9 +1196,7 @@ export class MediaService implements OnModuleInit {
             '-v',
             'error',
             '-show_entries',
-            'format=duration:packet=duration_time',
-            '-select_streams',
-            'a:0',
+            'stream=codec_type:format=duration:packet=stream_index,duration_time',
             '-of',
             'compact=p=0:nk=0',
             tempFile,
@@ -1030,17 +1205,50 @@ export class MediaService implements OnModuleInit {
         );
 
         let pending = '';
+        let audioStreamCount = 0;
+        let nonAudioStreamCount = 0;
         let formatDuration = 0;
         let packetDuration = 0;
         let audioPackets = 0;
         const consumeLine = (line: string) => {
-          for (const field of line.split('|')) {
-            const [key, raw] = field.split('=');
-            if (key === 'duration_time') audioPackets++;
-            const value = Number(raw);
-            if (!Number.isFinite(value) || value <= 0) continue;
-            if (key === 'duration') formatDuration = value;
-            if (key === 'duration_time') packetDuration += value;
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          let lineStreamIndex: number | null = null;
+          let lineDurationTime = 0;
+          for (const field of trimmed.split('|')) {
+            if (!field) continue;
+            const eqIdx = field.indexOf('=');
+            if (eqIdx <= 0) continue;
+            const entryKey = field.slice(0, eqIdx).trim();
+            const raw = field.slice(eqIdx + 1).trim();
+            if (entryKey === 'codec_type') {
+              if (raw === 'audio') {
+                audioStreamCount++;
+              } else {
+                nonAudioStreamCount++;
+              }
+            } else if (entryKey === 'stream_index') {
+              const idx = Number(raw);
+              if (Number.isInteger(idx) && idx >= 0) {
+                lineStreamIndex = idx;
+              }
+            } else if (entryKey === 'duration') {
+              const value = Number(raw);
+              if (Number.isFinite(value) && value > 0) {
+                formatDuration = value;
+              }
+            } else if (entryKey === 'duration_time') {
+              const value = Number(raw);
+              if (Number.isFinite(value) && value > 0) {
+                lineDurationTime = value;
+              }
+            }
+          }
+          if (lineStreamIndex === 0) {
+            audioPackets++;
+            if (lineDurationTime > 0) {
+              packetDuration += lineDurationTime;
+            }
           }
         };
         let stderr = '';
@@ -1081,6 +1289,14 @@ export class MediaService implements OnModuleInit {
           if (killed) return;
           if (code === 0) {
             consumeLine(pending);
+            if (nonAudioStreamCount > 0 || audioStreamCount !== 1) {
+              reject(
+                new Error(
+                  `Invalid media streams detected (audio=${audioStreamCount}, nonAudio=${nonAudioStreamCount})`,
+                ),
+              );
+              return;
+            }
             const measured = formatDuration || packetDuration;
             if (audioPackets > 0 && measured > 0) {
               resolve(measured);
@@ -1097,9 +1313,56 @@ export class MediaService implements OnModuleInit {
         });
       });
 
+      const sha256Hex = sha256.digest('hex');
+      if (duration >= 2) {
+        const totalBytes = fs.statSync(tempFile).size;
+        const confirmedKey = this.toConfirmedKey(key, sha256Hex);
+        if (confirmedKey !== key) {
+          const putStream = fs.createReadStream(tempFile);
+          putStream.on('error', () => {
+            // Error esperado si el descriptor se destruye antes de completar lectura
+          });
+          try {
+            await this.s3Client.send(
+              new PutObjectCommand({
+                Bucket: this.bucketName,
+                Key: confirmedKey,
+                ContentType: this.inferContentTypeFromKey(key),
+                Body: putStream,
+                ContentLength: totalBytes,
+              }),
+            );
+          } catch (storageErr: unknown) {
+            this.logger.error(
+              `Fallo transitorio promoviendo audio confirmado a clave inmutable (${storageErr instanceof Error ? storageErr.message : String(storageErr)})`,
+            );
+            throw new ServiceUnavailableException({
+              statusCode: 503,
+              code: 'AUDIO_PROCESSOR_UNAVAILABLE',
+              message:
+                'El procesador de audio no está disponible temporalmente. Intenta de nuevo en unos minutos',
+            });
+          } finally {
+            await this.closeReadStreamSafely(putStream);
+          }
+          await this.deleteFile(key).catch(() => {});
+          if (this.frozenProbeByKey.size >= 1000) {
+            const oldestKey = this.frozenProbeByKey.keys().next().value;
+            if (oldestKey !== undefined) {
+              this.frozenProbeByKey.delete(oldestKey);
+            }
+          }
+          this.frozenProbeByKey.set(key, {
+            confirmedKey,
+            sha256: sha256Hex,
+            byteLength: totalBytes,
+          });
+        }
+      }
+
       return duration;
     } catch (err: unknown) {
-      if (err instanceof PayloadTooLargeException) {
+      if (err instanceof PayloadTooLargeException || err instanceof ServiceUnavailableException) {
         throw err;
       }
       const errCode = isRecord(err) && typeof err.code === 'string' ? err.code : undefined;

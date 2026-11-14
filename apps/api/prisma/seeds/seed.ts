@@ -3,11 +3,19 @@ import * as argon2 from 'argon2';
 import { getPrisma } from './client';
 
 export async function seedMinimal() {
+  const appEnv = process.env.APP_ENV || 'local';
+  const explicitPassword = process.env.PILOT_TEACHER_PASSWORD?.trim();
+  if (appEnv !== 'local' && (!explicitPassword || explicitPassword.length < 8)) {
+    throw new Error(
+      'PILOT_TEACHER_PASSWORD debe definirse explícitamente por variable de entorno fuera del entorno local (APP_ENV !== "local").',
+    );
+  }
+
   const prisma = getPrisma();
   const orgSlug = process.env.PILOT_ORG_SLUG || 'pilot';
   const orgName = process.env.PILOT_ORG_NAME || 'Academia Englove Piloto';
   const teacherEmail = process.env.PILOT_TEACHER_EMAIL || 'profesora@englove.org';
-  const teacherPassword = process.env.PILOT_TEACHER_PASSWORD || 'Englove2026!';
+  const teacherPassword = explicitPassword || 'Englove2026!';
 
   // Organization
   const org = await prisma.organization.upsert({

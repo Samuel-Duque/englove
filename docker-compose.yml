@@ -26,7 +26,7 @@ services:
   # Bucket privado: las URLs prefirmadas se validan con firma estricta (sin acceso anónimo, regla G-B10)
   # Nota: se usa el mirror pgsty/minio y pgsty/mc tras la restricción de Docker Hub para minio oficial
   minio:
-    image: pgsty/minio:latest
+    image: pgsty/minio@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
     container_name: englove-minio
     restart: unless-stopped
     ports:
@@ -40,7 +40,7 @@ services:
       - englove_miniodata:/data
 
   minio-init:
-    image: pgsty/mc:latest
+    image: pgsty/mc@sha256:b532278b7a3747dbab6fe45eebb40a653efa704e6758e24e9d9ec54fc96c1800
     container_name: englove-minio-init
     depends_on:
       - minio
@@ -59,7 +59,7 @@ services:
 
   # Mailpit para captura SMTP local de correos transaccionales (RF-15, decisión 134)
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     container_name: englove-mailpit
     restart: unless-stopped
     ports:

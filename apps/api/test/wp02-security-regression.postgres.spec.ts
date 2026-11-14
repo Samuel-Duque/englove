@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import * as argon2 from 'argon2';
 import { isPostgresAvailable } from './postgres-test-helper';
 import { Response, Request } from 'express';
 import {
@@ -887,6 +888,82 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
           where: { id: userBId, organization_id: orgBId },
           data: { email: 'teacher.b@wp02.test' },
         });
+      });
+    }
+  });
+
+  // ============================================================================
+  // C-01: Autenticación — no DoS en refresh ante secreto arbitrario + revocación acreditada
+  // ============================================================================
+  it('C-01: refresh con sid válido y secreto arbitrario rechaza con 401 sin revocar AuthSession, mientras el reuso acreditado revoca la familia en PostgreSQL', async () => {
+    expect(isPostgresAvailable).toBe(true);
+
+    const c01UserId = '90000000-0000-4000-8000-0000000000c1';
+    const c01Email = 'c01.teacher@wp02.test';
+    const c01Password = 'C01StrongPass2026!';
+    const passwordHash = await argon2.hash(c01Password);
+
+    await TenantContext.runBypass(async () => {
+      await prisma.user.create({
+        data: {
+          id: c01UserId,
+          organization_id: orgBId,
+          name: 'C01 Teacher',
+          email: c01Email,
+          password_hash: passwordHash,
+          role: Role.teacher,
+        },
+      });
+    });
+
+    try {
+      const loginMock = createMockResponse();
+      await authService.login({ email: c01Email, password: c01Password }, '127.0.0.1', loginMock.res);
+      const initialRefresh = loginMock.cookies['englove_test_refresh_token']?.value;
+      expect(initialRefresh).toBeDefined();
+      const [sid] = (initialRefresh ?? '').split('.');
+      expect(sid).toMatch(/^[0-9a-f-]{36}$/i);
+
+      // 1) Petición forjada con sid conocido y secreto arbitrario NO debe revocar la sesión
+      const forgedMock = createMockResponse();
+      await expect(
+        authService.refresh(`${sid}.forged-arbitrary-secret-not-hmac`, forgedMock.res),
+      ).rejects.toThrow(UnauthorizedException);
+
+      const sessionAfterForged = await TenantContext.run({ organizationId: orgBId }, () =>
+        prisma.authSession.findFirst({ where: { id: sid, organization_id: orgBId } }),
+      );
+      expect(sessionAfterForged?.revoked_at).toBeNull();
+
+      // 2) El token legítimo emitido originalmente sigue funcionando y rota el token
+      const validMock = createMockResponse();
+      const refreshed = await authService.refresh(initialRefresh ?? '', validMock.res);
+      expect(refreshed.user.id).toBe(c01UserId);
+      const rotatedRefresh = validMock.cookies['englove_test_refresh_token']?.value;
+      expect(rotatedRefresh).toBeDefined();
+      expect(rotatedRefresh).not.toBe(initialRefresh);
+
+      // 3) El reuso acreditado del token anterior (HMAC válido para este sid) SÍ revoca la familia
+      const replayMock = createMockResponse();
+      await expect(authService.refresh(initialRefresh ?? '', replayMock.res)).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      const sessionAfterReplay = await TenantContext.run({ organizationId: orgBId }, () =>
+        prisma.authSession.findFirst({ where: { id: sid, organization_id: orgBId } }),
+      );
+      expect(sessionAfterReplay?.revoked_at).not.toBeNull();
+
+      // 4) Incluso el token nuevo rotado queda invalidado tras revocar la familia
+      const postRevokeMock = createMockResponse();
+      await expect(authService.refresh(rotatedRefresh ?? '', postRevokeMock.res)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    } finally {
+      await TenantContext.runBypass(async () => {
+        // guardrails-ignore G-A06: limpieza de fixture aislada de prueba C-01
+        await prisma.authSession.deleteMany({ where: { organization_id: orgBId, user_id: c01UserId } });
+        await prisma.user.deleteMany({ where: { organization_id: orgBId, id: c01UserId } });
       });
     }
   });

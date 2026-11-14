@@ -29,7 +29,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
     authSession: { deleteMany: MockFn };
     passwordResetToken: { deleteMany: MockFn };
     emailChangeRequest: { deleteMany: MockFn };
-    attempt: { findMany: MockFn; update: MockFn };
+    attempt: { findMany: MockFn; update: MockFn; updateMany: MockFn };
     mediaAsset: { findMany: MockFn; update: MockFn };
     student: { findMany: MockFn; update: MockFn };
   };
@@ -68,6 +68,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       attempt: {
         findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn().mockResolvedValue({ id: 'attempt-1' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       mediaAsset: {
         findMany: vi.fn().mockResolvedValue([]),
@@ -113,9 +114,13 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       await service.runIdentityMaintenance(periodKey);
 
-      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+      expect(mockPrisma.attempt.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'attempt-expired', organization_id: orgId },
+          where: {
+            id: 'attempt-expired',
+            organization_id: orgId,
+            status: AttemptStatus.in_progress,
+          },
           data: { status: AttemptStatus.abandoned },
         }),
       );
@@ -135,7 +140,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       await service.runIdentityMaintenance(periodKey);
 
-      expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
+      expect(mockPrisma.attempt.updateMany).not.toHaveBeenCalled();
     });
 
     it('marca como abandoned los intentos in_progress de microjuegos autónomos (sin assignment) tras 24h (P2-05)', async () => {
@@ -153,9 +158,13 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       await service.runIdentityMaintenance(periodKey);
 
-      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+      expect(mockPrisma.attempt.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'game-attempt-expired', organization_id: orgId },
+          where: {
+            id: 'game-attempt-expired',
+            organization_id: orgId,
+            status: AttemptStatus.in_progress,
+          },
           data: { status: AttemptStatus.abandoned },
         }),
       );
@@ -176,7 +185,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       await service.runIdentityMaintenance(periodKey);
 
-      expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
+      expect(mockPrisma.attempt.updateMany).not.toHaveBeenCalled();
     });
   });
 

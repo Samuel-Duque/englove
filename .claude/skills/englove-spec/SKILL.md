@@ -32,7 +32,7 @@ Léelas cada vez; no trabajes de memoria, porque los documentos cambian entre ro
 | `planning/architecture-overview.md` | Las secciones de la capacidad: rutas y navegación (§3.1), estados de error (§3.6), guards (§4.3), scoring (§4.4), modelo de datos (§6), flujos (§7), seguridad (§8), convenciones y catálogo de `code` (§13) |
 | `specs/README.md` y specs anteriores | Estado de las demás specs (SPEC-01 a SPEC-11) y contratos ya aprobados de los que depende la nueva |
 
-Los documentos de cada ronda (`planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-para-correccion-de-planeacion.md`, `planning/decisiones-modelo-de-datos.md`) son vinculantes en lo decidido (decisiones 34, 57 y 67) y sirven para buscar detalle, pero ya están volcados en CONTEXT y architecture: la spec enlaza a estos dos.
+Las decisiones de rondas previas (decisiones 34, 57 y 67) ya están volcadas en `.agents/CONTEXT.md` y `planning/architecture-overview.md`: la spec enlaza directamente a estos dos.
 
 ## Elige el modo
 

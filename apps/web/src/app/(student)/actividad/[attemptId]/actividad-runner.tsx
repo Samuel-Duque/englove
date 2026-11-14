@@ -31,6 +31,7 @@ import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
 import { setActiveAttemptState } from '../../../../lib/pwa-manager';
 import { speak } from '../../../../lib/speech';
+import { formatBlankPrompt, formatBlankPromptForSpeech } from '../../../../lib/blank-prompt';
 import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb, getPendingAttemptAnswers, getOfflineUserId } from '../../../../lib/offline-queue';
 import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
 
@@ -1056,7 +1057,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                   {hasTtsSupport && (
                     <button
                       type="button"
-                      onClick={() => speakText(item.prompt)}
+                      onClick={() => speakText(formatBlankPromptForSpeech(item.prompt))}
                       className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
                       aria-label={`Escuchar pregunta ${itemIdx + 1}`}
                     >
@@ -1065,7 +1066,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                   )}
                 </div>
                 <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
-                  {item.prompt}
+                  {formatBlankPrompt(item.prompt, item.blanks)}
                 </p>
 
                 {/* Blank inputs */}
@@ -1144,7 +1145,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     {hasTtsSupport && (
                       <button
                         type="button"
-                        onClick={() => speakText(item.prompt)}
+                        onClick={() => speakText(formatBlankPromptForSpeech(item.prompt))}
                         className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
                         aria-label={`Escuchar ítem ${itemIdx + 1}`}
                       >
@@ -1153,7 +1154,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     )}
                   </div>
                   <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
-                    {item.prompt}
+                    {formatBlankPrompt(item.prompt, item.blanks)}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     {item.blanks.map((b, bIdx) => {

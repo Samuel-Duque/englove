@@ -18,9 +18,9 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 5. `planning/taskboard.md` — tareas.
 6. `specs/` — contratos y estados actuales; la verificación histórica no sustituye re-verificar una enmienda ni aceptar staging.
 
-Insumos históricos de la Etapa 12 (100% subsanados y verificados bajo `SPEC-11`): `AUDITORIA.md` (auditoría del 2026-11-05), `testing-issues/` (ISSUE-01 a ISSUE-10 y RFC-01) y los planes archivados `planning/plan-implementacion-auditoria-1-servidor-y-fundacion.md` y `planning/plan-implementacion-auditoria-2-cliente-y-cierre.md` (documentos históricos/archivados; los agentes no deben usarlos como tareas pendientes ni como fuente de nuevas decisiones; la fuente única de verdad es `.agents/CONTEXT.md`).
+Auditorías y pendientes operativos vigentes: `planning/pendientes-cierre-auditorias.md` (consolidado accionable de lo pendiente para la próxima sesión), `planning/auditoria-general-2026-11-12.md`, `planning/remediacion-auditoria-2026-11-12.md`, `planning/auditoria-adversarial-2026-11-13.md` y `planning/despliegue-staging.md` (los documentos históricos cerrados de Etapa 12 y rondas previas fueron retirados del árbol y permanecen en el historial de Git; la fuente única de verdad es `.agents/CONTEXT.md`).
 
-Otros documentos: `planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-modelo-de-datos.md`, `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
+Otros documentos: `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
 
 ## Para las skills que buscan `GLOSSARY.md` y `docs/adr/`
 

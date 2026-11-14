@@ -14,6 +14,7 @@ import {
   GameAnswerKey,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { formatBlankPrompt } from '../../../lib/blank-prompt';
 import { GameRenderer } from '../../../components/activities/GameRenderer';
 import { AccessibleModal } from '../../../components/ui/modal';
 
@@ -2854,7 +2855,7 @@ export function ActivityEditorComponent({
                     className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
                   >
                     <p className="text-base text-zinc-800">
-                      {idx + 1}. {it.prompt}
+                      {idx + 1}. {formatBlankPrompt(it.prompt, it.blanks)}
                     </p>
                     {it.blanks.map((b, bIdx) => (
                       <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
@@ -2927,7 +2928,7 @@ export function ActivityEditorComponent({
                     className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
                   >
                     <p className="text-sm font-medium text-zinc-800">
-                      {idx + 1}. {it.prompt}{' '}
+                      {idx + 1}. {formatBlankPrompt(it.prompt, it.blanks)}{' '}
                       <span className="text-xs text-zinc-500 font-normal">
                         ({it.weight || '0'}%)
                       </span>

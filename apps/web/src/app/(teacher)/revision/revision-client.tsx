@@ -19,6 +19,7 @@ import {
   MediaPlaybackUrlResponseSchema,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { formatBlankPrompt } from '../../../lib/blank-prompt';
 import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
 
 export function RevisionClient() {
@@ -611,7 +612,7 @@ export function RevisionClient() {
                           key={it.id || idx}
                           className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2 text-xs"
                         >
-                          {it.prompt && <p className="font-bold text-zinc-800">{it.prompt}</p>}
+                          {it.prompt && <p className="font-bold text-zinc-800">{formatBlankPrompt(it.prompt)}</p>}
                           {it.question && <p className="font-bold text-zinc-800">{it.question}</p>}
 
                           <div className="pt-1">

@@ -16,7 +16,7 @@ import {
   type StudentProfileView,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../lib/api';
-import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh } from '../../lib/auth-session';
+import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh, clearSharedSession } from '../../lib/auth-session';
 import { getActivityTypeLabel } from '../../lib/activity-labels';
 import { TeacherNav } from '../../components/teacher-nav';
 import { StudentNav } from '../../components/student-nav';
@@ -40,6 +40,7 @@ export function InicioClient() {
         }
       }
       if (!sessionData) {
+        clearSharedSession();
         router.replace('/login');
         return null;
       }
@@ -48,9 +49,10 @@ export function InicioClient() {
   });
 
   const session = sessionQuery.data ?? null;
+  const activeUserId = session?.user.id ?? null;
 
   const remindersQuery = useQuery({
-    queryKey: ['teacher', 'reminders'],
+    queryKey: ['teacher', 'reminders', activeUserId],
     queryFn: () =>
       apiFetch<RemindersResponse>('/api/v1/dashboard/reminders', {
         schema: RemindersResponseSchema,
@@ -59,7 +61,7 @@ export function InicioClient() {
   });
 
   const cardsQuery = useQuery({
-    queryKey: ['student', 'assignments'],
+    queryKey: ['student', 'assignments', activeUserId],
     queryFn: () =>
       apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments', {
         schema: AssignmentCardListResponseSchema,
@@ -68,7 +70,7 @@ export function InicioClient() {
   });
 
   const profileQuery = useQuery({
-    queryKey: ['student', 'profile'],
+    queryKey: ['student', 'profile', activeUserId],
     queryFn: () => fetchSharedProfile(),
     enabled: session?.user.role === 'student',
   });

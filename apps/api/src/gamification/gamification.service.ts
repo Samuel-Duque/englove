@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransactionContext } from '../common/tenant/transaction.context';
 import {
   ProgressEventType,
   BadgeAwardView,
@@ -50,7 +51,10 @@ export class GamificationService {
     attemptId: string,
     score: number | null,
   ): Promise<BadgeAwardView[]> {
-    await this.prisma.progressEvent.create({
+    const activeTx = TransactionContext.getClient();
+    const db = activeTx ?? this.prisma;
+
+    await db.progressEvent.create({
       data: {
         organization_id: organizationId,
         student_id: studentId,
@@ -59,6 +63,12 @@ export class GamificationService {
         value: score !== null ? new Prisma.Decimal(score) : null,
       },
     });
+
+    // Cuando corre dentro de la transacción de completeAttempt, las insignias se evalúan
+    // tras el commit para que una colisión concurrente de insignia única jamás aborte la tx SQL (RT-03).
+    if (activeTx) {
+      return [];
+    }
 
     return this.evaluateBadges(organizationId, studentId);
   }
@@ -72,7 +82,10 @@ export class GamificationService {
     studentId: string,
     attemptId: string,
   ): Promise<BadgeAwardView[]> {
-    await this.prisma.progressEvent.create({
+    const activeTx = TransactionContext.getClient();
+    const db = activeTx ?? this.prisma;
+
+    await db.progressEvent.create({
       data: {
         organization_id: organizationId,
         student_id: studentId,
@@ -81,6 +94,10 @@ export class GamificationService {
         value: new Prisma.Decimal(1),
       },
     });
+
+    if (activeTx) {
+      return [];
+    }
 
     return this.evaluateBadges(organizationId, studentId);
   }

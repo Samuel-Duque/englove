@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { validateEnvironment, AppEnv } from '../src/config/env.validation';
 
@@ -92,5 +94,19 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
         PORT: '-1',
       }),
     ).toThrowError(/PORT/);
+  });
+
+  it('RT-10: docker-compose.yml publishes admin/dev ports strictly on 127.0.0.1 loopback', () => {
+    const composePath = path.resolve(process.cwd(), '../../docker-compose.yml');
+    const compose = fs.readFileSync(composePath, 'utf8');
+    const portMappings = [...compose.matchAll(/^\s*-\s*"([^"]+)"/gm)].map((m) => m[1] ?? '');
+
+    expect(portMappings).toEqual([
+      '127.0.0.1:5433:5432',
+      '127.0.0.1:9000:9000',
+      '127.0.0.1:9001:9001',
+      '127.0.0.1:1025:1025',
+      '127.0.0.1:8025:8025',
+    ]);
   });
 });

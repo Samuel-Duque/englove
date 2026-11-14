@@ -496,8 +496,11 @@ export class AuthService {
       });
     }
 
-    const [sid, secret] = refreshTokenValue.split('.');
-    if (!sid || !secret) {
+    const parts = refreshTokenValue.split('.');
+    const sid = parts[0];
+    const secret = parts[1];
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid ?? '');
+    if (parts.length !== 2 || !sid || !secret || !isUuid) {
       this.clearSessionCookies(res);
       throw new UnauthorizedException({
         statusCode: 401,
@@ -1204,6 +1207,14 @@ export class AuthService {
         }
       }
 
+      const existingUser = tx.user?.findFirst
+        ? await tx.user.findFirst({
+            where: { id: currentUser.id, organization_id: currentUser.organizationId },
+            select: { email: true },
+          })
+        : null;
+      const previousEmail = existingUser?.email ?? currentUser.email;
+
       await tx.user.update({
         where: { id: currentUser.id, organization_id: currentUser.organizationId },
         data: { email: activeRequest.new_email },
@@ -1229,7 +1240,7 @@ export class AuthService {
         data: { revoked_at: new Date() },
       });
 
-      return { status: 'success' as const };
+      return { status: 'success' as const, previousEmail };
     });
 
     if (txResult.status === 'failed') {
@@ -1243,7 +1254,7 @@ export class AuthService {
     // Notify previous email (RF-14)
     await this.mailService.sendMail({
       template: 'email-changed',
-      to: currentUser.email,
+      to: txResult.previousEmail,
       variables: {},
     });
 

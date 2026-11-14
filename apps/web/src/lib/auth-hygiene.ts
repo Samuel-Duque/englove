@@ -1,13 +1,25 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { getQueryClient } from "./query-client";
 import {
+  AUTH_SYNC_CHANNEL,
+  SESSION_EPOCH_KEY,
   clearSharedSession,
-  markLogoutPending,
-  isLogoutPending,
   confirmLogoutComplete,
+  getTabBoundEpoch,
+  getTabInstanceId,
+  isLogoutInitiatedLocally,
+  isLogoutPending,
+  markLogoutPending,
+  parseSessionEpoch,
+  publishSessionEpoch,
+  readPersistedSessionEpoch,
   settleSharedRefresh,
 } from "./auth-session";
 import { clearSharedFeatureFlags } from "./feature-flags-client";
+
+export interface ClearSharedDeviceOptions {
+  broadcast?: boolean;
+}
 
 /**
  * Performs client-side hygiene on logout or session expiration (Rule G-C13, RF-18).
@@ -15,12 +27,20 @@ import { clearSharedFeatureFlags } from "./feature-flags-client";
  */
 export async function clearSharedDeviceSession(
   queryClient: QueryClient = getQueryClient(),
+  options?: ClearSharedDeviceOptions,
 ): Promise<void> {
-  // Cancel in-flight queries and drop every cached response of the previous account
-  await queryClient.cancelQueries();
-  queryClient.clear();
+  // Drop in-memory session, flags, and cached responses synchronously before awaiting async cleanup
   clearSharedSession();
   clearSharedFeatureFlags();
+  queryClient.clear();
+  if (options?.broadcast !== false && !isLogoutInitiatedLocally()) {
+    const persisted = readPersistedSessionEpoch();
+    if (persisted?.state !== "logged_out") {
+      publishSessionEpoch("logged_out", null);
+    }
+  }
+  await queryClient.cancelQueries();
+  queryClient.clear();
 
   // Clear IndexedDB pending queues if running in browser (RF-6, ISSUE-04)
   if (typeof window !== "undefined" && "indexedDB" in window) {
@@ -236,6 +256,195 @@ export async function logoutSharedDevice(
   queryClient: QueryClient = getQueryClient(),
 ): Promise<boolean> {
   markLogoutPending();
-  await clearSharedDeviceSession(queryClient);
+  await clearSharedDeviceSession(queryClient, { broadcast: false });
   return reconcilePendingLogout();
+}
+
+export function isPublicAppRoute(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/offline" ||
+    pathname === "/terminos" ||
+    pathname.startsWith("/terminos/") ||
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/registro" ||
+    pathname.startsWith("/registro/") ||
+    pathname.startsWith("/recuperar") ||
+    pathname === "/restablecer" ||
+    pathname.startsWith("/restablecer/")
+  );
+}
+
+export type CrossTabInvalidationReason = "logout" | "account_switch";
+
+export interface CrossTabSessionSyncOptions {
+  queryClient?: QueryClient;
+  getPathname?: () => string;
+  onInvalidate: (reason: CrossTabInvalidationReason) => void;
+}
+
+export function startCrossTabSessionSync(
+  options: CrossTabSessionSyncOptions,
+): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const queryClient = options.queryClient ?? getQueryClient();
+  const getPathname =
+    options.getPathname ?? (() => window.location?.pathname ?? "/");
+  const initialEpoch = readPersistedSessionEpoch();
+  const baselineGen = initialEpoch?.gen ?? 0;
+  const baselineUid =
+    initialEpoch?.state === "active" ? initialEpoch.uid : null;
+  let invalidated = false;
+
+  const resolveBoundUid = (
+    bound: ReturnType<typeof getTabBoundEpoch>,
+  ): string | null => {
+    if (bound?.state === "active") {
+      return bound.uid;
+    }
+    return !isPublicAppRoute(getPathname()) ? baselineUid : null;
+  };
+
+  const triggerInvalidation = (reason: CrossTabInvalidationReason): void => {
+    if (invalidated) return;
+    if (!isPublicAppRoute(getPathname())) {
+      invalidated = true;
+    }
+    clearSharedSession();
+    clearSharedFeatureFlags();
+    queryClient.clear();
+    void queryClient.cancelQueries();
+    options.onInvalidate(reason);
+  };
+
+  const evaluate = (storageCleared = false): void => {
+    if (invalidated || isLogoutInitiatedLocally()) return;
+
+    const bound = getTabBoundEpoch();
+    const boundUid = resolveBoundUid(bound);
+    const persisted = readPersistedSessionEpoch();
+    const isProtectedRoute = !isPublicAppRoute(getPathname());
+
+    if (isLogoutPending()) {
+      triggerInvalidation("logout");
+      return;
+    }
+
+    if (
+      storageCleared &&
+      (bound?.state === "active" || (isProtectedRoute && baselineUid !== null))
+    ) {
+      triggerInvalidation("logout");
+      return;
+    }
+
+    if (persisted?.state === "logged_out") {
+      if (bound?.state === "active" || persisted.gen > baselineGen) {
+        triggerInvalidation("logout");
+      }
+      return;
+    }
+
+    if (
+      boundUid !== null &&
+      persisted?.state === "active" &&
+      persisted.uid !== null &&
+      persisted.uid !== boundUid
+    ) {
+      triggerInvalidation("account_switch");
+    }
+  };
+
+  const onStorage = (event: StorageEvent): void => {
+    if (event.key === null) {
+      evaluate(true);
+      return;
+    }
+    if (event.key === SESSION_EPOCH_KEY) {
+      evaluate(event.newValue === null);
+      return;
+    }
+    if (event.key === "englove_logout_pending") {
+      evaluate(false);
+    }
+  };
+
+  const onFocusOrVisible = (): void => {
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState === "hidden"
+    ) {
+      return;
+    }
+    evaluate(false);
+  };
+
+  let channel: BroadcastChannel | null = null;
+  const onChannelMessage = (event: MessageEvent): void => {
+    const data: unknown = event.data;
+    if (typeof data !== "object" || data === null || Array.isArray(data)) {
+      return;
+    }
+    const type = Reflect.get(data, "type");
+    const sender = Reflect.get(data, "sender");
+    if (type !== "session_epoch" || sender === getTabInstanceId()) {
+      return;
+    }
+    const epoch = parseSessionEpoch(Reflect.get(data, "epoch"));
+    if (!epoch) return;
+    const bound = getTabBoundEpoch();
+    const boundUid = resolveBoundUid(bound);
+    if (epoch.state === "logged_out") {
+      if (
+        !isLogoutInitiatedLocally() &&
+        (bound?.state === "active" || epoch.gen > baselineGen)
+      ) {
+        triggerInvalidation("logout");
+      }
+      return;
+    }
+    if (boundUid !== null && epoch.uid !== null && epoch.uid !== boundUid) {
+      triggerInvalidation("account_switch");
+    }
+  };
+
+  if (typeof BroadcastChannel === "function") {
+    try {
+      channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+      channel.addEventListener("message", onChannelMessage);
+    } catch {
+      channel = null;
+    }
+  }
+
+  window.addEventListener?.("storage", onStorage);
+  window.addEventListener?.("focus", onFocusOrVisible);
+  window.addEventListener?.("pageshow", onFocusOrVisible);
+  if (typeof document !== "undefined") {
+    document.addEventListener?.("visibilitychange", onFocusOrVisible);
+  }
+
+  // Run an immediate check in case another tab logged out during hydration
+  evaluate(false);
+
+  return () => {
+    window.removeEventListener?.("storage", onStorage);
+    window.removeEventListener?.("focus", onFocusOrVisible);
+    window.removeEventListener?.("pageshow", onFocusOrVisible);
+    if (typeof document !== "undefined") {
+      document.removeEventListener?.("visibilitychange", onFocusOrVisible);
+    }
+    if (channel) {
+      try {
+        channel.removeEventListener("message", onChannelMessage);
+        channel.close();
+      } catch {
+        // Ignore close errors
+      }
+    }
+  };
 }

@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
+import { Role } from "@englove/shared";
 import {
   logoutSharedDevice,
   reconcilePendingLogout,
+  startCrossTabSessionSync,
 } from "../src/lib/auth-hygiene";
 import {
+  SESSION_EPOCH_KEY,
   fetchSharedSession,
   requestSharedRefresh,
   isLogoutPending,
   getSharedSession,
+  setSharedSession,
 } from "../src/lib/auth-session";
 import { apiFetch } from "../src/lib/api";
 
@@ -153,5 +157,174 @@ describe("SEG-01: failed logout never silently restores the previous account", (
       "/api/v1/auth/logout",
     ]);
     expect(getSharedSession()).toBeNull();
+  });
+
+  it("RT-04: cross-tab logout epoch clears QueryClient and notifies subscriber even after pending lock finishes", () => {
+    const storage = new Map<string, string>();
+    const listeners = new Map<string, Set<(event: unknown) => void>>();
+    const addListener = (type: string, fn: (event: unknown) => void) => {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)?.add(fn);
+    };
+    const removeListener = (type: string, fn: (event: unknown) => void) => {
+      listeners.get(type)?.delete(fn);
+    };
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+      sessionStorage: { clear: vi.fn() },
+      location: { origin: "http://localhost:3000", pathname: "/inicio" },
+      addEventListener: addListener,
+      removeEventListener: removeListener,
+    });
+
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["teacher", "reminders", "teacher-a"], {
+      pendingRegistrations: 4,
+    });
+    setSharedSession({
+      user: {
+        id: "teacher-a",
+        role: Role.teacher,
+        name: "Docente A",
+        email: "teacher@example.invalid",
+      },
+      student: null,
+      organizationId: "org-1",
+    });
+
+    const onInvalidate = vi.fn();
+    const stop = startCrossTabSessionSync({
+      queryClient,
+      getPathname: () => "/inicio",
+      onInvalidate,
+    });
+
+    storage.set(
+      SESSION_EPOCH_KEY,
+      JSON.stringify({ gen: 2, state: "logged_out", uid: null }),
+    );
+    for (const fn of listeners.get("storage") ?? []) {
+      fn({
+        key: SESSION_EPOCH_KEY,
+        newValue: storage.get(SESSION_EPOCH_KEY) ?? null,
+      });
+    }
+
+    expect(onInvalidate).toHaveBeenCalledWith("logout");
+    expect(getSharedSession()).toBeNull();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    stop();
+  });
+
+  it("RT-04: cross-tab account switch and focus check invalidate stale user data", () => {
+    const storage = new Map<string, string>();
+    const listeners = new Map<string, Set<(event: unknown) => void>>();
+    const addListener = (type: string, fn: (event: unknown) => void) => {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)?.add(fn);
+    };
+    const removeListener = (type: string, fn: (event: unknown) => void) => {
+      listeners.get(type)?.delete(fn);
+    };
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+      sessionStorage: { clear: vi.fn() },
+      location: { origin: "http://localhost:3000", pathname: "/alumnos" },
+      addEventListener: addListener,
+      removeEventListener: removeListener,
+    });
+
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["teacher", "reminders", "teacher-a"], {
+      pendingRegistrations: 2,
+    });
+    setSharedSession({
+      user: {
+        id: "teacher-a",
+        role: Role.teacher,
+        name: "Docente A",
+        email: "teacher@example.invalid",
+      },
+      student: null,
+      organizationId: "org-1",
+    });
+
+    const onInvalidate = vi.fn();
+    const stop = startCrossTabSessionSync({
+      queryClient,
+      getPathname: () => "/alumnos",
+      onInvalidate,
+    });
+
+    storage.set(
+      SESSION_EPOCH_KEY,
+      JSON.stringify({ gen: 3, state: "active", uid: "student-b" }),
+    );
+    for (const fn of listeners.get("focus") ?? []) {
+      fn({});
+    }
+
+    expect(onInvalidate).toHaveBeenCalledWith("account_switch");
+    expect(getSharedSession()).toBeNull();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    stop();
+  });
+
+  it("RT-04: detects account switch and storage clear on teacher routes without tabBoundEpoch hydrated", () => {
+    const storage = new Map<string, string>();
+    storage.set(
+      SESSION_EPOCH_KEY,
+      JSON.stringify({ gen: 1, state: "active", uid: "teacher-a" }),
+    );
+    const listeners = new Map<string, Set<(event: unknown) => void>>();
+    const addListener = (type: string, fn: (event: unknown) => void) => {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)?.add(fn);
+    };
+    const removeListener = (type: string, fn: (event: unknown) => void) => {
+      listeners.get(type)?.delete(fn);
+    };
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+      sessionStorage: { clear: vi.fn() },
+      location: { origin: "http://localhost:3000", pathname: "/alumnos" },
+      addEventListener: addListener,
+      removeEventListener: removeListener,
+    });
+
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["students", "list"], [{ id: "st-1" }]);
+
+    // Intentionally do NOT call setSharedSession / fetchSharedSession in this tab
+    const onInvalidate = vi.fn();
+    const stop = startCrossTabSessionSync({
+      queryClient,
+      getPathname: () => "/alumnos",
+      onInvalidate,
+    });
+
+    storage.set(
+      SESSION_EPOCH_KEY,
+      JSON.stringify({ gen: 2, state: "active", uid: "student-b" }),
+    );
+    for (const fn of listeners.get("focus") ?? []) {
+      fn({});
+    }
+
+    expect(onInvalidate).toHaveBeenCalledWith("account_switch");
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    stop();
   });
 });

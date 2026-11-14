@@ -11,6 +11,7 @@ import {
 } from "./offline-queue";
 import { syncUserSegment } from "./user-segment";
 import { checkAppMinVersion } from "./pwa-manager";
+import { getQueryClient } from "./query-client";
 
 let inFlightPromise: Promise<SessionView | null> | null = null;
 let cachedSession: SessionView | null = null;
@@ -25,8 +26,165 @@ let lastSuccessfulRefresh = 0;
 const TAB_SYNC_KEY = "englove_tab_sync_ts";
 const PROFILE_CACHE_TTL_MS = 60 * 1000;
 const LOGOUT_PENDING_KEY = "englove_logout_pending";
+export const SESSION_EPOCH_KEY = "englove_session_epoch";
+export const AUTH_SYNC_CHANNEL = "englove_auth_sync";
+
+export interface SessionEpoch {
+  gen: number;
+  state: "active" | "logged_out";
+  uid: string | null;
+}
+
+const TAB_INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 let logoutPendingInMemory = false;
 let sessionGeneration = 0;
+let tabBoundEpoch: SessionEpoch | null = null;
+let currentEpochSnapshot = "0:unknown:none";
+const epochListeners = new Set<() => void>();
+
+export function getTabInstanceId(): string {
+  return TAB_INSTANCE_ID;
+}
+
+function formatEpochSnapshot(epoch: SessionEpoch | null): string {
+  return epoch
+    ? `${epoch.gen}:${epoch.state}:${epoch.uid ?? "none"}`
+    : "0:unknown:none";
+}
+
+function setBoundEpoch(next: SessionEpoch | null): void {
+  tabBoundEpoch = next;
+  const formatted = formatEpochSnapshot(next);
+  if (formatted !== currentEpochSnapshot) {
+    currentEpochSnapshot = formatted;
+    for (const listener of epochListeners) {
+      try {
+        listener();
+      } catch {
+        // Ignore subscriber errors during state sync
+      }
+    }
+  }
+}
+
+export function subscribeSessionEpoch(listener: () => void): () => void {
+  epochListeners.add(listener);
+  return () => {
+    epochListeners.delete(listener);
+  };
+}
+
+export function getSessionEpochSnapshot(): string {
+  return currentEpochSnapshot;
+}
+
+export function getTabBoundEpoch(): SessionEpoch | null {
+  return tabBoundEpoch;
+}
+
+export function isLogoutInitiatedLocally(): boolean {
+  return logoutPendingInMemory;
+}
+
+export function parseSessionEpoch(raw: unknown): SessionEpoch | null {
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    if (!raw.trim()) return null;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const gen = Reflect.get(value, "gen");
+  const state = Reflect.get(value, "state");
+  const uid = Reflect.get(value, "uid");
+  if (typeof gen !== "number" || !Number.isInteger(gen) || gen < 0) {
+    return null;
+  }
+  if (state !== "active" && state !== "logged_out") {
+    return null;
+  }
+  if (uid !== null && typeof uid !== "string") {
+    return null;
+  }
+  return { gen, state, uid };
+}
+
+export function readPersistedSessionEpoch(): SessionEpoch | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage?.getItem(SESSION_EPOCH_KEY);
+    return raw ? parseSessionEpoch(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function broadcastEpochOverChannel(epoch: SessionEpoch): void {
+  if (typeof BroadcastChannel !== "function") return;
+  try {
+    const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+    channel.postMessage({
+      type: "session_epoch",
+      sender: TAB_INSTANCE_ID,
+      epoch,
+    });
+    channel.close();
+  } catch {
+    // Ignore when BroadcastChannel is unavailable or restricted
+  }
+}
+
+export function publishSessionEpoch(
+  state: "active" | "logged_out",
+  uid: string | null,
+  options?: { broadcast?: boolean },
+): SessionEpoch {
+  const persisted = readPersistedSessionEpoch();
+  const baseGen = Math.max(persisted?.gen ?? 0, tabBoundEpoch?.gen ?? 0);
+  const nextEpoch: SessionEpoch = {
+    gen: baseGen + 1,
+    state,
+    uid,
+  };
+  setBoundEpoch(nextEpoch);
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage?.setItem(
+        SESSION_EPOCH_KEY,
+        JSON.stringify(nextEpoch),
+      );
+    }
+  } catch {
+    // Ignore when localStorage is blocked
+  }
+  if (options?.broadcast !== false) {
+    broadcastEpochOverChannel(nextEpoch);
+  }
+  return nextEpoch;
+}
+
+export function syncBoundSessionEpoch(uid: string): {
+  epoch: SessionEpoch;
+  accountChanged: boolean;
+} {
+  const previousUid = tabBoundEpoch?.state === "active" ? tabBoundEpoch.uid : null;
+  const accountChanged = Boolean(previousUid && previousUid !== uid);
+  const persisted = readPersistedSessionEpoch();
+  if (persisted && persisted.state === "active" && persisted.uid === uid) {
+    setBoundEpoch(persisted);
+    return { epoch: persisted, accountChanged };
+  }
+  const nextEpoch = publishSessionEpoch("active", uid, {
+    broadcast: accountChanged || persisted?.uid !== undefined,
+  });
+  return { epoch: nextEpoch, accountChanged };
+}
 
 /** A UI lock only: revocation and authorization remain server responsibilities. */
 export function isLogoutPending(): boolean {
@@ -48,6 +206,7 @@ export function isLogoutPending(): boolean {
 export function markLogoutPending(): void {
   logoutPendingInMemory = true;
   clearSharedSession();
+  publishSessionEpoch("logged_out", null);
   try {
     window.localStorage?.setItem(LOGOUT_PENDING_KEY, "1");
   } catch {
@@ -77,11 +236,21 @@ export async function settleSharedRefresh(): Promise<void> {
  * Consulta la sesión actual de forma pasiva y de solo lectura vía GET /api/v1/auth/session (P0-03, QA-02).
  * No rota ni consume el refresh_token.
  */
+function hasEpochInvalidationSince(startEpoch: SessionEpoch | null): boolean {
+  const latest = readPersistedSessionEpoch();
+  if (!latest) return false;
+  if (latest.gen <= (startEpoch?.gen ?? 0)) return false;
+  if (latest.state === "logged_out") return true;
+  if (startEpoch?.uid && latest.uid !== startEpoch.uid) return true;
+  return false;
+}
+
 export async function fetchSharedSession(
   force: boolean = false,
 ): Promise<SessionView | null> {
   if (isLogoutPending()) return null;
   const generation = sessionGeneration;
+  const startEpoch = readPersistedSessionEpoch();
   if (!force && cachedSession) {
     return cachedSession;
   }
@@ -111,9 +280,27 @@ export async function fetchSharedSession(
         throw new Error(`SERVER_ERROR_${res.status}`);
       }
       const data: SessionView = await res.json();
-      if (generation !== sessionGeneration || isLogoutPending()) return null;
+      if (
+        generation !== sessionGeneration ||
+        isLogoutPending() ||
+        hasEpochInvalidationSince(startEpoch)
+      ) {
+        return null;
+      }
       await purgeOtherUsersEntries(data.user.id);
-      if (generation !== sessionGeneration || isLogoutPending()) return null;
+      if (
+        generation !== sessionGeneration ||
+        isLogoutPending() ||
+        hasEpochInvalidationSince(startEpoch)
+      ) {
+        return null;
+      }
+      const { accountChanged } = syncBoundSessionEpoch(data.user.id);
+      if (accountChanged) {
+        cachedProfile = null;
+        inFlightProfilePromise = null;
+        getQueryClient().clear();
+      }
       cachedSession = data;
       try {
         if (typeof window !== "undefined" && "localStorage" in window) {
@@ -150,8 +337,15 @@ export async function fetchSharedSession(
 export async function requestSharedRefresh(): Promise<boolean> {
   if (isLogoutPending()) return false;
   const generation = sessionGeneration;
+  const startEpoch = readPersistedSessionEpoch();
   const performRefresh = async (): Promise<boolean> => {
-    if (isLogoutPending() || generation !== sessionGeneration) return false;
+    if (
+      isLogoutPending() ||
+      generation !== sessionGeneration ||
+      hasEpochInvalidationSince(startEpoch)
+    ) {
+      return false;
+    }
     // Si otra pestaña o llamada refrescó en los últimos 2 segundos, no rotar de nuevo
     if (Date.now() - lastSuccessfulRefresh < 2000 && cachedSession) {
       return true;
@@ -181,9 +375,27 @@ export async function requestSharedRefresh(): Promise<boolean> {
       }
 
       const data: SessionView = await res.json();
-      if (generation !== sessionGeneration || isLogoutPending()) return false;
+      if (
+        generation !== sessionGeneration ||
+        isLogoutPending() ||
+        hasEpochInvalidationSince(startEpoch)
+      ) {
+        return false;
+      }
       await purgeOtherUsersEntries(data.user.id);
-      if (generation !== sessionGeneration || isLogoutPending()) return false;
+      if (
+        generation !== sessionGeneration ||
+        isLogoutPending() ||
+        hasEpochInvalidationSince(startEpoch)
+      ) {
+        return false;
+      }
+      const { accountChanged } = syncBoundSessionEpoch(data.user.id);
+      if (accountChanged) {
+        cachedProfile = null;
+        inFlightProfilePromise = null;
+        getQueryClient().clear();
+      }
       cachedSession = data;
       lastSuccessfulRefresh = Date.now();
       try {
@@ -219,7 +431,13 @@ export async function requestSharedRefresh(): Promise<boolean> {
   ) {
     try {
       return await navigator.locks.request("englove_auth_refresh", async () => {
-        if (isLogoutPending() || generation !== sessionGeneration) return false;
+        if (
+          isLogoutPending() ||
+          generation !== sessionGeneration ||
+          hasEpochInvalidationSince(startEpoch)
+        ) {
+          return false;
+        }
         // 1. Memoria local de esta pestaña
         if (Date.now() - lastSuccessfulRefresh < 2000 && cachedSession) {
           return true;
@@ -268,10 +486,20 @@ export async function requestSharedRefresh(): Promise<boolean> {
 
 export function setSharedSession(session: SessionView): void {
   if (isLogoutPending()) return;
+  const previousUid =
+    tabBoundEpoch?.state === "active"
+      ? tabBoundEpoch.uid
+      : (cachedSession?.user.id ?? null);
+  if (previousUid && previousUid !== session.user.id) {
+    cachedProfile = null;
+    inFlightProfilePromise = null;
+    getQueryClient().clear();
+  }
   void purgeOtherUsersEntries(session.user.id);
   cachedSession = session;
   inFlightPromise = null;
   lastSuccessfulRefresh = Date.now();
+  publishSessionEpoch("active", session.user.id);
   try {
     if (typeof window !== "undefined" && "localStorage" in window) {
       window.localStorage.setItem(TAB_SYNC_KEY, String(lastSuccessfulRefresh));
@@ -299,6 +527,7 @@ export async function fetchSharedProfile(
 ): Promise<StudentProfileView | null> {
   if (isLogoutPending()) return null;
   const generation = sessionGeneration;
+  const startEpoch = readPersistedSessionEpoch();
   const now = Date.now();
   if (
     !force &&
@@ -316,9 +545,28 @@ export async function fetchSharedProfile(
       const data = await apiFetch<StudentProfileView>("/api/v1/me", {
         schema: StudentProfileViewSchema,
       });
-      if (isLogoutPending() || generation !== sessionGeneration) return null;
+      if (
+        isLogoutPending() ||
+        generation !== sessionGeneration ||
+        hasEpochInvalidationSince(startEpoch)
+      ) {
+        return null;
+      }
       await purgeOtherUsersEntries(data.user.id);
-      if (isLogoutPending() || generation !== sessionGeneration) return null;
+      if (
+        isLogoutPending() ||
+        generation !== sessionGeneration ||
+        hasEpochInvalidationSince(startEpoch)
+      ) {
+        return null;
+      }
+      const { accountChanged } = syncBoundSessionEpoch(data.user.id);
+      if (accountChanged) {
+        cachedSession = null;
+        inFlightPromise = null;
+        lastSuccessfulRefresh = 0;
+        getQueryClient().clear();
+      }
       cachedProfile = { data, timestamp: Date.now() };
       return data;
     } catch {
@@ -344,6 +592,7 @@ export function clearSharedProfile(): void {
 
 export function clearSharedSession(): void {
   sessionGeneration++;
+  setBoundEpoch(null);
   suspendOfflineQueue();
   cachedSession = null;
   inFlightPromise = null;

@@ -19,6 +19,81 @@ function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
 }
 
+const KNOWN_BODY_PARSER_TYPES = new Set([
+  'entity.too.large',
+  'entity.parse.failed',
+  'encoding.unsupported',
+  'charset.unsupported',
+  'parameters.too.many',
+  'request.aborted',
+  'request.size.invalid',
+  'stream.encoding.set',
+  'stream.not.readable',
+]);
+
+function mapParserError(exception: unknown): {
+  statusCode: number;
+  code: string;
+  message: string;
+} | null {
+  if (!isRecord(exception)) {
+    return null;
+  }
+
+  const rawType = typeof exception.type === 'string' ? exception.type : undefined;
+  const isParserError =
+    (rawType !== undefined && KNOWN_BODY_PARSER_TYPES.has(rawType)) ||
+    (exception.expose === true && rawType !== undefined);
+  if (!isParserError) {
+    return null;
+  }
+
+  const rawStatus =
+    typeof exception.status === 'number'
+      ? exception.status
+      : typeof exception.statusCode === 'number'
+        ? exception.statusCode
+        : undefined;
+
+  if (rawType === 'entity.too.large' || rawStatus === HttpStatus.PAYLOAD_TOO_LARGE) {
+    return {
+      statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'La solicitud supera el tamaño máximo permitido',
+    };
+  }
+
+  if (rawType === 'entity.parse.failed' || rawStatus === HttpStatus.BAD_REQUEST) {
+    return {
+      statusCode: HttpStatus.BAD_REQUEST,
+      code: 'VALIDATION_ERROR',
+      message: 'El cuerpo de la solicitud no es válido',
+    };
+  }
+
+  if (
+    rawType === 'encoding.unsupported' ||
+    rawType === 'charset.unsupported' ||
+    rawStatus === HttpStatus.UNSUPPORTED_MEDIA_TYPE
+  ) {
+    return {
+      statusCode: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      code: 'UNSUPPORTED_MEDIA_TYPE',
+      message: 'Formato o codificación de solicitud no compatible',
+    };
+  }
+
+  if (rawStatus !== undefined && rawStatus >= 400 && rawStatus < 500) {
+    return {
+      statusCode: rawStatus,
+      code: rawStatus === HttpStatus.TOO_MANY_REQUESTS ? 'RATE_LIMITED' : 'VALIDATION_ERROR',
+      message: 'La solicitud no pudo procesarse',
+    };
+  }
+
+  return null;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -73,10 +148,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = res;
       }
     } else {
-      // Unexpected exception: log operational metadata without sensitive PII (Rule G-C10, P1-01)
-      const rawUrl = request.originalUrl || request.url || '';
-      const sanitizedUrl = rawUrl ? rawUrl.split('?')[0] : '';
-      this.logger.error(`Error no controlado procesando ${request.method} ${sanitizedUrl}`);
+      const parserError = mapParserError(exception);
+      if (parserError) {
+        statusCode = parserError.statusCode;
+        code = parserError.code;
+        message = parserError.message;
+      } else {
+        // Unexpected exception: log operational metadata without sensitive PII (Rule G-C10, P1-01)
+        const rawUrl = request.originalUrl || request.url || '';
+        const sanitizedUrl = rawUrl ? rawUrl.split('?')[0] : '';
+        this.logger.error(`Error no controlado procesando ${request.method} ${sanitizedUrl}`);
+      }
     }
 
     const appMinVersion = process.env.APP_MIN_VERSION;

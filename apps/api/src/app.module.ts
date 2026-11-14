@@ -23,7 +23,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { StatsModule } from './stats/stats.module';
 import { ResourcesModule } from './resources/resources.module';
 import { OriginGuard } from './common/guards/origin.guard';
-import { RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
+import { PreAuthRateLimiterGuard, RateLimiterGuard } from './common/rate-limiting/rate-limiter.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
@@ -95,6 +95,10 @@ export function sanitizePinoReq<T extends { url?: string; originalUrl?: string; 
     ResourcesModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: PreAuthRateLimiterGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: OriginGuard,

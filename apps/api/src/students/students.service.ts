@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
@@ -13,6 +14,7 @@ import {
   AgeSegment,
   Level,
   AuditAction,
+  MediaAssetStatus,
   StudentView,
   StudentListResponse,
   MembershipView,
@@ -39,6 +41,7 @@ function isRecord(val: unknown): val is Record<string, unknown> {
 
 @Injectable()
 export class StudentsService {
+  private readonly logger = new Logger(StudentsService.name);
   private readonly webBaseUrl: string;
 
   constructor(
@@ -1046,12 +1049,46 @@ export class StudentsService {
       }
     }
 
-    // Step 2: Delete R2 storage objects (raw and converted) BEFORE database transaction (Decision 103, RF-26)
+    // Step 2: Persist durable pending_delete state BEFORE deleting R2 objects (Architecture §8.4, Decision 103, RT-09)
+    if (
+      student.media_assets.length > 0 &&
+      typeof this.prisma.mediaAsset?.updateMany === 'function'
+    ) {
+      await this.prisma.mediaAsset.updateMany({
+        where: {
+          organization_id: organizationId,
+          student_id: studentId,
+          status: { not: MediaAssetStatus.deleted },
+        },
+        data: { status: MediaAssetStatus.pending_delete },
+      });
+    }
+
+    // Step 2b: Delete R2 storage objects idempotently with per-asset durable progress BEFORE database cascade
     if (this.mediaService) {
+      let deletedCount = 0;
       for (const media of student.media_assets) {
-        await this.mediaService.deleteFile(media.key);
-        if (media.converted_key) {
-          await this.mediaService.deleteFile(media.converted_key);
+        if ('status' in media && media.status === MediaAssetStatus.deleted) {
+          deletedCount++;
+          continue;
+        }
+        try {
+          await this.mediaService.deleteFile(media.key);
+          if (media.converted_key) {
+            await this.mediaService.deleteFile(media.converted_key);
+          }
+          if (typeof this.prisma.mediaAsset?.update === 'function') {
+            await this.prisma.mediaAsset.update({
+              where: { id: media.id, organization_id: organizationId },
+              data: { status: MediaAssetStatus.deleted, deleted_at: new Date() },
+            });
+          }
+          deletedCount++;
+        } catch (err: unknown) {
+          this.logger.warn(
+            `Borrado R2 incompleto en baja de alumno (${deletedCount}/${student.media_assets.length} assets eliminados; assetId=${media.id})`,
+          );
+          throw err;
         }
       }
     }

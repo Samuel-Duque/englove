@@ -18,6 +18,7 @@ import * as express from 'express';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { resolveTrustProxySetting } from './common/utils/identity.utils';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true, bodyParser: false });
@@ -27,8 +28,9 @@ async function bootstrap() {
   const port = configService.get<number>('PORT', 3001);
   const webBaseUrl = configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
 
-  // Trust reverse proxy for single hop (Render) to reliably determine client IP (SPEC-02 §4)
-  app.set('trust proxy', 1);
+  // Trust proxy configured by environment: disabled in local/direct access, trusted private proxy hops in staging/production (RT-05)
+  const trustProxy = resolveTrustProxySetting(appEnv, configService.get<string>('TRUST_PROXY'));
+  app.set('trust proxy', trustProxy);
 
   // Security headers with Helmet (Rule G-C10, SPEC-02 RF-16, ISSUE-01)
   app.use(

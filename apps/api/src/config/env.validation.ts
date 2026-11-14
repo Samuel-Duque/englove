@@ -40,6 +40,7 @@ const baseEnvSchema = z.object({
     .string()
     .regex(/^\d+\.\d+\.\d+$/, 'APP_MIN_VERSION must be valid SemVer (MAJOR.MINOR.PATCH)')
     .optional(),
+  TRUST_PROXY: z.string().optional(),
 });
 
 export type ValidatedEnv = z.infer<typeof baseEnvSchema>;

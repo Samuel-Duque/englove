@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
   PayloadTooLargeException,
   UnprocessableEntityException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -534,6 +535,10 @@ export class MediaService implements OnModuleInit {
           ? forcedDurationSeconds
           : await this.probeDuration(asset.key, actualSize);
     } catch (err: unknown) {
+      if (err instanceof ServiceUnavailableException) {
+        // Procesador temporalmente indisponible (p. ej. ffprobe ausente): conservar asset para reintento sin culpar al alumno (RT-11)
+        throw err;
+      }
       if (err instanceof PayloadTooLargeException) {
         await this.deleteFile(asset.key).catch(() => {});
       }
@@ -690,12 +695,22 @@ export class MediaService implements OnModuleInit {
   }
 
   async deleteFile(key: string): Promise<void> {
-    await this.s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      }),
-    );
+    try {
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        }),
+      );
+    } catch (err: unknown) {
+      const s3Name = isRecord(err) && typeof err.name === 'string' ? err.name : undefined;
+      const metadata = isRecord(err) && isRecord(err.$metadata) ? err.$metadata : undefined;
+      const httpStatus = typeof metadata?.httpStatusCode === 'number' ? metadata.httpStatusCode : undefined;
+      if (s3Name === 'NoSuchKey' || s3Name === 'NotFound' || httpStatus === 404) {
+        return;
+      }
+      throw err;
+    }
   }
 
   private enqueueTranscode(assetId: string): void {
@@ -1087,7 +1102,18 @@ export class MediaService implements OnModuleInit {
       if (err instanceof PayloadTooLargeException) {
         throw err;
       }
+      const errCode = isRecord(err) && typeof err.code === 'string' ? err.code : undefined;
       const errMessage = err instanceof Error ? err.message : String(err);
+      if (errCode === 'ENOENT' || errCode === 'EACCES') {
+        this.logger.error(
+          `Procesador ffprobe no disponible al validar asset (${errCode}). Devolviendo 503 AUDIO_PROCESSOR_UNAVAILABLE`,
+        );
+        throw new ServiceUnavailableException({
+          statusCode: 503,
+          code: 'AUDIO_PROCESSOR_UNAVAILABLE',
+          message: 'El procesador de audio no está disponible temporalmente. Intenta de nuevo en unos minutos',
+        });
+      }
       this.logger.warn(
         `ffprobe no pudo medir duración del asset (${errMessage}). Rechazando con AUDIO_IMPLAUSIBLE_DURATION`,
       );

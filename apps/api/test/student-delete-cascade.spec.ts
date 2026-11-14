@@ -27,7 +27,11 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
     progressEvent: { deleteMany: MockFn };
     badgeAward: { deleteMany: MockFn };
     attempt: { deleteMany: MockFn };
-    mediaAsset: { deleteMany: MockFn };
+    mediaAsset: {
+      deleteMany: MockFn;
+      updateMany: MockFn;
+      update: MockFn;
+    };
     authSession: { deleteMany: MockFn };
     passwordResetToken: { deleteMany: MockFn };
     emailChangeRequest: { deleteMany: MockFn };
@@ -45,6 +49,8 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
       mockPrisma.review.deleteMany,
       mockPrisma.attempt.deleteMany,
       mockPrisma.mediaAsset.deleteMany,
+      mockPrisma.mediaAsset.updateMany,
+      mockPrisma.mediaAsset.update,
     ]) {
       for (const [args] of mutation.mock.calls) {
         expect(args).toEqual(expect.objectContaining({
@@ -145,6 +151,8 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
       },
       mediaAsset: {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        update: vi.fn().mockResolvedValue({ id: 'media-1' }),
       },
       authSession: {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -235,5 +243,109 @@ describe('SPEC-05: Baja atómica de estudiante (Decisión 103, Q-04, ENG-070)', 
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(mockPrisma.student.delete).not.toHaveBeenCalled();
     expect(mockPrisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('RT-09: marca MediaAsset como pending_delete antes de borrar en R2 y preserva estado durable ante fallo parcial entre raw y convertido', async () => {
+    const rawKey = `${orgId}/${studentId}/attempt-1/rec.webm`;
+    const convertedKey = `${orgId}/${studentId}/attempt-1/rec.mp4`;
+    const callOrder: string[] = [];
+
+    mockPrisma.mediaAsset.updateMany.mockImplementation(async (args: { data?: { status?: string } }) => {
+      callOrder.push(`updateMany:${String(args?.data?.status)}`);
+      return { count: 1 };
+    });
+    mockMediaService.deleteFile
+      .mockImplementationOnce(async (key: string) => {
+        callOrder.push(`delete:${key}`);
+      })
+      .mockImplementationOnce(async (key: string) => {
+        callOrder.push(`delete:${key}`);
+        throw new Error('R2 timeout on converted object');
+      });
+
+    await expect(
+      service.deleteStudentCascade(orgId, studentId),
+    ).rejects.toThrow('R2 timeout on converted object');
+
+    expect(callOrder[0]).toBe('updateMany:pending_delete');
+    expect(callOrder).toContain(`delete:${rawKey}`);
+    expect(callOrder).toContain(`delete:${convertedKey}`);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.mediaAsset.update).not.toHaveBeenCalled();
+    expect(mockPrisma.student.delete).not.toHaveBeenCalled();
+
+    // Reanudación idempotente: el retry completa el borrado y ejecuta la transacción SQL
+    mockMediaService.deleteFile.mockResolvedValue(undefined);
+    await service.deleteStudentCascade(orgId, studentId);
+
+    expect(mockPrisma.mediaAsset.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: orgId,
+          student_id: studentId,
+          status: { not: 'deleted' },
+        }),
+        data: { status: 'pending_delete' },
+      }),
+    );
+    expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'media-1', organization_id: orgId },
+        data: expect.objectContaining({ status: 'deleted' }),
+      }),
+    );
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.student.delete).toHaveBeenCalledWith({
+      where: { id: studentId, organization_id: orgId },
+    });
+  });
+
+  it('RT-09: al reintentar tras fallo parcial con un asset ya marcado deleted, no lo revierte a pending_delete ni reintenta borrarlo en R2', async () => {
+    mockPrisma.student.findFirst.mockResolvedValueOnce({
+      id: studentId,
+      organization_id: orgId,
+      user_id: studentUserId,
+      memberships: [],
+      attempts: [{ id: 'attempt-1' }],
+      user: {
+        id: studentUserId,
+        name: 'Sofía Martínez',
+        email: 'sofia@colegio.edu.co',
+      },
+      media_assets: [
+        {
+          id: 'media-already-deleted',
+          status: 'deleted',
+          key: `${orgId}/${studentId}/attempt-0/done.webm`,
+          converted_key: null,
+        },
+        {
+          id: 'media-pending',
+          status: 'pending_delete',
+          key: `${orgId}/${studentId}/attempt-1/pending.webm`,
+          converted_key: null,
+        },
+      ],
+    });
+
+    await service.deleteStudentCascade(orgId, studentId);
+
+    expect(mockPrisma.mediaAsset.updateMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: orgId,
+        student_id: studentId,
+        status: { not: 'deleted' },
+      },
+      data: { status: 'pending_delete' },
+    });
+    expect(mockMediaService.deleteFile).toHaveBeenCalledTimes(1);
+    expect(mockMediaService.deleteFile).toHaveBeenCalledWith(
+      `${orgId}/${studentId}/attempt-1/pending.webm`,
+    );
+    expect(mockPrisma.mediaAsset.update).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith({
+      where: { id: 'media-pending', organization_id: orgId },
+      data: expect.objectContaining({ status: 'deleted' }),
+    });
   });
 });

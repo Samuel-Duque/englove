@@ -10,6 +10,7 @@ import {
   ConflictException,
   NotFoundException,
   PayloadTooLargeException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ActivityType, AttemptStatus, MediaAssetStatus } from '@englove/shared';
@@ -532,6 +533,48 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       await service['processQueue']();
 
       expect(pushSpy).toHaveBeenCalledWith('asset-retry-1');
+    });
+
+    it('RT-11: cuando ffprobe falla por ENOENT devuelve 503 AUDIO_PROCESSOR_UNAVAILABLE sin culpar al alumno ni marcar pending_delete', async () => {
+      // Primero verificar que deleteFile tolera NoSuchKey/404 idempotentemente (RT-09)
+      vi.spyOn(service['s3Client'], 'send').mockRejectedValueOnce(
+        Object.assign(new Error('NoSuchKey'), { name: 'NoSuchKey', $metadata: { httpStatusCode: 404 } }),
+      );
+      await expect(service.deleteFile('org/student/attempt/already-gone.webm')).resolves.toBeUndefined();
+
+      // Reproducir ENOENT real en probeDuration ocultando PATH temporalmente (con magic bytes EBML válidos)
+      const originalPath = process.env.PATH;
+      const originalPathWin = process.env.Path;
+      vi.spyOn(service['s3Client'], 'send').mockResolvedValueOnce({
+        Body: Readable.from(Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(64)])),
+      } as never);
+      process.env.PATH = '';
+      process.env.Path = '';
+      try {
+        const probeErr = await service['probeDuration']('missing-binary.webm').catch((e: unknown) => e);
+        expect(probeErr).toBeInstanceOf(ServiceUnavailableException);
+      } finally {
+        process.env.PATH = originalPath;
+        process.env.Path = originalPathWin;
+      }
+
+      // ConfirmUpload no marca pending_delete cuando probeDuration lanza 503
+      vi.spyOn(service as any, 'probeDuration').mockRejectedValueOnce(
+        new ServiceUnavailableException({
+          statusCode: 503,
+          code: 'AUDIO_PROCESSOR_UNAVAILABLE',
+          message: 'El procesador de audio no está disponible temporalmente. Intenta de nuevo en unos minutos',
+        }),
+      );
+      const err = await service
+        .confirmUpload(orgId, studentId, attemptId, mediaId, 60)
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ServiceUnavailableException);
+      expect(mockPrisma.mediaAsset.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: MediaAssetStatus.pending_delete }),
+        }),
+      );
     });
   });
 });

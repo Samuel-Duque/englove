@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { isPostgresAvailable } from './postgres-test-helper';
 import { Response, Request } from 'express';
 import {
@@ -807,5 +807,87 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     expect(sanitized.url).toBe('/api/v1/auth/callback');
     expect(sanitized.originalUrl).toBe('/api/v1/auth/callback');
     expect(sanitized.query).toEqual({});
+  });
+
+  // ============================================================================
+  // RT-07: refresh con sid no-UUID rechaza con 401 AUTH_UNAUTHORIZED sin 500 de Postgres
+  // ============================================================================
+  it('RT-07: refresh con sid malformado o no-UUID devuelve 401 AUTH_UNAUTHORIZED y limpia cookies', async () => {
+    expect(isPostgresAvailable).toBe(true);
+
+    const { res, clearedCookies } = createMockResponse();
+    const err = await authService.refresh('not-a-uuid.some-secret', res).catch((e) => e);
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    expect(err.getResponse().code).toBe('AUTH_UNAUTHORIZED');
+    expect(clearedCookies['englove_test_access_token']).toBeDefined();
+    expect(clearedCookies['englove_test_refresh_token']).toBeDefined();
+    expect(clearedCookies['englove_test_session_hint']).toBeDefined();
+  });
+
+  // ============================================================================
+  // RT-08: confirmEmailChange notifica al correo real en DB aunque currentUser.email esté obsoleto
+  // ============================================================================
+  it('RT-08: confirmEmailChange envía email-changed al correo real previo de DB aunque el JWT porte un email obsoleto', async () => {
+    expect(isPostgresAvailable).toBe(true);
+
+    const reqId = '90000000-0000-4000-8000-000000000049';
+    const otp = '748291';
+    const sendSpy = vi.spyOn(mailService, 'sendMail').mockResolvedValue({
+      status: 'accepted',
+      messageId: 'rt08-msg',
+    });
+
+    try {
+      await TenantContext.runBypass(async () => {
+        // Simula usuario cuyo correo actual en DB ya es email-b@wp02.test (tras un primer cambio),
+        // pero su JWT aún porta el claim antiguo email-a@wp02.test.
+        await prisma.user.update({
+          where: { id: userBId, organization_id: orgBId },
+          data: { email: 'email-b@wp02.test' },
+        });
+        await prisma.emailChangeRequest.deleteMany({
+          where: { organization_id: orgBId, user_id: userBId },
+        });
+        await prisma.emailChangeRequest.create({
+          data: {
+            id: reqId,
+            organization_id: orgBId,
+            user_id: userBId,
+            new_email: 'email-c@wp02.test',
+            otp_hash: hashSha256(otp),
+            expires_at: new Date(Date.now() + 10 * 60 * 1000),
+            failed_attempts: 0,
+          },
+        });
+      });
+
+      const staleJwtUser = {
+        id: userBId,
+        email: 'email-a@wp02.test',
+        role: Role.teacher,
+        organizationId: orgBId,
+        sessionId: '00000000-0000-4000-8000-000000000099',
+      };
+
+      const res = await authService.confirmEmailChange({ otp }, staleJwtUser);
+      expect(res.message).toBe('Tu correo fue actualizado.');
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: 'email-changed',
+          to: 'email-b@wp02.test',
+        }),
+      );
+    } finally {
+      sendSpy.mockRestore();
+      await TenantContext.runBypass(async () => {
+        await prisma.emailChangeRequest.deleteMany({
+          where: { organization_id: orgBId, user_id: userBId },
+        });
+        await prisma.user.update({
+          where: { id: userBId, organization_id: orgBId },
+          data: { email: 'teacher.b@wp02.test' },
+        });
+      });
+    }
   });
 });

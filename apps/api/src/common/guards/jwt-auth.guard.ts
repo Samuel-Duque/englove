@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
 import { ApprovalStatus, Role, AgeSegment } from '@englove/shared';
+import { RateLimiterService } from '../rate-limiting/rate-limiter.service';
+import { consumeAnonymousIpBudgetOnce } from '../rate-limiting/rate-limiter.guard';
+import { extractClientIp } from '../utils/identity.utils';
 
 interface JwtPayload {
   sub: string;
@@ -35,6 +39,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly rateLimiterService?: RateLimiterService,
   ) {
     this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'englove_');
     this.jwtSecret =
@@ -59,6 +64,7 @@ export class JwtAuthGuard implements CanActivate {
       if (isPublic) {
         return true;
       }
+      consumeAnonymousIpBudgetOnce(this.rateLimiterService, request, extractClientIp(request));
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'AUTH_UNAUTHORIZED',
@@ -82,7 +88,7 @@ export class JwtAuthGuard implements CanActivate {
       // Query session by sid to ensure session is active and not revoked (Decision 68)
       const session = await this.prisma.authSession.findFirst({
         where: { id: payload.sid, organization_id: payload.org },
-        include: { user: { select: { id: true, locked_until: true } } },
+        include: { user: { select: { id: true, email: true, locked_until: true } } },
       });
 
       if (!session || session.revoked_at !== null || session.expires_at <= new Date()) {
@@ -144,7 +150,7 @@ export class JwtAuthGuard implements CanActivate {
 
       const authUser: AuthenticatedUser = {
         id: payload.sub,
-        email: payload.email,
+        email: session.user?.email ?? payload.email,
         role: payload.role,
         organizationId: payload.org,
         studentId,
@@ -158,6 +164,7 @@ export class JwtAuthGuard implements CanActivate {
       if (isPublic) {
         return true;
       }
+      consumeAnonymousIpBudgetOnce(this.rateLimiterService, request, extractClientIp(request));
       if (err instanceof ForbiddenException || err instanceof UnauthorizedException) {
         throw err;
       }

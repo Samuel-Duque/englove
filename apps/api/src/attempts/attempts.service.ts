@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransactionContext } from '../common/tenant/transaction.context';
 import { ScoringService } from '../scoring/scoring.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { MediaService } from '../media/media.service';
@@ -28,6 +29,7 @@ import {
   AttemptView,
   RuntimeView,
   CompletionView,
+  BadgeAwardView,
   AssignmentCard,
   AssignmentCardListResponse,
   StudentProgressView,
@@ -949,8 +951,15 @@ export class AttemptsService {
         }
       }
 
-      // Bound processedEventIds buffer to last 500 items FIFO to prevent unbounded memory growth (BUG-01)
-      const finalProcessedEventIds = Array.from(processedSet).slice(-500);
+      // Conservar todos los clientEventId procesados durante el intento sin evicción FIFO (RT-01)
+      if (processedSet.size > 10_000) {
+        throw new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'VALIDATION_ERROR',
+          message: 'El intento superó el límite máximo de eventos permitidos',
+        });
+      }
+      const finalProcessedEventIds = Array.from(processedSet);
 
       await tx.attempt.update({
         where: { id: attempt.id, organization_id: organizationId },
@@ -1031,11 +1040,12 @@ export class AttemptsService {
       });
     }
 
+    const startedAtBase = attempt.started_at ?? new Date();
     const effectiveDueAt =
       attempt.previous_attempt?.retry_extend_until ??
       attempt.assignment?.due_at ??
       new Date(
-        (attempt.started_at instanceof Date ? attempt.started_at : new Date(attempt.started_at)).getTime() +
+        (startedAtBase instanceof Date ? startedAtBase : new Date(startedAtBase)).getTime() +
           24 * 60 * 60 * 1000,
       );
     const completeUntil = attempt.assignment
@@ -1053,10 +1063,8 @@ export class AttemptsService {
       return await this.buildExistingCompletionView(organizationId, attempt, activity);
     }
 
-    // Check expiration and mark offline_sync if late (SPEC-09 RF-16)
-    if (attempt.assignment_id !== null) {
-      await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil, organizationId);
-    }
+    // Check expiration and mark offline_sync if late — both assigned and autonomous game attempts (RT-02, SPEC-09 RF-16)
+    await this.checkLateSubmissionAndMarkOfflineSync(attempt, completeUntil, organizationId);
 
     if (attempt.status !== AttemptStatus.in_progress) {
       throw new ConflictException({
@@ -1119,62 +1127,78 @@ export class AttemptsService {
       );
     }
 
-    // Atomic transaction with SELECT ... FOR UPDATE (P1-06, SEC-09d)
-    const txResult = await this.prisma.$transaction(async (tx) => {
-      // guardrails-ignore G-A06: Bloqueo transaccional anti-carrera P1-06 para completeAttempt
-      const lockedRows = await tx.$queryRaw<Array<{
-        id: string;
-        status: AttemptStatus;
-        payload: unknown;
-        started_at: Date;
-        finished_at: Date | null;
-        graded_at: Date | null;
-        score: Prisma.Decimal | null;
-        flags: string[];
-        attempt_number: number;
-        assignment_id: string | null;
-        activity_id: string | null;
-        previous_attempt_id: string | null;
-      }>>`
-        SELECT id, status, payload, started_at, finished_at, graded_at, score, flags, attempt_number, assignment_id, activity_id, previous_attempt_id
-        FROM attempts
-        WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
-        FOR UPDATE
-      `;
-      const locked = lockedRows[0];
-      if (!locked) {
-        throw new NotFoundException({
-          statusCode: 404,
-          code: 'ATTEMPT_NOT_FOUND',
-          message: 'Intento no encontrado',
-        });
-      }
+    // Atomic transaction with SELECT ... FOR UPDATE (P1-06, SEC-09d, RT-02, RT-03)
+    const txResult = await this.prisma.$transaction((tx) =>
+      TransactionContext.run(tx, async () => {
+        // guardrails-ignore G-A06: Bloqueo transaccional anti-carrera P1-06 para completeAttempt
+        const lockedRows = await tx.$queryRaw<Array<{
+          id: string;
+          status: AttemptStatus;
+          payload: unknown;
+          started_at: Date;
+          finished_at: Date | null;
+          graded_at: Date | null;
+          score: Prisma.Decimal | null;
+          flags: string[];
+          attempt_number: number;
+          assignment_id: string | null;
+          activity_id: string | null;
+          previous_attempt_id: string | null;
+        }>>`
+          SELECT id, status, payload, started_at, finished_at, graded_at, score, flags, attempt_number, assignment_id, activity_id, previous_attempt_id
+          FROM attempts
+          WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        const locked = lockedRows[0];
+        if (!locked) {
+          throw new NotFoundException({
+            statusCode: 404,
+            code: 'ATTEMPT_NOT_FOUND',
+            message: 'Intento no encontrado',
+          });
+        }
 
-      // Check if another concurrent request completed this attempt while waiting for the lock
-      if (
-        locked.status === AttemptStatus.graded ||
-        locked.status === AttemptStatus.pending_review
-      ) {
-        const mergedAttempt = { ...attempt, ...locked };
-        const view = await this.buildExistingCompletionView(
-          organizationId,
-          mergedAttempt,
-          activity,
-          tx,
-        );
-        return { isExisting: true, view, updatedAttempt: null, correction: null, scoreForEvent: null, isAudioSubmitted: false, isGame: false };
-      }
+        // Check if another concurrent request completed this attempt while waiting for the lock
+        if (
+          locked.status === AttemptStatus.graded ||
+          locked.status === AttemptStatus.pending_review
+        ) {
+          const mergedAttempt = { ...attempt, ...locked };
+          const view = await this.buildExistingCompletionView(
+            organizationId,
+            mergedAttempt,
+            activity,
+            tx,
+          );
+          const emptyBadges: BadgeAwardView[] = [];
+          return {
+            isExisting: true,
+            view,
+            updatedAttempt: null,
+            correction: null,
+            newBadges: emptyBadges,
+          };
+        }
 
-      if (locked.status !== AttemptStatus.in_progress) {
-        throw new ConflictException({
-          statusCode: 409,
-          code: 'ATTEMPT_NOT_IN_PROGRESS',
-          message: 'El intento ya no admite cambios',
-        });
-      }
+        if (locked.status !== AttemptStatus.in_progress) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ATTEMPT_NOT_IN_PROGRESS',
+            message: 'El intento ya no admite cambios',
+          });
+        }
 
-      const now = new Date();
-      const startedAt = locked.started_at ? new Date(locked.started_at) : attempt.started_at;
+        const now = new Date();
+        if (now > completeUntil) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ATTEMPT_CLOSED',
+            message: 'La actividad ya está cerrada',
+          });
+        }
+
+        const startedAt = locked.started_at ? new Date(locked.started_at) : attempt.started_at;
       const durationSeconds = Math.max(
         0,
         Math.round((now.getTime() - startedAt.getTime()) / 1000),
@@ -1371,43 +1395,58 @@ export class AttemptsService {
         });
       }
 
-      return {
-        isExisting: false,
-        view: null,
-        updatedAttempt,
-        correction,
-        scoreForEvent,
-        isAudioSubmitted,
-        isGame: activity.type === ActivityType.game,
-      };
-    });
+        // Emit ProgressEvent inside the same SQL transaction so Attempt completion and progress never diverge (RT-03)
+        let recordedBadges: import('@englove/shared').BadgeAwardView[] = [];
+        if (isAudioSubmitted) {
+          recordedBadges =
+            (await this.gamificationService.recordAudioSubmitted(
+              organizationId,
+              studentId,
+              attempt.id,
+            )) ?? [];
+        } else if (activity.type === ActivityType.game) {
+          // P0-10: Restaurar ProgressEvent en microjuegos autónomos pasando score=null para alimentar rachas e insignias sin alterar notas
+          recordedBadges =
+            (await this.gamificationService.recordAttemptCompleted(
+              organizationId,
+              studentId,
+              attempt.id,
+              null,
+            )) ?? [];
+        } else if (scoreForEvent !== undefined) {
+          recordedBadges =
+            (await this.gamificationService.recordAttemptCompleted(
+              organizationId,
+              studentId,
+              attempt.id,
+              scoreForEvent,
+            )) ?? [];
+        }
+
+        return {
+          isExisting: false,
+          view: null,
+          updatedAttempt,
+          correction,
+          newBadges: recordedBadges,
+        };
+      }),
+    );
 
     if (txResult.isExisting && txResult.view) {
       return txResult.view;
     }
 
-    let newBadges: import('@englove/shared').BadgeAwardView[] = [];
-    if (txResult.isAudioSubmitted) {
-      newBadges = await this.gamificationService.recordAudioSubmitted(
-        organizationId,
-        studentId,
-        attempt.id,
-      );
-    } else if (txResult.isGame) {
-      // P0-10: Restaurar ProgressEvent en microjuegos autónomos pasando score=null para alimentar rachas e insignias sin alterar notas
-      newBadges = await this.gamificationService.recordAttemptCompleted(
-        organizationId,
-        studentId,
-        attempt.id,
-        null,
-      );
-    } else if (txResult.scoreForEvent !== undefined) {
-      newBadges = await this.gamificationService.recordAttemptCompleted(
-        organizationId,
-        studentId,
-        attempt.id,
-        txResult.scoreForEvent,
-      );
+    let newBadges = txResult.newBadges;
+    if (
+      newBadges.length === 0 &&
+      typeof this.gamificationService.evaluateBadges === 'function'
+    ) {
+      try {
+        newBadges = (await this.gamificationService.evaluateBadges(organizationId, studentId)) ?? [];
+      } catch {
+        // Evaluación de insignias best-effort tras commit atómico de Attempt + ProgressEvent
+      }
     }
 
     return {

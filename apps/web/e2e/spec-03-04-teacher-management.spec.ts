@@ -18,7 +18,22 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       },
     ]);
 
-    // Mock teacher auth refresh & me
+    // Mock teacher auth refresh & me & session
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: {
+            id: 'tch-e2e-1',
+            email: 'teacher@englove.local',
+            name: 'Profesora Clara Gómez',
+            role: 'teacher',
+          },
+          organizationId: 'org-e2e',
+        },
+      });
+    });
+
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
@@ -194,7 +209,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(previewBtn).toBeVisible();
     await previewBtn.click();
 
-    const dialog = page.locator('div[role="dialog"]');
+    const dialog = page.getByRole('dialog', { name: 'Previsualización Docente' });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('h2:has-text("Previsualización Docente")')).toBeVisible();
     await expect(
@@ -205,7 +220,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
 
     // 4.2 Cambiar a open_question y previsualizar
     await page.selectOption('select#activity-type', 'open_question');
-    await expect(page.locator('textarea#oq-prompt')).toBeVisible();
+    await expect(page.locator('textarea#oq-prompt-0, textarea#oq-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
     await dialog.locator('button:has-text("✕")').click();
@@ -257,6 +272,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       });
     });
 
+    await page.fill('input#activity-title', 'Actividad Multitipo E2E');
     await page.click('button:has-text("Crear borrador")');
     await expect(page.locator('h1:has-text("Editor de actividad")')).toBeVisible();
   });

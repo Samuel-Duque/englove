@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   NotFoundException,
   BadRequestException,
@@ -32,6 +32,25 @@ describe('SPEC-03: Gestor de Contenidos — ActivitiesService (ENG-030, ENG-031,
 
   let service: ActivitiesService;
   let mockPrisma: any;
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.activity.update,
+      mockPrisma.activity.delete,
+      mockPrisma.fillBlankDetail.update,
+      mockPrisma.openQuestionDetail.update,
+      mockPrisma.speakingDetail.update,
+      mockPrisma.gameDetail.update,
+      mockPrisma.examDetail.update,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockPrisma = {
@@ -757,7 +776,7 @@ describe('SPEC-03: Gestor de Contenidos — ActivitiesService (ENG-030, ENG-031,
 
       await expect(service.deleteActivity(orgId, activityId)).resolves.toBeUndefined();
       expect(mockPrisma.activity.delete).toHaveBeenCalledWith({
-        where: { id: activityId },
+        where: { id: activityId, organization_id: orgId },
       });
     });
 

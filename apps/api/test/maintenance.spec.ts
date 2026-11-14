@@ -29,7 +29,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
     authSession: { deleteMany: MockFn };
     passwordResetToken: { deleteMany: MockFn };
     emailChangeRequest: { deleteMany: MockFn };
-    attempt: { findMany: MockFn; update: MockFn };
+    attempt: { findMany: MockFn; update: MockFn; updateMany: MockFn };
     mediaAsset: { findMany: MockFn; update: MockFn };
     student: { findMany: MockFn; update: MockFn };
   };
@@ -68,6 +68,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       attempt: {
         findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn().mockResolvedValue({ id: 'attempt-1' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       mediaAsset: {
         findMany: vi.fn().mockResolvedValue([]),
@@ -92,6 +93,9 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       mockPrisma as unknown as PrismaService,
       mockGamificationService as unknown as GamificationService,
       mockMediaService as unknown as MediaService,
+      {} as any,
+      {} as any,
+      {} as any,
     );
   });
 
@@ -110,9 +114,13 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       await service.runIdentityMaintenance(periodKey);
 
-      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+      expect(mockPrisma.attempt.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'attempt-expired' },
+          where: {
+            id: 'attempt-expired',
+            organization_id: orgId,
+            status: AttemptStatus.in_progress,
+          },
           data: { status: AttemptStatus.abandoned },
         }),
       );
@@ -132,7 +140,52 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       await service.runIdentityMaintenance(periodKey);
 
-      expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
+      expect(mockPrisma.attempt.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('marca como abandoned los intentos in_progress de microjuegos autónomos (sin assignment) tras 24h (P2-05)', async () => {
+      // Microgame started 25h ago -> expired
+      const started25hAgo = new Date(Date.now() - 25 * 3600 * 1000);
+      mockPrisma.attempt.findMany.mockResolvedValueOnce([
+        {
+          id: 'game-attempt-expired',
+          status: AttemptStatus.in_progress,
+          assignment: null,
+          started_at: started25hAgo,
+          previous_attempt: null,
+        },
+      ]);
+
+      await service.runIdentityMaintenance(periodKey);
+
+      expect(mockPrisma.attempt.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'game-attempt-expired',
+            organization_id: orgId,
+            status: AttemptStatus.in_progress,
+          },
+          data: { status: AttemptStatus.abandoned },
+        }),
+      );
+    });
+
+    it('no modifica intentos in_progress de microjuegos autónomos dentro de las 24h (P2-05)', async () => {
+      // Microgame started 10h ago -> not expired
+      const started10hAgo = new Date(Date.now() - 10 * 3600 * 1000);
+      mockPrisma.attempt.findMany.mockResolvedValueOnce([
+        {
+          id: 'game-attempt-active',
+          status: AttemptStatus.in_progress,
+          assignment: null,
+          started_at: started10hAgo,
+          previous_attempt: null,
+        },
+      ]);
+
+      await service.runIdentityMaintenance(periodKey);
+
+      expect(mockPrisma.attempt.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -153,7 +206,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       expect(mockMediaService.deleteFile).toHaveBeenCalledWith('org/student/att/rec.mp4');
       expect(mockPrisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'media-to-purge' },
+          where: { id: 'media-to-purge', organization_id: orgId },
           data: expect.objectContaining({ status: MediaAssetStatus.deleted }),
         }),
       );
@@ -161,10 +214,17 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
   });
 
   describe('RF-24: Revisión mensual de edad y alternancia de interfaz', () => {
+    const bogotaFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
     it('activa can_switch_interface = true al cumplir 11 años sin alterar el tema visual (age_segment)', async () => {
-      // Student is 11 years old
-      const elevenYearsAgo = new Date();
-      elevenYearsAgo.setFullYear(elevenYearsAgo.getFullYear() - 11);
+      // Student is 11 years old (civil date in UTC midnight matching Postgres @db.Date)
+      const [nowY, nowM, nowD] = bogotaFormatter.format(new Date()).split('-').map(Number);
+      const elevenYearsAgo = new Date(Date.UTC((nowY ?? 2026) - 11, (nowM ?? 1) - 1, nowD ?? 1));
 
       mockPrisma.student.findMany.mockResolvedValueOnce([
         {
@@ -179,7 +239,7 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
       expect(mockPrisma.student.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: studentId },
+          where: { id: studentId, organization_id: orgId },
           data: { can_switch_interface: true },
         }),
       );
@@ -187,8 +247,8 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
 
     it('no activa can_switch_interface si el alumno es menor de 11 años', async () => {
       // Student is 9 years old
-      const nineYearsAgo = new Date();
-      nineYearsAgo.setFullYear(nineYearsAgo.getFullYear() - 9);
+      const [nowY, nowM, nowD] = bogotaFormatter.format(new Date()).split('-').map(Number);
+      const nineYearsAgo = new Date(Date.UTC((nowY ?? 2026) - 9, (nowM ?? 1) - 1, nowD ?? 1));
 
       mockPrisma.student.findMany.mockResolvedValueOnce([
         {
@@ -202,6 +262,31 @@ describe('SPEC-05: MaintenanceService Jobs (RF-5, RF-13, RF-24)', () => {
       await service.runMonthlyAgeReview(periodKey);
 
       expect(mockPrisma.student.update).not.toHaveBeenCalled();
+    });
+
+    it('evalúa fecha civil de Postgres @db.Date (UTC midnight) en America/Bogota sin desfase de un día (P2-05)', async () => {
+      // Student born on exactly 11 years ago today in UTC
+      const nowBogota = bogotaFormatter.format(new Date());
+      const [nowY, nowM, nowD] = nowBogota.split('-').map(Number);
+      const exactBirthDate = new Date(Date.UTC((nowY ?? 2026) - 11, (nowM ?? 1) - 1, nowD ?? 1));
+
+      mockPrisma.student.findMany.mockResolvedValueOnce([
+        {
+          id: studentId,
+          birth_date: exactBirthDate,
+          can_switch_interface: false,
+          age_segment: 'kids',
+        },
+      ]);
+
+      await service.runMonthlyAgeReview(periodKey);
+
+      expect(mockPrisma.student.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: studentId, organization_id: orgId },
+          data: { can_switch_interface: true },
+        }),
+      );
     });
   });
 });

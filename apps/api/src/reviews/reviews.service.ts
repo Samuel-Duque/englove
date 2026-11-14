@@ -31,7 +31,25 @@ import {
   StudentFeedbackListResponse,
   StudentFeedbackItemView,
   StudentFeedbackAttemptView,
+  FillBlankConfigSchema,
+  FillBlankAnswerKeySchema,
+  ExamConfigSchema,
+  ExamAnswerKeySchema,
+  getOpenQuestionItems,
 } from '@englove/shared';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function isStickerCode(val: unknown): val is StickerCode {
+  return typeof val === 'string' && val in STICKERS;
+}
+
+function parseStickers(stickers: unknown): StickerCode[] {
+  if (!Array.isArray(stickers)) return [];
+  return stickers.filter(isStickerCode);
+}
 
 @Injectable()
 export class ReviewsService {
@@ -46,7 +64,6 @@ export class ReviewsService {
     private readonly configService: ConfigService,
   ) {
     this.appPublicUrl =
-      this.configService.get<string>('APP_PUBLIC_URL') ||
       this.configService.get<string>('WEB_BASE_URL') ||
       'http://localhost:3000';
   }
@@ -58,22 +75,14 @@ export class ReviewsService {
     organizationId: string,
     query: ReviewQueryDto,
   ): Promise<ReviewListResponse> {
-    const where: Prisma.AttemptWhereInput = {
-      organization_id: organizationId,
-      status: AttemptStatus.pending_review,
-      assignment_id: { not: undefined },
-      assignment: {
-        activity: {
-          type: { not: ActivityType.game },
-        },
+    const assignmentWhere: Prisma.AssignmentWhereInput = {
+      activity: {
+        type: { not: ActivityType.game },
       },
     };
 
     if (query.groupId) {
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        group_id: query.groupId,
-      };
+      assignmentWhere.group_id = query.groupId;
     }
 
     if (query.type) {
@@ -85,13 +94,17 @@ export class ReviewsService {
           limit: query.limit || 20,
         };
       }
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        activity: {
-          type: query.type,
-        },
+      assignmentWhere.activity = {
+        type: query.type,
       };
     }
+
+    const where: Prisma.AttemptWhereInput = {
+      organization_id: organizationId,
+      status: AttemptStatus.pending_review,
+      assignment_id: { not: null },
+      assignment: assignmentWhere,
+    };
 
     if (query.from || query.to) {
       where.finished_at = {};
@@ -121,7 +134,9 @@ export class ReviewsService {
       }),
     ]);
 
-    const items = attempts.map((att) => this.mapToReviewListItem(att));
+    const items = attempts
+      .filter((att): att is typeof att & { assignment: NonNullable<typeof att.assignment> } => Boolean(att.assignment))
+      .map((att) => this.mapToReviewListItem(att));
 
     return {
       items,
@@ -138,22 +153,14 @@ export class ReviewsService {
     organizationId: string,
     query: ReviewQueryDto,
   ): Promise<ReviewListResponse> {
-    const where: Prisma.AttemptWhereInput = {
-      organization_id: organizationId,
-      status: AttemptStatus.graded,
-      assignment_id: { not: undefined },
-      assignment: {
-        activity: {
-          type: { not: ActivityType.game },
-        },
+    const assignmentWhere: Prisma.AssignmentWhereInput = {
+      activity: {
+        type: { not: ActivityType.game },
       },
     };
 
     if (query.groupId) {
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        group_id: query.groupId,
-      };
+      assignmentWhere.group_id = query.groupId;
     }
 
     if (query.type) {
@@ -165,13 +172,17 @@ export class ReviewsService {
           limit: query.limit || 20,
         };
       }
-      where.assignment = {
-        ...(where.assignment as Prisma.AssignmentWhereInput),
-        activity: {
-          type: query.type,
-        },
+      assignmentWhere.activity = {
+        type: query.type,
       };
     }
+
+    const where: Prisma.AttemptWhereInput = {
+      organization_id: organizationId,
+      status: AttemptStatus.graded,
+      assignment_id: { not: null },
+      assignment: assignmentWhere,
+    };
 
     if (query.from || query.to) {
       where.graded_at = {};
@@ -201,7 +212,9 @@ export class ReviewsService {
       }),
     ]);
 
-    const items = attempts.map((att) => this.mapToReviewListItem(att));
+    const items = attempts
+      .filter((att): att is typeof att & { assignment: NonNullable<typeof att.assignment> } => Boolean(att.assignment))
+      .map((att) => this.mapToReviewListItem(att));
 
     return {
       items,
@@ -230,10 +243,16 @@ export class ReviewsService {
             group: true,
             activity: {
               include: {
-                fill_blank_detail: true,
+                fill_blank_detail: {
+                  // guardrails-ignore G-C04: lectura controlada de answer_key para evaluacion docente en getReviewDetail
+                  select: { id: true, config: true, answer_key: true },
+                },
                 open_question_detail: true,
                 speaking_detail: true,
-                exam_detail: true,
+                exam_detail: {
+                  // guardrails-ignore G-C04: lectura controlada de answer_key para evaluacion docente en getReviewDetail
+                  select: { id: true, config: true, answer_key: true },
+                },
               },
             },
           },
@@ -258,44 +277,55 @@ export class ReviewsService {
     const act = attempt.assignment.activity;
 
     if (act.type === ActivityType.fill_blank && act.fill_blank_detail) {
-      const config = act.fill_blank_detail.config as {
-        items?: Array<{ id: string; prompt?: string; blanks?: unknown[]; rubricText?: string }>;
-      };
-      const answerKey = act.fill_blank_detail.answer_key as {
-        items?: Record<string, Record<string, string>>;
-      };
-      for (const it of config.items || []) {
+      const fbConfig = FillBlankConfigSchema.safeParse(act.fill_blank_detail.config);
+      const fbKey = FillBlankAnswerKeySchema.safeParse(act.fill_blank_detail.answer_key);
+      const itemsList = fbConfig.success ? fbConfig.data.items : [];
+      const keyItems = fbKey.success ? fbKey.data.items : {};
+      for (const it of itemsList) {
         items.push({
           id: it.id,
           prompt: it.prompt,
-          correctAnswer: answerKey?.items?.[it.id] ?? null,
-          rubricText: it.rubricText ?? null,
+          correctAnswer: keyItems[it.id] ?? null,
+          rubricText: null,
         });
       }
     } else if (act.type === ActivityType.open_question && act.open_question_detail) {
-      const config = act.open_question_detail.config as {
-        prompt?: string;
-        rubric?: string;
-        rubric_text?: string;
-        rubricText?: string;
-        sample_answer?: string;
-        items?: Array<{ id: string; prompt?: string; rubric?: string; rubricText?: string }>;
-      };
-      if (Array.isArray(config.items) && config.items.length > 0) {
-        for (const it of config.items) {
-          items.push({
-            id: it.id,
-            prompt: it.prompt,
-            rubricText: it.rubric || it.rubricText || null,
-            correctAnswer: null,
-          });
+      const cfg = isRecord(act.open_question_detail.config) ? act.open_question_detail.config : {};
+      const rawItems = 'items' in cfg && Array.isArray(cfg.items) ? cfg.items : [];
+      if (rawItems.length > 0) {
+        for (const it of rawItems) {
+          if (isRecord(it) && typeof it.id === 'string') {
+            const prompt = typeof it.prompt === 'string' ? it.prompt : undefined;
+            const rubric =
+              typeof it.rubric === 'string'
+                ? it.rubric
+                : typeof it.rubricText === 'string'
+                  ? it.rubricText
+                  : null;
+            items.push({
+              id: it.id,
+              prompt,
+              rubricText: rubric,
+              correctAnswer: null,
+            });
+          }
         }
       } else {
+        const prompt = typeof cfg.prompt === 'string' ? cfg.prompt : undefined;
+        const rubricText =
+          typeof cfg.rubric === 'string'
+            ? cfg.rubric
+            : typeof cfg.rubricText === 'string'
+              ? cfg.rubricText
+              : typeof cfg.rubric_text === 'string'
+                ? cfg.rubric_text
+                : null;
+        const sampleAnswer = typeof cfg.sample_answer === 'string' ? cfg.sample_answer : null;
         items.push({
           id: act.id,
-          prompt: config.prompt,
-          rubricText: config.rubric || config.rubricText || config.rubric_text || null,
-          correctAnswer: config.sample_answer || null,
+          prompt,
+          rubricText,
+          correctAnswer: sampleAnswer,
         });
       }
     } else if (act.type === ActivityType.speaking && act.speaking_detail) {
@@ -305,41 +335,49 @@ export class ReviewsService {
         maxDurationSeconds: act.speaking_detail.max_duration_seconds,
       });
     } else if (act.type === ActivityType.exam && act.exam_detail) {
-      const config = act.exam_detail.config as {
-        items?: Array<{ id: string; prompt?: string; weight?: number; rubricText?: string }>;
-      };
-      const answerKey = act.exam_detail.answer_key as {
-        items?: Record<string, Record<string, string>>;
-      };
-      for (const it of config.items || []) {
+      const exConfig = ExamConfigSchema.safeParse(act.exam_detail.config);
+      const exKey = ExamAnswerKeySchema.safeParse(act.exam_detail.answer_key);
+      const itemsList = exConfig.success ? exConfig.data.items : [];
+      const keyItems = exKey.success ? exKey.data.items : {};
+      for (const it of itemsList) {
         items.push({
           id: it.id,
           prompt: it.prompt,
           weight: it.weight,
-          correctAnswer: answerKey?.items?.[it.id] ?? null,
-          rubricText: it.rubricText ?? null,
+          correctAnswer: keyItems[it.id] ?? null,
+          rubricText: null,
         });
       }
     }
 
-    const payloadObj = (attempt.payload as { answers?: Record<string, unknown> }) || {};
-    let rawAnswers = payloadObj.answers || {};
-    if (
-      rawAnswers &&
-      typeof rawAnswers === 'object' &&
-      'items' in rawAnswers &&
-      typeof (rawAnswers as { items: unknown }).items === 'object'
-    ) {
-      rawAnswers = { ...rawAnswers, ...(rawAnswers as { items: Record<string, unknown> }).items };
+    const payloadObj = isRecord(attempt.payload) ? attempt.payload : {};
+    const rawAnswers = isRecord(payloadObj.answers) ? payloadObj.answers : {};
+    let flattenedAnswers: Record<string, unknown> = { ...rawAnswers };
+    if ('items' in rawAnswers && isRecord(rawAnswers.items)) {
+      flattenedAnswers = { ...flattenedAnswers, ...rawAnswers.items };
     }
-    const answers = { ...rawAnswers };
+    const answers = { ...flattenedAnswers };
 
-    // If open_question, bridge answers['text'] with answers[act.id]
+    // If open_question, bridge answers['text'] with answers[act.id] and answers[item.id] ONLY for single-item activity (P1-07, RFC-01)
     if (act.type === ActivityType.open_question) {
-      if (answers['text'] !== undefined && answers[act.id] === undefined) {
-        answers[act.id] = answers['text'];
-      } else if (answers[act.id] !== undefined && answers['text'] === undefined) {
-        answers['text'] = answers[act.id];
+      const oqItems = getOpenQuestionItems(act.open_question_detail?.config, act.id);
+      const isMultiItem = oqItems.length > 1;
+      if (!isMultiItem) {
+        const singleItemId = oqItems.length === 1 && oqItems[0] ? oqItems[0].id : act.id;
+
+        if (answers['text'] !== undefined && answers[singleItemId] === undefined) {
+          answers[singleItemId] = answers['text'];
+        } else if (answers[singleItemId] !== undefined && answers['text'] === undefined) {
+          answers['text'] = answers[singleItemId];
+        }
+
+        if (singleItemId !== act.id) {
+          if (answers['text'] !== undefined && answers[act.id] === undefined) {
+            answers[act.id] = answers['text'];
+          } else if (answers[act.id] !== undefined && answers['text'] === undefined) {
+            answers['text'] = answers[act.id];
+          }
+        }
       }
     }
 
@@ -366,12 +404,15 @@ export class ReviewsService {
       review: h.review
         ? {
             comment: h.review.comment,
-            stickers: (h.review.stickers as StickerCode[]) || [],
+            stickers: parseStickers(h.review.stickers),
           }
         : null,
     }));
 
-    const baseItem = this.mapToReviewListItem(attempt);
+    const baseItem = this.mapToReviewListItem({
+      ...attempt,
+      assignment: attempt.assignment,
+    });
 
     return {
       ...baseItem,
@@ -428,6 +469,14 @@ export class ReviewsService {
     const now = new Date();
     let isFirstReview = false;
 
+    if (dto.score !== undefined && (typeof dto.score !== 'number' || dto.score < 0 || dto.score > 5)) {
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        code: 'SCORE_OUT_OF_RANGE',
+        message: 'La calificación debe estar entre 0.0 y 5.0',
+      });
+    }
+
     if (attempt.status === AttemptStatus.pending_review) {
       // Manual initial grading (RF-4)
       if (dto.score === undefined || dto.score === null) {
@@ -435,14 +484,6 @@ export class ReviewsService {
           statusCode: 400,
           code: 'SCORE_REQUIRED',
           message: 'El puntaje es obligatorio para calificar un intento pendiente',
-        });
-      }
-
-      if (typeof dto.score !== 'number' || dto.score < 0 || dto.score > 5) {
-        throw new UnprocessableEntityException({
-          statusCode: 422,
-          code: 'SCORE_OUT_OF_RANGE',
-          message: 'La calificación debe estar entre 0.0 y 5.0',
         });
       }
 
@@ -469,9 +510,31 @@ export class ReviewsService {
       const retentionUntil = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
 
       await this.prisma.$transaction(async (tx) => {
+        // Concurrency lock (ENG-152)
+        let locked: { id: string; status: AttemptStatus } | undefined;
+        if (typeof tx.$queryRaw === 'function') {
+          const lockedRows = await tx.$queryRaw<Array<{ id: string; status: AttemptStatus }>>`
+            SELECT id, status
+            FROM attempts
+            WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+            FOR UPDATE
+          `;
+          locked = lockedRows?.[0];
+        }
+        if (!locked) {
+          locked = { id: attempt.id, status: attempt.status };
+        }
+        if (locked.status === AttemptStatus.graded && dto.score !== undefined) {
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            code: 'SCORE_NOT_EDITABLE',
+            message: 'El puntaje ya no es editable una vez calificado el intento',
+          });
+        }
+
         // Update attempt
         await tx.attempt.update({
-          where: { id: attempt.id },
+          where: { id: attempt.id, organization_id: organizationId },
           data: {
             score: new Prisma.Decimal(roundedScore),
             graded_at: now,
@@ -479,16 +542,34 @@ export class ReviewsService {
           },
         });
 
-        // Create review
-        await tx.review.create({
-          data: {
-            organization_id: organizationId,
-            attempt_id: attempt.id,
-            reviewer_id: reviewerId,
-            comment: rawComment.length > 0 ? rawComment : null,
-            stickers,
-          },
-        });
+        // Create or update review atomically (P1-06)
+        const existingReview = tx.review?.findFirst
+          ? await tx.review.findFirst({
+              where: { attempt_id: attempt.id, organization_id: organizationId },
+            })
+          : attempt.review;
+
+        if (existingReview) {
+          const reviewTarget = tx.review ?? this.prisma.review;
+          await reviewTarget.update({
+            where: { id: existingReview.id, organization_id: organizationId },
+            data: {
+              reviewer_id: reviewerId,
+              comment: rawComment.length > 0 ? rawComment : null,
+              stickers,
+            },
+          });
+        } else {
+          await tx.review.create({
+            data: {
+              organization_id: organizationId,
+              attempt_id: attempt.id,
+              reviewer_id: reviewerId,
+              comment: rawComment.length > 0 ? rawComment : null,
+              stickers,
+            },
+          });
+        }
 
         // Set retention_until on ready MediaAssets
         await tx.mediaAsset.updateMany({
@@ -502,16 +583,18 @@ export class ReviewsService {
           },
         });
 
-        // Create progress event (review_received)
-        await tx.progressEvent.create({
-          data: {
-            organization_id: organizationId,
-            student_id: attempt.student_id,
-            attempt_id: attempt.id,
-            type: ProgressEventType.review_received,
-            value: new Prisma.Decimal(roundedScore),
-          },
-        });
+        // Create progress event (review_received) only once
+        if (!existingReview) {
+          await tx.progressEvent.create({
+            data: {
+              organization_id: organizationId,
+              student_id: attempt.student_id,
+              attempt_id: attempt.id,
+              type: ProgressEventType.review_received,
+              value: new Prisma.Decimal(roundedScore),
+            },
+          });
+        }
 
         if (dto.allowRetry) {
           await this.applyGrantRetryTx(
@@ -558,12 +641,28 @@ export class ReviewsService {
         }
       }
 
-      isFirstReview = !attempt.review;
-
       await this.prisma.$transaction(async (tx) => {
-        if (attempt.review) {
-          await tx.review.update({
-            where: { id: attempt.review.id },
+        if (typeof tx.$queryRaw === 'function') {
+          await tx.$queryRaw`
+            SELECT id
+            FROM attempts
+            WHERE id = ${attempt.id}::uuid AND organization_id = ${organizationId}::uuid
+            FOR UPDATE
+          `;
+        }
+
+        const existingReview = tx.review?.findFirst
+          ? await tx.review.findFirst({
+              where: { attempt_id: attempt.id, organization_id: organizationId },
+            })
+          : attempt.review;
+
+        isFirstReview = !existingReview;
+
+        if (existingReview) {
+          const reviewTarget = tx.review ?? this.prisma.review;
+          await reviewTarget.update({
+            where: { id: existingReview.id, organization_id: organizationId },
             data: {
               reviewer_id: reviewerId,
               comment: rawComment.length > 0 ? rawComment : null,
@@ -680,13 +779,15 @@ export class ReviewsService {
     });
 
     // 1. Validation: must exist, have assignment and not be game (Decision 111)
-    if (!attempt || !attempt.assignment || attempt.assignment.activity.type === ActivityType.game) {
+    if (!attempt || !attempt.assignment || !attempt.assignment_id || attempt.assignment.activity.type === ActivityType.game) {
       throw new ConflictException({
         statusCode: 409,
         code: 'RETRY_NOT_ALLOWED',
         message: 'Los microjuegos son de práctica autónoma 24/7 y no admiten nuevo intento asignado',
       });
     }
+
+    const assignmentId = attempt.assignment_id;
 
     // 2. Lock assignment and verify not cancelled (RF-7)
     let assignment: { id: string; due_at: Date; cancelled_at: Date | null } | null;
@@ -695,14 +796,14 @@ export class ReviewsService {
         const rows = await tx.$queryRaw<Array<{ id: string; due_at: Date; cancelled_at: Date | null }>>`
           SELECT id, due_at, cancelled_at
           FROM assignments
-          WHERE id = ${attempt.assignment_id}::uuid AND organization_id = ${organizationId}::uuid
+          WHERE id = ${assignmentId}::uuid AND organization_id = ${organizationId}::uuid
           FOR UPDATE
         `;
         assignment = rows[0] || null;
       } catch {
         assignment = await tx.assignment.findFirst({
           where: {
-            id: attempt.assignment_id,
+            id: assignmentId,
             organization_id: organizationId,
           },
         });
@@ -710,7 +811,7 @@ export class ReviewsService {
     } else {
       assignment = await tx.assignment.findFirst({
         where: {
-          id: attempt.assignment_id,
+          id: assignmentId,
           organization_id: organizationId,
         },
       });
@@ -736,7 +837,7 @@ export class ReviewsService {
     // Check if another attempt with higher attempt_number exists
     const higherAttempt = await tx.attempt.findFirst({
       where: {
-        assignment_id: attempt.assignment_id,
+        assignment_id: assignmentId,
         student_id: attempt.student_id,
         organization_id: organizationId,
         attempt_number: { gt: attempt.attempt_number },
@@ -824,7 +925,7 @@ export class ReviewsService {
         organization_id: organizationId,
         student_id: studentId,
         status: AttemptStatus.graded,
-        assignment_id: { not: undefined },
+        assignment_id: { not: null },
         assignment: {
           activity: {
             type: { not: ActivityType.game },
@@ -846,6 +947,7 @@ export class ReviewsService {
     // Group by assignment_id
     const assignmentMap = new Map<string, typeof gradedAttempts>();
     for (const att of gradedAttempts) {
+      if (!att.assignment_id || !att.assignment) continue;
       const list = assignmentMap.get(att.assignment_id) || [];
       list.push(att);
       assignmentMap.set(att.assignment_id, list);
@@ -856,7 +958,7 @@ export class ReviewsService {
 
     for (const [, attempts] of assignmentMap) {
       const latest = attempts[attempts.length - 1];
-      if (!latest) {
+      if (!latest || !latest.assignment) {
         continue;
       }
       const assignment = latest.assignment;
@@ -930,7 +1032,7 @@ export class ReviewsService {
     }
 
     const latest = gradedAttempts[gradedAttempts.length - 1];
-    if (!latest) {
+    if (!latest || !latest.assignment) {
       throw new NotFoundException({
         statusCode: 404,
         code: 'FEEDBACK_NOT_FOUND',
@@ -1048,7 +1150,7 @@ export class ReviewsService {
         ? {
             id: att.review.id,
             comment: att.review.comment,
-            stickers: (att.review.stickers as StickerCode[]) || [],
+            stickers: parseStickers(att.review.stickers),
             reviewerId: att.review.reviewer_id,
             createdAt: att.review.created_at?.toISOString?.() ?? new Date().toISOString(),
             updatedAt: att.review.updated_at?.toISOString?.() ?? new Date().toISOString(),
@@ -1077,8 +1179,8 @@ export class ReviewsService {
     } | null;
   }): StudentFeedbackAttemptView {
     const rawScore = att.score !== null ? Number(att.score) : 0;
-    const stickerDefs = (att.review?.stickers || [])
-      .map((code) => STICKERS[code as StickerCode])
+    const stickerDefs = parseStickers(att.review?.stickers)
+      .map((code) => STICKERS[code])
       .filter((s): s is NonNullable<typeof s> => Boolean(s));
 
     return {

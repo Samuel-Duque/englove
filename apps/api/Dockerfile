@@ -5,12 +5,15 @@ RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
 
 # Stage 2: Dependencies builder
 FROM base AS dependencies
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY tooling/ ./tooling/
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
+COPY apps/api/prisma/ ./apps/api/prisma/
+COPY apps/api/prisma.config.ts ./apps/api/
+COPY apps/web/package.json ./apps/web/
 
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm install --frozen-lockfile
 
 # Stage 3: Builder
 FROM dependencies AS builder
@@ -21,6 +24,9 @@ COPY apps/api/ ./apps/api/
 RUN pnpm --filter @englove/shared build
 RUN pnpm --filter @englove/api db:generate
 RUN pnpm --filter @englove/api build
+RUN pnpm --filter @englove/api deploy --prod --legacy --offline --ignore-scripts /out/api
+# Prisma genera fuera del paquete @prisma/client; conservar ese artefacto en el despliegue aislado.
+RUN cd apps/api && node -e "const fs = require('node:fs'); const path = require('node:path'); const generated = path.resolve(path.dirname(require.resolve('@prisma/client/package.json')), '../../.prisma'); const deployed = path.resolve(path.dirname(require.resolve('@prisma/client/package.json', { paths: ['/out/api'] })), '../../.prisma'); fs.cpSync(generated, deployed, { recursive: true });"
 
 # Stage 4: Production runner
 FROM node:24-alpine AS runner
@@ -31,18 +37,13 @@ RUN apk add --no-cache ffmpeg
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV NODE_OPTIONS="--max-old-space-size=320"
 
 # Copy built application and required packages
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
-COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --chown=node:node --from=builder /out/api/ ./
+
+USER node
 
 EXPOSE 3001
 
-WORKDIR /app/apps/api
 CMD ["node", "dist/src/main.js"]

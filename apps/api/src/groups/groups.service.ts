@@ -178,7 +178,7 @@ export class GroupsService {
     }
 
     const updated = await this.prisma.group.update({
-      where: { id: group.id },
+      where: { id: group.id, organization_id: organizationId },
       data: { name: trimmedName },
       include: {
         _count: {
@@ -196,6 +196,22 @@ export class GroupsService {
 
   async archiveGroup(organizationId: string, id: string): Promise<GroupView> {
     return await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM groups
+          WHERE id = ${id}::uuid AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        if (lockedRows.length === 0) {
+          throw new NotFoundException({
+            statusCode: 404,
+            code: 'NOT_FOUND',
+            message: 'Grupo no encontrado',
+          });
+        }
+      }
+
       const group = await tx.group.findFirst({
         where: {
           id,
@@ -232,7 +248,7 @@ export class GroupsService {
       }
 
       const updated = await tx.group.update({
-        where: { id: group.id },
+        where: { id: group.id, organization_id: organizationId },
         data: {
           archived_at: new Date(),
         },
@@ -286,7 +302,7 @@ export class GroupsService {
       }
 
       await tx.group.delete({
-        where: { id: group.id },
+        where: { id: group.id, organization_id: organizationId },
       });
     });
   }

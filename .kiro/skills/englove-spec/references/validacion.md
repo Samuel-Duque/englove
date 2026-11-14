@@ -13,11 +13,13 @@
 - Las tareas `ENG` de la cabecera existen en el taskboard y cubren todas las que tienen esta spec en su columna Spec.
 - Registro de cambios con al menos una fila; tamaño por debajo de unos 20 minutos de lectura (sin contar la sintaxis de las tablas); fila en el `README.md` de la carpeta de la spec.
 - Si la spec tiene sufijo (`SPEC-05a`), comprueba sus tareas contra las que el taskboard asigna a ese identificador; si el taskboard todavía las asigna al identificador sin sufijo, avisa de que hay que actualizar la columna Spec.
+- En specs en estado Aprobada o Verificada, no debe quedar ninguna marca residual "(Propuesto)".
+- En specs en estado Verificada, el modo `--check-git` exige al menos una fila nueva en la sección 12 Registro de cambios si el archivo fue modificado en git (decisión 128).
 
 ## B. Jerarquía y decisiones
 
 - [ ] Ningún RF, regla, endpoint o campo contradice CONTEXT, architecture ni una spec Aprobada de la que dependa.
-- [ ] Cada decisión citada está vigente: revisa la columna Estado de CONTEXT §14 y sigue las Sustituidas, Retiradas o Modificadas hasta la última.
+- [ ] Cada decisión citada está vigente: revisa la columna Estado de CONTEXT §14 (decisiones 1 a 145, incluidas las decisiones 127 a 137 de Etapa 12 y QA-01 a QA-08) y sigue las Sustituidas, Retiradas o Modificadas hasta la última.
 - [ ] Recorre las decisiones de §14 que tocan esta capacidad (búscalas por las entidades, endpoints y términos de la spec) y comprueba que cada una se refleja en un RF o una regla, o que no aplica.
 - [ ] Lo **Propuesto** está marcado como tal y tiene su pregunta en la sección 11.
 - [ ] La spec enlaza en lugar de copiar párrafos de CONTEXT o architecture.
@@ -31,6 +33,7 @@
 - [ ] No aparecen `Guardian`, `ConsentRecord`, `ConsentStatus`, `ConsentMethod`, Supabase Storage, Auth, Realtime o RLS, ni los flags `stats` o `leaderboard` (decisiones 35, 36, 41 y 55; CONTEXT §6).
 - [ ] Los archivos van a Cloudflare R2 con URLs firmadas por el backend (decisión 55).
 - [ ] La autorización nunca depende de `middleware.ts` (decisión 58).
+- [ ] Accesibilidad: conformidad WCAG 2.2 AA estricta en toda interfaz web y microjuegos; axe-core con preset `'wcag22aa'` (decisión 133).
 - [ ] Ningún estado de proceso asume varias instancias de la API; toda tarea asíncrona es idempotente y las periódicas usan `ScheduledJobRun` (decisiones 64 y 76).
 - [ ] Modelo de datos según la decisión 67: nota solo en `Attempt`, `answer_key` nunca hacia el alumno, una sola membresía de grupo vigente, `onDelete` declarado en cada clave foránea, nombre en `User.name`.
 - [ ] Terminología de la decisión 66: "tipo de actividad" y "mecánica de juego" en su sentido exacto; `fill_blank` y `exam` son tipos de actividad, no mecánicas.

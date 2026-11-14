@@ -3,6 +3,8 @@
  * Each formula returns a fraction between 0.0 and 1.0.
  */
 
+import { AgeSegment } from '../enums';
+
 /**
  * Fill in the blanks:
  * Correct blanks / total blanks.
@@ -246,4 +248,60 @@ export function scoreToStars(score: number | null | undefined): number {
   if (score < 3.0) return 1;
   if (score < 4.5) return 2;
   return 3;
+}
+
+/**
+ * Microgames star calculation (SPEC-11 §4.2, P1-05):
+ * percent === 0 => 0 stars
+ * percent < 60 => 1 star
+ * percent < 90 => 2 stars
+ * percent >= 90 => 3 stars
+ */
+export function gamePercentToStars(percent: number): number {
+  if (percent >= 90) return 3;
+  if (percent >= 60) return 2;
+  if (percent > 0) return 1;
+  return 0;
+}
+
+export function scoreToGameStars(score: number | null | undefined): number {
+  if (score === null || score === undefined || score < 0.1) return 0;
+  if (score < 3.0) return 1;
+  if (score < 4.5) return 2;
+  return 3;
+}
+
+/**
+ * 10 normative motivation messages for microgames (SPEC-11 §4.2, P1-05).
+ */
+export function getGameMotivationMessage(score: number, ageSegment?: AgeSegment): string {
+  const isTeens = ageSegment === AgeSegment.teens;
+
+  if (score >= 5.0) {
+    return isTeens
+      ? '¡Partida impecable! Acertaste todos los retos.'
+      : '¡Increíble! Acertaste todo en esta partida.';
+  }
+
+  if (score >= 4.5) {
+    return isTeens
+      ? '¡Excelente práctica! Lograste 3 estrellas; estás a un paso de una ronda sin fallos.'
+      : '¡Súper bien! Conseguiste las 3 estrellas; juega otra vez si quieres acertar todas.';
+  }
+
+  if (score >= 3.0) {
+    return isTeens
+      ? '¡Buen ritmo! Sumaste 2 estrellas; intenta otra partida para alcanzar las 3.'
+      : '¡Buen trabajo! Ganaste 2 estrellas; prueba otra ronda para llegar a 3.';
+  }
+
+  if (score >= 0.1) {
+    return isTeens
+      ? '¡Sumaste 1 estrella! Repasa las pistas e inténtalo de nuevo.'
+      : '¡Ya tienes 1 estrella! Cada partida te ayuda a mejorar.';
+  }
+
+  return isTeens
+    ? '¡No pasa nada! Vuelve a intentarlo para desbloquear tus estrellas.'
+    : '¡Sigue intentando! Juega otra vez para ganar tu primera estrella.';
 }

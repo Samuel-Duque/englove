@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -11,14 +11,16 @@ import {
   calculateDragDropScore,
   calculateTimedChoiceScore,
   reconstructMemoryPlays,
-  scoreToStars,
-  MatchSolution,
-  OrderWordsSettings,
-  OrderWordsSolution,
-  DragDropSolution,
-  MemorySettings,
-  MemorySolution,
-  TimedChoiceSolution,
+  scoreToGameStars,
+  getGameMotivationMessage,
+  AgeSegment,
+  MatchSolutionSchema,
+  OrderWordsSettingsSchema,
+  OrderWordsSolutionSchema,
+  DragDropSolutionSchema,
+  MemorySettingsSchema,
+  MemorySolutionSchema,
+  TimedChoiceSolutionSchema,
 } from '@englove/shared';
 
 import { MatchGame } from './games/MatchGame';
@@ -26,7 +28,7 @@ import { OrderWordsGame } from './games/OrderWordsGame';
 import { DragDropGame } from './games/DragDropGame';
 import { MemoryGame } from './games/MemoryGame';
 import { TimedChoiceGame } from './games/TimedChoiceGame';
-import { loadMotionTheme } from '../../lib/motion';
+import { speak } from '../../lib/speech';
 
 export interface SimulatedResult {
   score: number;
@@ -38,11 +40,6 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
   const { config, previewMode = false, onComplete } = props;
   const [simulatedResult, setSimulatedResult] = useState<SimulatedResult | null>(null);
 
-  // Dynamic chunk loading of age-specific motion presets (RF-10, ENG-086)
-  useEffect(() => {
-    void loadMotionTheme(props.theme || 'kids');
-  }, [props.theme]);
-
   // In previewMode, simulate scoring in-memory without making network calls
   const handlePreviewComplete = (finalAnswers: GameAnswers) => {
     let fraction = 0;
@@ -50,44 +47,58 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
     const solution = config.answerKey?.solution;
 
     if (mechanic === GameMechanic.match && solution) {
-      fraction = calculateMatchScore((solution as MatchSolution).pairs, finalAnswers.pairs || {});
+      const parsedSol = MatchSolutionSchema.safeParse(solution);
+      if (parsedSol.success) {
+        fraction = calculateMatchScore(parsedSol.data.pairs, finalAnswers.pairs || {});
+      }
     } else if (mechanic === GameMechanic.order_words && solution) {
-      const settings = config.settings as OrderWordsSettings;
-      fraction = calculateOrderWordsScore(
-        settings.tokens,
-        (solution as OrderWordsSolution).tokenIds,
-        finalAnswers.tokenIds || [],
-      );
+      const parsedSettings = OrderWordsSettingsSchema.safeParse(config.settings);
+      const parsedSol = OrderWordsSolutionSchema.safeParse(solution);
+      if (parsedSettings.success && parsedSol.success) {
+        fraction = calculateOrderWordsScore(
+          parsedSettings.data.tokens,
+          parsedSol.data.tokenIds,
+          finalAnswers.tokenIds || [],
+        );
+      }
     } else if (mechanic === GameMechanic.drag_drop && solution) {
-      fraction = calculateDragDropScore(
-        (solution as DragDropSolution).placements,
-        finalAnswers.placements || {},
-      );
+      const parsedSol = DragDropSolutionSchema.safeParse(solution);
+      if (parsedSol.success) {
+        fraction = calculateDragDropScore(
+          parsedSol.data.placements,
+          finalAnswers.placements || {},
+        );
+      }
     } else if (mechanic === GameMechanic.memory && solution) {
-      const settings = config.settings as MemorySettings;
-      const recon = reconstructMemoryPlays(
-        settings.cards,
-        (solution as MemorySolution).pairs,
-        finalAnswers.selections || [],
-      );
-      fraction = recon.fraction;
+      const parsedSettings = MemorySettingsSchema.safeParse(config.settings);
+      const parsedSol = MemorySolutionSchema.safeParse(solution);
+      if (parsedSettings.success && parsedSol.success) {
+        const recon = reconstructMemoryPlays(
+          parsedSettings.data.cards,
+          parsedSol.data.pairs,
+          finalAnswers.selections || [],
+        );
+        fraction = recon.fraction;
+      }
     } else if (mechanic === GameMechanic.timed_choice && solution) {
-      fraction = calculateTimedChoiceScore(
-        (solution as TimedChoiceSolution).choices,
-        finalAnswers.choices || {},
-      );
+      const parsedSol = TimedChoiceSolutionSchema.safeParse(solution);
+      if (parsedSol.success) {
+        fraction = calculateTimedChoiceScore(
+          parsedSol.data.choices,
+          finalAnswers.choices || {},
+        );
+      }
     }
 
     const score = Math.round(fraction * 5 * 10) / 10;
-    const stars = scoreToStars(score);
+    const stars = scoreToGameStars(score);
+    const ageSegment = props.theme === 'teens' ? AgeSegment.teens : AgeSegment.kids;
+    const message = getGameMotivationMessage(score, ageSegment);
 
     setSimulatedResult({
       score,
       stars,
-      message:
-        score >= 3.0
-          ? '¡Excelente partida simulada!'
-          : 'Partida completada. Modo previsualización.',
+      message,
     });
 
     onComplete?.(finalAnswers);
@@ -113,31 +124,52 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
       default:
         return (
           <div className="p-8 text-center text-zinc-500 font-semibold">
-            Mecánica de juego no reconocida: {(config as { mechanic?: string })?.mechanic}
+            Mecánica de juego no reconocida: {String(config?.mechanic)}
           </div>
         );
     }
   };
 
+  const promptToSpeak = config.instructions || '';
+  const [isPlayingTts, setIsPlayingTts] = useState(false);
+
+  const handleSpeakPrompt = () => {
+    if (!promptToSpeak || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    setIsPlayingTts(true);
+    speak(promptToSpeak, () => setIsPlayingTts(false));
+  };
+
   return (
     <div className="w-full">
+      {promptToSpeak && (
+        <div className="mb-4 flex items-center justify-between gap-3 p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/80">
+          <p className="text-sm font-bold text-amber-950">{promptToSpeak}</p>
+          <button
+            type="button"
+            onClick={handleSpeakPrompt}
+            aria-label="Escuchar enunciado en inglés"
+            className="shrink-0 inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+          >
+            <span>{isPlayingTts ? '🔊 Reproduciendo…' : '🔊 Escuchar'}</span>
+          </button>
+        </div>
+      )}
       {previewMode && (
         <div className="mb-4 space-y-2">
-          <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center shadow-xs">
-            👀 Vista previa: no se guardan respuestas (0 llamadas a la API)
+          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold text-center shadow-xs">
+            Modo de prueba — este intento no se guarda
           </div>
           {simulatedResult && (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center justify-between shadow-xs">
               <div>
                 <p className="text-xs font-black uppercase tracking-wider text-emerald-800">
-                  Resultado simulado en memoria:
+                  Resultado de prueba:
                 </p>
                 <p className="text-base font-extrabold">{simulatedResult.message}</p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black">{simulatedResult.score.toFixed(1)} / 5.0</span>
-                <div className="text-amber-500 text-lg">
-                  {'⭐'.repeat(simulatedResult.stars)}
+                <div className="text-amber-500 text-xl font-bold">
+                  {'★'.repeat(simulatedResult.stars) + '☆'.repeat(3 - simulatedResult.stars)}
                 </div>
               </div>
             </div>

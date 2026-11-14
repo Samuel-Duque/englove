@@ -6,16 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ExternalResourceItem,
   ExternalResourceListResponse,
+  ExternalResourceListResponseSchema,
   StudentProfileView,
+  StudentProfileViewSchema,
+  FeatureFlagsResponse,
+  FeatureFlagsResponseSchema,
+  isValidHttpsResourceUrl,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
-
-interface FeatureFlagsResponse {
-  flags: {
-    games: boolean;
-    extra_content: boolean;
-  };
-}
 
 export function ExtraClient() {
   // Offline detection (T-05, RF-8)
@@ -74,19 +72,28 @@ export function ExtraClient() {
   // Queries
   const flagsQuery = useQuery({
     queryKey: ['feature-flags'],
-    queryFn: () => apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags'),
+    queryFn: () =>
+      apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags', {
+        schema: FeatureFlagsResponseSchema,
+      }),
   });
 
   const meQuery = useQuery({
-    queryKey: ['me'],
-    queryFn: () => apiFetch<StudentProfileView>('/api/v1/me'),
+    queryKey: ['student', 'profile'],
+    queryFn: () =>
+      apiFetch<StudentProfileView>('/api/v1/me', {
+        schema: StudentProfileViewSchema,
+      }),
   });
 
   const isExtraContentEnabled = Boolean(flagsQuery.data?.flags?.extra_content);
 
   const resourcesQuery = useQuery({
     queryKey: ['resources'],
-    queryFn: () => apiFetch<ExternalResourceListResponse>('/api/v1/resources'),
+    queryFn: () =>
+      apiFetch<ExternalResourceListResponse>('/api/v1/resources', {
+        schema: ExternalResourceListResponseSchema,
+      }),
     enabled: isExtraContentEnabled,
   });
 
@@ -171,7 +178,7 @@ export function ExtraClient() {
             href="/inicio"
             className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-6 py-2.5 rounded-2xl text-sm font-bold shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
               isKids
-                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white'
             }`}
           >
@@ -248,7 +255,7 @@ export function ExtraClient() {
           className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
             filterPill === 'todos'
               ? isKids
-                ? 'bg-amber-500 text-white shadow-xs'
+                ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
                 : 'bg-indigo-600 text-white shadow-xs'
               : isKids
                 ? 'bg-amber-100/70 text-amber-900 hover:bg-amber-200'
@@ -266,7 +273,7 @@ export function ExtraClient() {
             className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
               filterPill === 'nivel'
                 ? isKids
-                  ? 'bg-amber-500 text-white shadow-xs'
+                  ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
                   : 'bg-indigo-600 text-white shadow-xs'
                 : isKids
                   ? 'bg-amber-100/70 text-amber-900 hover:bg-amber-200'
@@ -284,7 +291,7 @@ export function ExtraClient() {
           className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
             filterPill === 'generales'
               ? isKids
-                ? 'bg-amber-500 text-white shadow-xs'
+                ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
                 : 'bg-indigo-600 text-white shadow-xs'
               : isKids
                 ? 'bg-amber-100/70 text-amber-900 hover:bg-amber-200'
@@ -326,7 +333,7 @@ export function ExtraClient() {
               href="/inicio"
               className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
                 isKids
-                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                  ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
               }`}
             >
@@ -414,18 +421,22 @@ export function ExtraClient() {
                     <div />
                   )}
 
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
-                      isKids
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                    }`}
-                  >
-                    Abrir en pestaña nueva ↗
-                  </a>
+                  {isValidHttpsResourceUrl(item.url) ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      Abrir en pestaña nueva ↗
+                    </a>
+                  ) : (
+                    <span className="text-xs text-zinc-400 italic">Enlace no seguro o inválido</span>
+                  )}
                 </div>
               </li>
             );

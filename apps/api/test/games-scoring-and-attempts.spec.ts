@@ -376,7 +376,7 @@ describe('SPEC-06 Microjuegos — ScoringService y AttemptsService (RF-7, RF-8, 
       mockMedia = {};
       mockJwt = {
         sign: vi.fn().mockReturnValue('mock-token'),
-        verify: vi.fn().mockReturnValue({ attemptId: 'att-1', studentId: 'stu-1', organizationId: 'org-1' }),
+        verify: vi.fn().mockReturnValue({ attemptId: 'att-1', studentId: 'stu-1', organizationId: 'org-1', typ: 'attempt' }),
       };
       mockConfig = {
         get: vi.fn().mockReturnValue('secret'),

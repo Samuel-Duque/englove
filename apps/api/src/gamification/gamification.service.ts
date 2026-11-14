@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransactionContext } from '../common/tenant/transaction.context';
 import {
   ProgressEventType,
   BadgeAwardView,
@@ -11,6 +12,28 @@ export interface StreakState {
   forgivenessAvailable: boolean;
   activeWeeksSinceForgivenessUsed: number;
   periodKey: string | null;
+  forgivenWeekKeys: string[];
+}
+
+const bogotaDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+interface BadgeRuleDef {
+  type?: string;
+  event?: string;
+  threshold?: number;
+}
+
+function parseBadgeRule(val: unknown): BadgeRuleDef | null {
+  if (typeof val !== 'object' || val === null || Array.isArray(val)) return null;
+  const type = 'type' in val && typeof val.type === 'string' ? val.type : undefined;
+  const event = 'event' in val && typeof val.event === 'string' ? val.event : undefined;
+  const threshold = 'threshold' in val && typeof val.threshold === 'number' ? val.threshold : undefined;
+  return { type, event, threshold };
 }
 
 @Injectable()
@@ -28,7 +51,10 @@ export class GamificationService {
     attemptId: string,
     score: number | null,
   ): Promise<BadgeAwardView[]> {
-    await this.prisma.progressEvent.create({
+    const activeTx = TransactionContext.getClient();
+    const db = activeTx ?? this.prisma;
+
+    await db.progressEvent.create({
       data: {
         organization_id: organizationId,
         student_id: studentId,
@@ -37,6 +63,12 @@ export class GamificationService {
         value: score !== null ? new Prisma.Decimal(score) : null,
       },
     });
+
+    // Cuando corre dentro de la transacción de completeAttempt, las insignias se evalúan
+    // tras el commit para que una colisión concurrente de insignia única jamás aborte la tx SQL (RT-03).
+    if (activeTx) {
+      return [];
+    }
 
     return this.evaluateBadges(organizationId, studentId);
   }
@@ -50,7 +82,10 @@ export class GamificationService {
     studentId: string,
     attemptId: string,
   ): Promise<BadgeAwardView[]> {
-    await this.prisma.progressEvent.create({
+    const activeTx = TransactionContext.getClient();
+    const db = activeTx ?? this.prisma;
+
+    await db.progressEvent.create({
       data: {
         organization_id: organizationId,
         student_id: studentId,
@@ -60,52 +95,28 @@ export class GamificationService {
       },
     });
 
+    if (activeTx) {
+      return [];
+    }
+
     return this.evaluateBadges(organizationId, studentId);
   }
 
   /**
-   * Calculates streak using the 4-rule algorithm (architecture §9.3, Decision 34 §9, SPEC-05 RF-18 to RF-21).
-   * Rule 1: Only active weeks count (weeks with attempt_completed or audio_submitted).
-   * Rule 2: Forgiveness only with active streak (streak 0 never consumes forgiveness).
-   * Rule 3: Forgiveness recovery requires 2 consecutive active weeks. Inactive week resets counter.
-   * Rule 4: Max 1 forgiveness. Two consecutive inactive weeks break the streak.
+   * Calculates streak from an in-memory sorted array of events.
+   * Eliminates N+1 database queries when called in loops or batch operations.
    */
-  async calculateStreak(
-    organizationId: string,
-    studentId: string,
+  calculateStreakFromEvents(
+    events: Array<{ occurred_at: Date }>,
     asOfDate?: Date,
-  ): Promise<StreakState> {
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, organization_id: organizationId },
-    });
-
-    if (!student) {
-      return {
-        weeks: 0,
-        forgivenessAvailable: true,
-        activeWeeksSinceForgivenessUsed: 0,
-        periodKey: null,
-      };
-    }
-
-    // Load all completed activity events for this student
-    const events = await this.prisma.progressEvent.findMany({
-      where: {
-        student_id: studentId,
-        organization_id: organizationId,
-        type: {
-          in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted],
-        },
-      },
-      orderBy: { occurred_at: 'asc' },
-    });
-
+  ): StreakState {
     if (events.length === 0) {
       return {
         weeks: 0,
         forgivenessAvailable: true,
         activeWeeksSinceForgivenessUsed: 0,
         periodKey: null,
+        forgivenWeekKeys: [],
       };
     }
 
@@ -124,6 +135,7 @@ export class GamificationService {
         forgivenessAvailable: true,
         activeWeeksSinceForgivenessUsed: 0,
         periodKey: null,
+        forgivenWeekKeys: [],
       };
     }
     const firstWeekDate = firstEvent.occurred_at;
@@ -135,6 +147,7 @@ export class GamificationService {
     let weeks = 0;
     let forgivenessAvailable = true;
     let activeWeeksSinceForgivenessUsed = 0;
+    const forgivenWeekKeys: string[] = [];
 
     for (const wKey of weekSequence) {
       const isActive = activeWeeks.has(wKey);
@@ -164,6 +177,7 @@ export class GamificationService {
             // Rule 2: Consume perdón y conserva la racha; no suma semana
             forgivenessAvailable = false;
             activeWeeksSinceForgivenessUsed = 0;
+            forgivenWeekKeys.push(wKey);
           } else {
             // Rule 4: Dos semanas inactivas consecutivas rompen la racha
             weeks = 0;
@@ -179,7 +193,49 @@ export class GamificationService {
       forgivenessAvailable,
       activeWeeksSinceForgivenessUsed,
       periodKey: currentWeekKey,
+      forgivenWeekKeys,
     };
+  }
+
+  /**
+   * Calculates streak using the 4-rule algorithm (architecture §9.3, Decision 34 §9, SPEC-05 RF-18 to RF-21).
+   * Rule 1: Only active weeks count (weeks with attempt_completed or audio_submitted).
+   * Rule 2: Forgiveness only with active streak (streak 0 never consumes forgiveness).
+   * Rule 3: Forgiveness recovery requires 2 consecutive active weeks. Inactive week resets counter.
+   * Rule 4: Max 1 forgiveness. Two consecutive inactive weeks break the streak.
+   */
+  async calculateStreak(
+    organizationId: string,
+    studentId: string,
+    asOfDate?: Date,
+  ): Promise<StreakState> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, organization_id: organizationId },
+    });
+
+    if (!student) {
+      return {
+        weeks: 0,
+        forgivenessAvailable: true,
+        activeWeeksSinceForgivenessUsed: 0,
+        periodKey: null,
+        forgivenWeekKeys: [],
+      };
+    }
+
+    // Load all completed activity events for this student
+    const events = await this.prisma.progressEvent.findMany({
+      where: {
+        student_id: studentId,
+        organization_id: organizationId,
+        type: {
+          in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted],
+        },
+      },
+      orderBy: { occurred_at: 'asc' },
+    });
+
+    return this.calculateStreakFromEvents(events, asOfDate);
   }
 
   /**
@@ -214,7 +270,7 @@ export class GamificationService {
       if (awardedRuleIds.has(rule.id)) continue;
 
       let isEligible = false;
-      const ruleDef = rule.rule as { type?: string; event?: string; threshold?: number } | null;
+      const ruleDef = parseBadgeRule(rule.rule);
 
       if (ruleDef?.type === 'event_count') {
         if (ruleDef.event === 'attempt_completed') {
@@ -299,12 +355,7 @@ export class GamificationService {
   }
 
   getBogotaIsoWeekKey(date: Date): string {
-    const bogotaDateStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    const bogotaDateStr = bogotaDateFormatter.format(date);
 
     const [yearStr, monthStr, dayStr] = bogotaDateStr.split('-');
     const bogotaDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));

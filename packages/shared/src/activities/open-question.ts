@@ -67,23 +67,19 @@ export function getOpenQuestionItems(
   fallbackActivityId?: string,
 ): OpenQuestionItem[] {
   if (!config || typeof config !== 'object') return [];
-  const cfg = config as {
-    instructions?: string;
-    items?: OpenQuestionItem[];
-    prompt?: string;
-    rubric?: string;
-    maxLength?: number;
-  };
-  if (Array.isArray(cfg.items) && cfg.items.length > 0) {
-    return cfg.items;
+  const parsed = OpenQuestionConfigSchema.safeParse(config);
+  if (parsed.success && Array.isArray(parsed.data.items) && parsed.data.items.length > 0) {
+    return parsed.data.items;
   }
-  if (typeof cfg.prompt === 'string' && cfg.prompt.length > 0) {
+  if ('prompt' in config && typeof config.prompt === 'string' && config.prompt.length > 0) {
+    const rubric = 'rubric' in config && typeof config.rubric === 'string' ? config.rubric : undefined;
+    const maxLength = 'maxLength' in config && typeof config.maxLength === 'number' ? config.maxLength : 2000;
     return [
       {
         id: fallbackActivityId || '00000000-0000-4000-8000-000000000001',
-        prompt: cfg.prompt,
-        rubric: cfg.rubric,
-        maxLength: cfg.maxLength ?? 2000,
+        prompt: config.prompt,
+        rubric,
+        maxLength,
       },
     ];
   }

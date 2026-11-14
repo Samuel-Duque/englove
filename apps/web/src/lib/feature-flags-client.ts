@@ -1,12 +1,7 @@
+import { FeatureFlagsResponseSchema, type FeatureFlagsResponse } from '@englove/shared';
 import { apiFetch } from './api';
 
-export interface FeatureFlagsResponse {
-  organizationId: string;
-  flags: {
-    games?: boolean;
-    extra_content?: boolean;
-  };
-}
+export type { FeatureFlagsResponse };
 
 let cachedFeatureFlags: { data: FeatureFlagsResponse; timestamp: number } | null = null;
 let inflightFeatureFlagsPromise: Promise<FeatureFlagsResponse | null> | null = null;
@@ -30,7 +25,9 @@ export async function fetchSharedFeatureFlags(force = false): Promise<FeatureFla
 
   inflightFeatureFlagsPromise = (async () => {
     try {
-      const data = await apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags');
+      const data = await apiFetch<FeatureFlagsResponse>('/api/v1/feature-flags', {
+        schema: FeatureFlagsResponseSchema,
+      });
       cachedFeatureFlags = { data, timestamp: Date.now() };
       return data;
     } catch {

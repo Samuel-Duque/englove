@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   NotFoundException,
   BadRequestException,
@@ -8,6 +8,7 @@ import {
   Level,
   AgeSegment,
   AuditAction,
+  AttemptStatus,
 } from '@englove/shared';
 import { StudentsService } from '../src/students/students.service';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -24,6 +25,21 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
   let service: StudentsService;
   let mockPrisma: any;
   let mockMailService: any;
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.student.update,
+      mockPrisma.user.update,
+      mockPrisma.groupMembership.update,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockMailService = {
@@ -71,10 +87,15 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
       get: vi.fn((_key: string, def?: string) => def ?? 'http://localhost:3000'),
     };
 
+    const mockMediaService = {
+      deleteFile: vi.fn().mockResolvedValue(undefined),
+    };
+
     service = new StudentsService(
       mockPrisma as unknown as PrismaService,
       mockMailService as unknown as MailService,
       mockConfigService as any,
+      mockMediaService as any,
     );
   });
 
@@ -183,7 +204,7 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
       expect(result.groupId).toBe(groupBId);
       expect(mockPrisma.groupMembership.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'mem-old' },
+          where: { id: 'mem-old', organization_id: orgId },
           data: { left_at: expect.any(Date) },
         }),
       );
@@ -288,6 +309,142 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
         },
       });
     });
+
+    it('QA-07 / P0-09: rechaza traslado si hay reintentos concedidos no consumidos sin confirmLostRetries con UNCONSUMED_RETRY_WARNING y details', async () => {
+      const approvedStudent = {
+        id: studentId,
+        user_id: studentUserId,
+        organization_id: orgId,
+        level: Level.A1,
+        age_segment: AgeSegment.kids,
+        approval_status: ApprovalStatus.approved,
+        can_switch_interface: false,
+        birth_date: new Date('2015-05-10'),
+        guardian_name: 'Papá',
+        guardian_contact: 'papa@mail.com',
+        user: {
+          id: studentUserId,
+          name: 'Carlos Alumno',
+          email: 'carlos@test.com',
+          role: 'student',
+          locked_until: null,
+        },
+        memberships: [
+          { id: 'mem-1', group_id: groupAId, left_at: null },
+        ],
+      };
+
+      mockPrisma.student.findFirst.mockResolvedValue(approvedStudent);
+      mockPrisma.group.findFirst.mockResolvedValue({
+        id: groupBId,
+        organization_id: orgId,
+        archived_at: null,
+      });
+      mockPrisma.groupMembership.findFirst.mockResolvedValue({
+        id: 'mem-1',
+        group_id: groupAId,
+        student_id: studentId,
+      });
+
+      // Active unconsumed retry on assignment
+      mockPrisma.attempt = {
+        findMany: vi.fn().mockResolvedValueOnce([
+          {
+            id: 'att-retry-1',
+            assignment_id: 'asg-1',
+            attempt_number: 1,
+            retry_granted_at: new Date(),
+            retry_extend_until: new Date(Date.now() + 86400000),
+            status: AttemptStatus.graded,
+            next_attempt: null,
+            assignment: {
+              id: 'asg-1',
+              activity_id: 'act-1',
+              due_at: new Date(Date.now() + 86400000),
+              group_id: groupAId,
+              activity: { title: 'Vocabulario A1' },
+            },
+          },
+        ]),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      };
+
+      await expect(
+        service.transferStudentGroup(orgId, studentId, groupBId, false),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 409,
+          code: 'UNCONSUMED_RETRY_WARNING',
+          details: {
+            affectedActivities: [
+              expect.objectContaining({
+                assignmentId: 'asg-1',
+                activityTitle: 'Vocabulario A1',
+              }),
+            ],
+          },
+        },
+      });
+    });
+
+    it('QA-07 / P0-09: revoca reintentos no consumidos limpiando retry_granted_at y retry_extend_until cuando confirmLostRetries=true', async () => {
+      const approvedStudent = {
+        id: studentId,
+        user_id: studentUserId,
+        organization_id: orgId,
+        level: Level.A1,
+        age_segment: AgeSegment.kids,
+        approval_status: ApprovalStatus.approved,
+        can_switch_interface: false,
+        birth_date: new Date('2015-05-10'),
+        guardian_name: 'Papá',
+        guardian_contact: 'papa@mail.com',
+        user: {
+          id: studentUserId,
+          name: 'Carlos Alumno',
+          email: 'carlos@test.com',
+          role: 'student',
+          locked_until: null,
+        },
+        memberships: [
+          { id: 'mem-1', group_id: groupAId, left_at: null },
+        ],
+      };
+
+      mockPrisma.student.findFirst.mockResolvedValue(approvedStudent);
+      mockPrisma.group.findFirst.mockResolvedValue({
+        id: groupBId,
+        organization_id: orgId,
+        archived_at: null,
+      });
+      mockPrisma.groupMembership.findFirst.mockResolvedValue({
+        id: 'mem-1',
+        group_id: groupAId,
+        student_id: studentId,
+      });
+
+      mockPrisma.attempt = {
+        findMany: vi.fn().mockResolvedValueOnce([
+          { id: 'att-retry-1' },
+        ]),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      };
+
+      await service.transferStudentGroup(orgId, studentId, groupBId, true);
+
+      expect(mockPrisma.attempt.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['att-retry-1'] },
+          organization_id: orgId,
+        },
+        data: {
+          retry_granted_at: null,
+          retry_granted_by: null,
+          retry_extend_until: null,
+        },
+      });
+      expect(mockPrisma.groupMembership.create).toHaveBeenCalled();
+    });
   });
 
   describe('Cambio administrativo de correo (RF-18, RF-19, RF-20, ENG-046)', () => {
@@ -320,7 +477,7 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
 
       // Updates user email
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: studentUserId },
+        where: { id: studentUserId, organization_id: orgId },
         data: { email: newEmail },
       });
 
@@ -442,6 +599,57 @@ describe('SPEC-03: Gestor de Contenidos — Students Admin Operations (ENG-040, 
           code: 'EMAIL_TAKEN',
         },
       });
+    });
+  });
+
+  describe('deleteStudentCascade (P2-03, T3.11, Decisión 103)', () => {
+    it('borra archivos R2 antes y ejecuta la cascada relacional dentro de $transaction', async () => {
+      const mockMediaDeleteFile = vi.fn().mockResolvedValue(undefined);
+      (service as any).mediaService = { deleteFile: mockMediaDeleteFile };
+
+      const executionOrder: string[] = [];
+      mockPrisma.$transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => {
+        executionOrder.push('transaction_start');
+        const res = await cb(mockPrisma);
+        executionOrder.push('transaction_commit');
+        return res;
+      });
+
+      mockMediaDeleteFile.mockImplementation(async () => {
+        executionOrder.push('r2_delete');
+      });
+
+      mockPrisma.student.findFirst = vi.fn().mockResolvedValue({
+        id: studentId,
+        user_id: studentUserId,
+        organization_id: orgId,
+        memberships: [],
+        attempts: [{ id: 'att-1' }],
+        media_assets: [{ key: 'media/raw.webm', converted_key: 'media/conv.mp4' }],
+      });
+
+      mockPrisma.auditLog.findMany = vi.fn().mockResolvedValue([]);
+      mockPrisma.review = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
+      mockPrisma.progressEvent = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
+      mockPrisma.badgeAward = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
+      mockPrisma.attempt = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
+      mockPrisma.groupMembership.deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+      mockPrisma.mediaAsset = { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
+      mockPrisma.authSession.deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+      mockPrisma.student.delete = vi.fn().mockResolvedValue({ id: studentId });
+      mockPrisma.user.delete = vi.fn().mockResolvedValue({ id: studentUserId });
+
+      await service.deleteStudentCascade(orgId, studentId);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(executionOrder).toEqual([
+        'r2_delete',
+        'r2_delete',
+        'transaction_start',
+        'transaction_commit',
+      ]);
+      expect(mockMediaDeleteFile).toHaveBeenCalledWith('media/raw.webm');
+      expect(mockMediaDeleteFile).toHaveBeenCalledWith('media/conv.mp4');
     });
   });
 });

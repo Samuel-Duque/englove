@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Mi Perfil',
 };
 
-export const instant = false;
-
 export default function PerfilPage() {
   return (
     <Suspense

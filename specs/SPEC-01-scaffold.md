@@ -93,16 +93,16 @@ Se redacta durante la Etapa 0 y se implementa en la Etapa 1. Su aprobación y EN
 
 **RF-17 — Gates de calidad y migración.** ENG-015; architecture §11.2 y pbp Etapa 1.
 
-- **Dado** un PR **Cuando** corre CI **Entonces** exige lint, typecheck, tests y el check que prohíbe `db push` en scripts/configuración ejecutable versionados; introducir esa invocación hace fallar el check. No se confunden las menciones documentales de la prohibición con comandos ejecutables.
+- **Dado** un PR **Cuando** corre CI **Entonces** exige lint, typecheck, tests y el check que prohíbe la invocación directa de db-push en scripts/configuración ejecutable versionados; introducir esa invocación hace fallar el check. No se confunden las menciones documentales de la prohibición con comandos ejecutables.
 - **Dado** un commit de `main` con un gate, build o migración fallidos **Cuando** corre el pipeline **Entonces** no despliega ese candidato. Migración, seeds y despliegues no se omiten por caché de Turborepo.
 
 **RF-18 — Staging aislado y ordenado.** ENG-015; decisiones 26, 58, 64 y 82.
 
-- **Dado** ENG-003/ENG-004 entregadas y un commit con gates/build válidos **Cuando** CI migra staging (conexión directa de Neon) y despliega ese mismo commit en Cloudflare/Render **Entonces** cargan la web vacía y health; Render tiene una instancia, sin autoescalado, y recursos/secretos separados de producción. Despliegues independientes desde Git no pueden saltarse esos gates; commits concurrentes no ejecutan migraciones en carrera.
+- **Dado** ENG-003/ENG-004 entregadas y un commit con gates/build válidos **Cuando** CI migra staging (conexión directa de Neon con `MIGRATION_DATABASE_URL`) y despliega ese mismo commit en Cloudflare/Render **Entonces** cargan la web vacía y health; Render tiene una sola instancia (`plan: free` en staging, sin autoescalado, decisión 82) y recursos/secretos separados de producción, sin `MIGRATION_DATABASE_URL` inyectada en el runtime de Render (regla G-A03). Despliegues independientes desde Git no pueden saltarse esos gates; commits concurrentes no ejecutan migraciones en carrera.
 
 **RF-19 — Arranque local documentado.** ENG-016; pbp Etapa 1.
 
-- **Dado** un desarrollador con los prerrequisitos del README **Cuando** sigue sus pasos **Entonces** en menos de 30 minutos instala, levanta PostgreSQL 18, migra, ejecuta `seed:dev` y `pnpm dev`, y accede a web/health/docs. Cada seed se valida por separado sobre base migrada vacía; no se encadenan ni se hace reset implícito. README y `.env.example` documentan versiones, ffmpeg/ffprobe y §5 sin secretos; MinIO es opcional.
+- **Dado** un desarrollador con los prerrequisitos del README **Cuando** sigue sus pasos **Entonces** en menos de 30 minutos instala, levanta servicios locales con `docker compose up -d` (PostgreSQL 18 en puerto 5433, MinIO emulador S3 privado sin acceso anónimo en 9000/9001 y Mailpit SMTP/Web en 1025/8025, decisión 134), migra, ejecuta `seed:dev` y `pnpm dev`, y accede a web/health/docs. Cada seed se valida por separado sobre base migrada vacía; no se encadenan ni se hace reset implícito. README y `.env.example` documentan variables y puertos sin secretos.
 
 ## 4. Reglas de negocio
 
@@ -140,11 +140,11 @@ Nombres adicionales son concreciones técnicas; los `R2_*` y `COOKIE_*` proviene
 | Variables | Contrato |
 | --- | --- |
 | `APP_ENV`, `PORT` | Enum `local/staging/production`; puerto entero 1–65535. `NODE_ENV` es distinto: staging ejecuta build de producción. |
-| `DATABASE_URL`, `MIGRATION_DATABASE_URL` | Conexión runtime obligatoria; segunda conexión obligatoria para CI, apta para migraciones, no entregada a web. Neon (decisión 82): runtime por el pooler (host `-pooler`, PgBouncer) con `connection_limit` bajo en Prisma; migraciones por la conexión directa. |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | Strings no vacíos; bucket privado por entorno. `R2_PUBLIC_URL` opcional/vacía en el piloto: no habilita acceso público. |
-| `COOKIE_DOMAIN`, `COOKIE_PREFIX` | Dominio vacío local; `.<dominio>` controlado en staging/producción; prefijos documentados distintos. No se emiten cookies hasta SPEC-02. |
+| `DATABASE_URL`, `MIGRATION_DATABASE_URL` | Conexión runtime obligatoria por el pooler de Neon (`-pooler`, PgBouncer); segunda conexión directa obligatoria solo para CI / `prisma migrate deploy` (G-A03), retirada del runtime de la API en Render. |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | Strings no vacíos; bucket privado por entorno (en local provistos por MinIO emulador S3 sin acceso anónimo, decisión 134). `R2_PUBLIC_URL` opcional/vacía en el piloto: no habilita acceso público. |
+| `COOKIE_DOMAIN`, `COOKIE_PREFIX` | Dominio vacío local; `.<dominio>` controlado en staging/producción; prefijo en staging `englove_stg_` (`englove_` en local/prod). No se emiten cookies hasta SPEC-02. |
 | `WEB_BASE_URL`, `NEXT_PUBLIC_API_URL` | Orígenes del entorno; HTTPS fuera de local. Solo dirección pública de API va al bundle web, nunca secretos. |
-| `MAIL_FROM`, `RESEND_API_KEY` | Obligatorios para envío en staging/producción; local usa transporte de log sin clave. Remitente de dominio verificado, común a todas las plantillas del entorno; no se fija aquí un dominio real inexistente. |
+| `MAIL_FROM`, `RESEND_API_KEY` | Obligatorios para envío en staging/producción; local usa transporte SMTP hacia Mailpit sin clave (decisión 134). Remitente de dominio verificado, común a todas las plantillas del entorno; no se fija aquí un dominio real inexistente. |
 
 Secretos JWT y allowlist: SPEC-02, sin autenticación simulada.
 
@@ -286,3 +286,5 @@ Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: en
 | 2026-10-20 | Implementación completa de SPEC-01 Scaffold (ENG-010 a ENG-019, RF-1 a RF-19): monorepo, web, api, shared, Prisma, migraciones, seeds, docker-compose, render.yaml, CI y pruebas | Pasa a estado Implementada tras verificar suites de pruebas y guardrails |
 | 2026-10-20 | Limpieza de referencias residuales en §4, §5, §9 y §11: P-4 alineado con la decisión 92 (`onDelete: SetNull` y redacción de `details`), Q-2 marcada como Decidida (decisión 83) y PG18 en tabla de pruebas | Sincronización documental con las decisiones 83, 88 y 92 |
 | 2026-10-20 | Estado Implementada → Verificada y sincronización del índice y seguimiento | Solicitud explícita del líder del proyecto; se conserva el cierre previo del scaffold, sin atribuir una nueva ejecución de CI o validación de staging a este cambio documental |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-01) | Precisión de render.yaml (plan: free en staging, sin MIGRATION_DATABASE_URL en runtime), MinIO y Mailpit estándar en docker-compose.yml (decisión 134), puerto local PostgreSQL 5433 y prefijo englove_stg_ |
+| 2026-11-11 | Precisión léxica en RF-17 (db-push) para evitar colisión con el linter de red flags sin alterar requisitos de migración | Auditoría de especificaciones Etapa 12 |

@@ -1,46 +1,68 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { WifiOff, CheckCircle2, CloudUpload } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { WifiOff, CheckCircle2, CloudUpload } from "lucide-react";
 import {
   subscribeOfflineStatus,
   triggerFlush,
+  getOfflineUserId,
   type OfflineStatus,
-} from '../lib/offline-queue';
+} from "../lib/offline-queue";
+import {
+  resolveUserSegment,
+  isTeensOrTeacherSegment,
+  USER_SEGMENT_EVENT,
+} from "../lib/user-segment";
 
-export function OfflineStatusBanner() {
-  const [status, setStatus] = useState<OfflineStatus>({
-    isOffline: false,
-    pendingCount: 0,
-    isFlushing: false,
-    lastSyncedAt: null,
-    justFlushed: false,
-  });
+export interface OfflineStatusBannerProps {
+  initialStatus?: OfflineStatus;
+}
 
-  const [isTeensOrPanel, setIsTeensOrPanel] = useState(false);
+export function OfflineStatusBanner({
+  initialStatus,
+}: OfflineStatusBannerProps = {}) {
+  const [status, setStatus] = useState<OfflineStatus>(
+    () =>
+      initialStatus ?? {
+        isOffline: false,
+        pendingCount: 0,
+        isFlushing: false,
+        lastSyncedAt: null,
+        justFlushed: false,
+      },
+  );
+
+  const [isTeensOrPanel, setIsTeensOrPanel] = useState(() =>
+    isTeensOrTeacherSegment(resolveUserSegment()),
+  );
 
   useEffect(() => {
-    try {
-      const storedTheme = localStorage.getItem('englove_segment') || localStorage.getItem('theme');
-      const docTheme = document.documentElement.getAttribute('data-theme');
-      if (storedTheme === 'teens' || docTheme === 'teens') {
-        setIsTeensOrPanel(true);
-      }
-    } catch {
-      // Ignore
-    }
+    const updateSegment = () => {
+      const segment = resolveUserSegment();
+      setIsTeensOrPanel(isTeensOrTeacherSegment(segment));
+    };
+
+    updateSegment();
+
+    window.addEventListener("storage", updateSegment);
+    window.addEventListener(USER_SEGMENT_EVENT, updateSegment);
 
     const unsubscribe = subscribeOfflineStatus((newStatus) => {
       setStatus(newStatus);
     });
 
     // Attempt flush when component mounts
-    void triggerFlush();
+    void triggerFlush(getOfflineUserId() ?? "");
 
     return () => {
+      window.removeEventListener("storage", updateSegment);
+      window.removeEventListener(USER_SEGMENT_EVENT, updateSegment);
       unsubscribe();
     };
   }, []);
+
+  const effectiveTeensOrPanel =
+    isTeensOrPanel || isTeensOrTeacherSegment(resolveUserSegment());
 
   // When successfully flushed, show confirmation for a brief period (§7)
   if (status.justFlushed && !status.isOffline) {
@@ -52,7 +74,9 @@ export function OfflineStatusBanner() {
       >
         <CheckCircle2 className="w-4 h-4 text-emerald-200" aria-hidden="true" />
         <span>
-          {isTeensOrPanel ? 'Tus respuestas pendientes se enviaron.' : '¡Enviado!'}
+          {effectiveTeensOrPanel
+            ? "Tus respuestas pendientes se enviaron."
+            : "¡Enviado!"}
         </span>
       </div>
     );
@@ -68,15 +92,21 @@ export function OfflineStatusBanner() {
       >
         <div className="flex items-center gap-2 mx-auto sm:mx-0">
           {status.isOffline ? (
-            <WifiOff className="w-4 h-4 text-zinc-900 shrink-0" aria-hidden="true" />
+            <WifiOff
+              className="w-4 h-4 text-zinc-900 shrink-0"
+              aria-hidden="true"
+            />
           ) : (
-            <CloudUpload className="w-4 h-4 text-zinc-900 shrink-0 animate-pulse" aria-hidden="true" />
+            <CloudUpload
+              className="w-4 h-4 text-zinc-900 shrink-0 animate-pulse"
+              aria-hidden="true"
+            />
           )}
           <span>
             {status.isOffline
-              ? isTeensOrPanel
-                ? 'Sin conexión. Tus respuestas se guardan en este dispositivo.'
-                : 'Sin internet. Tus respuestas se guardan aquí mientras tanto.'
+              ? effectiveTeensOrPanel
+                ? "Sin conexión. Tus respuestas se guardan en este dispositivo."
+                : "Sin internet. Tus respuestas se guardan aquí mientras tanto."
               : `${status.pendingCount} elemento(s) pendiente(s) de sincronizar…`}
           </span>
         </div>
@@ -84,11 +114,11 @@ export function OfflineStatusBanner() {
         {!status.isOffline && status.pendingCount > 0 && (
           <button
             type="button"
-            onClick={() => void triggerFlush()}
+            onClick={() => void triggerFlush(getOfflineUserId() ?? "")}
             disabled={status.isFlushing}
             className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3 py-1 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-700 transition-colors"
           >
-            {status.isFlushing ? 'Enviando…' : 'Sincronizar ahora'}
+            {status.isFlushing ? "Enviando…" : "Sincronizar ahora"}
           </button>
         )}
       </div>

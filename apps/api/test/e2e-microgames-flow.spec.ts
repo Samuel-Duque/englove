@@ -7,7 +7,6 @@ import {
   Level,
   Role,
   AgeSegment,
-  ProgressEventType,
   GameConfig,
   GameAnswerKey,
 } from '@englove/shared';
@@ -21,51 +20,12 @@ import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException } from '@nestjs/common';
-import * as net from 'net';
+import { ConflictException, HttpException } from '@nestjs/common';
+import { TenantContext } from '../src/common/tenant/tenant.context';
+import { isPostgresAvailable } from './postgres-test-helper';
 
-function getPostgresPort(): number {
-  const url = process.env.DATABASE_URL;
-  if (!url) return 5433;
-  try {
-    const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5433;
-  } catch {
-    return 5433;
-  }
-}
-
-async function checkPortOpen(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(port, '127.0.0.1');
-  });
-}
-
-async function checkPostgresRunning(): Promise<boolean> {
-  const configuredPort = getPostgresPort();
-  if (await checkPortOpen(configuredPort)) return true;
-  if (configuredPort !== 5433 && (await checkPortOpen(5433))) return true;
-  if (configuredPort !== 5432 && (await checkPortOpen(5432))) return true;
-  return false;
-}
-
-describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (ENG-080 a ENG-087)', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+describe.skipIf(!isPostgresAvailable)('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (ENG-080 a ENG-087)', () => {
+  let prisma: PrismaService;
   let activitiesService: ActivitiesService;
   let assignmentsService: AssignmentsService;
   let attemptsService: AttemptsService;
@@ -81,21 +41,13 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   const rightPerroId = '22222222-2222-4222-8222-222222222202';
 
   let activityId = '';
-  let assignmentId = '';
   let attempt1Id = '';
   let attempt1Token = '';
   let attempt2Id = '';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost; saltando pruebas E2E de microjuegos en DB real.');
-      return;
-    }
-
-    try {
-      prisma = new PrismaService();
-      await prisma.$connect();
+    prisma = new PrismaService();
+    await prisma.$connect();
 
       const configService = new ConfigService({
         JWT_SECRET: 'e2e-microgames-flow-test-jwt-secret-min-32-chars-long!',
@@ -237,14 +189,10 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
           active: true,
         },
       });
-    } catch (err) {
-      console.warn('Error conectando a Docker PostgreSQL para E2E de microjuegos:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       try {
         await prisma.badgeAward.deleteMany({ where: { organization_id: orgId } });
         await prisma.badgeRule.deleteMany({ where: { organization_id: orgId } });
@@ -265,300 +213,316 @@ describe('SPEC-06: Flujo integral de microjuegos en PostgreSQL real con Docker (
   });
 
   it('Paso 1: Docente crea y publica actividad de tipo game (mechanic = match) en PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        const gameConfig: GameConfig = {
+          mechanic: GameMechanic.match,
+          instructions: 'Une cada palabra con su traducción',
+          settings: {
+            left: [
+              { id: leftAppleId, text: 'Apple' },
+              { id: leftDogId, text: 'Dog' },
+            ],
+            right: [
+              { id: rightManzanaId, text: 'Manzana' },
+              { id: rightPerroId, text: 'Perro' },
+            ],
+          },
+        };
 
-    const gameConfig: GameConfig = {
-      mechanic: GameMechanic.match,
-      instructions: 'Une cada palabra con su traducción',
-      settings: {
-        left: [
-          { id: leftAppleId, text: 'Apple' },
-          { id: leftDogId, text: 'Dog' },
-        ],
-        right: [
-          { id: rightManzanaId, text: 'Manzana' },
-          { id: rightPerroId, text: 'Perro' },
-        ],
+        const gameAnswerKey: GameAnswerKey = {
+          solution: {
+            pairs: {
+              [leftAppleId]: rightManzanaId,
+              [leftDogId]: rightPerroId,
+            },
+          },
+        };
+
+        const created = await activitiesService.createActivity(orgId, teacherId, {
+          title: 'Match Animals & Fruits',
+          type: ActivityType.game,
+          level: Level.A1,
+          expectedDurationSeconds: 120,
+          minPlausibleSeconds: 15,
+          config: gameConfig,
+          answerKey: gameAnswerKey,
+        });
+
+        activityId = created.id;
+        expect(created.type).toBe(ActivityType.game);
+        expect(created.status).toBe(ActivityStatus.draft);
+
+        // Verify GameDetail persistence in PostgreSQL
+        const detailInDb = await prisma!.gameDetail.findFirst({
+          where: { organization_id: orgId, activity_id: activityId },
+        });
+        expect(detailInDb).toBeDefined();
+        expect(detailInDb?.mechanic).toBe(GameMechanic.match);
+
+        // Publish activity
+        const published = await activitiesService.publishActivity(orgId, activityId);
+        expect(published.status).toBe(ActivityStatus.published);
       },
-    };
+    );
+  });
 
-    const gameAnswerKey: GameAnswerKey = {
-      solution: {
-        pairs: {
-          [leftAppleId]: rightManzanaId,
-          [leftDogId]: rightPerroId,
-        },
+  it('Paso 2: Docente intenta asignar microjuego y es rechazado con 422 (Decisión 130, ENG-150)', async () => {
+    return TenantContext.run(
+      { organizationId: orgId, userId: teacherId, role: Role.teacher },
+      async () => {
+        const now = new Date();
+        const opensAt = new Date(now.getTime() - 60000); // opened 1 min ago
+        const dueAt = new Date(now.getTime() + 7 * 24 * 3600000); // due in 7 days
+
+        await expect(
+          assignmentsService.createAssignments(orgId, {
+            activityId,
+            groupIds: [groupId],
+            opensAt: opensAt.toISOString(),
+            dueAt: dueAt.toISOString(),
+          }),
+        ).rejects.toThrow(HttpException);
       },
-    };
-
-    const created = await activitiesService.createActivity(orgId, teacherId, {
-      title: 'Match Animals & Fruits',
-      type: ActivityType.game,
-      level: Level.A1,
-      expectedDurationSeconds: 120,
-      minPlausibleSeconds: 15,
-      config: gameConfig,
-      answerKey: gameAnswerKey,
-    });
-
-    activityId = created.id;
-    expect(created.type).toBe(ActivityType.game);
-    expect(created.status).toBe(ActivityStatus.draft);
-
-    // Verify GameDetail persistence in PostgreSQL
-    const detailInDb = await prisma!.gameDetail.findFirst({
-      where: { organization_id: orgId, activity_id: activityId },
-    });
-    expect(detailInDb).toBeDefined();
-    expect(detailInDb?.mechanic).toBe(GameMechanic.match);
-
-    // Publish activity
-    const published = await activitiesService.publishActivity(orgId, activityId);
-    expect(published.status).toBe(ActivityStatus.published);
+    );
   });
 
-  it('Paso 2: Docente asigna la actividad al grupo de alumnos', async () => {
-    if (!isPostgresAvailable) return;
-
-    const now = new Date();
-    const opensAt = new Date(now.getTime() - 60000); // opened 1 min ago
-    const dueAt = new Date(now.getTime() + 7 * 24 * 3600000); // due in 7 days
-
-    const result = await assignmentsService.createAssignments(orgId, {
-      activityId,
-      groupIds: [groupId],
-      opensAt: opensAt.toISOString(),
-      dueAt: dueAt.toISOString(),
-    });
-
-    assignmentId = result.items[0]!.id;
-    expect(assignmentId).toBeDefined();
-    expect(result.items[0]?.activity.id).toBe(activityId);
-  });
-
-  it('Paso 3: Feature Flag gating (RF-11) — startAttempt falla con 409 si flags.games es false', async () => {
-    if (!isPostgresAvailable) return;
-
-    await expect(
-      attemptsService.startAttempt(orgId, studentId, assignmentId),
-    ).rejects.toThrow(ConflictException);
-  });
-
-  it('Paso 4: Habilitar feature flag games y listar asignaciones disponibles para alumno (RF-11, Decisión 104)', async () => {
-    if (!isPostgresAvailable) return;
-
-    await prisma!.featureFlag.update({
-      where: {
-        organization_id_key: {
-          organization_id: orgId,
-          key: 'games',
-        },
+  it('Paso 3: Feature Flag gating (RF-11) — startGameAttempt falla con 409 si flags.games es false', async () => {
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        await expect(
+          attemptsService.startGameAttempt(orgId, studentId, activityId),
+        ).rejects.toThrow(ConflictException);
       },
-      data: { enabled: true },
-    });
-
-    const availList = await attemptsService.listStudentAssignments(orgId, studentId, {
-      scope: 'available',
-    });
-
-    expect(availList.items.length).toBe(1);
-    const card = availList.items[0]!;
-    expect(card.id).toBe(assignmentId);
-    expect(card.activity.type).toBe(ActivityType.game);
-    expect(card.activity.mechanic).toBe(GameMechanic.match);
-    expect(card.canStart).toBe(true);
-    expect(card.latestAttempt).toBeNull();
+    );
   });
 
-  it('Paso 5: Alumno inicia Intento #1 (RF-1, RF-7) — crea Attempt en PostgreSQL con attempt_number = 1 y entrega GamePublicConfig', async () => {
-    if (!isPostgresAvailable) return;
+  it('Paso 4: Habilitar feature flag games y listar microjuegos autónomos para alumno (Decisión 130)', async () => {
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        await prisma!.featureFlag.update({
+          where: {
+            organization_id_key: {
+              organization_id: orgId,
+              key: 'games',
+            },
+          },
+          data: { enabled: true },
+        });
 
-    const runtime = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+        const gamesList = await attemptsService.listStudentGames(orgId, studentId);
+        expect(gamesList.items.length).toBeGreaterThanOrEqual(1);
+        const game = gamesList.items.find((g) => g.id === activityId);
+        expect(game).toBeDefined();
+        expect(game?.mechanic).toBe(GameMechanic.match);
+        expect(game?.attemptsCount).toBe(0);
+        expect(game?.status).toBe('not_started');
+      },
+    );
+  });
 
-    attempt1Id = runtime.attempt.id;
-    attempt1Token = runtime.attemptToken!;
+  it('Paso 5: Alumno inicia Intento #1 (RF-1, RF-7, Decisión 130) — crea Attempt en PostgreSQL con attempt_number = 1 y entrega GamePublicConfig', async () => {
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const runtime = await attemptsService.startGameAttempt(orgId, studentId, activityId);
 
-    expect(runtime.attempt.attemptNumber).toBe(1);
-    expect(runtime.attempt.status).toBe(AttemptStatus.in_progress);
-    expect(runtime.activity.type).toBe(ActivityType.game);
+        attempt1Id = runtime.attempt.id;
+        attempt1Token = runtime.attemptToken!;
 
-    const publicCfg = runtime.activity.config as { mechanic?: string; answerKey?: unknown };
-    expect(publicCfg.mechanic).toBe(GameMechanic.match);
-    expect(publicCfg.answerKey).toBeDefined();
+        expect(runtime.attempt.attemptNumber).toBe(1);
+        expect(runtime.attempt.status).toBe(AttemptStatus.in_progress);
+        expect(runtime.activity.type).toBe(ActivityType.game);
 
-    // Verify row in real PostgreSQL
-    const attemptInDb = await prisma!.attempt.findFirst({
-      where: { id: attempt1Id, organization_id: orgId },
-    });
-    expect(attemptInDb).toBeDefined();
-    expect(attemptInDb?.attempt_number).toBe(1);
-    expect(attemptInDb?.previous_attempt_id).toBeNull();
-    expect(attemptInDb?.status).toBe(AttemptStatus.in_progress);
+        const publicCfg = runtime.activity.config as { mechanic?: string; answerKey?: unknown };
+        expect(publicCfg.mechanic).toBe(GameMechanic.match);
+        expect(publicCfg.answerKey).toBeDefined();
+
+        // Verify row in real PostgreSQL
+        const attemptInDb = await prisma!.attempt.findFirst({
+          where: { id: attempt1Id, organization_id: orgId },
+        });
+        expect(attemptInDb).toBeDefined();
+        expect(attemptInDb?.attempt_number).toBe(1);
+        expect(attemptInDb?.assignment_id).toBeNull();
+        expect(attemptInDb?.activity_id).toBe(activityId);
+        expect(attemptInDb?.previous_attempt_id).toBeNull();
+        expect(attemptInDb?.status).toBe(AttemptStatus.in_progress);
+      },
+    );
   });
 
   it('Paso 6: Transmisión de eventos de emparejamiento con idempotencia y reemplazo exacto (RF-8)', async () => {
-    if (!isPostgresAvailable) return;
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        // Event 1: student matches apple -> manzana, dog -> perro
+        const evRes1 = await attemptsService.submitEvents(orgId, studentId, attempt1Id, attempt1Token, {
+          events: [
+            {
+              clientEventId: 'evt-match-001',
+              itemId: 'pairs',
+              answer: {
+                [leftAppleId]: rightManzanaId,
+                [leftDogId]: rightPerroId,
+              },
+            },
+          ],
+        });
+        expect(evRes1.acceptedEventIds).toContain('evt-match-001');
 
-    // Event 1: student matches apple -> manzana, dog -> perro
-    const evRes1 = await attemptsService.submitEvents(orgId, studentId, attempt1Id, attempt1Token, {
-      events: [
-        {
-          clientEventId: 'evt-match-001',
-          itemId: 'pairs',
-          answer: {
-            [leftAppleId]: rightManzanaId,
-            [leftDogId]: rightPerroId,
-          },
-        },
-      ],
-    });
-    expect(evRes1.acceptedEventIds).toContain('evt-match-001');
+        // Event 2: duplicate clientEventId is ignored idempotently
+        const evRes2 = await attemptsService.submitEvents(orgId, studentId, attempt1Id, attempt1Token, {
+          events: [
+            {
+              clientEventId: 'evt-match-001',
+              itemId: 'pairs',
+              answer: { [leftAppleId]: 'wrong' },
+            },
+          ],
+        });
+        expect(evRes2.acceptedEventIds).toContain('evt-match-001');
 
-    // Event 2: duplicate clientEventId is ignored idempotently
-    const evRes2 = await attemptsService.submitEvents(orgId, studentId, attempt1Id, attempt1Token, {
-      events: [
-        {
-          clientEventId: 'evt-match-001',
-          itemId: 'pairs',
-          answer: { [leftAppleId]: 'wrong' },
-        },
-      ],
-    });
-    expect(evRes2.acceptedEventIds).toContain('evt-match-001');
-
-    // Verify in PostgreSQL that answers reflects evt-match-001
-    const attemptAfterEv = await prisma!.attempt.findFirst({
-      where: { id: attempt1Id, organization_id: orgId },
-    });
-    const payload = attemptAfterEv?.payload as { answers?: { pairs?: Record<string, string> } };
-    expect(payload.answers?.pairs?.[leftAppleId]).toBe(rightManzanaId);
-    expect(payload.answers?.pairs?.[leftDogId]).toBe(rightPerroId);
+        // Verify in PostgreSQL that answers reflects evt-match-001
+        const attemptAfterEv = await prisma!.attempt.findFirst({
+          where: { id: attempt1Id, organization_id: orgId },
+        });
+        const payload = attemptAfterEv?.payload as { answers?: { pairs?: Record<string, string> } };
+        expect(payload.answers?.pairs?.[leftAppleId]).toBe(rightManzanaId);
+        expect(payload.answers?.pairs?.[leftDogId]).toBe(rightPerroId);
+      },
+    );
   });
 
   it('Paso 7: Completar Intento #1 (RF-7) — calificación determinista 5.0 en servidor, insignias y finished_at en PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        // Ensure started_at was at least 20s ago so min_plausible_seconds (15s) is satisfied
+        await prisma!.attempt.update({
+          where: { id: attempt1Id },
+          data: {
+            started_at: new Date(Date.now() - 25000),
+          },
+        });
 
-    // Ensure started_at was at least 20s ago so min_plausible_seconds (15s) is satisfied
-    await prisma!.attempt.update({
-      where: { id: attempt1Id },
-      data: {
-        started_at: new Date(Date.now() - 25000),
+        const completion = await attemptsService.completeAttempt(orgId, studentId, attempt1Id, attempt1Token, {});
+
+        expect(completion.attempt.status).toBe(AttemptStatus.graded);
+        expect(completion.attempt.score).toBeNull();
+        expect(completion.attempt.stars).toBe(3);
+        expect(completion.attempt.motivationMessage).toBeDefined();
+        expect(completion.attempt.flags).toEqual([]);
+        expect(completion.newBadges.some((b) => b.key === 'first_activity')).toBe(true);
+
+        // Verify in real PostgreSQL database
+        const gradedInDb = await prisma!.attempt.findFirst({
+          where: { id: attempt1Id, organization_id: orgId },
+        });
+        expect(gradedInDb?.status).toBe(AttemptStatus.graded);
+        expect(Number(gradedInDb?.score)).toBe(5.0);
+        expect(gradedInDb?.finished_at).toBeDefined();
+        expect(gradedInDb?.graded_at).toBeDefined();
       },
-    });
-
-    const completion = await attemptsService.completeAttempt(orgId, studentId, attempt1Id, attempt1Token, {});
-
-    expect(completion.attempt.status).toBe(AttemptStatus.graded);
-    expect(completion.attempt.score).toBe(5.0);
-    expect(completion.attempt.flags).toEqual([]);
-    expect(completion.newBadges.length).toBeGreaterThanOrEqual(1);
-    expect(completion.newBadges[0]?.key).toBe('first_activity');
-
-    // Verify in real PostgreSQL database
-    const gradedInDb = await prisma!.attempt.findFirst({
-      where: { id: attempt1Id, organization_id: orgId },
-    });
-    expect(gradedInDb?.status).toBe(AttemptStatus.graded);
-    expect(Number(gradedInDb?.score)).toBe(5.0);
-    expect(gradedInDb?.finished_at).toBeDefined();
-    expect(gradedInDb?.graded_at).toBeDefined();
-
-    // Verify ProgressEvent in PostgreSQL
-    const progressEventInDb = await prisma!.progressEvent.findFirst({
-      where: {
-        organization_id: orgId,
-        student_id: studentId,
-        type: ProgressEventType.attempt_completed,
-      },
-    });
-    expect(progressEventInDb).toBeDefined();
-    expect(Number(progressEventInDb?.value)).toBe(5.0);
+    );
   });
 
-  it('Paso 8: Decisión 104 — Jugar de nuevo en asignación abierta crea un Attempt individual (attempt_number = 2) sin sobrescribir el 1', async () => {
-    if (!isPostgresAvailable) return;
+  it('Paso 8: Decisión 104 y 130 — Jugar de nuevo como microjuego autónomo crea un Attempt individual (attempt_number = 2) sin sobrescribir el 1', async () => {
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const runtime2 = await attemptsService.startGameAttempt(orgId, studentId, activityId);
 
-    const runtime2 = await attemptsService.startAttempt(orgId, studentId, assignmentId);
+        attempt2Id = runtime2.attempt.id;
+        expect(runtime2.attempt.attemptNumber).toBe(2);
+        expect(attempt2Id).not.toBe(attempt1Id);
 
-    attempt2Id = runtime2.attempt.id;
-    expect(runtime2.attempt.attemptNumber).toBe(2);
-    expect(attempt2Id).not.toBe(attempt1Id);
+        // Verify DB state: Attempt 1 is still graded 5.0, and Attempt 2 is a separate row
+        const att1InDb = await prisma!.attempt.findFirst({
+          where: { id: attempt1Id, organization_id: orgId },
+        });
+        expect(att1InDb?.status).toBe(AttemptStatus.graded);
+        expect(Number(att1InDb?.score)).toBe(5.0);
 
-    // Verify DB state: Attempt 1 is still graded 5.0, and Attempt 2 is a separate row
-    const att1InDb = await prisma!.attempt.findFirst({
-      where: { id: attempt1Id, organization_id: orgId },
-    });
-    expect(att1InDb?.status).toBe(AttemptStatus.graded);
-    expect(Number(att1InDb?.score)).toBe(5.0);
+        const att2InDb = await prisma!.attempt.findFirst({
+          where: { id: attempt2Id, organization_id: orgId },
+        });
+        expect(att2InDb?.attempt_number).toBe(2);
+        expect(att2InDb?.previous_attempt_id).toBe(attempt1Id);
+        expect(att2InDb?.status).toBe(AttemptStatus.in_progress);
 
-    const att2InDb = await prisma!.attempt.findFirst({
-      where: { id: attempt2Id, organization_id: orgId },
-    });
-    expect(att2InDb?.attempt_number).toBe(2);
-    expect(att2InDb?.previous_attempt_id).toBe(attempt1Id);
-    expect(att2InDb?.status).toBe(AttemptStatus.in_progress);
-
-    // Attempting to start a 3rd attempt while attempt 2 is in_progress must fail with 409
-    await expect(
-      attemptsService.startAttempt(orgId, studentId, assignmentId),
-    ).rejects.toThrow(ConflictException);
+        // T4.1 / SPEC-11 §5.1: Iniciar otro intento mientras attempt 2 está in_progress elimina el intento in_progress previo sin lanzar 409
+        const runtime3 = await attemptsService.startGameAttempt(orgId, studentId, activityId);
+        expect(runtime3.attempt.id).toBeDefined();
+        expect(runtime3.attempt.id).not.toBe(attempt2Id);
+        attempt2Id = runtime3.attempt.id;
+      },
+    );
   });
 
   // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
   it('Paso 9: RF-8 — Intento completado en < min_plausible_seconds recibe flag implausible_duration conservando puntaje en PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
-
-    // started_at set to 4 seconds ago (< 15s min_plausible_seconds)
-    await prisma!.attempt.update({
-      where: { id: attempt2Id },
-      data: {
-        started_at: new Date(Date.now() - 4000),
-      },
-    });
-
-    const token2 = (await attemptsService.getAttempt(orgId, studentId, attempt2Id)).attemptToken!;
-
-    await attemptsService.submitEvents(orgId, studentId, attempt2Id, token2, {
-      events: [
-        {
-          clientEventId: 'evt-match-002',
-          itemId: 'pairs',
-          answer: {
-            [leftAppleId]: rightManzanaId,
-            [leftDogId]: rightPerroId,
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        // started_at set to 4 seconds ago (< 15s min_plausible_seconds)
+        await prisma!.attempt.update({
+          where: { id: attempt2Id },
+          data: {
+            started_at: new Date(Date.now() - 4000),
           },
-        },
-      ],
-    });
+        });
 
-    const completion2 = await attemptsService.completeAttempt(orgId, studentId, attempt2Id, token2, {});
+        const token2 = (await attemptsService.getAttempt(orgId, studentId, attempt2Id)).attemptToken!;
 
-    expect(completion2.attempt.score).toBe(5.0);
-    // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
-    expect(completion2.attempt.flags).toContain('implausible_duration');
+        await attemptsService.submitEvents(orgId, studentId, attempt2Id, token2, {
+          events: [
+            {
+              clientEventId: 'evt-match-002',
+              itemId: 'pairs',
+              answer: {
+                [leftAppleId]: rightManzanaId,
+                [leftDogId]: rightPerroId,
+              },
+            },
+          ],
+        });
 
-    // Verify flag in PostgreSQL
-    const att2InDb = await prisma!.attempt.findFirst({
-      where: { id: attempt2Id, organization_id: orgId },
-    });
-    expect(att2InDb?.status).toBe(AttemptStatus.graded);
-    expect(Number(att2InDb?.score)).toBe(5.0);
-    // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
-    expect(att2InDb?.flags).toContain('implausible_duration');
+        const completion2 = await attemptsService.completeAttempt(orgId, studentId, attempt2Id, token2, {});
+
+        expect(completion2.attempt.score).toBeNull();
+        expect(completion2.attempt.stars).toBe(3);
+        // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
+        expect(completion2.attempt.flags).toContain('implausible_duration');
+
+        // Verify flag in PostgreSQL
+        const att2InDb = await prisma!.attempt.findFirst({
+          where: { id: attempt2Id, organization_id: orgId },
+        });
+        expect(att2InDb?.status).toBe(AttemptStatus.graded);
+        expect(Number(att2InDb?.score)).toBe(5.0);
+        // guardrails-ignore G-C06: prueba de flag de negocio implausible_duration segun SPEC-05 RF-10 y SPEC-06 RF-8
+        expect(att2InDb?.flags).toContain('implausible_duration');
+      },
+    );
   });
 
-  it('Paso 10: RF-11 — Consultar asignaciones tras completar partidas devuelve canStart = true y estado histórico correcto', async () => {
-    if (!isPostgresAvailable) return;
-
-    const continuityList = await attemptsService.listStudentAssignments(orgId, studentId, {
-      scope: 'continuity',
-    });
-
-    expect(continuityList.items.length).toBe(1);
-    const card = continuityList.items[0]!;
-    expect(card.id).toBe(assignmentId);
-    expect(card.canStart).toBe(true); // Open window allows playing again
-    expect(card.latestAttempt?.attemptNumber).toBe(2);
-    expect(card.latestAttempt?.score).toBe(5.0);
+  it('Paso 10: RF-11 — Consultar listStudentGames tras completar partidas devuelve estrellas y estado histórico correcto (Decisión 130)', async () => {
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const gamesList = await attemptsService.listStudentGames(orgId, studentId);
+        const game = gamesList.items.find((g) => g.id === activityId);
+        expect(game).toBeDefined();
+        expect(game?.attemptsCount).toBe(2);
+        expect(game?.bestStars).toBe(3);
+        expect(game?.bestScore).toBeNull();
+        expect(game?.bestMaxScore).toBeNull();
+        expect(game?.status).toBe('completed');
+      },
+    );
   });
 });

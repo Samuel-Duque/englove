@@ -98,4 +98,17 @@ describe('RF-7, RF-8, RF-9, ENG-017: tests de esquema y restricciones', () => {
       /examDetail:\s*\{[\s\S]*?answer_key:\s*true/,
     );
   });
+
+  it('RF-01 (SPEC-11): migration includes attempts_parent_xor_check constraint and media_assets_student_id_idx', () => {
+    const microgamesMigrationPath = path.resolve(
+      __dirname,
+      '../prisma/migrations/20261108000000_autonomous_microgames/migration.sql',
+    );
+    const microgamesMigrationContent = fs.readFileSync(microgamesMigrationPath, 'utf8');
+
+    expect(microgamesMigrationContent).toMatch(/CONSTRAINT\s+"attempts_parent_xor_check"\s+CHECK/i);
+    expect(microgamesMigrationContent).toMatch(/CREATE INDEX\s+"media_assets_student_id_idx"\s+ON\s+"media_assets"\("student_id"\)/i);
+    expect(schemaContent).toMatch(/@@unique\(\[activity_id,\s*student_id,\s*attempt_number\]\)/);
+    expect(schemaContent).toMatch(/@@index\(\[organization_id,\s*activity_id,\s*status,\s*graded_at\]\)/);
+  });
 });

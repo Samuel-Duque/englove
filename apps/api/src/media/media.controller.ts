@@ -2,20 +2,18 @@ import {
   Controller,
   Post,
   Get,
-  Put,
-  Res,
   Param,
   Body,
+  Headers,
   HttpCode,
   HttpStatus,
   UseInterceptors,
   ParseUUIDPipe,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { MediaService } from './media.service';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
 import { MediaUploadUrlDto } from './dto/media.dto';
@@ -23,6 +21,7 @@ import {
   Role,
   MediaUploadUrlResponse,
   MediaPlaybackUrlResponse,
+  MediaConfirmResponse,
 } from '@englove/shared';
 
 const uuidPipe = new ParseUUIDPipe({
@@ -46,6 +45,7 @@ export class MediaController {
   async getUploadUrl(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: MediaUploadUrlDto,
+    @Headers('x-attempt-token') attemptToken?: string,
   ): Promise<MediaUploadUrlResponse> {
     if (!user.studentId) {
       throw new BadRequestException({
@@ -55,10 +55,51 @@ export class MediaController {
       });
     }
 
+    if (!attemptToken) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'ATTEMPT_TOKEN_REQUIRED',
+        message: 'Se requiere x-attempt-token para obtener URL de subida',
+      });
+    }
+
     return this.mediaService.createUploadUrl(
       user.organizationId,
       user.studentId,
       dto,
+      attemptToken,
+    );
+  }
+
+  @Post(':id/confirm')
+  @Roles(Role.student)
+  @HttpCode(HttpStatus.OK)
+  async confirmMedia(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', uuidPipe) id: string,
+    @Headers('x-attempt-token') attemptToken?: string,
+  ): Promise<MediaConfirmResponse> {
+    if (!user.studentId) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'STUDENT_PROFILE_REQUIRED',
+        message: 'Se requiere perfil de estudiante para confirmar audio',
+      });
+    }
+
+    if (!attemptToken) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'ATTEMPT_TOKEN_REQUIRED',
+        message: 'Se requiere x-attempt-token para confirmar audio',
+      });
+    }
+
+    return this.mediaService.confirmUploadEndpoint(
+      user.organizationId,
+      user.studentId,
+      id,
+      attemptToken,
     );
   }
 
@@ -80,21 +121,5 @@ export class MediaController {
     @Param('id', uuidPipe) id: string,
   ): Promise<MediaPlaybackUrlResponse> {
     return this.mediaService.getDownloadUrl(user.organizationId, id);
-  }
-
-  @Public()
-  @Put('mock-upload/:id')
-  @HttpCode(HttpStatus.OK)
-  async handleMockUpload(@Param('id') id: string) {
-    return { ok: true, id };
-  }
-
-  @Public()
-  @Get('mock-stream/:id')
-  async handleMockStream(@Param('id') _id: string, @Res() res: Response) {
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Content-Type', 'audio/webm');
-    res.setHeader('Content-Length', '0');
-    res.status(HttpStatus.OK).end();
   }
 }

@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -12,16 +13,20 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
-import { ApprovalStatus } from '@englove/shared';
+import { ApprovalStatus, Role, AgeSegment } from '@englove/shared';
+import { RateLimiterService } from '../rate-limiting/rate-limiter.service';
+import { consumeAnonymousIpBudgetOnce } from '../rate-limiting/rate-limiter.guard';
+import { extractClientIp } from '../utils/identity.utils';
 
 interface JwtPayload {
   sub: string;
   email: string;
-  role: string;
+  role: Role;
   org: string;
   sid: string;
   student_id?: string;
-  age_segment?: string;
+  age_segment?: AgeSegment;
+  typ?: string;
 }
 
 @Injectable()
@@ -34,12 +39,16 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly rateLimiterService?: RateLimiterService,
   ) {
     this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'englove_');
-    this.jwtSecret = this.configService.get<string>(
-      'JWT_SECRET',
-      'englove-dev-jwt-secret-min-32-chars-long-local-secret!',
-    );
+    this.jwtSecret =
+      typeof this.configService.getOrThrow === 'function'
+        ? this.configService.getOrThrow<string>('JWT_SECRET')
+        : (this.configService.get<string>('JWT_SECRET') ?? '');
+    if (!this.jwtSecret) {
+      throw new Error('JWT_SECRET configuration is missing');
+    }
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -55,6 +64,7 @@ export class JwtAuthGuard implements CanActivate {
       if (isPublic) {
         return true;
       }
+      consumeAnonymousIpBudgetOnce(this.rateLimiterService, request, extractClientIp(request));
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'AUTH_UNAUTHORIZED',
@@ -67,9 +77,18 @@ export class JwtAuthGuard implements CanActivate {
         secret: this.jwtSecret,
       });
 
+      if (payload.typ !== 'access') {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'Tu sesión terminó. Inicia sesión de nuevo',
+        });
+      }
+
       // Query session by sid to ensure session is active and not revoked (Decision 68)
       const session = await this.prisma.authSession.findFirst({
         where: { id: payload.sid, organization_id: payload.org },
+        include: { user: { select: { id: true, email: true, locked_until: true } } },
       });
 
       if (!session || session.revoked_at !== null || session.expires_at <= new Date()) {
@@ -88,6 +107,26 @@ export class JwtAuthGuard implements CanActivate {
         });
       }
 
+      // Check user locked_until to sever active sessions for locked accounts (P1-12)
+      let lockedUntil: Date | null | undefined =
+        typeof session === 'object' && session !== null && 'user' in session && session.user && typeof session.user === 'object' && 'locked_until' in session.user
+          ? (session.user.locked_until instanceof Date ? session.user.locked_until : null)
+          : undefined;
+      if (lockedUntil === undefined && this.prisma.user) {
+        const u = await this.prisma.user.findFirst({
+          where: { id: payload.sub, organization_id: payload.org },
+          select: { locked_until: true },
+        });
+        lockedUntil = u?.locked_until;
+      }
+      if (lockedUntil && lockedUntil > new Date()) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'Tu cuenta se encuentra bloqueada temporalmente',
+        });
+      }
+
       // Check current student approval status (RF-2: synthetic JWT cannot bypass approval)
       let studentId = payload.student_id;
       let ageSegment = payload.age_segment;
@@ -100,7 +139,7 @@ export class JwtAuthGuard implements CanActivate {
         if (!student || student.approval_status === ApprovalStatus.pending_approval) {
           throw new ForbiddenException({
             statusCode: 403,
-            code: 'FORBIDDEN',
+            code: 'AUTH_FORBIDDEN',
             message: 'No tienes acceso a esta sección',
           });
         }
@@ -111,21 +150,22 @@ export class JwtAuthGuard implements CanActivate {
 
       const authUser: AuthenticatedUser = {
         id: payload.sub,
-        email: payload.email,
-        role: payload.role as AuthenticatedUser['role'],
+        email: session.user?.email ?? payload.email,
+        role: payload.role,
         organizationId: payload.org,
         studentId,
-        ageSegment: ageSegment as AuthenticatedUser['ageSegment'],
+        ageSegment,
         sessionId: payload.sid,
       };
 
-      (request as unknown as { user: AuthenticatedUser }).user = authUser;
+      Object.assign(request, { user: authUser });
       return true;
     } catch (err) {
       if (isPublic) {
         return true;
       }
-      if (err instanceof ForbiddenException) {
+      consumeAnonymousIpBudgetOnce(this.rateLimiterService, request, extractClientIp(request));
+      if (err instanceof ForbiddenException || err instanceof UnauthorizedException) {
         throw err;
       }
       throw new UnauthorizedException({
@@ -138,10 +178,7 @@ export class JwtAuthGuard implements CanActivate {
 
   private extractToken(request: Request): string | undefined {
     const cookieName = `${this.cookiePrefix}access_token`;
-    const fromCookie =
-      request.cookies?.[cookieName] ||
-      request.cookies?.['access_token'] ||
-      request.cookies?.['englove_access_token'];
+    const fromCookie = request.cookies?.[cookieName];
 
     if (fromCookie && typeof fromCookie === 'string') {
       return fromCookie;

@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ActivityStatus,
@@ -14,8 +15,34 @@ import {
   resolveActivityDurations,
   validateActivityPayload,
   ActivityValidationError,
-  GameConfig,
+  SpeakingConfigSchema,
+  GameConfigSchema,
+  GameMechanic,
+  Level,
 } from '@englove/shared';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function toPrismaJson(val: unknown): Prisma.InputJsonValue {
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+    return val;
+  }
+  if (Array.isArray(val)) {
+    return val.map((item) => (item === null ? null : toPrismaJson(item)));
+  }
+  if (isRecord(val)) {
+    const obj: Record<string, Prisma.InputJsonValue | null> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        obj[k] = v === null ? null : toPrismaJson(v);
+      }
+    }
+    return obj;
+  }
+  return {};
+}
 import {
   CreateActivityDto,
   UpdateActivityDto,
@@ -26,7 +53,7 @@ interface ActivityWithDetails {
   id: string;
   organization_id: string;
   type: ActivityType;
-  level: ActivitySummary['level'];
+  level: Level;
   title: string;
   status: ActivityStatus;
   version: number;
@@ -36,16 +63,16 @@ interface ActivityWithDetails {
   created_by: string;
   created_at: Date;
   updated_at: Date;
-  fill_blank_detail?: { config: unknown; answer_key: unknown } | null;
-  open_question_detail?: { config: unknown } | null;
+  fill_blank_detail?: { config: Prisma.JsonValue | unknown; answer_key?: Prisma.JsonValue | unknown } | null;
+  open_question_detail?: { config: Prisma.JsonValue | unknown } | null;
   speaking_detail?: {
     prompt: string;
     example_url: string | null;
     min_duration_seconds: number;
     max_duration_seconds: number;
   } | null;
-  game_detail?: { mechanic: unknown; config: unknown; answer_key: unknown } | null;
-  exam_detail?: { config: unknown; answer_key: unknown } | null;
+  game_detail?: { mechanic: unknown; config: Prisma.JsonValue | unknown; answer_key?: Prisma.JsonValue | unknown } | null;
+  exam_detail?: { config: Prisma.JsonValue | unknown; answer_key?: Prisma.JsonValue | unknown } | null;
 }
 
 @Injectable()
@@ -243,7 +270,7 @@ export class ActivitiesService {
       });
     }
 
-    return this.toActivityEditor(activity as unknown as ActivityWithDetails, false);
+    return this.toActivityEditor(activity, false);
   }
 
   async createActivity(
@@ -303,8 +330,8 @@ export class ActivitiesService {
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              config: validConfig as object,
-              answer_key: (validAnswerKey ?? {}) as object,
+              config: toPrismaJson(validConfig),
+              answer_key: toPrismaJson(validAnswerKey),
             },
           });
           break;
@@ -314,40 +341,40 @@ export class ActivitiesService {
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              config: validConfig as object,
+              config: toPrismaJson(validConfig),
             },
           });
           break;
 
         case ActivityType.speaking: {
-          const spkConfig = validConfig as {
-            prompt: string;
-            exampleUrl?: string;
-            minDurationSeconds: number;
-            maxDurationSeconds: number;
-          };
+          const parsedSpk = SpeakingConfigSchema.safeParse(validConfig);
+          const prompt = parsedSpk.success ? parsedSpk.data.prompt : '';
+          const exampleUrl = parsedSpk.success ? parsedSpk.data.exampleUrl : undefined;
+          const minDuration = parsedSpk.success ? parsedSpk.data.minDurationSeconds : 2;
+          const maxDuration = parsedSpk.success ? parsedSpk.data.maxDurationSeconds : 120;
           await tx.speakingDetail.create({
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              prompt: spkConfig.prompt,
-              example_url: spkConfig.exampleUrl ?? null,
-              min_duration_seconds: spkConfig.minDurationSeconds,
-              max_duration_seconds: spkConfig.maxDurationSeconds,
+              prompt,
+              example_url: exampleUrl ?? null,
+              min_duration_seconds: minDuration,
+              max_duration_seconds: maxDuration,
             },
           });
           break;
         }
 
         case ActivityType.game: {
-          const gameConfig = validConfig as GameConfig;
+          const parsedGame = GameConfigSchema.safeParse(validConfig);
+          const mechanic = parsedGame.success ? parsedGame.data.mechanic : GameMechanic.match;
           await tx.gameDetail.create({
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              mechanic: gameConfig.mechanic,
-              config: validConfig as object,
-              answer_key: (validAnswerKey ?? {}) as object,
+              mechanic,
+              config: toPrismaJson(validConfig),
+              answer_key: toPrismaJson(validAnswerKey),
             },
           });
           break;
@@ -358,8 +385,8 @@ export class ActivitiesService {
             data: {
               organization_id: organizationId,
               activity_id: act.id,
-              config: validConfig as object,
-              answer_key: (validAnswerKey ?? {}) as object,
+              config: toPrismaJson(validConfig),
+              answer_key: toPrismaJson(validAnswerKey),
             },
           });
           break;
@@ -412,9 +439,7 @@ export class ActivitiesService {
     const attemptCount = await this.prisma.attempt.count({
       where: {
         organization_id: organizationId,
-        assignment: {
-          activity_id: id,
-        },
+        OR: [{ activity_id: id }, { assignment: { activity_id: id } }],
       },
     });
 
@@ -458,7 +483,7 @@ export class ActivitiesService {
 
     if (activity.type === ActivityType.game && dto.config !== undefined) {
       const existingMechanic = activity.game_detail?.mechanic;
-      const newMechanic = (dto.config as Record<string, unknown>)?.['mechanic'];
+      const newMechanic = isRecord(dto.config) ? dto.config['mechanic'] : undefined;
       if (newMechanic && existingMechanic && newMechanic !== existingMechanic) {
         throw new BadRequestException({
           statusCode: 400,
@@ -481,8 +506,8 @@ export class ActivitiesService {
     }
 
     const isPublished = activity.status === ActivityStatus.published;
-    const configToValidate = dto.config !== undefined ? dto.config : this.extractConfigAndKey(activity as unknown as ActivityWithDetails).config;
-    const answerKeyToValidate = dto.answerKey !== undefined ? dto.answerKey : this.extractConfigAndKey(activity as unknown as ActivityWithDetails).answerKey;
+    const configToValidate = dto.config !== undefined ? dto.config : this.extractConfigAndKey(activity).config;
+    const answerKeyToValidate = dto.answerKey !== undefined ? dto.answerKey : this.extractConfigAndKey(activity).answerKey;
 
     const { validConfig, validAnswerKey, weightsAdjusted } = this.validateActivityContent(
       activity.type,
@@ -518,12 +543,31 @@ export class ActivitiesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        // C-04: Bloqueo de fila común sobre activities para serializar edición frente al primer intento
+        const lockedRows = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+          SELECT id, status
+          FROM activities
+          WHERE id = ${id}::uuid
+            AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        if (Array.isArray(lockedRows) && lockedRows.length > 0 && lockedRows[0]?.status === ActivityStatus.archived) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'ACTIVITY_NOT_EDITABLE',
+            message: 'Esta actividad no se puede editar porque ya está archivada',
+          });
+        }
+      }
+
       const attemptsCount = await tx.attempt.count({
         where: {
-          assignment: {
-            activity_id: id,
-          },
           organization_id: organizationId,
+          OR: [
+            { activity_id: id },
+            { assignment: { activity_id: id } },
+          ],
         },
       });
 
@@ -535,7 +579,7 @@ export class ActivitiesService {
         });
       }
       await tx.activity.update({
-        where: { id: activity.id },
+        where: { id: activity.id, organization_id: organizationId },
         data: {
           title: trimmedTitle,
           level: dto.level,
@@ -548,37 +592,36 @@ export class ActivitiesService {
         switch (activity.type) {
           case ActivityType.fill_blank:
             await tx.fillBlankDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
-                config: validConfig as object,
-                answer_key: (validAnswerKey ?? {}) as object,
+                config: toPrismaJson(validConfig),
+                answer_key: toPrismaJson(validAnswerKey),
               },
             });
             break;
 
           case ActivityType.open_question:
             await tx.openQuestionDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
-                config: validConfig as object,
+                config: toPrismaJson(validConfig),
               },
             });
             break;
 
           case ActivityType.speaking: {
-            const spkConfig = validConfig as {
-              prompt: string;
-              exampleUrl?: string;
-              minDurationSeconds: number;
-              maxDurationSeconds: number;
-            };
+            const parsedSpk = SpeakingConfigSchema.safeParse(validConfig);
+            const prompt = parsedSpk.success ? parsedSpk.data.prompt : '';
+            const exampleUrl = parsedSpk.success ? parsedSpk.data.exampleUrl : undefined;
+            const minDuration = parsedSpk.success ? parsedSpk.data.minDurationSeconds : 2;
+            const maxDuration = parsedSpk.success ? parsedSpk.data.maxDurationSeconds : 120;
             await tx.speakingDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
-                prompt: spkConfig.prompt,
-                example_url: spkConfig.exampleUrl ?? null,
-                min_duration_seconds: spkConfig.minDurationSeconds,
-                max_duration_seconds: spkConfig.maxDurationSeconds,
+                prompt,
+                example_url: exampleUrl ?? null,
+                min_duration_seconds: minDuration,
+                max_duration_seconds: maxDuration,
               },
             });
             break;
@@ -586,20 +629,20 @@ export class ActivitiesService {
 
           case ActivityType.game:
             await tx.gameDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
-                config: validConfig as object,
-                answer_key: (validAnswerKey ?? {}) as object,
+                config: toPrismaJson(validConfig),
+                answer_key: toPrismaJson(validAnswerKey),
               },
             });
             break;
 
           case ActivityType.exam:
             await tx.examDetail.update({
-              where: { activity_id: activity.id },
+              where: { activity_id: activity.id, organization_id: organizationId },
               data: {
-                config: validConfig as object,
-                answer_key: (validAnswerKey ?? {}) as object,
+                config: toPrismaJson(validConfig),
+                answer_key: toPrismaJson(validAnswerKey),
               },
             });
             break;
@@ -645,14 +688,14 @@ export class ActivitiesService {
     }
 
     if (activity.status === ActivityStatus.published) {
-      return this.toActivityEditor(activity as unknown as ActivityWithDetails, false);
+      return this.toActivityEditor(activity, false);
     }
 
-    const { config, answerKey } = this.extractConfigAndKey(activity as unknown as ActivityWithDetails);
+    const { config, answerKey } = this.extractConfigAndKey(activity);
     this.validateActivityContent(activity.type, config, answerKey, true);
 
     await this.prisma.activity.update({
-      where: { id: activity.id },
+      where: { id: activity.id, organization_id: organizationId },
       data: {
         status: ActivityStatus.published,
       },
@@ -714,8 +757,8 @@ export class ActivitiesService {
               data: {
                 organization_id: organizationId,
                 activity_id: act.id,
-                config: source.fill_blank_detail.config as object,
-                answer_key: source.fill_blank_detail.answer_key as object,
+                config: toPrismaJson(source.fill_blank_detail.config),
+                answer_key: toPrismaJson(source.fill_blank_detail.answer_key),
               },
             });
           }
@@ -727,7 +770,7 @@ export class ActivitiesService {
               data: {
                 organization_id: organizationId,
                 activity_id: act.id,
-                config: source.open_question_detail.config as object,
+                config: toPrismaJson(source.open_question_detail.config),
               },
             });
           }
@@ -755,8 +798,8 @@ export class ActivitiesService {
                 organization_id: organizationId,
                 activity_id: act.id,
                 mechanic: source.game_detail.mechanic,
-                config: source.game_detail.config as object,
-                answer_key: source.game_detail.answer_key as object,
+                config: toPrismaJson(source.game_detail.config),
+                answer_key: toPrismaJson(source.game_detail.answer_key),
               },
             });
           }
@@ -768,8 +811,8 @@ export class ActivitiesService {
               data: {
                 organization_id: organizationId,
                 activity_id: act.id,
-                config: source.exam_detail.config as object,
-                answer_key: source.exam_detail.answer_key as object,
+                config: toPrismaJson(source.exam_detail.config),
+                answer_key: toPrismaJson(source.exam_detail.answer_key),
               },
             });
           }
@@ -803,7 +846,7 @@ export class ActivitiesService {
     }
 
     await this.prisma.activity.update({
-      where: { id: activity.id },
+      where: { id: activity.id, organization_id: organizationId },
       data: {
         status: ActivityStatus.archived,
       },
@@ -843,11 +886,11 @@ export class ActivitiesService {
       });
     }
 
-    const { config, answerKey } = this.extractConfigAndKey(activity as unknown as ActivityWithDetails);
+    const { config, answerKey } = this.extractConfigAndKey(activity);
     this.validateActivityContent(activity.type, config, answerKey, true);
 
     await this.prisma.activity.update({
-      where: { id: activity.id },
+      where: { id: activity.id, organization_id: organizationId },
       data: {
         status: ActivityStatus.published,
       },
@@ -858,6 +901,17 @@ export class ActivitiesService {
 
   async deleteActivity(organizationId: string, id: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        // C-04: Bloqueo de fila común sobre activities antes de validar dependencias para borrado
+        await tx.$queryRaw`
+          SELECT id
+          FROM activities
+          WHERE id = ${id}::uuid
+            AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+      }
+
       const activity = await tx.activity.findFirst({
         where: {
           id,
@@ -877,21 +931,29 @@ export class ActivitiesService {
         });
       }
 
+      const attemptsCount = await tx.attempt.count({
+        where: {
+          organization_id: organizationId,
+          OR: [{ activity_id: id }, { assignment: { activity_id: id } }],
+        },
+      });
+
       const isDraft = activity.status === ActivityStatus.draft;
       const hasAssignments = activity.assignments.length > 0;
       const hasChildren = activity.children.length > 0;
+      const hasAttempts = attemptsCount > 0;
 
-      if (!isDraft || hasAssignments || hasChildren) {
+      if (!isDraft || hasAssignments || hasChildren || hasAttempts) {
         throw new ConflictException({
           statusCode: 409,
           code: 'ACTIVITY_DELETE_NOT_ALLOWED',
           message:
-            'No se puede eliminar la actividad. Solo se pueden borrar borradores sin asignaciones ni versiones derivadas.',
+            'No se puede eliminar la actividad. Solo se pueden borrar borradores sin asignaciones, intentos ni versiones derivadas.',
         });
       }
 
       await tx.activity.delete({
-        where: { id: activity.id },
+        where: { id: activity.id, organization_id: organizationId },
       });
     });
   }

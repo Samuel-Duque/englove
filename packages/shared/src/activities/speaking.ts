@@ -13,7 +13,7 @@ export const SpeakingConfigSchema = z.object({
     .refine((url) => url.startsWith('https://'), { message: 'URL de ejemplo debe ser HTTPS' })
     .optional(),
   minDurationSeconds: z.literal(2).default(2),
-  maxDurationSeconds: z.number().int().min(2).max(300).default(120),
+  maxDurationSeconds: z.number().int().min(2).max(300, 'La grabación no puede durar más de 300 segundos').default(120),
 });
 
 export type SpeakingConfig = z.infer<typeof SpeakingConfigSchema>;

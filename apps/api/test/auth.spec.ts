@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createHmac, randomBytes } from 'node:crypto';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -151,13 +152,15 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         student: null,
       });
 
-      // Verify httpOnly cookies were set
-      expect(res.cookie).toHaveBeenCalledTimes(2);
+      // Verify session cookies were set (access, refresh, session_hint per QA-02)
+      expect(res.cookie).toHaveBeenCalledTimes(3);
       expect(res.cookies['englove_access_token']?.options.httpOnly).toBe(true);
       expect(res.cookies['englove_access_token']?.options.path).toBe('/');
       expect(res.cookies['englove_refresh_token']?.options.httpOnly).toBe(true);
-      expect(res.cookies['englove_refresh_token']?.options.path).toBe('/api/v1/auth/refresh');
-    });
+      expect(res.cookies['englove_refresh_token']?.options.path).toBe('/api/v1/auth');
+      expect(res.cookies['englove_session_hint']?.options.httpOnly).toBe(false);
+      expect(res.cookies['englove_session_hint']?.options.path).toBe('/');
+    }, 15000);
 
     it('devuelve respuesta uniforme 401 AUTH_INVALID_CREDENTIALS ante correo inexistente o contraseña errónea', async () => {
       const mockPrisma = {
@@ -350,11 +353,13 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
           }),
         }),
       );
-      expect(res.cookie).toHaveBeenCalledTimes(2);
+      expect(res.cookie).toHaveBeenCalledTimes(3);
     });
 
-    it('revoca la familia de sesión completa si se detecta reuso de token rotado', async () => {
-      const oldSecret = 'already-rotated-secret';
+    it('revoca la familia de sesión completa si se detecta reuso acreditado de token rotado', async () => {
+      const nonce = randomBytes(24).toString('hex');
+      const mac = createHmac('sha256', JWT_SECRET).update(`${sessionId}:${nonce}`).digest('hex');
+      const oldSecret = `${nonce}-${mac}`;
       const currentSecret = 'newest-secret';
       const currentHash = hashSha256(currentSecret);
 
@@ -364,6 +369,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         user_id: teacherId,
         refresh_token_hash: currentHash, // current hash in DB does not match oldSecret
         expires_at: new Date(Date.now() + 100000),
+        rotated_at: new Date(),
         revoked_at: null,
       };
 
@@ -396,10 +402,48 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
 
       // Verify session was revoked in DB
       expect(mockPrisma.authSession.update).toHaveBeenCalledWith({
-        where: { id: sessionId },
+        where: { id: sessionId, organization_id: orgId },
         data: { revoked_at: expect.any(Date) },
       });
       // Verify cookies were cleared
+      expect(res.clearCookie).toHaveBeenCalled();
+    });
+
+    it('C-01: no revoca una sesión activa si refresh recibe un SID conocido con secreto arbitrario inválido', async () => {
+      const currentSecret = 'valid-active-secret';
+      const currentHash = hashSha256(currentSecret);
+
+      const sessionRecord = {
+        id: sessionId,
+        organization_id: orgId,
+        user_id: teacherId,
+        refresh_token_hash: currentHash,
+        expires_at: new Date(Date.now() + 100000),
+        rotated_at: new Date(),
+        revoked_at: null,
+      };
+
+      const mockPrisma = {
+        authSession: {
+          findFirst: vi.fn().mockResolvedValue(sessionRecord),
+          update: vi.fn(),
+        },
+      } as unknown as PrismaService;
+
+      const authService = new AuthService(
+        mockPrisma,
+        mockConfigService,
+        jwtService,
+        mockMailService,
+        rateLimiter,
+      );
+
+      const res = createMockResponse();
+      await expect(
+        authService.refresh(`${sessionId}.arbitrary-forged-secret`, res),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockPrisma.authSession.update).not.toHaveBeenCalled();
       expect(res.clearCookie).toHaveBeenCalled();
     });
 
@@ -700,7 +744,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       // Unlock
       await studentsService.unlockStudent(orgId, studentId);
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: studentUserId },
+        where: { id: studentUserId, organization_id: orgId },
         data: { locked_until: null, failed_login_count: 0 },
       });
     });
@@ -1067,7 +1111,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       await studentsService.rejectStudent(orgId, studentId);
 
       expect(mockPrisma.user.delete).toHaveBeenCalledWith({
-        where: { id: studentUserId },
+        where: { id: studentUserId, organization_id: orgId },
       });
     });
 
@@ -1454,7 +1498,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
     it('JwtAuthGuard bloquea JWT sintético de estudiante sin student_id cuando el alumno no está aprobado', async () => {
       // Synthetic token without student_id in payload
       const token = jwtService.sign(
-        { sub: studentUserId, email: 'carlos@student.edu', role: Role.student, org: orgId, sid: sessionId },
+        { sub: studentUserId, email: 'carlos@student.edu', role: Role.student, org: orgId, sid: sessionId, typ: 'access' },
         { secret: JWT_SECRET },
       );
 
@@ -1628,7 +1672,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         },
       } as unknown as PrismaService;
 
-      const maintenance = new MaintenanceService(mockPrisma);
+      const maintenance = new MaintenanceService(mockPrisma, {} as any, {} as any, {} as any, {} as any, {} as any);
       await maintenance.runIdentityMaintenance('2026-10-21');
 
       expect(mockPrisma.scheduledJobRun.create).toHaveBeenCalledWith(
@@ -1685,7 +1729,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
         },
       } as unknown as PrismaService;
 
-      const maintenance = new MaintenanceService(mockPrisma);
+      const maintenance = new MaintenanceService(mockPrisma, {} as any, {} as any, {} as any, {} as any, {} as any);
       await expect(maintenance.runIdentityMaintenance('2026-10-21')).resolves.not.toThrow();
       expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
     });

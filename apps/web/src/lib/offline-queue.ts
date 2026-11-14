@@ -6,20 +6,24 @@
  * mediaId reuse, response handling (RF-15), and user queue isolation (RF-5).
  */
 
-import { uploadAudioBlob } from './audio-upload';
+import { uploadAudioBlob } from "./audio-upload";
+import { ApiError } from "./api";
+import { isLogoutPending } from "./auth-session";
 
 export interface PendingEventRecord {
   id?: number;
   userId: string;
   attemptId: string;
   clientEventId: string;
-  eventType: 'answered' | 'completed';
+  eventType: "answered" | "completed";
   payload: Record<string, unknown>;
   attemptToken: string;
   createdAt: number; // Local FIFO only, NEVER sent to API (Decision 37)
 }
 
 export interface PendingUploadRecord {
+  // Un borrador del grabador no se sube en paralelo al envío directo; Entregar lo encola.
+  isDraft?: boolean;
   attemptId: string;
   userId: string;
   blob: Blob;
@@ -38,21 +42,30 @@ export interface OfflineStatus {
   justFlushed: boolean;
 }
 
-const DB_NAME = 'englove_offline';
+const DB_NAME = "englove_offline";
 const DB_VERSION = 2;
-const EVENTS_STORE = 'pendingEvents';
-const UPLOADS_STORE = 'pendingUploads';
+const EVENTS_STORE = "pendingEvents";
+const UPLOADS_STORE = "pendingUploads";
 
 function createStoresIfMissing(db: IDBDatabase) {
   if (!db.objectStoreNames.contains(EVENTS_STORE)) {
-    const eventStore = db.createObjectStore(EVENTS_STORE, { keyPath: 'id', autoIncrement: true });
-    eventStore.createIndex('attemptId', 'attemptId', { unique: false });
-    eventStore.createIndex('userId', 'userId', { unique: false });
+    const eventStore = db.createObjectStore(EVENTS_STORE, {
+      keyPath: "id",
+      autoIncrement: true,
+    });
+    eventStore.createIndex("attemptId", "attemptId", { unique: false });
+    eventStore.createIndex("userId", "userId", { unique: false });
   }
   if (!db.objectStoreNames.contains(UPLOADS_STORE)) {
-    const uploadStore = db.createObjectStore(UPLOADS_STORE, { keyPath: 'attemptId' });
-    uploadStore.createIndex('userId', 'userId', { unique: false });
+    const uploadStore = db.createObjectStore(UPLOADS_STORE, {
+      keyPath: "attemptId",
+    });
+    uploadStore.createIndex("userId", "userId", { unique: false });
   }
+}
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
 let isQueuePausedDueToAuth = false;
@@ -64,30 +77,56 @@ let lastSyncedAt: number | null = null;
 let justFlushed = false;
 let justFlushedTimer: NodeJS.Timeout | null = null;
 let hasBeenOffline = false;
+let activeQueueUserId: string | null = null;
+let identityGeneration = 0;
+let flushAbortController: AbortController | null = null;
+
+export function getOfflineUserId(): string | null {
+  return isLogoutPending() ? null : activeQueueUserId;
+}
+
+export function suspendOfflineQueue(): void {
+  flushAbortController?.abort();
+  identityGeneration++;
+  activeQueueUserId = null;
+  isQueuePausedDueToAuth = true;
+  resetBackoff();
+  if (flushDebounceTimer) clearTimeout(flushDebounceTimer);
+  flushDebounceTimer = null;
+}
+
+function hasActiveIdentity(userId: string): boolean {
+  return Boolean(userId && userId === getOfflineUserId());
+}
 
 const statusListeners = new Set<(status: OfflineStatus) => void>();
 
 function notifyStatus() {
-  getPendingCount().then((count) => {
-    const isOffline = typeof navigator !== 'undefined' ? !navigator.onLine : false;
-    const status: OfflineStatus = {
-      isOffline,
-      pendingCount: count,
-      isFlushing: isFlushingInternal,
-      lastSyncedAt,
-      justFlushed,
-    };
-    for (const listener of statusListeners) {
-      try {
-        listener(status);
-      } catch {
-        // Ignore subscriber error
+  getPendingCount(getOfflineUserId() ?? "")
+    .then((count) => {
+      const isOffline =
+        typeof navigator !== "undefined" ? !navigator.onLine : false;
+      const status: OfflineStatus = {
+        isOffline,
+        pendingCount: count,
+        isFlushing: isFlushingInternal,
+        lastSyncedAt,
+        justFlushed,
+      };
+      for (const listener of statusListeners) {
+        try {
+          listener(status);
+        } catch {
+          // Ignore subscriber error
+        }
       }
-    }
-  }).catch(() => {});
+    })
+    .catch(() => {});
 }
 
-export function subscribeOfflineStatus(listener: (status: OfflineStatus) => void): () => void {
+export function subscribeOfflineStatus(
+  listener: (status: OfflineStatus) => void,
+): () => void {
   statusListeners.add(listener);
   notifyStatus();
   return () => {
@@ -96,10 +135,10 @@ export function subscribeOfflineStatus(listener: (status: OfflineStatus) => void
 }
 
 // IndexedDB Helper
-function openOfflineDb(): Promise<IDBDatabase> {
+export function openOfflineDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !('indexedDB' in window)) {
-      return reject(new Error('IndexedDB not supported'));
+    if (typeof window === "undefined" || !("indexedDB" in window)) {
+      return reject(new Error("IndexedDB not supported"));
     }
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
@@ -107,7 +146,10 @@ function openOfflineDb(): Promise<IDBDatabase> {
     };
     request.onsuccess = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(EVENTS_STORE) || !db.objectStoreNames.contains(UPLOADS_STORE)) {
+      if (
+        !db.objectStoreNames.contains(EVENTS_STORE) ||
+        !db.objectStoreNames.contains(UPLOADS_STORE)
+      ) {
         // Self-heal: database was created without stores. Delete and recreate at DB_VERSION to avoid VersionError drift (ISSUE-04)
         db.close();
         const delReq = window.indexedDB.deleteDatabase(DB_NAME);
@@ -115,13 +157,13 @@ function openOfflineDb(): Promise<IDBDatabase> {
           openOfflineDb().then(resolve, reject);
         };
         delReq.onerror = () => reject(delReq.error);
-        delReq.onblocked = () => reject(new Error('IndexedDB delete blocked'));
+        delReq.onblocked = () => reject(new Error("IndexedDB delete blocked"));
         return;
       }
       resolve(db);
     };
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('IndexedDB blocked'));
+    request.onblocked = () => reject(new Error("IndexedDB blocked"));
   });
 }
 
@@ -129,10 +171,19 @@ function openOfflineDb(): Promise<IDBDatabase> {
  * Enqueues an answered event.
  * Local `createdAt` never travels to the API (Decision 37).
  */
-export async function enqueueEvent(record: Omit<PendingEventRecord, 'id' | 'createdAt'>): Promise<number> {
+export async function enqueueEvent(
+  record: Omit<PendingEventRecord, "id" | "createdAt">,
+): Promise<number> {
+  if (!hasActiveIdentity(record.userId))
+    throw new Error("OFFLINE_IDENTITY_REQUIRED");
+  const generation = identityGeneration;
   const db = await openOfflineDb();
+  if (generation !== identityGeneration || !hasActiveIdentity(record.userId)) {
+    db.close();
+    throw new Error("OFFLINE_IDENTITY_REQUIRED");
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(EVENTS_STORE, 'readwrite');
+    const tx = db.transaction(EVENTS_STORE, "readwrite");
     const store = tx.objectStore(EVENTS_STORE);
     const item: PendingEventRecord = {
       ...record,
@@ -140,14 +191,15 @@ export async function enqueueEvent(record: Omit<PendingEventRecord, 'id' | 'crea
     };
     const req = store.add(item);
     req.onsuccess = () => {
-      const generatedId = req.result as number;
+      const generatedId =
+        typeof req.result === "number" ? req.result : Number(req.result);
       resolve(generatedId);
     };
     req.onerror = () => reject(req.error);
     tx.oncomplete = () => {
       db.close();
       notifyStatus();
-      scheduleDebouncedFlush(250);
+      scheduleDebouncedFlush(250, record.userId);
     };
   });
 }
@@ -155,10 +207,19 @@ export async function enqueueEvent(record: Omit<PendingEventRecord, 'id' | 'crea
 /**
  * Enqueues an audio recording for background upload.
  */
-export async function enqueueUpload(record: Omit<PendingUploadRecord, 'createdAt'>): Promise<void> {
+export async function enqueueUpload(
+  record: Omit<PendingUploadRecord, "createdAt">,
+): Promise<void> {
+  if (!hasActiveIdentity(record.userId))
+    throw new Error("OFFLINE_IDENTITY_REQUIRED");
+  const generation = identityGeneration;
   const db = await openOfflineDb();
+  if (generation !== identityGeneration || !hasActiveIdentity(record.userId)) {
+    db.close();
+    throw new Error("OFFLINE_IDENTITY_REQUIRED");
+  }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(UPLOADS_STORE, 'readwrite');
+    const tx = db.transaction(UPLOADS_STORE, "readwrite");
     const store = tx.objectStore(UPLOADS_STORE);
     const item: PendingUploadRecord = {
       ...record,
@@ -168,7 +229,7 @@ export async function enqueueUpload(record: Omit<PendingUploadRecord, 'createdAt
     tx.oncomplete = () => {
       db.close();
       notifyStatus();
-      void triggerFlush();
+      void triggerFlush(record.userId);
       resolve();
     };
     tx.onerror = () => {
@@ -178,30 +239,62 @@ export async function enqueueUpload(record: Omit<PendingUploadRecord, 'createdAt
   });
 }
 
+/** Recupera la última respuesta pendiente por ítem para el usuario y el intento activos. */
+export async function getPendingAttemptAnswers(userId: string, attemptId: string): Promise<Record<string, unknown>> {
+  if (!hasActiveIdentity(userId)) return {};
+  const generation = identityGeneration;
+  try {
+    const db = await openOfflineDb();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(EVENTS_STORE, "readonly");
+      const request = tx.objectStore(EVENTS_STORE).getAll();
+      let answers: Record<string, unknown> = {};
+      request.onsuccess = () => {
+        const events: PendingEventRecord[] = request.result || [];
+        for (const event of events) {
+          if (event.userId !== userId || event.attemptId !== attemptId || event.eventType !== "answered") continue;
+          const itemId = event.payload.itemId;
+          if (typeof itemId === "string" && ["pairs", "tokenIds", "placements", "selections", "choices"].includes(itemId)) {
+            answers[itemId] = event.payload.answer;
+          }
+        }
+      };
+      tx.oncomplete = () => {
+        db.close();
+        if (generation !== identityGeneration || !hasActiveIdentity(userId)) answers = {};
+        resolve(answers);
+      };
+      tx.onerror = () => { db.close(); resolve({}); };
+    });
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Gets total pending items (events + uploads)
  */
-export async function getPendingCount(userId?: string): Promise<number> {
+export async function getPendingCount(userId: string): Promise<number> {
+  if (!hasActiveIdentity(userId)) return 0;
+  const generation = identityGeneration;
   try {
     const db = await openOfflineDb();
-    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) => db.objectStoreNames.contains(s));
+    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) =>
+      db.objectStoreNames.contains(s),
+    );
     if (existingStores.length === 0) {
       db.close();
       return 0;
     }
     return new Promise((resolve) => {
-      const tx = db.transaction(existingStores, 'readonly');
+      const tx = db.transaction(existingStores, "readonly");
       let count = 0;
 
       if (existingStores.includes(EVENTS_STORE)) {
         const eventsReq = tx.objectStore(EVENTS_STORE).getAll();
         eventsReq.onsuccess = () => {
           const events: PendingEventRecord[] = eventsReq.result || [];
-          if (userId) {
-            count += events.filter((e) => e.userId === userId).length;
-          } else {
-            count += events.length;
-          }
+          count += events.filter((e) => e.userId === userId).length;
         };
       }
 
@@ -209,17 +302,17 @@ export async function getPendingCount(userId?: string): Promise<number> {
         const uploadsReq = tx.objectStore(UPLOADS_STORE).getAll();
         uploadsReq.onsuccess = () => {
           const uploads: PendingUploadRecord[] = uploadsReq.result || [];
-          if (userId) {
-            count += uploads.filter((u) => u.userId === userId).length;
-          } else {
-            count += uploads.length;
-          }
+          count += uploads.filter((u) => u.userId === userId).length;
         };
       }
 
       tx.oncomplete = () => {
         db.close();
-        resolve(count);
+        resolve(
+          generation === identityGeneration && hasActiveIdentity(userId)
+            ? count
+            : 0,
+        );
       };
       tx.onerror = () => {
         db.close();
@@ -234,7 +327,7 @@ export async function getPendingCount(userId?: string): Promise<number> {
 /**
  * Checks if there is pending work for a user or generally.
  */
-export async function hasPendingWork(userId?: string): Promise<boolean> {
+export async function hasPendingWork(userId: string): Promise<boolean> {
   const count = await getPendingCount(userId);
   return count > 0;
 }
@@ -242,15 +335,24 @@ export async function hasPendingWork(userId?: string): Promise<boolean> {
 /**
  * Purges entries of other users before showing current user portal (RF-5).
  */
-export async function purgeOtherUsersEntries(currentUserId: string): Promise<void> {
+export async function purgeOtherUsersEntries(
+  currentUserId: string,
+): Promise<void> {
+  if (!currentUserId || isLogoutPending()) return;
+  if (activeQueueUserId === currentUserId) return;
+  const generation = ++identityGeneration;
+  flushAbortController?.abort();
+  activeQueueUserId = null;
   try {
     const db = await openOfflineDb();
-    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) => db.objectStoreNames.contains(s));
+    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) =>
+      db.objectStoreNames.contains(s),
+    );
     if (existingStores.length === 0) {
       db.close();
       return;
     }
-    const tx = db.transaction(existingStores, 'readwrite');
+    const tx = db.transaction(existingStores, "readwrite");
 
     if (existingStores.includes(EVENTS_STORE)) {
       const eventsStore = tx.objectStore(EVENTS_STORE);
@@ -258,7 +360,10 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
       eventsReq.onsuccess = () => {
         const events: PendingEventRecord[] = eventsReq.result || [];
         for (const ev of events) {
-          if (ev.userId && ev.userId !== currentUserId && ev.id !== undefined) {
+          if (
+            (!ev.userId || ev.userId !== currentUserId) &&
+            ev.id !== undefined
+          ) {
             eventsStore.delete(ev.id);
           }
         }
@@ -271,7 +376,7 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
       uploadsReq.onsuccess = () => {
         const uploads: PendingUploadRecord[] = uploadsReq.result || [];
         for (const up of uploads) {
-          if (up.userId && up.userId !== currentUserId) {
+          if (!up.userId || up.userId !== currentUserId) {
             uploadsStore.delete(up.attemptId);
           }
         }
@@ -291,6 +396,12 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
     notifyStatus();
   } catch {
     // Ignore error
+  } finally {
+    if (generation === identityGeneration && !isLogoutPending()) {
+      activeQueueUserId = currentUserId;
+      isQueuePausedDueToAuth = false;
+      notifyStatus();
+    }
   }
 }
 
@@ -298,18 +409,21 @@ export async function purgeOtherUsersEntries(currentUserId: string): Promise<voi
  * Clears all pending events and uploads on logout (RF-5).
  */
 export async function clearOfflineQueue(): Promise<void> {
+  suspendOfflineQueue();
   if (flushDebounceTimer) {
     clearTimeout(flushDebounceTimer);
     flushDebounceTimer = null;
   }
   try {
     const db = await openOfflineDb();
-    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) => db.objectStoreNames.contains(s));
+    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) =>
+      db.objectStoreNames.contains(s),
+    );
     if (existingStores.length === 0) {
       db.close();
       return;
     }
-    const tx = db.transaction(existingStores, 'readwrite');
+    const tx = db.transaction(existingStores, "readwrite");
     for (const store of existingStores) {
       tx.objectStore(store).clear();
     }
@@ -335,12 +449,14 @@ export async function clearOfflineQueue(): Promise<void> {
 async function purgeAttemptFromQueue(attemptId: string): Promise<void> {
   try {
     const db = await openOfflineDb();
-    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) => db.objectStoreNames.contains(s));
+    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) =>
+      db.objectStoreNames.contains(s),
+    );
     if (existingStores.length === 0) {
       db.close();
       return;
     }
-    const tx = db.transaction(existingStores, 'readwrite');
+    const tx = db.transaction(existingStores, "readwrite");
 
     if (existingStores.includes(EVENTS_STORE)) {
       const eventStore = tx.objectStore(EVENTS_STORE);
@@ -385,7 +501,7 @@ async function discardAudioBlob(attemptId: string): Promise<void> {
       db.close();
       return;
     }
-    const tx = db.transaction(UPLOADS_STORE, 'readwrite');
+    const tx = db.transaction(UPLOADS_STORE, "readwrite");
     tx.objectStore(UPLOADS_STORE).delete(attemptId);
     await new Promise<void>((resolve) => {
       tx.oncomplete = () => {
@@ -417,8 +533,18 @@ function scheduleBackoffRetry() {
   retryAttempt++;
 
   currentRetryTimeout = setTimeout(() => {
-    void triggerFlush();
+    void triggerFlush(getOfflineUserId() ?? "");
   }, delay);
+}
+
+/**
+ * Resumes the offline queue after successful authentication/token refresh (P0-03).
+ */
+export function resumeOfflineQueueAfterAuth(): void {
+  if (!getOfflineUserId()) return;
+  isQueuePausedDueToAuth = false;
+  resetBackoff();
+  void triggerFlush(getOfflineUserId() ?? "");
 }
 
 /**
@@ -441,8 +567,12 @@ function resetBackoff() {
  * Schedules a debounced flush (micro-batching) to avoid flooding the API
  * with individual HTTP requests on every rapid user interaction (ISSUE-09).
  */
-export function scheduleDebouncedFlush(delayMs = 250): void {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+export function scheduleDebouncedFlush(
+  delayMs = 250,
+  activeUserId: string,
+): void {
+  if (!hasActiveIdentity(activeUserId)) return;
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
     return;
   }
   if (flushDebounceTimer) {
@@ -450,35 +580,44 @@ export function scheduleDebouncedFlush(delayMs = 250): void {
   }
   flushDebounceTimer = setTimeout(() => {
     flushDebounceTimer = null;
-    void triggerFlush();
+    void triggerFlush(activeUserId);
   }, delayMs);
 }
 
-export async function triggerFlush(): Promise<void> {
+export async function triggerFlush(activeUserId: string): Promise<void> {
+  if (!hasActiveIdentity(activeUserId)) return;
   if (flushDebounceTimer) {
     clearTimeout(flushDebounceTimer);
     flushDebounceTimer = null;
   }
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   if (isQueuePausedDueToAuth) return;
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
     notifyStatus();
     return;
   }
 
-  if (typeof navigator !== 'undefined' && 'locks' in navigator && navigator.locks.request) {
+  if (
+    typeof navigator !== "undefined" &&
+    "locks" in navigator &&
+    navigator.locks.request
+  ) {
     try {
-      await navigator.locks.request('englove_offline_flush', { ifAvailable: true }, async (lock) => {
-        if (!lock) return; // Another tab is flushing
-        await executeFlush();
-      });
+      await navigator.locks.request(
+        "englove_offline_flush",
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock) return; // Another tab is flushing
+          await executeFlush(activeUserId);
+        },
+      );
       return;
     } catch {
       // Fallback to internal mutex
     }
   }
 
-  await executeFlush();
+  await executeFlush(activeUserId);
 }
 
 /**
@@ -486,15 +625,24 @@ export async function triggerFlush(): Promise<void> {
  * 1. Batches of up to 50 events per attempt.
  * 2. Upload audio (with mediaId reuse).
  * 3. Complete attempt delivery.
+ * Filters strictly by activeUserId when specified (RF-6).
  */
-async function executeFlush(): Promise<void> {
+export async function executeFlush(activeUserId: string): Promise<void> {
+  if (!hasActiveIdentity(activeUserId) || isQueuePausedDueToAuth) return;
+  const generation = identityGeneration;
+  const isCurrent = () =>
+    generation === identityGeneration && hasActiveIdentity(activeUserId);
   if (isFlushingInternal) return;
+  const controller = new AbortController();
+  flushAbortController = controller;
   isFlushingInternal = true;
   notifyStatus();
 
   try {
     const db = await openOfflineDb();
-    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) => db.objectStoreNames.contains(s));
+    const existingStores = [EVENTS_STORE, UPLOADS_STORE].filter((s) =>
+      db.objectStoreNames.contains(s),
+    );
     if (existingStores.length === 0) {
       db.close();
       isFlushingInternal = false;
@@ -502,7 +650,7 @@ async function executeFlush(): Promise<void> {
       return;
     }
 
-    const tx = db.transaction(existingStores, 'readonly');
+    const tx = db.transaction(existingStores, "readonly");
     let eventsReq: IDBRequest<PendingEventRecord[]> | undefined;
     let uploadsReq: IDBRequest<PendingUploadRecord[]> | undefined;
 
@@ -513,7 +661,9 @@ async function executeFlush(): Promise<void> {
       uploadsReq = tx.objectStore(UPLOADS_STORE).getAll();
     }
 
-    const [events, uploads] = await new Promise<[PendingEventRecord[], PendingUploadRecord[]]>((resolve, reject) => {
+    const [rawEvents, rawUploads] = await new Promise<
+      [PendingEventRecord[], PendingUploadRecord[]]
+    >((resolve, reject) => {
       tx.oncomplete = () => {
         db.close();
         resolve([eventsReq?.result || [], uploadsReq?.result || []]);
@@ -524,6 +674,11 @@ async function executeFlush(): Promise<void> {
       };
     });
 
+    if (!isCurrent()) return;
+    const events = rawEvents.filter((e) => e.userId === activeUserId);
+    const uploads = rawUploads.filter((u) => u.userId === activeUserId &&
+      (!u.isDraft || events.some(event => event.attemptId === u.attemptId && event.eventType === "completed")));
+
     if (events.length === 0 && uploads.length === 0) {
       isFlushingInternal = false;
       notifyStatus();
@@ -532,61 +687,118 @@ async function executeFlush(): Promise<void> {
 
     // Group items by attemptId
     const attemptIds = Array.from(
-      new Set([...events.map((e) => e.attemptId), ...uploads.map((u) => u.attemptId)]),
+      new Set([
+        ...events.map((e) => e.attemptId),
+        ...uploads.map((u) => u.attemptId),
+      ]),
     );
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
     let hadSuccess = false;
     let hadError = false;
 
     for (const attemptId of attemptIds) {
+      if (!isCurrent()) return;
       const attemptEvents = events
         .filter((e) => e.attemptId === attemptId)
         .sort((a, b) => a.createdAt - b.createdAt);
       const attemptUpload = uploads.find((u) => u.attemptId === attemptId);
 
       // Separate answered events from completed event
-      const answeredEvents = attemptEvents.filter((e) => e.eventType === 'answered');
-      const completionEvent = attemptEvents.find((e) => e.eventType === 'completed');
+      const answeredEvents = attemptEvents.filter(
+        (e) => e.eventType === "answered",
+      );
+      const completionEvent = attemptEvents.find(
+        (e) => e.eventType === "completed",
+      );
 
       // 1. Send answered events in batches of up to 50 (RF-11, RF-14)
       while (answeredEvents.length > 0) {
+        if (!isCurrent()) return;
         const batch = answeredEvents.splice(0, 50);
         const first = batch[0];
         if (!first) break;
         const attemptToken = first.attemptToken;
 
         try {
-          const res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/events`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-attempt-token': attemptToken,
-              Origin: (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000',
+          let res = await fetch(
+            `${apiUrl}/api/v1/attempts/${attemptId}/events`,
+            {
+              signal: controller.signal,
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-attempt-token": attemptToken,
+                Origin:
+                  (typeof window !== "undefined" && window.location?.origin) ||
+                  "http://localhost:3000",
+              },
+              credentials: "include",
+              body: JSON.stringify({
+                events: batch.map((ev) => ({
+                  clientEventId: ev.clientEventId,
+                  eventType: "answer_changed",
+                  ...ev.payload,
+                })),
+              }),
             },
-            credentials: 'include',
-            body: JSON.stringify({
-              events: batch.map((ev) => ({
-                clientEventId: ev.clientEventId,
-                eventType: 'answer_changed',
-                ...ev.payload,
-              })),
-            }),
-          });
+          );
 
+          if (!isCurrent()) return;
+          if (!res.ok && res.status === 401) {
+            try {
+              const { requestSharedRefresh } = await import("./auth-session");
+              const refreshed = await requestSharedRefresh();
+              if (refreshed && isCurrent()) {
+                res = await fetch(
+                  `${apiUrl}/api/v1/attempts/${attemptId}/events`,
+                  {
+                    signal: controller.signal,
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-attempt-token": attemptToken,
+                      Origin:
+                        (typeof window !== "undefined" &&
+                          window.location?.origin) ||
+                        "http://localhost:3000",
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({
+                      events: batch.map((ev) => ({
+                        clientEventId: ev.clientEventId,
+                        eventType: "answer_changed",
+                        ...ev.payload,
+                      })),
+                    }),
+                  },
+                );
+              }
+            } catch {
+              // Ignore refresh error
+            }
+          }
+
+          if (!isCurrent()) return;
           if (res.ok) {
             // Success: remove these events from IndexedDB
             const delDb = await openOfflineDb();
             if (delDb.objectStoreNames.contains(EVENTS_STORE)) {
-              const delTx = delDb.transaction(EVENTS_STORE, 'readwrite');
+              const delTx = delDb.transaction(EVENTS_STORE, "readwrite");
               const delStore = delTx.objectStore(EVENTS_STORE);
               for (const ev of batch) {
                 if (ev.id !== undefined) delStore.delete(ev.id);
               }
               await new Promise<void>((resDel) => {
-                delTx.oncomplete = () => { delDb.close(); resDel(); };
-                delTx.onerror = () => { delDb.close(); resDel(); };
+                delTx.oncomplete = () => {
+                  delDb.close();
+                  resDel();
+                };
+                delTx.onerror = () => {
+                  delDb.close();
+                  resDel();
+                };
               });
             } else {
               delDb.close();
@@ -599,28 +811,35 @@ async function executeFlush(): Promise<void> {
               return;
             } else if (status === 409) {
               const errBody = await res.json().catch(() => ({}));
-              if (errBody.code === 'ATTEMPT_CLOSED') {
+              if (errBody.code === "ATTEMPT_CLOSED") {
                 await purgeAttemptFromQueue(attemptId);
               } else {
                 // 409 ATTEMPT_NOT_IN_PROGRESS: discard batch
                 const delDb = await openOfflineDb();
                 if (delDb.objectStoreNames.contains(EVENTS_STORE)) {
-                  const delTx = delDb.transaction(EVENTS_STORE, 'readwrite');
+                  const delTx = delDb.transaction(EVENTS_STORE, "readwrite");
                   for (const ev of batch) {
-                    if (ev.id !== undefined) delTx.objectStore(EVENTS_STORE).delete(ev.id);
+                    if (ev.id !== undefined)
+                      delTx.objectStore(EVENTS_STORE).delete(ev.id);
                   }
                   delTx.oncomplete = () => delDb.close();
                 } else {
                   delDb.close();
                 }
               }
-            } else if (status === 400 || status === 404) {
-              // Discard affected entries
+            } else if (
+              status === 400 ||
+              status === 404 ||
+              status === 413 ||
+              status === 422
+            ) {
+              // Discard affected entries on 4xx validation errors (RF-6)
               const delDb = await openOfflineDb();
               if (delDb.objectStoreNames.contains(EVENTS_STORE)) {
-                const delTx = delDb.transaction(EVENTS_STORE, 'readwrite');
+                const delTx = delDb.transaction(EVENTS_STORE, "readwrite");
                 for (const ev of batch) {
-                  if (ev.id !== undefined) delTx.objectStore(EVENTS_STORE).delete(ev.id);
+                  if (ev.id !== undefined)
+                    delTx.objectStore(EVENTS_STORE).delete(ev.id);
                 }
                 delTx.oncomplete = () => delDb.close();
               } else {
@@ -628,13 +847,13 @@ async function executeFlush(): Promise<void> {
               }
             } else if (status >= 500 || status === 429) {
               hadError = true;
-              scheduleBackoffRetry();
+              if (isCurrent()) scheduleBackoffRetry();
               return;
             }
           }
         } catch {
           hadError = true;
-          scheduleBackoffRetry();
+          if (isCurrent()) scheduleBackoffRetry();
           return;
         }
       }
@@ -642,70 +861,156 @@ async function executeFlush(): Promise<void> {
       // 2. Upload Audio if pending (RF-13)
       let resolvedMediaId: string | null = attemptUpload?.mediaId || null;
       if (attemptUpload && !resolvedMediaId) {
+        if (!isCurrent()) return;
         try {
           resolvedMediaId = await uploadAudioBlob({
+            signal: controller.signal,
+            attemptToken:
+              attemptUpload.attemptToken ?? completionEvent?.attemptToken,
             apiUrl,
             origin: window.location.origin,
             attemptId,
             blob: attemptUpload.blob,
           });
 
+          if (!isCurrent()) return;
           // Save mediaId to upload record for reuse
           const updateDb = await openOfflineDb();
-          const updateTx = updateDb.transaction(UPLOADS_STORE, 'readwrite');
+          const updateTx = updateDb.transaction(UPLOADS_STORE, "readwrite");
           updateTx.objectStore(UPLOADS_STORE).put({
             ...attemptUpload,
             mediaId: resolvedMediaId,
           });
           await new Promise<void>((resUp) => {
-            updateTx.oncomplete = () => { updateDb.close(); resUp(); };
-            updateTx.onerror = () => { updateDb.close(); resUp(); };
+            updateTx.oncomplete = () => {
+              updateDb.close();
+              resUp();
+            };
+            updateTx.onerror = () => {
+              updateDb.close();
+              resUp();
+            };
           });
           hadSuccess = true;
         } catch (uploadErr: unknown) {
-          const errMsg = String(uploadErr);
-          if (
-            // guardrails-ignore G-C06: constante de error de duracion de audio de SPEC-05/SPEC-09
-            errMsg.includes('AUDIO_IMPLAUSIBLE_DURATION') ||
-            // guardrails-ignore G-C06: constante de error de duracion de audio de SPEC-05/SPEC-09
-            errMsg.includes('AUDIO_EXCEEDS_MAX_DURATION') ||
-            errMsg.includes('413') ||
-            errMsg.includes('422')
-          ) {
+          if (!isCurrent()) return;
+          const status = uploadErr instanceof ApiError ? uploadErr.statusCode : undefined;
+          if (status === 401) {
+            isQueuePausedDueToAuth = true;
+            return;
+          } else if (status === 400 || status === 413 || status === 422) {
             await discardAudioBlob(attemptId);
-          } else if (errMsg.includes('ATTEMPT_CLOSED') || errMsg.includes('409')) {
+            continue;
+          } else if (status === 404 || status === 409) {
             await purgeAttemptFromQueue(attemptId);
+            continue;
           } else {
             hadError = true;
-            scheduleBackoffRetry();
+            if (isCurrent()) scheduleBackoffRetry();
             return;
           }
         }
       }
 
-      // 3. Complete Attempt if completed event is queued (RF-12)
+      // Uploaded bytes are not trusted until the server validates them with ffprobe.
+      // Confirm reused media too: a prior confirmation may have failed transiently.
+      if (attemptUpload && resolvedMediaId) {
+        if (!isCurrent()) return;
+        const token =
+          attemptUpload.attemptToken ?? completionEvent?.attemptToken;
+        const confirm = await fetch(
+          `${apiUrl}/api/v1/media/${resolvedMediaId}/confirm`,
+          {
+            method: "POST",
+            credentials: "include",
+            signal: controller.signal,
+            headers: {
+              "Content-Type": "application/json",
+              "x-attempt-token": token ?? "",
+            },
+          },
+        );
+        if (!isCurrent()) return;
+        if (!confirm.ok) {
+          if (confirm.status === 401) isQueuePausedDueToAuth = true;
+          else if (confirm.status >= 500 || confirm.status === 429)
+            scheduleBackoffRetry();
+          else if (confirm.status === 409)
+            await purgeAttemptFromQueue(attemptId);
+          else if ([400, 404, 413, 422].includes(confirm.status))
+            await discardAudioBlob(attemptId);
+          return;
+        }
+      }
+
+      // 3. Complete Attempt if completed event is queued (RF-12, RF-6)
       if (completionEvent) {
+        if (!isCurrent()) return;
+        // If audio upload is required but unresolved, omit /complete (RF-6)
+        if (attemptUpload && !resolvedMediaId) {
+          continue;
+        }
+
         try {
-          const compPayload = (completionEvent.payload || {}) as {
-            answers?: Record<string, unknown>;
-          };
-          const compAnswers = compPayload.answers;
+          const compPayload = isRecord(completionEvent.payload)
+            ? completionEvent.payload
+            : {};
+          const answersVal = compPayload.answers;
+          const compAnswers = isRecord(answersVal) ? answersVal : undefined;
           const completeBody: Record<string, unknown> = {
             ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {}),
-            ...(compAnswers && Object.keys(compAnswers).length > 0 ? { answers: compAnswers } : {}),
+            ...(compAnswers && Object.keys(compAnswers).length > 0
+              ? { answers: compAnswers }
+              : {}),
           };
 
-          const completeRes = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-attempt-token': completionEvent.attemptToken,
-              Origin: (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000',
+          let completeRes = await fetch(
+            `${apiUrl}/api/v1/attempts/${attemptId}/complete`,
+            {
+              signal: controller.signal,
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-attempt-token": completionEvent.attemptToken,
+                Origin:
+                  (typeof window !== "undefined" && window.location?.origin) ||
+                  "http://localhost:3000",
+              },
+              credentials: "include",
+              body: JSON.stringify(completeBody),
             },
-            credentials: 'include',
-            body: JSON.stringify(completeBody),
-          });
+          );
 
+          if (!isCurrent()) return;
+          if (!completeRes.ok && completeRes.status === 401) {
+            try {
+              const { requestSharedRefresh } = await import("./auth-session");
+              const refreshed = await requestSharedRefresh();
+              if (refreshed && isCurrent()) {
+                completeRes = await fetch(
+                  `${apiUrl}/api/v1/attempts/${attemptId}/complete`,
+                  {
+                    signal: controller.signal,
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-attempt-token": completionEvent.attemptToken,
+                      Origin:
+                        (typeof window !== "undefined" &&
+                          window.location?.origin) ||
+                        "http://localhost:3000",
+                    },
+                    credentials: "include",
+                    body: JSON.stringify(completeBody),
+                  },
+                );
+              }
+            } catch {
+              // Ignore refresh error
+            }
+          }
+
+          if (!isCurrent()) return;
           if (completeRes.ok) {
             // Successfully completed: purge events & upload
             await purgeAttemptFromQueue(attemptId);
@@ -715,17 +1020,24 @@ async function executeFlush(): Promise<void> {
             if (status === 401) {
               isQueuePausedDueToAuth = true;
               return;
-            } else if (status === 409) {
+            } else if (
+              status === 409 ||
+              status === 400 ||
+              status === 404 ||
+              status === 413 ||
+              status === 422
+            ) {
+              // 4xx client errors: purge attempt from queue without retrying (RF-6)
               await purgeAttemptFromQueue(attemptId);
             } else if (status >= 500 || status === 429) {
               hadError = true;
-              scheduleBackoffRetry();
+              if (isCurrent()) scheduleBackoffRetry();
               return;
             }
           }
         } catch {
           hadError = true;
-          scheduleBackoffRetry();
+          if (isCurrent()) scheduleBackoffRetry();
           return;
         }
       }
@@ -734,7 +1046,7 @@ async function executeFlush(): Promise<void> {
     if (hadSuccess && !hadError) {
       resetBackoff();
       lastSyncedAt = Date.now();
-      const remaining = await getPendingCount();
+      const remaining = await getPendingCount(activeUserId);
       if (remaining === 0 && hasBeenOffline) {
         hasBeenOffline = false;
         justFlushed = true;
@@ -748,19 +1060,20 @@ async function executeFlush(): Promise<void> {
   } catch {
     scheduleBackoffRetry();
   } finally {
+    if (flushAbortController === controller) flushAbortController = null;
     isFlushingInternal = false;
     notifyStatus();
   }
 }
 
 // Global window event listeners
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
     isQueuePausedDueToAuth = false;
     resetBackoff();
-    void triggerFlush();
+    void triggerFlush(getOfflineUserId() ?? "");
   });
-  window.addEventListener('offline', () => {
+  window.addEventListener("offline", () => {
     notifyStatus();
   });
 }

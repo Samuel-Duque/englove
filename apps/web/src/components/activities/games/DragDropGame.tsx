@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  DragDropSettings,
-  DragDropSolution,
+  DragDropSettingsSchema,
+  DragDropSolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -21,8 +21,10 @@ export function DragDropGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as DragDropSettings;
-  const solution = config.answerKey?.solution as DragDropSolution | undefined;
+  const parsedSettings = DragDropSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = DragDropSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalObjects = settings?.objects || [];
   const targets = settings?.targets || [];
@@ -38,6 +40,7 @@ export function DragDropGame({
   });
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<string>('');
 
   const objectMap = useMemo(() => {
     const map = new Map<string, { id: string; text: string }>();
@@ -73,6 +76,10 @@ export function DragDropGame({
     setSelectedObjectId(null);
     onEvent?.({ itemId: 'placements', answer: next });
 
+    const obj = objectMap.get(objectId);
+    const target = targets.find((t) => t.id === targetId);
+    setLiveStatus(`Ítem ${obj?.text ?? ''} colocado en categoría ${target?.text ?? 'categoría'}`);
+
     if (solution?.placements) {
       const isCorrect = solution.placements[objectId] === targetId;
       soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
@@ -84,6 +91,8 @@ export function DragDropGame({
     delete next[objectId];
     setPlacements(next);
     if (selectedObjectId === objectId) setSelectedObjectId(null);
+    const obj = objectMap.get(objectId);
+    setLiveStatus(`Ítem ${obj?.text ?? ''} devuelto a la bandeja`);
     onEvent?.({ itemId: 'placements', answer: next });
   };
 
@@ -108,6 +117,11 @@ export function DragDropGame({
         </div>
       )}
 
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
+
       {config.instructions && (
         <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
@@ -128,8 +142,12 @@ export function DragDropGame({
               id={target.id}
               name={
                 target.text ||
-                (target as unknown as { label?: string }).label ||
-                (target as unknown as { name?: string }).name ||
+                (typeof Reflect.get(target, 'label') === 'string'
+                  ? String(Reflect.get(target, 'label'))
+                  : undefined) ||
+                (typeof Reflect.get(target, 'name') === 'string'
+                  ? String(Reflect.get(target, 'name'))
+                  : undefined) ||
                 'Categoría'
               }
               placedObjects={placedInThis}
@@ -209,8 +227,8 @@ export function DragDropGame({
           onClick={handleComplete}
           className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
             isKids
-              ? 'bg-amber-500 hover:bg-amber-600 text-white'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
           Finalizar clasificación ✨
@@ -310,7 +328,8 @@ function TargetCategoryContainer({
       onDragLeave: () => setIsOver(false),
       onDrop: ({ source }) => {
         setIsOver(false);
-        const objId = source.data?.objectId as string | undefined;
+        const objId =
+          typeof source.data?.objectId === 'string' ? source.data.objectId : undefined;
         if (objId) onDropObject(objId);
       },
     });
@@ -319,17 +338,7 @@ function TargetCategoryContainer({
   return (
     <div
       ref={elRef}
-      role="button"
-      tabIndex={0}
-      aria-label={`Categoría ${name}. ${placedObjects.length} ítems`}
-      onClick={onClickCategory}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClickCategory();
-        }
-      }}
-      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all touch-manipulation cursor-pointer ${
+      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all select-none ${
         isOver
           ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg'
           : isTargetActive
@@ -340,14 +349,19 @@ function TargetCategoryContainer({
       }`}
     >
       <div>
-        <div className={`flex items-center justify-between pb-2 border-b ${
-          isKids ? 'border-zinc-100' : 'border-zinc-700'
-        }`}>
+        <button
+          type="button"
+          onClick={onClickCategory}
+          aria-label={`Colocar ítem en categoría ${name}. Actualmente ${placedObjects.length} ítems`}
+          className={`w-full flex items-center justify-between pb-2 border-b text-left rounded-lg p-1 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors ${
+            isKids ? 'border-zinc-100 hover:bg-zinc-50' : 'border-zinc-700 hover:bg-zinc-750'
+          }`}
+        >
           <span className={`text-sm font-black ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{name}</span>
           <span className="text-xs font-bold text-zinc-400">
-            {placedObjects.length} ítems
+            {isTargetActive ? '👈 Tocar para colocar' : `${placedObjects.length} ítems`}
           </span>
-        </div>
+        </button>
 
         <div className="flex flex-wrap gap-1.5 pt-3">
           {placedObjects.map((obj) => (
@@ -370,8 +384,9 @@ function TargetCategoryContainer({
                   e.stopPropagation();
                   onRemoveObject(obj.id);
                 }}
-                className="text-rose-600 hover:text-rose-800 font-black ml-1"
+                className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-black text-rose-600 hover:text-rose-800 ml-1 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500"
                 title="Devolver a la bandeja"
+                aria-label={`Devolver ${obj.text} a la bandeja`}
               >
                 ✕
               </button>

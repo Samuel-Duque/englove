@@ -1,18 +1,20 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import {
   ApprovalStatus,
+  AttemptStatus,
   AgeSegment,
   Level,
   AuditAction,
+  MediaAssetStatus,
   StudentView,
   StudentListResponse,
   MembershipView,
@@ -31,16 +33,22 @@ import {
 } from '../common/utils/identity.utils';
 import { Prisma } from '@prisma/client';
 import { MediaService } from '../media/media.service';
+import { TenantContext } from '../common/tenant/tenant.context';
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
 
 @Injectable()
 export class StudentsService {
+  private readonly logger = new Logger(StudentsService.name);
   private readonly webBaseUrl: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
-    @Optional() private readonly mediaService?: MediaService,
+    private readonly mediaService?: MediaService,
   ) {
     this.webBaseUrl = this.configService.get<string>('WEB_BASE_URL', 'http://localhost:3000');
   }
@@ -316,13 +324,13 @@ export class StudentsService {
     await this.prisma.$transaction(async (tx) => {
       if (dto.name !== undefined && dto.name.trim() !== '') {
         await tx.user.update({
-          where: { id: student.user_id },
+          where: { id: student.user_id, organization_id: organizationId },
           data: { name: dto.name.trim() },
         });
       }
 
       await tx.student.update({
-        where: { id: student.id },
+        where: { id: student.id, organization_id: organizationId },
         data: {
           birth_date: birthDateToUpdate,
           level: dto.level,
@@ -386,7 +394,7 @@ export class StudentsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      const groupDelegate = (tx as unknown as { group?: PrismaService['group'] }).group ?? this.prisma.group;
+      const groupDelegate = 'group' in tx && tx.group ? tx.group : this.prisma.group;
       const group = await groupDelegate.findFirst({
         where: {
           id: dto.groupId,
@@ -471,33 +479,54 @@ export class StudentsService {
   }
 
   async rejectStudent(organizationId: string, id: string): Promise<void> {
-    const student = await this.prisma.student.findFirst({
-      where: {
-        id,
-        organization_id: organizationId,
-      },
-    });
+    const runTx = async (tx: Prisma.TransactionClient | PrismaService) => {
+      let student: { id: string; user_id: string; approval_status: ApprovalStatus } | null;
+      if ('$queryRaw' in tx && typeof tx.$queryRaw === 'function') {
+        const rows = await tx.$queryRaw<
+          Array<{ id: string; user_id: string; approval_status: ApprovalStatus }>
+        >`
+          SELECT id, user_id, approval_status
+          FROM students
+          WHERE id = ${id}::uuid
+            AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        student = rows[0] ?? null;
+      } else {
+        const studentClient = 'student' in tx && tx.student ? tx.student : this.prisma.student;
+        student = await studentClient.findFirst({
+          where: { id, organization_id: organizationId },
+        });
+      }
 
-    if (!student) {
-      throw new NotFoundException({
-        statusCode: 404,
-        code: 'NOT_FOUND',
-        message: 'Alumno no encontrado',
+      if (!student) {
+        throw new NotFoundException({
+          statusCode: 404,
+          code: 'NOT_FOUND',
+          message: 'Alumno no encontrado',
+        });
+      }
+
+      if (student.approval_status !== ApprovalStatus.pending_approval) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'STUDENT_ALREADY_PROCESSED',
+          message: 'La solicitud ya fue procesada previamente',
+        });
+      }
+
+      // Delete User, cascading to Student, sessions and tokens without orphans (RF-10, Decision 77)
+      const userClient = 'user' in tx && tx.user ? tx.user : this.prisma.user;
+      await userClient.delete({
+        where: { id: student.user_id, organization_id: organizationId },
       });
-    }
+    };
 
-    if (student.approval_status !== ApprovalStatus.pending_approval) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'STUDENT_NOT_PENDING',
-        message: 'La solicitud ya no está pendiente. Actualiza la lista',
-      });
+    if (typeof this.prisma.$transaction === 'function') {
+      await this.prisma.$transaction(runTx);
+    } else {
+      await runTx(this.prisma);
     }
-
-    // Delete User, cascading to Student, sessions and tokens without orphans (RF-10, Decision 77)
-    await this.prisma.user.delete({
-      where: { id: student.user_id },
-    });
   }
 
   async unlockStudent(organizationId: string, id: string): Promise<void> {
@@ -520,7 +549,7 @@ export class StudentsService {
     }
 
     await this.prisma.user.update({
-      where: { id: student.user_id },
+      where: { id: student.user_id, organization_id: organizationId },
       data: {
         failed_login_count: 0,
         locked_until: null,
@@ -638,6 +667,7 @@ export class StudentsService {
     organizationId: string,
     studentId: string,
     groupId: string,
+    confirmLostRetries?: boolean,
   ): Promise<StudentView> {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -666,6 +696,30 @@ export class StudentsService {
     }
 
     return await this.prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === 'function') {
+        const lockedGroups = await tx.$queryRaw<Array<{ id: string; archived_at: Date | null }>>`
+          SELECT id, archived_at
+          FROM groups
+          WHERE id = ${groupId}::uuid AND organization_id = ${organizationId}::uuid
+          FOR UPDATE
+        `;
+        const lockedGroup = lockedGroups[0];
+        if (!lockedGroup) {
+          throw new NotFoundException({
+            statusCode: 404,
+            code: 'NOT_FOUND',
+            message: 'Grupo de destino no encontrado',
+          });
+        }
+        if (lockedGroup.archived_at !== null) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'GROUP_ARCHIVED',
+            message: 'El grupo de destino está archivado',
+          });
+        }
+      }
+
       const destinationGroup = await tx.group.findFirst({
         where: {
           id: groupId,
@@ -703,9 +757,94 @@ export class StudentsService {
       }
 
       const now = new Date();
+
+      // Check unconsumed retries in current group (RF-9, Decision 131, QA-07)
+      if (currentActive && !confirmLostRetries && tx.attempt) {
+        const unconsumedAttempts = await tx.attempt.findMany({
+          where: {
+            organization_id: organizationId,
+            student_id: studentId,
+            assignment_id: { not: null },
+            retry_granted_at: { not: null },
+            status: AttemptStatus.graded,
+            next_attempt: null,
+            assignment: {
+              group_id: currentActive.group_id,
+              cancelled_at: null,
+            },
+          },
+          include: {
+            assignment: {
+              include: {
+                activity: true,
+              },
+            },
+          },
+        });
+
+        const activeUnconsumed = unconsumedAttempts.filter((att) => {
+          if (!att.assignment) return false;
+          const effectiveDue = att.retry_extend_until ?? att.assignment.due_at;
+          return effectiveDue === null || effectiveDue > now;
+        });
+
+        if (activeUnconsumed.length > 0) {
+          const affectedActivities = activeUnconsumed.map((att) => ({
+            assignmentId: att.assignment_id!,
+            activityId: att.assignment!.activity_id,
+            activityTitle: att.assignment!.activity.title,
+            effectiveDueAt: (att.retry_extend_until ?? att.assignment!.due_at).toISOString(),
+            attemptNumber: att.attempt_number,
+          }));
+
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'UNCONSUMED_RETRY_WARNING',
+            message:
+              'El alumno tiene reintentos concedidos pendientes en este grupo que se perderán al transferirlo.',
+            details: {
+              affectedActivities,
+            },
+          });
+        }
+      }
+
+      // If confirming lost retries, atomically revoke unconsumed retries in current group (QA-07)
+      if (currentActive && confirmLostRetries && tx.attempt) {
+        const attemptsToRevoke = await tx.attempt.findMany({
+          where: {
+            organization_id: organizationId,
+            student_id: studentId,
+            assignment_id: { not: null },
+            retry_granted_at: { not: null },
+            status: AttemptStatus.graded,
+            next_attempt: null,
+            assignment: {
+              group_id: currentActive.group_id,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (attemptsToRevoke.length > 0) {
+          const ids = attemptsToRevoke.map((a) => a.id);
+          await tx.attempt.updateMany({
+            where: {
+              id: { in: ids },
+              organization_id: organizationId,
+            },
+            data: {
+              retry_granted_at: null,
+              retry_granted_by: null,
+              retry_extend_until: null,
+            },
+          });
+        }
+      }
+
       if (currentActive) {
         await tx.groupMembership.update({
-          where: { id: currentActive.id },
+          where: { id: currentActive.id, organization_id: organizationId },
           data: { left_at: now },
         });
       }
@@ -759,9 +898,12 @@ export class StudentsService {
       });
     }
 
-    // guardrails-ignore G-A06: resolución de credencial opaca para validar tenant del propietario (SPEC-02 §8)
-    const existingUser = await this.prisma.user.findFirst({
-      where: { email: normalizedEmail },
+    // Check global uniqueness across all tenants (RF-3, SEC-09d)
+    // guardrails-ignore G-A06: verificación de unicidad global de correo en cambio de correo de estudiante
+    const existingUser = await TenantContext.runBypass(async () => {
+      return this.prisma.user.findFirst({
+        where: { email: normalizedEmail },
+      });
     });
 
     if (existingUser) {
@@ -775,7 +917,7 @@ export class StudentsService {
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.user.update({
-          where: { id: student.user_id },
+          where: { id: student.user_id, organization_id: organizationId },
           data: { email: normalizedEmail },
         });
 
@@ -812,7 +954,7 @@ export class StudentsService {
         });
       });
     } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'P2002') {
+      if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'P2002') {
         throw new ConflictException({
           statusCode: 409,
           code: 'EMAIL_TAKEN',
@@ -901,54 +1043,88 @@ export class StudentsService {
 
         const distinctStudentIds = new Set(overlappingMemberships.map((m) => m.student_id));
         await this.prisma.assignment.update({
-          where: { id: assignment.id },
+          where: { id: assignment.id, organization_id: organizationId },
           data: { historical_student_count: distinctStudentIds.size },
         });
       }
     }
 
-    // Step 2: Redact AuditLog and disconnect target_student_id (RF-26, Decision 92)
-    const logs = await this.prisma.auditLog.findMany({
-      where: {
-        organization_id: organizationId,
-        target_student_id: studentId,
-      },
-    });
-
-    for (const log of logs) {
-      const details = (log.details as Record<string, unknown>) || {};
-      const redactedDetails: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(details)) {
-        if (typeof v === 'string' && v.includes('@')) {
-          redactedDetails[k] = '[REDACTADO]';
-        } else {
-          redactedDetails[k] = v;
-        }
-      }
-
-      await this.prisma.auditLog.update({
-        where: { id: log.id },
-        data: {
-          target_student_id: null,
-          details: redactedDetails as Prisma.InputJsonObject,
+    // Step 2: Persist durable pending_delete state BEFORE deleting R2 objects (Architecture §8.4, Decision 103, RT-09)
+    if (
+      student.media_assets.length > 0 &&
+      typeof this.prisma.mediaAsset?.updateMany === 'function'
+    ) {
+      await this.prisma.mediaAsset.updateMany({
+        where: {
+          organization_id: organizationId,
+          student_id: studentId,
+          status: { not: MediaAssetStatus.deleted },
         },
+        data: { status: MediaAssetStatus.pending_delete },
       });
     }
 
-    // Step 3: Delete R2 storage objects (raw and converted)
+    // Step 2b: Delete R2 storage objects idempotently with per-asset durable progress BEFORE database cascade
     if (this.mediaService) {
+      let deletedCount = 0;
       for (const media of student.media_assets) {
-        await this.mediaService.deleteFile(media.key);
-        if (media.converted_key) {
-          await this.mediaService.deleteFile(media.converted_key);
+        if ('status' in media && media.status === MediaAssetStatus.deleted) {
+          deletedCount++;
+          continue;
+        }
+        try {
+          await this.mediaService.deleteFile(media.key);
+          if (media.converted_key) {
+            await this.mediaService.deleteFile(media.converted_key);
+          }
+          if (typeof this.prisma.mediaAsset?.update === 'function') {
+            await this.prisma.mediaAsset.update({
+              where: { id: media.id, organization_id: organizationId },
+              data: { status: MediaAssetStatus.deleted, deleted_at: new Date() },
+            });
+          }
+          deletedCount++;
+        } catch (err: unknown) {
+          this.logger.warn(
+            `Borrado R2 incompleto en baja de alumno (${deletedCount}/${student.media_assets.length} assets eliminados; assetId=${media.id})`,
+          );
+          throw err;
         }
       }
     }
 
-    // Step 4: Relational database cascade in transaction
+    // Step 3: Relational database cascade in transaction (P2-03, T3.11)
     const attemptIds = student.attempts.map((a) => a.id);
 
     await this.prisma.$transaction(async (tx) => {
+      // Redact AuditLog and disconnect target_student_id (RF-26, Decision 92, T3.11)
+      const logs = await tx.auditLog.findMany({
+        where: {
+          organization_id: organizationId,
+          target_student_id: studentId,
+        },
+      });
+
+      for (const log of logs) {
+        const details = isRecord(log.details) ? log.details : {};
+        const redactedDetails: Record<string, string | number | boolean> = {};
+        for (const [k, v] of Object.entries(details)) {
+          if (typeof v === 'string') {
+            redactedDetails[k] = v.includes('@') ? '[REDACTADO]' : v;
+          } else if (typeof v === 'number' || typeof v === 'boolean') {
+            redactedDetails[k] = v;
+          }
+        }
+
+        await tx.auditLog.update({
+          where: { id: log.id, organization_id: organizationId },
+          data: {
+            target_student_id: null,
+            details: redactedDetails,
+          },
+        });
+      }
+
       if (attemptIds.length > 0) {
         await tx.review.deleteMany({
           where: { organization_id: organizationId, attempt_id: { in: attemptIds } },
@@ -988,11 +1164,11 @@ export class StudentsService {
       });
 
       await tx.student.delete({
-        where: { id: studentId },
+        where: { id: studentId, organization_id: organizationId },
       });
 
       await tx.user.delete({
-        where: { id: student.user_id },
+        where: { id: student.user_id, organization_id: organizationId },
       });
     });
   }

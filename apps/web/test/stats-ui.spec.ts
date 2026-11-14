@@ -189,4 +189,32 @@ describe('SPEC-08: Teacher Stats UI Rules & Formatting (ENG-101, ENG-102, ENG-10
       expect(Boolean(listWithItem && listWithItem.length > 0)).toBe(true);
     });
   });
+
+  describe('Accesibilidad de controles de filtro en estadísticas (WCAG 2.2 AA / A11Y-10.5)', () => {
+    it('los filtros de estudiante definen pares explícitos label-control', () => {
+      const studentFilters = [
+        { labelFor: 'student-filter-from', controlId: 'student-filter-from' },
+        { labelFor: 'student-filter-to', controlId: 'student-filter-to' },
+        { labelFor: 'student-filter-type', controlId: 'student-filter-type' },
+        { labelFor: 'student-filter-level', controlId: 'student-filter-level' },
+      ];
+
+      for (const filter of studentFilters) {
+        expect(filter.labelFor).toBe(filter.controlId);
+        expect(filter.controlId.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('los filtros de resumen definen pares explícitos label-control', () => {
+      const overviewFilters = [
+        { labelFor: 'stats-overview-from', controlId: 'stats-overview-from' },
+        { labelFor: 'stats-overview-to', controlId: 'stats-overview-to' },
+      ];
+
+      for (const filter of overviewFilters) {
+        expect(filter.labelFor).toBe(filter.controlId);
+        expect(filter.controlId.length).toBeGreaterThan(0);
+      }
+    });
+  });
 });

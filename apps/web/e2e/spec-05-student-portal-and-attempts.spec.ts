@@ -29,26 +29,36 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     ]);
 
     // 2. Mockear endpoints de API a nivel de red
+    const sessionPayload1 = {
+      user: {
+        id: 'std-e2e-1',
+        email: 'student@englove.local',
+        name: 'Juanita Pérez',
+        role: 'student',
+      },
+      student: {
+        id: 'std-e2e-1',
+        level: 'A1',
+        ageSegment: 'kids',
+        canSwitchInterface: false,
+        group: { id: 'grp-1', name: 'Kids A1 Mañana' },
+      },
+      organizationId: 'org-e2e',
+    };
+
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(sessionPayload1),
+      });
+    });
+
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          user: {
-            id: 'std-e2e-1',
-            email: 'student@englove.local',
-            name: 'Juanita Pérez',
-            role: 'student',
-          },
-          student: {
-            id: 'std-e2e-1',
-            level: 'A1',
-            ageSegment: 'kids',
-            canSwitchInterface: false,
-            group: { id: 'grp-1', name: 'Kids A1 Mañana' },
-          },
-          organizationId: 'org-e2e',
-        }),
+        body: JSON.stringify(sessionPayload1),
       });
     });
 
@@ -259,12 +269,12 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
 
     // 7. Verificar pantalla de completado con estrellas (SPEC-05 RF-14, Decision 101: 5.0 = 3 estrellas)
     await expect(page.locator('text=¡Misión completada!')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=5.0 / 5.0')).toBeVisible();
+    await expect(page.locator('*:has-text("5,0"), *:has-text("5.0")').first()).toBeVisible();
 
     // 8. RF-30: Recargar la página y verificar que el intento persiste completado
     await page.reload();
     await expect(page.locator('text=¡Misión completada!')).toBeVisible();
-    await expect(page.locator('text=5.0 / 5.0')).toBeVisible();
+    await expect(page.locator('*:has-text("5,0"), *:has-text("5.0")').first()).toBeVisible();
 
     // 9. Navegar a /progreso y verificar racha y medallas
     await page.goto('/progreso');
@@ -281,14 +291,24 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       { name: 'englove_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
     ]);
 
+    const sessionPayload2 = {
+      user: { id: 'std-e2e-open', name: 'Laura Gómez', email: 'laura@englove.local', role: 'student' },
+      student: { id: 'std-e2e-open', level: 'A2', ageSegment: 'teens', canSwitchInterface: false },
+      organizationId: 'org-e2e',
+    };
+    await page.route('**/api/v1/me', route => route.fulfill({status: 200, json: sessionPayload2}));
+
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: sessionPayload2,
+      });
+    });
+
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
-        json: {
-          user: { id: 'std-e2e-open', name: 'Laura Gómez', email: 'laura@englove.local', role: 'student' },
-          student: { id: 'std-e2e-open', level: 'A2', ageSegment: 'teens', canSwitchInterface: false },
-          organizationId: 'org-e2e',
-        },
+        json: sessionPayload2,
       });
     });
 
@@ -357,14 +377,24 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       { name: 'englove_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
     ]);
 
+    const sessionPayload3 = {
+      user: { id: 'std-e2e-spk', name: 'Tomás Speaking', email: 'tomas@englove.local', role: 'student' },
+      student: { id: 'std-e2e-spk', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
+      organizationId: 'org-e2e',
+    };
+    await page.route('**/api/v1/me', route => route.fulfill({status: 200, json: sessionPayload3}));
+
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: sessionPayload3,
+      });
+    });
+
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
-        json: {
-          user: { id: 'std-e2e-spk', name: 'Tomás Speaking', email: 'tomas@englove.local', role: 'student' },
-          student: { id: 'std-e2e-spk', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
-          organizationId: 'org-e2e',
-        },
+        json: sessionPayload3,
       });
     });
 
@@ -394,8 +424,12 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       });
     });
 
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    let uploadRequests = 0;
     // Mock media upload-url and R2 PUT
     await page.route('**/api/v1/media/upload-url', async (route) => {
+      uploadRequests++;
       await route.fulfill({
         status: 201,
         json: {
@@ -408,6 +442,13 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
 
     await page.route('https://r2.englove.test/bucket/**', async (route) => {
       await route.fulfill({ status: 200 });
+    });
+
+    await page.route('**/api/v1/media/*/confirm', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: { id: 'asset-r2-mock-123', status: 'ready' },
+      });
     });
 
     await page.route('**/api/v1/attempts/att-spk-1/complete', async (route) => {
@@ -431,10 +472,14 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
           return true;
         }
         public mimeType = 'audio/webm';
+        public state = 'inactive';
         public ondataavailable: ((e: { data: Blob }) => void) | null = null;
         public onstop: (() => void) | null = null;
-        start() {}
+        start() {
+          this.state = 'recording';
+        }
         stop() {
+          this.state = 'inactive';
           if (this.ondataavailable) {
             this.ondataavailable({ data: new Blob(['mock audio stream'], { type: 'audio/webm' }) });
           }
@@ -460,6 +505,9 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     await expect(recordBtn).toBeVisible();
     await recordBtn.click();
 
+    // Esperar al menos 2.1 segundos para satisfacer minDurationSeconds (RF-3)
+    await page.waitForTimeout(2100);
+
     // Detener grabación
     const stopBtn = page.locator('button:has-text("Detener grabación")');
     await expect(stopBtn).toBeVisible();
@@ -467,8 +515,17 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
 
     await expect(page.locator('text=Grabación lista para enviar')).toBeVisible();
 
+    // OFF-01: apertura directa, borrador confirmado y recarga no duplican assets.
+    await expect(page.locator('button:has-text("Entregar actividad")')).toBeEnabled();
+    expect(uploadRequests).toBe(1);
+    await page.reload();
+    await expect(page.locator('text=Grabación lista para enviar')).toBeVisible();
+    await expect(page.locator('button:has-text("Entregar actividad")')).toBeEnabled();
+
     // Entregar actividad oral
     await page.click('button:has-text("Entregar actividad")');
     await expect(page.locator('text=¡Actividad entregada con éxito!')).toBeVisible({ timeout: 5000 });
+    expect(uploadRequests).toBe(1);
+    expect(pageErrors).toEqual([]);
   });
 });

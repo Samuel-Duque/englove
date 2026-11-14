@@ -4,6 +4,12 @@
  * Degrades gracefully without errors if browser blocks autoplay or audio context is unavailable.
  */
 
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
 export type SoundEvent = 'hit' | 'miss' | 'complete';
 
 class SoundManager {
@@ -12,7 +18,7 @@ class SoundManager {
   private getAudioContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
     if (!this.audioContext) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         try {
           this.audioContext = new AudioCtx();

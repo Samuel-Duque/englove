@@ -6,6 +6,7 @@ import {
   ActivityType,
   ActivityStatus,
   AttemptStatus,
+  ProgressEventType,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { seedMinimal } from './seed';
@@ -118,44 +119,71 @@ export async function seedVolume() {
         create: {
           organization_id: org.id,
           config: {
-            instructions: 'Fill the blank',
-            items: [{ id: 'v1', prompt: 'Hello ___', blanks: ['world'] }],
+            instructions: 'Fill the blanks with the correct word',
+            items: [
+              {
+                id: '11111111-1111-4111-9111-111111111101',
+                prompt: 'Hello {{22222222-2222-4222-9222-222222222101}}',
+                blanks: [
+                  {
+                    id: '22222222-2222-4222-9222-222222222101',
+                    options: [
+                      { id: '33333333-3333-4333-9333-333333333101', text: 'world' },
+                      { id: '33333333-3333-4333-9333-333333333102', text: 'earth' },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
-          answer_key: { items: { v1: ['world'] } },
+          answer_key: {
+            items: {
+              '22222222-2222-4222-9222-222222222101': '33333333-3333-4333-9333-333333333101',
+            },
+          },
         },
       },
     },
   });
 
-  const assignment = await prisma.assignment.upsert({
-    where: { id: '30000000-0000-4000-9000-000000000001' },
-    update: {},
-    create: {
-      id: '30000000-0000-4000-9000-000000000001',
-      organization_id: org.id,
-      activity_id: act.id,
-      group_id: groups[Level.A1]!,
-      opens_at: new Date('2026-01-01T00:00:00Z'),
-      due_at: new Date('2026-04-01T00:00:00Z'),
-    },
-  });
+  const assignmentsByGroup: Record<string, string> = {};
+  for (let idx = 0; idx < levels.length; idx++) {
+    const lvl = levels[idx]!;
+    const asgId = `30000000-0000-4000-9000-${(idx + 1).toString().padStart(12, '0')}`;
+    const asg = await prisma.assignment.upsert({
+      where: { id: asgId },
+      update: {},
+      create: {
+        id: asgId,
+        organization_id: org.id,
+        activity_id: act.id,
+        group_id: groups[lvl]!,
+        opens_at: new Date('2026-01-01T00:00:00Z'),
+        due_at: new Date('2026-04-01T00:00:00Z'),
+      },
+    });
+    assignmentsByGroup[groups[lvl]!] = asg.id;
+  }
 
-  // 3 months of attempts
+  // 3 months of attempts distributed across the student's respective group assignments (P1-09)
   const now = Date.now();
   for (let i = 0; i < createdStudents.length; i++) {
     const s = createdStudents[i]!;
+    const studentLvl = s.level ?? Level.A1;
+    const studentGroupId = groups[studentLvl]!;
+    const assignmentId = assignmentsByGroup[studentGroupId]!;
     const attemptId = `40000000-0000-4000-9000-${(i + 1).toString().padStart(12, '0')}`;
     // Distribute attempts across 90 days
     const daysAgo = (i % 90) + 1;
     const attemptTime = new Date(now - daysAgo * 24 * 3600 * 1000);
 
-    await prisma.attempt.upsert({
+    const attempt = await prisma.attempt.upsert({
       where: { id: attemptId },
       update: {},
       create: {
         id: attemptId,
         organization_id: org.id,
-        assignment_id: assignment.id,
+        assignment_id: assignmentId,
         student_id: s.id,
         attempt_number: 1,
         status: AttemptStatus.graded,
@@ -163,9 +191,24 @@ export async function seedVolume() {
         graded_at: attemptTime,
         started_at: new Date(attemptTime.getTime() - 300 * 1000),
         finished_at: attemptTime,
-        payload: { answers: { v1: ['world'] } },
+        payload: { answers: { '22222222-2222-4222-9222-222222222101': '33333333-3333-4333-9333-333333333101' } },
       },
     });
+    if (attempt.finished_at) {
+      await prisma.progressEvent.upsert({
+        where: { id: `61000000-0000-4000-9000-${(i + 1).toString().padStart(12, '0')}` },
+        update: { occurred_at: attempt.finished_at },
+        create: {
+          id: `61000000-0000-4000-9000-${(i + 1).toString().padStart(12, '0')}`,
+          organization_id: org.id,
+          student_id: s.id,
+          attempt_id: attempt.id,
+          type: ProgressEventType.attempt_completed,
+          value: attempt.score,
+          occurred_at: attempt.finished_at,
+        },
+      });
+    }
   }
 
   return { studentCount: createdStudents.length };

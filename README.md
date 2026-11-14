@@ -47,18 +47,23 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 
 ### 1. Gestor de contenidos y actividades interactivas
 
-- **5 tipos de actividad base:** 1.`fill_blank`: Completar textos y oraciones con opciones dinámicas. 2. `multiple_choice`: Preguntas de selección múltiple con opciones contextuales. 3. `matching`: Emparejamiento conceptual mediante arrastrar y soltar (_drag & drop_). 4. `audio_recording`: Grabación de pronunciación oral con subida directa y segura a Cloudflare R2 mediante URLs prefirmadas. 5. `game`: Microjuegos formativos.
-- **5 mecánicas de minijuegos educativos:**
-  - `word_scramble`: Ordenamiento de letras para armar palabras en inglés.
-  - `drag_letters`: Formación de vocabulario arrastrando letras sueltas.
-  - `pair_matching`: Emparejamiento de conceptos, traducción e imágenes.
-  - `flashcards`: Tarjetas nemotécnicas interactivas con autoevaluación.
-  - `whack_a_mole`: Identificación rápida de términos correctos con límite de tiempo.
-- Acceso a microjuegos en modo autónomo 24/7 en `/juegos` o como parte de asignaciones curriculares.
+- **5 tipos de actividad base:**
+  1. `fill_blank`: Completar textos y oraciones con opciones dinámicas y distractores.
+  2. `open_question`: Preguntas abiertas con rúbricas de evaluación cualitativa y cuantitativa (soporte multi-pregunta bajo RFC-01).
+  3. `speaking`: Grabación oral de pronunciación con subida directa y segura a Cloudflare R2 mediante URLs prefirmadas.
+  4. `game`: Microjuegos formativos interactivos autónomos (Decisión 130).
+  5. `exam`: Evaluaciones integradoras que combinan ejercicios estructurados.
+- **5 mecánicas de microjuegos formativos:**
+  - `match`: Emparejamiento de conceptos, traducciones o pares de vocabulario.
+  - `order_words`: Ordenamiento sintáctico de palabras para formar oraciones.
+  - `drag_drop`: Arrastrar y soltar elementos en categorías correspondientes.
+  - `memory`: Juego de memoria visual para asociar pares conceptuales.
+  - `timed_choice`: Selección rápida de respuestas correctas bajo tiempo límite.
+- Acceso a microjuegos en modo autónomo 24/7 en `/juegos` sin requerir `Assignment` previa (Decisión 130), con estrellas de práctica y ranking privado docente (Decisión 137).
 
 ### 2. Asignaciones y gestión docente
 
-- Creación de asignaciones grupales o individuales personalizadas.
+- Creación de asignaciones curriculares dirigidas a grupos completos (`group_id`), manteniendo el alcance pedagógico del piloto (Decisión 48).
 - Fechas de entrega con ventana de tolerancia de 24 horas (`effectiveDueAt`).
 - Habilitación controlada y atómica de nuevos intentos por decisión del docente.
 - Dashboard docente con métricas operativas y tarjetas de recordatorio automático (alumnos pendientes de aprobación, entregas sin calificar por más de 3 días).
@@ -100,17 +105,17 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 |                           | Pragmatic Drag and Drop | `^1.5.0`              | Motor accesible de arrastrar y soltar para ejercicios           |
 |                           | vinext / Wrangler       | `^1.2.1` / `^4.149.0` | Adaptador y CLI para despliegue en Cloudflare Workers           |
 | **Backend (`apps/api`)**  | NestJS                  | `^11.0.11`            | Arquitectura modular orientada a servicios, guards y DI         |
-|                           | Express                 | `^5.0.0`              | Servidor HTTP subyacente para el framework NestJS               |
+|                           | Express                 | `^5.3.0`              | Servidor HTTP subyacente para el framework NestJS               |
 |                           | Prisma ORM              | `^7.0.0`              | Mapeo objeto-relacional y migraciones tipadas                   |
 |                           | `@prisma/adapter-pg`    | `^7.10.1`             | Adaptador nativo PostgreSQL para poolers y servidor             |
 |                           | Argon2                  | `^0.41.1`             | Algoritmo resistente para hash seguro de contraseñas            |
 |                           | Pino / nestjs-pino      | `^9.6.0` / `^4.3.1`   | Logger estructurado de alto rendimiento sin fugas de PII        |
-|                           | fluent-ffmpeg           | `^2.1.3`              | Orquestador de transcodificación de audio en servidor           |
+|                           | ffmpeg (CLI)            | Binario / spawn       | Transcodificación de audio en servidor con child_process.spawn |
 |                           | AWS SDK S3              | `^3.750.0`            | Cliente S3 para generación de URLs prefirmadas en Cloudflare R2 |
 |                           | Resend SDK              | `^4.1.2`              | Envío de correos transaccionales institucionales                |
 | **Tipado y Compartido**   | `@englove/shared`       | `0.0.1`               | Contratos de actividad, enums canónicos y DTOs comunes          |
 |                           | TypeScript              | `~5.9.3`              | Tipado estricto sin comodines `any` en todo el repositorio      |
-|                           | Zod                     | `^3.24.2`             | Validación de esquemas estructurales de actividades y DTOs      |
+|                           | Zod                     | `^4.6.6`              | Validación de esquemas estructurales de actividades y DTOs      |
 | **Base de Datos & Infra** | PostgreSQL              | `18`                  | Base de datos relacional (Neon en la nube / Docker en local)    |
 |                           | Cloudflare R2           | S3 Compatible         | Almacenamiento seguro de objetos multimedia privados            |
 |                           | ffmpeg / ffprobe        | Binario del SO        | Validación técnica, métricas de decibelios y transcodificación  |
@@ -124,14 +129,14 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 ```
 englove/
 ├── .agents/
-│ ├── CONTEXT.md # Fuente única de verdad técnica y de producto (Decisiones 1–115)
+│ ├── CONTEXT.md # Fuente única de verdad técnica y de producto (Decisiones 1–137)
 │ └── skills/ # Habilidades y scripts automáticos del proyecto (guardrails, spec)
 ├── apps/
 │ ├── api/ # Backend NestJS 11
 │ │ ├── prisma/ # Esquema schema.prisma, migraciones y scripts de seed
 │ │ ├── src/
 │ │ │ ├── activities/ # Gestión de actividades y esquemas pedagógicos
-│ │ │ ├── assignments/ # Lógica de asignación grupal/individual y ventanas temporales
+│ │ │ ├── assignments/ # Lógica de asignación grupal y ventanas temporales
 │ │ │ ├── attempts/ # Registro y resolución de intentos del estudiante
 │ │ │ ├── auth/ # Autenticación, sesiones JWT, registro y control de acceso
 │ │ │ ├── common/ # Filtros globales, decoradores, pipes e interceptores
@@ -164,9 +169,9 @@ englove/
 │ ├── architecture-overview.md# Especificación técnica exhaustiva de la arquitectura del sistema
 │ ├── sdd-process.md # Manual del proceso Spec-Driven Development
 │ └── taskboard.md # Tablero de tareas del proyecto
-├── specs/ # Especificaciones formales por capacidad (SPEC-01 a SPEC-08)
+├── specs/ # Especificaciones formales por capacidad (SPEC-01 a SPEC-11 Verificadas)
 ├── tooling/ # Configuraciones transversales compartidas (tsconfig, eslint, prettier)
-├── docker-compose.yml # Configuración de contenedores locales (PostgreSQL 18)
+├── docker-compose.yml # Configuración de contenedores locales (PostgreSQL 18, MinIO S3 y Mailpit SMTP)
 ├── package.json # Scripts globales y dependencias de la raíz del monorepo
 ├── pnpm-workspace.yaml # Definición de paquetes y aplicaciones del monorepo
 └── turbo.json # Definición de pipelines de compilación y ejecución de Turborepo
@@ -214,7 +219,9 @@ cp .env.example .env
 ```
 
 > [!NOTE]
-> Las variables en `.env.example` vienen listas para el entorno local. No se requiere configurar claves reales de Cloudflare R2 ni de Resend en local: el servicio de correo opera en modo log seguro y el servicio de almacenamiento simula URLs locales válidas.
+> Las variables en `.env.example` vienen listas para el entorno local con MinIO (emulación local de Cloudflare R2 con el bucket `englove-dev`) y Mailpit (servidor SMTP local e interfaz web de inspección de correos en `http://localhost:8025`).
+
+Al iniciar la API desde `apps/api`, revisa también `apps/api/.env`: sus variables de R2 deben apuntar a MinIO local (`R2_ENDPOINT=http://localhost:9000`) y coincidir con las credenciales y el bucket del `.env` raíz. Un archivo antiguo con valores de ejemplo para R2 puede generar URLs inaccesibles. Con los servicios iniciados, `node scripts/check-local-audio.mjs` comprueba la configuración local, el bucket y las herramientas de audio sin subir archivos.
 
 ### 4. Instalar dependencias
 
@@ -224,15 +231,15 @@ Instala todas las dependencias del monorepo de forma limpia mediante pnpm:
 pnpm install
 ```
 
-### 5. Iniciar base de datos local (PostgreSQL 18)
+### 5. Iniciar servicios locales (PostgreSQL 18, MinIO y Mailpit)
 
-Levanta el contenedor de PostgreSQL 18 en segundo plano:
+Levanta los contenedores de desarrollo en segundo plano (PostgreSQL 18 se expone en el puerto local **`5433`** (`localhost:5433`) para evitar colisiones con instancias nativas de Postgres en el puerto estándar 5432):
 
 ```bash
-docker compose up -d postgres
+docker compose up -d
 ```
 
-Para verificar que el contenedor se encuentra activo y saludable:
+Para verificar que los contenedores se encuentran activos y saludables:
 
 ```bash
 docker compose ps
@@ -294,21 +301,20 @@ El script `pnpm seed:dev` provee las siguientes cuentas listas para probar los d
 
 ## Pruebas, calidad y guardrails
 
-La plataforma garantiza estabilidad, integridad de arquitectura y cumplimiento normativo mediante múltiples barreras de calidad automatizadas:
+La plataforma dispone de comprobaciones automatizadas de código, contratos, persistencia y accesibilidad. Sus resultados acreditan el alcance ejecutado y no garantizan ausencia de bugs ni aceptación operativa:
 
 ```bash
-# Ejecutar suite de pruebas completa (407 tests en verde)
+# Ejecutar las pruebas; para integrar PostgreSQL se necesita una base aislada migrada
 pnpm test
 # Ejecutar auditoría automatizada de reglas invariantes
 pnpm guardrails
 ```
 
-- **Suite de pruebas:** Más de **407 pruebas automáticas** en verde en todo el monorepo (Vitest):
-  - `packages/shared`: 58 tests (validación estricta de esquemas Zod, contratos y DTOs).
-  - `apps/api`: 265 tests (controladores, guards, servicios de scoring, media, review y flujos E2E con PostgreSQL real).
-  - `apps/web`: 84 tests (flujos docentes, portal de alumnos, componentes de microjuegos, protección de proxy y formularios).
+- **Evidencia fechada:** [auditoría del 12 de noviembre](./planning/auditoria-general-2026-11-12.md) y [estado de su remediación](./planning/remediacion-auditoria-2026-11-12.md). Los conteos pertenecen al snapshot y las ejecuciones de cada informe.
+- `packages/shared` verifica esquemas y contratos; `apps/api`, controladores, guards, servicios y flujos PostgreSQL; `apps/web`, helpers y componentes reales. Playwright cubre navegador con parte de la API simulada; no sustituye pruebas integrales contra staging.
+- CI exige PostgreSQL disponible y falla ante errores E2E. Para exigir PostgreSQL también en local: `REQUIRE_POSTGRES_TESTS=1`; nunca apuntar fixtures o migraciones de test a una base con datos reales.
 - **Verificación de guardrails (`pnpm guardrails`):** Script auditor (`check-guardrails.mjs`) que analiza estáticamente el código para prevenir desviaciones críticas de arquitectura:
-  - Cero consultas sin filtro explícito por `organization_id` (anti-IDOR).
+  - Señales de consultas sin filtro explícito por `organization_id` (requieren revisión semántica anti-IDOR).
   - Cero cálculo de notas en el frontend.
   - Cero creación de timestamps en el cliente.
   - Prohibición estricta de `prisma db push` en producción.
@@ -318,7 +324,7 @@ pnpm guardrails
 
 ## Metodología y estado del proyecto
 
-Englove sigue estrictamente la metodología **Spec-Driven Development (SDD)**: _ninguna línea de código de producción se escribe sin una especificación previa aprobada y verificada_.
+Englove sigue **Spec-Driven Development (SDD)**: el código de producción requiere una especificación previa aprobada. La implementación se verifica después conforme al proceso y sus criterios de aceptación.
 Para conocer en detalle el proceso y las especificaciones activas:
 
 - [Proceso SDD y ciclo de vida](./planning/sdd-process.md)
@@ -336,7 +342,12 @@ Para conocer en detalle el proceso y las especificaciones activas:
 | [SPEC-05](./specs/SPEC-05-portal-e-intentos.md)    | Portal del alumno y resolución de intentos            | **Verificada** | Etapa 5 |
 | [SPEC-06](./specs/SPEC-06-microjuegos.md)          | Microjuegos formativos autónomos                      | **Verificada** | Etapa 6 |
 | [SPEC-07](./specs/SPEC-07-revision-y-feedback.md)  | Revisión docente, retroalimentación y nuevo intento   | **Verificada** | Etapa 7 |
-| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Aprobada**   | Etapa 8 |
+| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Implementada** (enmienda NEG-01; re-verificación CI pendiente) | Etapa 8 |
+| [SPEC-09](./specs/SPEC-09-pwa-offline-a11y.md)     | PWA, offline y accesibilidad                          | **Verificada** | Etapa 9 |
+| [SPEC-10](./specs/SPEC-10-contenido-extra.md)      | Contenido extra                                       | **Verificada** | Etapa 10 |
+| [SPEC-11](./specs/SPEC-11-calidad-y-correcciones.md) | Calidad, correcciones y verificación                  | **Verificada** | Etapa 12 |
+
+El cierre histórico de Etapa 12 consta en SPEC-11. Las correcciones de la auditoría posterior del 2026-11-12 se registran por separado en su informe de remediación; no constituyen aceptación operativa ni cierre de Etapa 11.
 
 ---
 
@@ -358,8 +369,10 @@ Todo colaborador y agente de desarrollo en Englove debe respetar las siguientes 
 
 La plataforma está optimizada para operar con alta disponibilidad y costos contenidos:
 
-- **Frontend (`apps/web`):** Desplegado como **Cloudflare Worker** mediante `vinext`, logrando latencias perimetrales mínimas y renderizado Server Components (RSC) de alto rendimiento.
-- **Backend API (`apps/api`):** Alojado en **Render** como contenedor Docker en instancia única dedicada, con gestión segura de memoria para la cola de `ffmpeg`.
+- **Frontend (`apps/web`):** Destino previsto: **Cloudflare Workers** mediante `vinext`. El build y el empaquetado local no acreditan un despliegue cloud.
+- **Backend API (`apps/api`):** Destino previsto: **Render**, contenedor Docker en instancia única, con cola serial de `ffmpeg`.
+
+El aprovisionamiento y la aceptación operativa siguen el [taskboard](./planning/taskboard.md). La promoción a staging queda documentada en [despliegue-staging.md](./planning/despliegue-staging.md); no se declara infraestructura creada ni producción operativa por existir el workflow.
 - **Base de datos:** **PostgreSQL 18** gestionado en **Neon**, utilizando endpoint con PgBouncer para runtime y conexión directa para migraciones estructuradas de Prisma.
 - **Almacenamiento multimedia:** **Cloudflare R2** para la retención y entrega privada de archivos de audio e imágenes sin costos de egreso de datos.
 - **Correo transaccional:** **Resend** para notificaciones críticas, alertas de entrega y recuperación de accesos.

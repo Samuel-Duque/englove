@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Zona de Juegos',
 };
 
-export const instant = false;
-
 export default function JuegosPage() {
   return (
     <Suspense

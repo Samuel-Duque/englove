@@ -35,6 +35,7 @@ describe('SPEC-08: StatsController & RBAC Security (ENG-101, ENG-102)', () => {
       getOverview: vi.fn().mockResolvedValue({ period: {}, organizationSummary: {} }),
       getGroupStats: vi.fn().mockResolvedValue({ group: {}, students: [] }),
       getLeaderboard: vi.fn().mockResolvedValue({ entries: [] }),
+      getGamesLeaderboard: vi.fn().mockResolvedValue({ period: {}, topGames: [], entries: [] }),
       getStudentStats: vi.fn().mockResolvedValue({ student: {}, performance: {}, consistency: {} }),
     };
 
@@ -64,9 +65,16 @@ describe('SPEC-08: StatsController & RBAC Security (ENG-101, ENG-102)', () => {
       expect(() => rolesGuard.canActivate(context)).toThrow(ForbiddenException);
     });
 
+    it('RF-12 (ENG-162): estudiante recibe 403 Forbidden al intentar acceder a games-leaderboard', () => {
+      const context = createMockContext(studentUser, controller.getGamesLeaderboard);
+      expect(() => rolesGuard.canActivate(context)).toThrow(ForbiddenException);
+    });
+
     it('profesora tiene acceso permitido a todos los endpoints de estadísticas', () => {
       const context = createMockContext(teacherUser, controller.getLeaderboard);
       expect(rolesGuard.canActivate(context)).toBe(true);
+      const gamesContext = createMockContext(teacherUser, controller.getGamesLeaderboard);
+      expect(rolesGuard.canActivate(gamesContext)).toBe(true);
     });
   });
 
@@ -87,6 +95,11 @@ describe('SPEC-08: StatsController & RBAC Security (ENG-101, ENG-102)', () => {
     it('getLeaderboard invoca statsService.getLeaderboard con organizationId y filtros', async () => {
       await controller.getLeaderboard(teacherUser, { level: 'A1' as any });
       expect(mockStatsService.getLeaderboard).toHaveBeenCalledWith(orgId, { level: 'A1' });
+    });
+
+    it('RF-12 (ENG-162): getGamesLeaderboard invoca statsService.getGamesLeaderboard con organizationId y filtros', async () => {
+      await controller.getGamesLeaderboard(teacherUser, { level: 'A1' as any });
+      expect(mockStatsService.getGamesLeaderboard).toHaveBeenCalledWith(orgId, { level: 'A1' });
     });
 
     it('getStudentStats invoca statsService.getStudentStats con organizationId y studentId', async () => {

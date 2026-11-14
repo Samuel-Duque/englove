@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { GamificationService } from '../gamification/gamification.service';
+import { GamificationService, type StreakState } from '../gamification/gamification.service';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import {
   ActivityType,
   ApprovalStatus,
@@ -10,6 +11,7 @@ import {
   ProgressEventType,
   ScoreTrendComparison,
   ScoreTrendDirection,
+  WeekCalendarStatus,
   LevelStatsSummary,
   GroupStatsSummary,
   InactiveStudentAlert,
@@ -26,6 +28,12 @@ import {
   TimeBucketItem,
   StudentStatsResponse,
   StudentOfflineUndeliveredAttempt,
+  GamesPracticeSummary,
+  GamePracticeSessionItem,
+  GamesLeaderboardItem,
+  GamesLeaderboardResponse,
+  scoreToGameStars,
+  formatBogotaDateTime,
 } from '@englove/shared';
 import {
   StatsOverviewQueryDto,
@@ -34,14 +42,41 @@ import {
   StatsStudentQueryDto,
 } from './dto/stats-query.dto';
 
+const bogotaDayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 @Injectable()
 export class StatsService {
-  private readonly defaultPassingScore = 3.0;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
+    private readonly featureFlagsService: FeatureFlagsService,
   ) {}
+
+  private async computeStreak(
+    organizationId: string,
+    studentId: string,
+    events: Array<{ occurred_at: Date }>,
+    asOfDate?: Date,
+  ): Promise<StreakState> {
+    if (this.gamificationService && typeof this.gamificationService.calculateStreakFromEvents === 'function') {
+      return this.gamificationService.calculateStreakFromEvents(events, asOfDate);
+    }
+    if (this.gamificationService && typeof this.gamificationService.calculateStreak === 'function') {
+      return await this.gamificationService.calculateStreak(organizationId, studentId, asOfDate);
+    }
+    return {
+      weeks: 0,
+      forgivenessAvailable: true,
+      activeWeeksSinceForgivenessUsed: 0,
+      periodKey: null,
+      forgivenWeekKeys: [],
+    };
+  }
 
   /**
    * Parses and validates the date range. If from > to, throws 400 VALIDATION_ERROR.
@@ -128,12 +163,7 @@ export class StatsService {
    * Formats a date into YYYY-MM-DD in America/Bogota timezone.
    */
   private formatBogotaDay(date: Date): string {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    return bogotaDayFormatter.format(date);
   }
 
   /**
@@ -148,12 +178,7 @@ export class StatsService {
    * Returns the Monday (start date, YYYY-MM-DD) of the ISO week containing the given date in America/Bogota timezone.
    */
   private getBogotaIsoWeekMonday(date: Date): string {
-    const bogotaDateStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(date);
+    const bogotaDateStr = bogotaDayFormatter.format(date);
 
     const [yearStr, monthStr, dayStr] = bogotaDateStr.split('-');
     const bogotaDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));
@@ -194,6 +219,7 @@ export class StatsService {
       where: {
         organization_id: organizationId,
         status: AttemptStatus.graded,
+        assignment_id: { not: null },
         graded_at: { gte: from, lte: to },
         score: { not: null },
       },
@@ -208,6 +234,7 @@ export class StatsService {
     // Rule of last graded attempt per (student, assignment)
     const latestGradedAttemptsMap = new Map<string, (typeof gradedAttempts)[0]>();
     for (const att of gradedAttempts) {
+      if (!att.assignment_id) continue;
       const key = `${att.student_id}:${att.assignment_id}`;
       if (!latestGradedAttemptsMap.has(key)) {
         latestGradedAttemptsMap.set(key, att);
@@ -226,6 +253,7 @@ export class StatsService {
         assignment: {
           include: { activity: true },
         },
+        activity: true,
       },
     });
 
@@ -246,7 +274,7 @@ export class StatsService {
     // 5. Total time spent
     let totalTimeSpentSeconds = 0;
     for (const att of finishedAttempts) {
-      const expected = att.assignment?.activity?.expected_duration_seconds ?? 300;
+      const expected = att.activity?.expected_duration_seconds ?? att.assignment?.activity?.expected_duration_seconds ?? 300;
       totalTimeSpentSeconds += this.calculateEffectiveDuration(att.started_at, att.finished_at, expected);
     }
 
@@ -332,20 +360,25 @@ export class StatsService {
     });
     const studentsWithRecentActivity = new Set(recentActivityEvents.map((e) => e.student_id));
 
-    // For inactive alerts, find the last activity event ever for each student
-    const allStudentActivityEvents = await this.prisma.progressEvent.findMany({
-      where: {
-        organization_id: organizationId,
-        type: { in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted] },
-      },
-      select: { student_id: true, occurred_at: true },
-      orderBy: { occurred_at: 'desc' },
-    });
+    // For inactive alerts, find the last activity event ever for each student via batch groupBy (RF-11)
+    const lastActivityByStudent =
+      typeof this.prisma.progressEvent.groupBy === 'function'
+        ? await this.prisma.progressEvent.groupBy({
+            by: ['student_id'],
+            where: {
+              organization_id: organizationId,
+              type: { in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted] },
+            },
+            _max: {
+              occurred_at: true,
+            },
+          })
+        : [];
 
     const lastActivityMap = new Map<string, Date>();
-    for (const ev of allStudentActivityEvents) {
-      if (!lastActivityMap.has(ev.student_id)) {
-        lastActivityMap.set(ev.student_id, ev.occurred_at);
+    for (const item of lastActivityByStudent) {
+      if (item._max.occurred_at) {
+        lastActivityMap.set(item.student_id, item._max.occurred_at);
       }
     }
 
@@ -389,7 +422,10 @@ export class StatsService {
       let levelTime = 0;
       for (const att of finishedAttempts) {
         if (levelStudentIds.has(att.student_id)) {
-          const expected = att.assignment?.activity?.expected_duration_seconds ?? 300;
+          const expected =
+            att.activity?.expected_duration_seconds ??
+            att.assignment?.activity?.expected_duration_seconds ??
+            300;
           levelTime += this.calculateEffectiveDuration(att.started_at, att.finished_at, expected);
         }
       }
@@ -453,7 +489,7 @@ export class StatsService {
       let groupTime = 0;
       for (const att of finishedAttempts) {
         if (groupStudentIds.has(att.student_id)) {
-          const expected = att.assignment?.activity?.expected_duration_seconds ?? 300;
+          const expected = att.activity?.expected_duration_seconds ?? att.assignment?.activity?.expected_duration_seconds ?? 300;
           groupTime += this.calculateEffectiveDuration(att.started_at, att.finished_at, expected);
         }
       }
@@ -572,6 +608,8 @@ export class StatsService {
         organization_id: organizationId,
         student_id: { in: memberStudentIds },
         status: AttemptStatus.graded,
+        assignment_id: { not: null },
+        assignment: { activity: { type: { not: ActivityType.game } } },
         graded_at: { gte: earliestTrendDate, lte: to },
         score: { not: null },
       },
@@ -594,7 +632,7 @@ export class StatsService {
       });
       const latestMap = new Map<string, number>();
       for (const a of windowAttempts) {
-        if (!latestMap.has(a.assignment_id) && a.score !== null) {
+        if (a.assignment_id && !latestMap.has(a.assignment_id) && a.score !== null) {
           latestMap.set(a.assignment_id, Number(a.score));
         }
       }
@@ -602,7 +640,7 @@ export class StatsService {
       return vals.length > 0 ? this.round1(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
     };
 
-    // Load progress events in period for active weeks & streaks
+    // Load progress events in period for active weeks
     const progressEvents = await this.prisma.progressEvent.findMany({
       where: {
         organization_id: organizationId,
@@ -612,19 +650,43 @@ export class StatsService {
       },
     });
 
-    // Load all progress events ever to get lastActivityAt
-    const allEventsEver = await this.prisma.progressEvent.findMany({
+    // Load last activity for members via batch groupBy (RF-11)
+    const lastActivityByStudent =
+      typeof this.prisma.progressEvent.groupBy === 'function'
+        ? await this.prisma.progressEvent.groupBy({
+            by: ['student_id'],
+            where: {
+              organization_id: organizationId,
+              student_id: { in: memberStudentIds },
+              type: { in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted] },
+            },
+            _max: { occurred_at: true },
+          })
+        : [];
+    const lastActivityMap = new Map<string, Date>();
+    for (const item of lastActivityByStudent) {
+      if (item._max.occurred_at) {
+        lastActivityMap.set(item.student_id, item._max.occurred_at);
+      }
+    }
+
+    // Load all historical events for member streaks in a single batch query (RF-11)
+    const allMemberEvents = await this.prisma.progressEvent.findMany({
       where: {
         organization_id: organizationId,
         student_id: { in: memberStudentIds },
         type: { in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted] },
       },
-      select: { student_id: true, occurred_at: true },
-      orderBy: { occurred_at: 'desc' },
+      orderBy: { occurred_at: 'asc' },
     });
-    const lastActivityMap = new Map<string, Date>();
-    for (const ev of allEventsEver) {
-      if (!lastActivityMap.has(ev.student_id)) lastActivityMap.set(ev.student_id, ev.occurred_at);
+    const eventsByStudent = new Map<string, Array<{ occurred_at: Date }>>();
+    for (const ev of allMemberEvents) {
+      let list = eventsByStudent.get(ev.student_id);
+      if (!list) {
+        list = [];
+        eventsByStudent.set(ev.student_id, list);
+      }
+      list.push(ev);
     }
 
     // Finished attempts in period for time spent
@@ -637,6 +699,7 @@ export class StatsService {
       },
       include: {
         assignment: { include: { activity: true } },
+        activity: true,
       },
     });
 
@@ -685,14 +748,15 @@ export class StatsService {
         stEvents.map((e) => this.gamificationService.getBogotaIsoWeekKey(e.occurred_at)),
       );
 
-      // Streak
-      const streak = await this.gamificationService.calculateStreak(organizationId, studentId, to);
+      // Streak calculated in-memory (RF-11)
+      const stHistEvents = eventsByStudent.get(studentId) ?? [];
+      const streak = await this.computeStreak(organizationId, studentId, stHistEvents, to);
 
       // Time spent
       let timeSpentSeconds = 0;
       for (const att of finishedAttempts) {
         if (att.student_id === studentId) {
-          const exp = att.assignment?.activity?.expected_duration_seconds ?? 300;
+          const exp = att.activity?.expected_duration_seconds ?? att.assignment?.activity?.expected_duration_seconds ?? 300;
           timeSpentSeconds += this.calculateEffectiveDuration(att.started_at, att.finished_at, exp);
         }
       }
@@ -810,8 +874,18 @@ export class StatsService {
       timeSpentSeconds: totalTime,
     };
 
-    const previousFrom = trendMode === '7d' ? t7PrevFrom.toISOString() : t30PrevFrom.toISOString();
-    const previousTo = trendMode === '7d' ? t7PrevTo.toISOString() : t30PrevTo.toISOString();
+    const gamesPractice = await this.computeGamesPractice(
+      organizationId,
+      memberStudentIds,
+      from,
+      to,
+      false,
+    );
+
+    const previousFrom =
+      trendMode === '7d' ? t7PrevFrom.toISOString() : t30PrevFrom.toISOString();
+    const previousTo =
+      trendMode === '7d' ? t7PrevTo.toISOString() : t30PrevTo.toISOString();
 
     return {
       group: { id: group.id, name: group.name },
@@ -824,6 +898,7 @@ export class StatsService {
       trendMode,
       summary,
       students: studentRows,
+      gamesPractice,
     };
   }
 
@@ -866,11 +941,14 @@ export class StatsService {
     const studentIds = students.map((s) => s.id);
 
     // 2. Graded attempts in period for average score (rule of last graded attempt)
+    // Exclude games per RF-12 / Decision 137
     const gradedAttempts = await this.prisma.attempt.findMany({
       where: {
         organization_id: organizationId,
         student_id: { in: studentIds },
         status: AttemptStatus.graded,
+        assignment_id: { not: null },
+        assignment: { activity: { type: { not: ActivityType.game } } },
         graded_at: { gte: from, lte: to },
         score: { not: null },
       },
@@ -883,7 +961,7 @@ export class StatsService {
         studentScoresMap.set(att.student_id, new Map());
       }
       const m = studentScoresMap.get(att.student_id)!;
-      if (!m.has(att.assignment_id) && att.score !== null) {
+      if (att.assignment_id && !m.has(att.assignment_id) && att.score !== null) {
         m.set(att.assignment_id, Number(att.score));
       }
     }
@@ -904,6 +982,25 @@ export class StatsService {
       completedCountMap.set(ev.student_id, (completedCountMap.get(ev.student_id) ?? 0) + 1);
     }
 
+    // Batch load all historical events for streaks in a single query (RF-11)
+    const allLeaderboardEvents = await this.prisma.progressEvent.findMany({
+      where: {
+        organization_id: organizationId,
+        student_id: { in: studentIds },
+        type: { in: [ProgressEventType.attempt_completed, ProgressEventType.audio_submitted] },
+      },
+      orderBy: { occurred_at: 'asc' },
+    });
+    const eventsByStudent = new Map<string, Array<{ occurred_at: Date }>>();
+    for (const ev of allLeaderboardEvents) {
+      let list = eventsByStudent.get(ev.student_id);
+      if (!list) {
+        list = [];
+        eventsByStudent.set(ev.student_id, list);
+      }
+      list.push(ev);
+    }
+
     // 4. Build leaderboard entries
     const entries: LeaderboardEntry[] = [];
 
@@ -914,7 +1011,8 @@ export class StatsService {
         scores.length > 0 ? this.round1(scores.reduce((sum, s) => sum + s, 0) / scores.length) : null;
 
       const completedCount = completedCountMap.get(student.id) ?? 0;
-      const streak = await this.gamificationService.calculateStreak(organizationId, student.id, to);
+      const stHistEvents = eventsByStudent.get(student.id) ?? [];
+      const streak = await this.computeStreak(organizationId, student.id, stHistEvents, to);
       const badgesCount = student.badge_awards?.length ?? 0;
       const activeGroup = query.groupId
         ? (student.memberships ?? []).find((m) => m.group_id === query.groupId)?.group ??
@@ -1015,10 +1113,12 @@ export class StatsService {
     const activeGroup = activeMembership?.group ?? (student.memberships ?? [])[0]?.group ?? null;
 
     // Optional query filters
+    const { config } = await this.featureFlagsService.getConfiguration(organizationId);
+    const passingScore = config.passing_score;
     const typeFilter = query.type;
     const levelFilter = query.level;
 
-    // 1. Performance - load graded attempts in period
+    // 1. Performance - load graded attempts in period (excluding games per SPEC-11 RF-12 / Decision 137)
     const gradedAttempts = await this.prisma.attempt.findMany({
       where: {
         organization_id: organizationId,
@@ -1026,16 +1126,13 @@ export class StatsService {
         status: AttemptStatus.graded,
         graded_at: { gte: from, lte: to },
         score: { not: null },
-        ...(typeFilter || levelFilter
-          ? {
-              assignment: {
-                activity: {
-                  ...(typeFilter ? { type: typeFilter } : {}),
-                  ...(levelFilter ? { level: levelFilter } : {}),
-                },
-              },
-            }
-          : {}),
+        assignment_id: { not: null },
+        assignment: {
+          activity: {
+            type: typeFilter ? typeFilter : { not: ActivityType.game },
+            ...(levelFilter ? { level: levelFilter } : {}),
+          },
+        },
       },
       include: {
         assignment: {
@@ -1051,31 +1148,16 @@ export class StatsService {
     });
 
     // Score series:
-    // Autonomous games (ActivityType.game): include ALL attempts 1..N
     // Assigned activities (fill_blank, open_question, speaking, exam): latest graded attempt per assignment
+    // Microgames (game) are excluded from scoreSeries per RF-12 / Decision 137 (they live in gamesPractice)
     const scoreSeries: StudentScorePoint[] = [];
     const nonGameLatestMap = new Map<string, (typeof gradedAttempts)[0]>();
 
     for (const att of gradedAttempts) {
-      const act = att.assignment.activity;
-      if (act.type === ActivityType.game) {
-        scoreSeries.push({
-          attemptId: att.id,
-          assignmentId: att.assignment_id,
-          activityId: act.id,
-          activityTitle: act.title,
-          activityType: act.type,
-          gameMechanic: act.game_detail?.mechanic ?? null,
-          level: act.level,
-          attemptNumber: att.attempt_number,
-          score: Number(att.score),
-          passed: Number(att.score) >= this.defaultPassingScore,
-          gradedAt: att.graded_at!.toISOString(),
-          usedExtendedDeadline: Boolean(att.previous_attempt?.retry_extend_until),
-          // guardrails-ignore G-C06: bandera de duracion calculada en servidor, no telemetria de terceros
-          implausibleDuration: att.flags.includes('implausible_duration'),
-        });
-      } else {
+      const act = att.assignment?.activity;
+      if (!act || act.type === ActivityType.game) continue;
+
+      if (att.assignment_id) {
         const existing = nonGameLatestMap.get(att.assignment_id);
         if (!existing || existing.attempt_number < att.attempt_number) {
           nonGameLatestMap.set(att.assignment_id, att);
@@ -1084,10 +1166,11 @@ export class StatsService {
     }
 
     for (const att of nonGameLatestMap.values()) {
-      const act = att.assignment.activity;
+      const act = att.assignment?.activity;
+      if (!act) continue;
       scoreSeries.push({
         attemptId: att.id,
-        assignmentId: att.assignment_id,
+        assignmentId: att.assignment_id ?? '',
         activityId: act.id,
         activityTitle: act.title,
         activityType: act.type,
@@ -1095,7 +1178,7 @@ export class StatsService {
         level: act.level,
         attemptNumber: att.attempt_number,
         score: Number(att.score),
-        passed: Number(att.score) >= this.defaultPassingScore,
+        passed: Number(att.score) >= passingScore,
         gradedAt: att.graded_at!.toISOString(),
         usedExtendedDeadline: Boolean(att.previous_attempt?.retry_extend_until),
         // guardrails-ignore G-C06: bandera de duracion calculada en servidor, no telemetria de terceros
@@ -1126,6 +1209,8 @@ export class StatsService {
         where: {
           organization_id: organizationId,
           status: AttemptStatus.graded,
+          assignment_id: { not: null },
+          assignment: { activity: { type: { not: ActivityType.game } } },
           graded_at: { gte: from, lte: to },
           score: { not: null },
           student: {
@@ -1138,19 +1223,22 @@ export class StatsService {
       });
       const gMap = new Map<string, number>();
       for (const a of groupGradedAttempts) {
-        const key = `${a.student_id}:${a.assignment_id}`;
-        if (!gMap.has(key) && a.score !== null) gMap.set(key, Number(a.score));
+        if (a.assignment_id && a.score !== null) {
+          const key = `${a.student_id}:${a.assignment_id}`;
+          if (!gMap.has(key)) {
+            gMap.set(key, Number(a.score));
+          }
+        }
       }
       const gVals = Array.from(gMap.values());
       groupAverageScore = gVals.length > 0 ? this.round1(gVals.reduce((sum, s) => sum + s, 0) / gVals.length) : null;
     }
 
-    // Breakdown by ActivityType
+    // Breakdown by ActivityType (excluding game per RF-12 / Decision 137)
     const activityTypes = [
       ActivityType.fill_blank,
       ActivityType.open_question,
       ActivityType.speaking,
-      ActivityType.game,
       ActivityType.exam,
     ];
     const byActivityType: StudentTypeBreakdown[] = activityTypes.map((t) => {
@@ -1167,26 +1255,8 @@ export class StatsService {
       };
     });
 
-    // Breakdown by GameMechanic
-    const mechanics = [
-      GameMechanic.match,
-      GameMechanic.order_words,
-      GameMechanic.drag_drop,
-      GameMechanic.memory,
-      GameMechanic.timed_choice,
-    ];
-    const byGameMechanic: StudentGameMechanicBreakdown[] = mechanics.map((m) => {
-      const items = scoreSeries.filter((p) => p.gameMechanic === m);
-      const scores = items.map((p) => p.score);
-      const avg = scores.length > 0 ? this.round1(scores.reduce((sum, s) => sum + s, 0) / scores.length) : null;
-      const uniqueGames = new Set(items.map((p) => p.activityId)).size;
-      return {
-        mechanic: m,
-        attemptsCount: items.length,
-        uniqueGamesCount: uniqueGames,
-        averageScore: avg,
-      };
-    });
+    // Breakdown by GameMechanic (empty for academic performance; game mechanics live in gamesPractice)
+    const byGameMechanic: StudentGameMechanicBreakdown[] = [];
 
     // Breakdown by Level
     const levels = [Level.A1, Level.A2, Level.B1, Level.B2];
@@ -1215,10 +1285,11 @@ export class StatsService {
       (e) => e.occurred_at >= from && e.occurred_at <= to,
     );
 
-    // Current Streak & Best Streak
-    const currentStreakState = await this.gamificationService.calculateStreak(
+    // Current Streak & Best Streak (calculated in-memory without N+1 queries, RF-11)
+    const currentStreakState = await this.computeStreak(
       organizationId,
       studentId,
+      allStudentEvents,
       to,
     );
 
@@ -1231,9 +1302,10 @@ export class StatsService {
         if (evaluatedWeeks.has(wk)) continue;
         evaluatedWeeks.add(wk);
 
-        const histStreak = await this.gamificationService.calculateStreak(
+        const histStreak = await this.computeStreak(
           organizationId,
           studentId,
+          allStudentEvents,
           ev.occurred_at,
         );
         if (histStreak.weeks > bestStreakWeeks) {
@@ -1257,6 +1329,7 @@ export class StatsService {
       },
       include: {
         assignment: { include: { activity: true } },
+        activity: true,
       },
     });
 
@@ -1267,7 +1340,7 @@ export class StatsService {
 
     for (const att of finishedAttempts) {
       if (!att.finished_at) continue;
-      const exp = att.assignment?.activity?.expected_duration_seconds ?? 300;
+      const exp = att.activity?.expected_duration_seconds ?? att.assignment?.activity?.expected_duration_seconds ?? 300;
       const dur = this.calculateEffectiveDuration(att.started_at, att.finished_at, exp);
       totalTimeSpentSeconds += dur;
 
@@ -1316,6 +1389,7 @@ export class StatsService {
       .sort((a, b) => a.bucketKey.localeCompare(b.bucketKey));
 
     // 12-week ISO calendar (last 12 weeks ending at `to`)
+    // Marks 'forgiven' on the exact week that consumed forgiveness (RF-8 / ISSUE-03)
     const weeklyCalendar: StudentWeekCalendarItem[] = [];
     const eventCountsByWeek = new Map<string, number>();
     for (const ev of allStudentEvents) {
@@ -1324,6 +1398,7 @@ export class StatsService {
     }
 
     const currentWeekKey = this.gamificationService.getBogotaIsoWeekKey(to);
+    const forgivenWeekKeys = new Set(currentStreakState.forgivenWeekKeys);
 
     // Generate last 12 ISO weeks backwards from `to`
     for (let i = 11; i >= 0; i--) {
@@ -1334,20 +1409,16 @@ export class StatsService {
       if (weeklyCalendar.some((item) => item.weekKey === wKey)) continue;
 
       const completedCount = eventCountsByWeek.get(wKey) ?? 0;
-      let status: 'active' | 'forgiven' | 'inactive' | 'current_pending';
+      let status: WeekCalendarStatus;
 
       if (completedCount > 0) {
         status = 'active';
       } else if (wKey === currentWeekKey) {
         status = 'current_pending';
+      } else if (forgivenWeekKeys.has(wKey)) {
+        status = 'forgiven';
       } else {
-        // If inactive, did it consume forgiveness?
-        const st = await this.gamificationService.calculateStreak(organizationId, studentId, weekDate);
-        if (!st.forgivenessAvailable && st.weeks > 0) {
-          status = 'forgiven';
-        } else {
-          status = 'inactive';
-        }
+        status = 'inactive';
       }
 
       weeklyCalendar.push({
@@ -1438,6 +1509,14 @@ export class StatsService {
       };
     });
 
+    const gamesPractice = await this.computeGamesPractice(
+      organizationId,
+      [studentId],
+      from,
+      to,
+      true, // includeSessions = true for student view
+    );
+
     return {
       student: {
         id: student.id,
@@ -1454,7 +1533,7 @@ export class StatsService {
         level: levelFilter ?? null,
       },
       performance: {
-        passingScore: this.defaultPassingScore,
+        passingScore,
         studentAverageScore,
         groupAverageScore,
         totalGradedActivities,
@@ -1482,6 +1561,382 @@ export class StatsService {
         monthlyTime,
         offlineUndeliveredAttempts,
       },
+      gamesPractice,
+    };
+  }
+
+  /**
+   * Computes games practice summary and session history for students.
+   * RF-12 / Decision 137.
+   */
+  async computeGamesPractice(
+    organizationId: string,
+    studentIds: string[],
+    from: Date,
+    to: Date,
+    includeSessions = false,
+  ): Promise<GamesPracticeSummary> {
+    if (studentIds.length === 0) {
+      return {
+        totalSessions: 0,
+        uniqueGamesPlayed: 0,
+        totalPracticeTimeSeconds: 0,
+        byMechanic: [
+          { mechanic: GameMechanic.match, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
+          { mechanic: GameMechanic.order_words, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
+          { mechanic: GameMechanic.drag_drop, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
+          { mechanic: GameMechanic.memory, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
+          { mechanic: GameMechanic.timed_choice, sessionsCount: 0, uniqueGamesCount: 0, practiceTimeSeconds: 0 },
+        ],
+        dailySummary: [],
+        weeklySummary: [],
+        ...(includeSessions ? { sessions: [] } : {}),
+      };
+    }
+
+    // Load graded attempts of type 'game' in period
+    const attempts = await this.prisma.attempt.findMany({
+      where: {
+        organization_id: organizationId,
+        student_id: { in: studentIds },
+        status: AttemptStatus.graded,
+        graded_at: { gte: from, lte: to },
+        OR: [
+          { activity_id: { not: null } },
+          { assignment: { activity: { type: ActivityType.game } } },
+        ],
+      },
+      include: {
+        activity: {
+          include: { game_detail: true },
+        },
+        assignment: {
+          include: {
+            activity: {
+              include: { game_detail: true },
+            },
+          },
+        },
+      },
+      orderBy: { started_at: 'desc' },
+    });
+
+    const uniqueGameIds = new Set<string>();
+    let totalPracticeTimeSeconds = 0;
+    let totalSessions = 0;
+
+    const mechanicMap = new Map<
+      GameMechanic,
+      { sessionsCount: number; uniqueGames: Set<string>; practiceTimeSeconds: number }
+    >();
+    for (const m of [
+      GameMechanic.match,
+      GameMechanic.order_words,
+      GameMechanic.drag_drop,
+      GameMechanic.memory,
+      GameMechanic.timed_choice,
+    ]) {
+      mechanicMap.set(m, { sessionsCount: 0, uniqueGames: new Set(), practiceTimeSeconds: 0 });
+    }
+
+    const dailyMap = new Map<string, { seconds: number; count: number }>();
+    const weeklyMap = new Map<string, { seconds: number; count: number }>();
+    const sessions: GamePracticeSessionItem[] = [];
+
+    for (const att of attempts) {
+      const act = att.activity ?? att.assignment?.activity;
+      if (!act) continue;
+      if (act.type && act.type !== ActivityType.game) continue;
+
+      totalSessions += 1;
+      const actId = act.id;
+      uniqueGameIds.add(actId);
+
+      const exp = act.expected_duration_seconds ?? 60;
+      const dur = this.calculateEffectiveDuration(att.started_at, att.finished_at, exp);
+      totalPracticeTimeSeconds += dur;
+
+      const mechanic = act.game_detail?.mechanic ?? GameMechanic.match;
+      const mData = mechanicMap.get(mechanic) ?? {
+        sessionsCount: 0,
+        uniqueGames: new Set(),
+        practiceTimeSeconds: 0,
+      };
+      mData.sessionsCount += 1;
+      mData.uniqueGames.add(actId);
+      mData.practiceTimeSeconds += dur;
+      mechanicMap.set(mechanic, mData);
+
+      const refDate = att.finished_at ?? att.started_at;
+      const dayKey = this.formatBogotaDay(refDate);
+      const weekKey = this.gamificationService.getBogotaIsoWeekKey(refDate);
+
+      const d = dailyMap.get(dayKey) ?? { seconds: 0, count: 0 };
+      d.seconds += dur;
+      d.count += 1;
+      dailyMap.set(dayKey, d);
+
+      const w = weeklyMap.get(weekKey) ?? { seconds: 0, count: 0 };
+      w.seconds += dur;
+      w.count += 1;
+      weeklyMap.set(weekKey, w);
+
+      if (includeSessions) {
+        sessions.push({
+          attemptId: att.id,
+          activityId: actId,
+          activityTitle: act.title,
+          mechanic,
+          level: act.level,
+          stars: scoreToGameStars(att.score !== null ? Number(att.score) : 0),
+          durationSeconds: dur,
+          playedAtBogota: formatBogotaDateTime(att.started_at),
+          implausibleDuration: att.flags?.includes('implausible_duration') ?? false,
+        });
+      }
+    }
+
+    const byMechanic = Array.from(mechanicMap.entries()).map(([mechanic, data]) => ({
+      mechanic,
+      sessionsCount: data.sessionsCount,
+      uniqueGamesCount: data.uniqueGames.size,
+      practiceTimeSeconds: data.practiceTimeSeconds,
+    }));
+
+    const dailySummary: TimeBucketItem[] = Array.from(dailyMap.entries())
+      .map(([bucketKey, val]) => ({
+        bucketKey,
+        timeSpentSeconds: val.seconds,
+        completedCount: val.count,
+      }))
+      .sort((a, b) => a.bucketKey.localeCompare(b.bucketKey));
+
+    const weeklySummary: TimeBucketItem[] = Array.from(weeklyMap.entries())
+      .map(([bucketKey, val]) => ({
+        bucketKey,
+        timeSpentSeconds: val.seconds,
+        completedCount: val.count,
+      }))
+      .sort((a, b) => a.bucketKey.localeCompare(b.bucketKey));
+
+    return {
+      totalSessions,
+      uniqueGamesPlayed: uniqueGameIds.size,
+      totalPracticeTimeSeconds,
+      byMechanic,
+      dailySummary,
+      weeklySummary,
+      ...(includeSessions ? { sessions } : {}),
+    };
+  }
+
+  /**
+   * ENG-162 / RF-12: GET /api/v1/stats/games-leaderboard (Decision 137)
+   * Private game ranking for teachers.
+   * Capped to top 5 attempts per game in period; 6 deterministic tie-breakers.
+   */
+  async getGamesLeaderboard(
+    organizationId: string,
+    query: StatsLeaderboardQueryDto,
+  ): Promise<GamesLeaderboardResponse> {
+    const { from, to } = this.parseDateRange(query.from, query.to);
+
+    // 1. Approved students matching filters
+    const students = await this.prisma.student.findMany({
+      where: {
+        organization_id: organizationId,
+        approval_status: ApprovalStatus.approved,
+        ...(query.level ? { level: query.level } : {}),
+        ...(query.groupId
+          ? {
+              memberships: {
+                some: {
+                  group_id: query.groupId,
+                  left_at: null,
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        user: true,
+        memberships: {
+          where: { left_at: null },
+          include: { group: true },
+        },
+      },
+    });
+
+    const studentIds = students.map((s) => s.id);
+    if (studentIds.length === 0) {
+      return {
+        period: { from: from.toISOString(), to: to.toISOString() },
+        filters: { groupId: query.groupId ?? null, level: query.level ?? null },
+        items: [],
+      };
+    }
+
+    // 2. Graded game attempts in period without 'implausible_duration'
+    const gameAttempts = await this.prisma.attempt.findMany({
+      where: {
+        organization_id: organizationId,
+        student_id: { in: studentIds },
+        status: AttemptStatus.graded,
+        graded_at: { gte: from, lte: to },
+        NOT: {
+          flags: { has: 'implausible_duration' },
+        },
+        OR: [
+          { activity_id: { not: null } },
+          { assignment: { activity: { type: ActivityType.game } } },
+        ],
+      },
+      include: {
+        activity: true,
+        assignment: { include: { activity: true } },
+      },
+      orderBy: { graded_at: 'desc' },
+    });
+
+    // Star to points mapping: 0 -> 0, 1 -> 10, 2 -> 25, 3 -> 50
+    const starPoints = (stars: number): number => {
+      switch (stars) {
+        case 3: return 50;
+        case 2: return 25;
+        case 1: return 10;
+        default: return 0;
+      }
+    };
+
+    // Group attempts by student, then by activity
+    const studentAttemptsMap = new Map<
+      string,
+      Map<string, Array<{ stars: number; points: number; duration: number; gradedAt: Date }>>
+    >();
+
+    for (const att of gameAttempts) {
+      if (att.flags && att.flags.includes('implausible_duration')) continue;
+      const act = att.activity ?? att.assignment?.activity;
+      if (!act) continue;
+
+      let actMap = studentAttemptsMap.get(att.student_id);
+      if (!actMap) {
+        actMap = new Map();
+        studentAttemptsMap.set(att.student_id, actMap);
+      }
+
+      let list = actMap.get(act.id);
+      if (!list) {
+        list = [];
+        actMap.set(act.id, list);
+      }
+
+      const stars = scoreToGameStars(att.score !== null ? Number(att.score) : 0);
+      const points = starPoints(stars);
+      const exp = act.expected_duration_seconds ?? 60;
+      const duration = this.calculateEffectiveDuration(att.started_at, att.finished_at, exp);
+
+      list.push({
+        stars,
+        points,
+        duration,
+        gradedAt: att.graded_at ?? att.started_at,
+      });
+    }
+
+    // Build raw leaderboard items
+    const rawItems: Array<{
+      studentId: string;
+      studentName: string;
+      groupId: string | null;
+      groupName: string | null;
+      level: Level;
+      gamePoints: number;
+      totalStars: number;
+      gamesPlayedCount: number;
+      uniqueGamesPlayed: number;
+      practiceTimeSeconds: number;
+      lastPlayedAt: string | null;
+    }> = [];
+
+    for (const student of students) {
+      const actMap = studentAttemptsMap.get(student.id);
+      let gamePoints = 0;
+      let totalStars = 0;
+      let gamesPlayedCount = 0;
+      let practiceTimeSeconds = 0;
+      let lastPlayedDate: Date | null = null;
+
+      if (actMap) {
+        for (const [_, list] of actMap.entries()) {
+          // Sort descending by points (highest first)
+          list.sort((a, b) => b.points - a.points);
+
+          // Cap of top 5 attempts per activity for gamePoints and totalStars
+          const top5 = list.slice(0, 5);
+          for (const item of top5) {
+            gamePoints += item.points;
+            totalStars += item.stars;
+          }
+
+          // All attempts count for practice time and gamesPlayedCount
+          for (const item of list) {
+            gamesPlayedCount += 1;
+            practiceTimeSeconds += item.duration;
+            if (!lastPlayedDate || item.gradedAt > lastPlayedDate) {
+              lastPlayedDate = item.gradedAt;
+            }
+          }
+        }
+      }
+
+      const activeGroup = query.groupId
+        ? (student.memberships ?? []).find((m) => m.group_id === query.groupId)?.group ??
+          (student.memberships ?? [])[0]?.group ??
+          null
+        : (student.memberships ?? [])[0]?.group ?? null;
+
+      rawItems.push({
+        studentId: student.id,
+        studentName: student.user.name,
+        groupId: activeGroup?.id ?? null,
+        groupName: activeGroup?.name ?? null,
+        level: student.level ?? Level.A1,
+        gamePoints,
+        totalStars,
+        gamesPlayedCount,
+        uniqueGamesPlayed: actMap ? actMap.size : 0,
+        practiceTimeSeconds,
+        lastPlayedAt: lastPlayedDate ? lastPlayedDate.toISOString() : null,
+      });
+    }
+
+    // 6 deterministic tie-breakers (Decision 137):
+    // 1) gamePoints DESC
+    // 2) totalStars DESC
+    // 3) uniqueGamesPlayed DESC
+    // 4) practiceTimeSeconds DESC
+    // 5) studentName ASC (es-CO)
+    // 6) studentId ASC
+    rawItems.sort((a, b) => {
+      if (b.gamePoints !== a.gamePoints) return b.gamePoints - a.gamePoints;
+      if (b.totalStars !== a.totalStars) return b.totalStars - a.totalStars;
+      if (b.uniqueGamesPlayed !== a.uniqueGamesPlayed) return b.uniqueGamesPlayed - a.uniqueGamesPlayed;
+      if (b.practiceTimeSeconds !== a.practiceTimeSeconds) return b.practiceTimeSeconds - a.practiceTimeSeconds;
+      const nameComp = a.studentName.localeCompare(b.studentName, 'es-CO');
+      if (nameComp !== 0) return nameComp;
+      return a.studentId.localeCompare(b.studentId);
+    });
+
+    const items: GamesLeaderboardItem[] = rawItems.map((item, idx) => ({
+      rank: idx + 1,
+      ...item,
+    }));
+
+    return {
+      period: { from: from.toISOString(), to: to.toISOString() },
+      filters: { groupId: query.groupId ?? null, level: query.level ?? null },
+      items,
     };
   }
 }

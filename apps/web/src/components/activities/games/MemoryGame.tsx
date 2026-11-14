@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  MemorySettings,
-  MemorySolution,
+  MemorySettingsSchema,
+  MemorySolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { soundManager } from '../../../lib/sound';
@@ -20,8 +20,10 @@ export function MemoryGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as MemorySettings;
-  const solution = config.answerKey?.solution as MemorySolution | undefined;
+  const parsedSettings = MemorySettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = MemorySolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalCards = settings?.cards || [];
 
@@ -66,6 +68,7 @@ export function MemoryGame({
   // Current turn: cards currently flipped in this round (0, 1, or 2)
   const [activeFlippedIds, setActiveFlippedIds] = useState<string[]>([]);
   const [isLocked, setIsLocked] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -82,13 +85,17 @@ export function MemoryGame({
     if (resolvedCardIds.has(cardId)) return;
     if (activeFlippedIds.includes(cardId)) return;
 
+    const clickedCard = shuffledCards.find((c) => c.id === cardId);
+
     if (activeFlippedIds.length === 0) {
       setActiveFlippedIds([cardId]);
+      setLiveStatus(`Primera carta volteada: ${clickedCard?.text ?? ''}`);
       return;
     }
 
     if (activeFlippedIds.length === 1) {
       const firstCardId = activeFlippedIds[0]!;
+      const firstCard = shuffledCards.find((c) => c.id === firstCardId);
       const currentTurn: [string, string] = [firstCardId, cardId];
       setActiveFlippedIds([firstCardId, cardId]);
       setIsLocked(true);
@@ -103,13 +110,16 @@ export function MemoryGame({
         soundManager.play('hit', soundEnabled);
         setIsLocked(false);
         setActiveFlippedIds([]);
+        setLiveStatus(`¡Coincidencia correcta! Pareja de ${clickedCard?.text ?? ''} encontrada.`);
 
         // Check if all pairs are now found
         if (foundPairsCount + 1 >= totalPairsCount) {
           soundManager.play('complete', soundEnabled);
+          setLiveStatus('¡Felicitaciones! Has encontrado todas las parejas.');
         }
       } else {
         soundManager.play('miss', soundEnabled);
+        setLiveStatus(`No coinciden: ${firstCard?.text ?? ''} y ${clickedCard?.text ?? ''}. Volteando cartas.`);
         // Flip back after 900 ms (RF-5 Acceptance Criterion 2)
         timeoutRef.current = setTimeout(() => {
           setActiveFlippedIds([]);
@@ -140,6 +150,11 @@ export function MemoryGame({
         </div>
       )}
 
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
+
       {config.instructions && (
         <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
@@ -154,21 +169,28 @@ export function MemoryGame({
           const isResolved = resolvedCardIds.has(card.id);
           const isTurnFlipped = activeFlippedIds.includes(card.id);
           const isFaceUp = isResolved || isTurnFlipped;
+          const isInactive = isFaceUp || isLocked;
 
           return (
             <button
               key={card.id}
               type="button"
-              disabled={isFaceUp || isLocked}
-              onClick={() => handleCardClick(card.id)}
-              className={`min-h-24 sm:min-h-28 rounded-2xl p-3 border-2 font-black text-sm sm:text-base flex items-center justify-center text-center shadow-xs transition-all touch-manipulation cursor-pointer select-none ${
+              aria-disabled={isInactive}
+              onClick={() => {
+                if (!isInactive) {
+                  handleCardClick(card.id);
+                }
+              }}
+              className={`min-h-24 sm:min-h-28 rounded-2xl p-3 border-2 font-black text-sm sm:text-base flex items-center justify-center text-center shadow-xs transition-all touch-manipulation select-none focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                isInactive ? 'cursor-default' : 'cursor-pointer'
+              } ${
                 isFaceUp
                   ? isResolved
                     ? 'border-emerald-400 bg-emerald-100/90 text-emerald-950 scale-102 ring-2 ring-emerald-300'
                     : 'border-amber-400 bg-amber-100 text-amber-950 scale-105 ring-4 ring-amber-300'
                   : isKids
-                    ? 'border-amber-300 bg-gradient-to-br from-amber-400 to-amber-500 text-white hover:from-amber-500 hover:to-amber-600 active:scale-95'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 active:scale-95'
+                    ? 'border-amber-400 bg-gradient-to-br from-amber-400 to-amber-500 text-amber-950 hover:from-amber-400 hover:to-amber-500 active:scale-95'
+                    : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-750 active:scale-95'
               }`}
               aria-label={isFaceUp ? card.text : 'Tarjeta oculta'}
             >
@@ -198,8 +220,8 @@ export function MemoryGame({
           onClick={handleComplete}
           className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
             isKids
-              ? 'bg-amber-500 hover:bg-amber-600 text-white'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
           Finalizar juego de memoria ✨

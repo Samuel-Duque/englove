@@ -12,6 +12,10 @@ import {
   GameAnswerKeySchema,
   GameConfig,
   GameAnswerKey,
+  MatchSolutionSchema,
+  DragDropSolutionSchema,
+  MemorySolutionSchema,
+  TimedChoiceSolutionSchema,
 } from './game';
 import {
   ExamConfigSchema,
@@ -92,7 +96,7 @@ export function validateActivityPayload(
       const parsedConfig = OpenQuestionConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de pregunta abierta inválida',
         );
       }
@@ -108,7 +112,7 @@ export function validateActivityPayload(
       const parsedConfig = SpeakingConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de speaking inválida',
         );
       }
@@ -124,14 +128,14 @@ export function validateActivityPayload(
       const parsedConfig = FillBlankConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de fill_blank inválida',
         );
       }
       const parsedKey = FillBlankAnswerKeySchema.safeParse(answerKey);
       if (!parsedKey.success) {
         throw new ActivityValidationError(
-          parsedKey.error.errors[0]?.message ?? 'Clave de fill_blank inválida',
+          parsedKey.error.issues[0]?.message ?? 'Clave de fill_blank inválida',
         );
       }
 
@@ -190,7 +194,7 @@ export function validateActivityPayload(
       if (!parsedConfig.success) {
         if (
           isPublishing &&
-          parsedConfig.error.errors.some((e) => e.code === 'too_small')
+          parsedConfig.error.issues.some((e) => e.code === 'too_small')
         ) {
           throw new ActivityValidationError(
             'Agrega al menos dos ítems para publicar',
@@ -198,7 +202,7 @@ export function validateActivityPayload(
           );
         }
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de examen inválida',
         );
       }
@@ -222,7 +226,7 @@ export function validateActivityPayload(
         const parsedKey = ExamAnswerKeySchema.safeParse(answerKey);
         if (!parsedKey.success) {
           throw new ActivityValidationError(
-            parsedKey.error.errors[0]?.message ?? 'Clave de examen inválida',
+            parsedKey.error.issues[0]?.message ?? 'Clave de examen inválida',
           );
         }
         validAnswerKey = parsedKey.data;
@@ -293,14 +297,14 @@ export function validateActivityPayload(
       const parsedConfig = GameConfigSchema.safeParse(config);
       if (!parsedConfig.success) {
         throw new ActivityValidationError(
-          parsedConfig.error.errors[0]?.message ??
+          parsedConfig.error.issues[0]?.message ??
             'Configuración de microjuego inválida',
         );
       }
       const parsedKey = GameAnswerKeySchema.safeParse(answerKey);
       if (!parsedKey.success) {
         throw new ActivityValidationError(
-          parsedKey.error.errors[0]?.message ?? 'Clave de microjuego inválida',
+          parsedKey.error.issues[0]?.message ?? 'Clave de microjuego inválida',
         );
       }
 
@@ -308,12 +312,13 @@ export function validateActivityPayload(
       const solution = parsedKey.data.solution;
 
       if (mechanic === 'match') {
-        if (!('pairs' in solution) || Array.isArray(solution.pairs)) {
+        const matchParsed = MatchSolutionSchema.safeParse(solution);
+        if (!matchParsed.success) {
           throw new ActivityValidationError(
             'La clave para match debe contener solution.pairs como diccionario',
           );
         }
-        const pairs = solution.pairs as Record<string, string>;
+        const pairs = matchParsed.data.pairs;
         const leftIds = new Set(parsedConfig.data.settings.left.map((l) => l.id));
         const rightIds = new Set(
           parsedConfig.data.settings.right.map((r) => r.id),
@@ -383,12 +388,13 @@ export function validateActivityPayload(
           }
         }
       } else if (mechanic === 'drag_drop') {
-        if (!('placements' in solution) || Array.isArray(solution.placements)) {
+        const dragParsed = DragDropSolutionSchema.safeParse(solution);
+        if (!dragParsed.success) {
           throw new ActivityValidationError(
             'La clave para drag_drop debe contener solution.placements',
           );
         }
-        const placements = solution.placements as Record<string, string>;
+        const placements = dragParsed.data.placements;
         const objectIds = new Set(
           parsedConfig.data.settings.objects.map((o) => o.id),
         );
@@ -413,12 +419,13 @@ export function validateActivityPayload(
           }
         }
       } else if (mechanic === 'memory') {
-        if (!('pairs' in solution) || !Array.isArray(solution.pairs)) {
+        const memParsed = MemorySolutionSchema.safeParse(solution);
+        if (!memParsed.success) {
           throw new ActivityValidationError(
             'La clave para memory debe contener solution.pairs como array',
           );
         }
-        const pairs = solution.pairs as [string, string][];
+        const pairs = memParsed.data.pairs;
         const cardIds = new Set(
           parsedConfig.data.settings.cards.map((c) => c.id),
         );
@@ -456,12 +463,13 @@ export function validateActivityPayload(
           );
         }
       } else if (mechanic === 'timed_choice') {
-        if (!('choices' in solution) || Array.isArray(solution.choices)) {
+        const tcParsed = TimedChoiceSolutionSchema.safeParse(solution);
+        if (!tcParsed.success) {
           throw new ActivityValidationError(
             'La clave para timed_choice debe contener solution.choices',
           );
         }
-        const choices = solution.choices as Record<string, string>;
+        const choices = tcParsed.data.choices;
         const questionIds = new Set(
           parsedConfig.data.settings.questions.map((q) => q.id),
         );
@@ -499,39 +507,51 @@ export function validateActivityPayload(
   }
 }
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function deepCloneRecord(obj: unknown): Record<string, unknown> {
+  if (!isRecord(obj)) return {};
+  try {
+    const parsed = JSON.parse(JSON.stringify(obj));
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Strips answer keys for graded activities (fill_blank, exam, open_question, speaking)
  * before sending configuration to the student (Rule G-C04, Decision 75, Architecture §5.3).
  * In microgames, key may accompany client for low-risk immediate feedback.
  * Projections are schema-validated without blind assertions (SPEC-03 §5).
  */
-export function toPublicConfig<T = unknown>(
+export function toPublicConfig(
   type: ActivityType,
   config: unknown,
   answerKey?: unknown,
-): T {
+): Record<string, unknown> {
   switch (type) {
     case ActivityType.fill_blank:
     case ActivityType.exam:
     case ActivityType.open_question:
     case ActivityType.speaking: {
-      const cloned = JSON.parse(JSON.stringify(config ?? {}));
-      if (cloned && typeof cloned === 'object') {
-        delete (cloned as Record<string, unknown>).answerKey;
-        delete (cloned as Record<string, unknown>).answer_key;
-      }
-      return cloned as T;
+      const cloned = deepCloneRecord(config);
+      delete cloned.answerKey;
+      delete cloned.answer_key;
+      return cloned;
     }
 
     case ActivityType.game: {
-      const cloned = JSON.parse(JSON.stringify(config ?? {}));
-      if (answerKey && cloned && typeof cloned === 'object') {
-        (cloned as Record<string, unknown>).answerKey = answerKey;
+      const cloned = deepCloneRecord(config);
+      if (answerKey !== undefined) {
+        cloned.answerKey = answerKey;
       }
-      return cloned as T;
+      return cloned;
     }
 
     default:
-      return JSON.parse(JSON.stringify(config ?? {})) as T;
+      return deepCloneRecord(config);
   }
 }

@@ -32,6 +32,23 @@ let isDismissedByUser = false;
 let isInActiveAttempt = false;
 let updateIntervalId: NodeJS.Timeout | null = null;
 let isControllerChangeListening = false;
+let updateRequested = false;
+let reloadPending = false;
+let hasReloaded = false;
+let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+function reloadRequestedUpdate(): void {
+  if (!updateRequested || hasReloaded || typeof window === 'undefined') return;
+  if (isInActiveAttempt) {
+    reloadPending = true;
+    return;
+  }
+  hasReloaded = true;
+  reloadPending = false;
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = null;
+  window.location.reload();
+}
 
 const listeners = new Set<() => void>();
 
@@ -81,6 +98,7 @@ export function setActiveAttemptState(active: boolean): void {
   if (isInActiveAttempt !== active) {
     isInActiveAttempt = active;
     updateSnapshotAndNotify();
+    if (!active && reloadPending) reloadRequestedUpdate();
   }
 }
 
@@ -102,18 +120,11 @@ export function checkAppMinVersion(minVersion: string | null): void {
 }
 
 export function applyUpdate(): void {
-  let reloaded = false;
-  const triggerReload = () => {
-    if (!reloaded && typeof window !== 'undefined') {
-      reloaded = true;
-      window.location.reload();
-    }
-  };
+  if (isInActiveAttempt || updateRequested) return;
+  updateRequested = true;
 
   // Fallback reload after 10 seconds (RF-8)
-  setTimeout(() => {
-    triggerReload();
-  }, 10000);
+  reloadTimer = setTimeout(reloadRequestedUpdate, 10000);
 
   if (swRegistration?.waiting) {
     swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -135,7 +146,7 @@ export function registerServiceWorker(): void {
   // Prevent multiple registrations
   if (swRegistration) return;
 
-  window.addEventListener('load', () => {
+  const startRegistration = () => {
     navigator.serviceWorker
       .register('/sw.js', { scope: '/' })
       .then((registration) => {
@@ -177,15 +188,15 @@ export function registerServiceWorker(): void {
     // RF-8: Reload only once when new SW takes control
     if (!isControllerChangeListening) {
       isControllerChangeListening = true;
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
+      navigator.serviceWorker.addEventListener('controllerchange', reloadRequestedUpdate);
     }
-  });
+  };
+
+  if (typeof document !== 'undefined' && document.readyState === 'complete') {
+    startRegistration();
+  } else {
+    window.addEventListener('load', startRegistration);
+  }
 }
 
 // For testing purposes
@@ -196,6 +207,11 @@ export function _resetPwaManagerState(): void {
   isDismissedByUser = false;
   isInActiveAttempt = false;
   isControllerChangeListening = false;
+  updateRequested = false;
+  reloadPending = false;
+  hasReloaded = false;
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = null;
   if (updateIntervalId) {
     clearInterval(updateIntervalId);
     updateIntervalId = null;

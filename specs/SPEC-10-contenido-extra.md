@@ -5,7 +5,7 @@
 | Estado               | Verificada                                                                                                                                                                                                     |
 | Etapa                | 10 — Contenido extra                                                                                                                                                                                           |
 | Tareas               | ENG-120, ENG-121                                                                                                                                                                                               |
-| Referencias          | CONTEXT §2.4, §4.2, §5.1, §5.2, §12.10, §14 (decisiones 17, 20, 29, 34, 41, 50, 51, 59, 66, 67, 75, 79, 83, 89, 120, 122, 124–126), §16; architecture §3.1–§3.6, §4.1, §4.2, §6.1, §6.2, §8.3; pbp Etapa 10 |
+| Referencias          | CONTEXT §2.4, §4, §5.1, §5.2, §12.10, §14 (decisiones 17, 20, 29, 34, 41, 50, 51, 59, 66, 67, 75, 79, 83, 89, 120, 122, 124–126), §16; architecture §3.1–§3.6, §4.1, §4.2, §6.1, §6.2, §8.3; pbp Etapa 10 |
 | Aprobada por / fecha | Líder del proyecto / 2026-11-04                                                                                                                                                                                   |
 
 ## 1. Contexto y objetivo
@@ -24,7 +24,7 @@ Esta especificación define el módulo `resources` en `apps/api`, la gestión do
 - Segmentación por nivel MCER (decisión 125): recursos generales para todos los niveles (`level = null`) y recursos exclusivos de un curso/nivel (`A1`, `A2`, `B1`, `B2`), filtrados en servidor para el alumno y filtrables en el panel docente.
 - Pantalla docente `/contenido-extra` con TanStack Query (`T-04`), creación/edición, filtro por nivel MCER, reordenamiento accesible y confirmación de borrado (`ENG-120`).
 - Pantalla del estudiante `/extra` adaptada por segmento (`kids` / `teens`), integrada en `StudentNav` respetando el tope de 5 entradas y el techo de 3 clics desde `/inicio`, abriendo cada recurso en pestaña nueva sin `iframe` (`ENG-121`).
-- Ajuste de `proxy.ts` para `/contenido-extra` (`teacher`) y `/extra` (`student`) (`T-01`), síntesis de voz en `kids`, aviso sin conexión y cobertura en la puerta `axe` (WCAG 2.1 AA) (`T-05`).
+- Ajuste de `proxy.ts` para `/contenido-extra` (`teacher`) y `/extra` (`student`) (`T-01`), síntesis de voz en `kids`, aviso sin conexión y cobertura en la puerta `axe` (WCAG 2.2 AA) (`T-05`).
 
 **No incluye:**
 
@@ -88,7 +88,7 @@ El panel incorpora `(teacher)/contenido-extra/page.tsx` y la entrada «Contenido
 
 ### RF-5 — Sección «Contenido extra» en `/extra` en máximo 3 clics y filtrado por nivel
 
-Tarea: `ENG-121`. Referencias: Decisiones 29, 79 y 125, `CONTEXT §4.2`, `§5.2`, `architecture §3.1`.
+Tarea: `ENG-121`. Referencias: Decisiones 29, 79 y 125, `CONTEXT §4`, `§5.2`, `architecture §3.1`.
 
 Con `flags.extra_content === true`, `StudentNav` muestra «Extra» (`/extra`, `aria-label="Contenido extra"`), manteniendo un máximo de 5 entradas (`Inicio`, `Juegos`, `Progreso`, `Feedback`, `Extra`). El alumno abre cualquier enlace en **máximo 3 clics** desde `/inicio` y solo recibe recursos generales para todos los niveles (`level = null`) más los recursos específicos de su `Student.level` vigente (decisión 125).
 
@@ -131,7 +131,7 @@ Tareas: `ENG-120`, `ENG-121`. Referencias: Decisiones 50, 51, 89, `CONTEXT §16`
 - **Dado** un recurso de `orgA`, **Cuando** un usuario de `orgB` intenta leerlo, editarlo, reordenarlo o borrarlo, **Entonces** no figura en `GET /api/v1/resources` y las rutas por `:id` devuelven `404 RESOURCE_NOT_FOUND` filtrando por `{ id, organization_id }`.
 - **Dado** una tablet compartida, **Cuando** el usuario cierra sesión o queda sin red, **Entonces** `clearSharedDeviceSession` vacía TanStack Query, el Service Worker no guarda `/api/v1/resources` en `Cache Storage` y, sin conexión, `/extra` muestra «Necesitas conexión a internet para abrir enlaces externos.» sin escribir en IndexedDB (`T-05`).
 
-### RF-9 — Adaptación temática (`kids` / `teens`), síntesis de voz y accesibilidad WCAG 2.1 AA
+### RF-9 — Adaptación temática (`kids` / `teens`), síntesis de voz y accesibilidad WCAG 2.2 AA
 
 Tareas: `ENG-120`, `ENG-121`. Referencias: Decisiones 120 y 122, `CONTEXT §5.2`, `SPEC-05 RF-27`, `SPEC-09 RF-19`–`RF-22`.
 
@@ -140,7 +140,7 @@ Tareas: `ENG-120`, `ENG-121`. Referencias: Decisiones 120 y 122, `CONTEXT §5.2`
 **Criterios de aceptación:**
 
 - **Dado** un alumno `kids` en `/extra` con soporte de Web Speech API, **Cuando** pulsa `🔊 Escuchar`, **Entonces** reproduce la consigna o descripción en español y detiene la locución al cancelar o salir de la ruta; sin soporte en el navegador, el control se omite sin error.
-- **Dado** `/contenido-extra` y `/extra` (`kids` y `teens`) evaluados con `@axe-core/playwright` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`), **Cuando** corre la suite, **Entonces** reporta `0` violaciones, cajas interactivas `>= 48 × 48 px` e indicador `:focus-visible` de `>= 2 px` con contraste `>= 3:1`.
+- **Dado** `/contenido-extra` y `/extra` (`kids` y `teens`) evaluados con `@axe-core/playwright` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), **Cuando** corre la suite, **Entonces** reporta `0` violaciones, cajas interactivas `>= 48 × 48 px` e indicador `:focus-visible` de `>= 2 px` con contraste `>= 3:1`.
 
 ## 4. Reglas de negocio
 
@@ -210,7 +210,7 @@ Se reutilizan **sin cambios de esquema ni migraciones DDL adicionales** (`T-03`)
 | RF-6 | Unitaria DOM + Playwright E2E | `RF-6`: tarjetas usan `<a href="https://..." target="_blank" rel="noopener noreferrer">`, cero marcos incrustados (`embed`, `object`), cero `dangerouslySetInnerHTML` y sin PII en la URL. |
 | RF-7 | Integración API + Playwright E2E | `RF-7`: listar y abrir recursos deja en `0` las nuevas filas de `Attempt`, `Review` y `ProgressEvent`, sin cambios en `/progreso` ni `/api/v1/stats/overview`. |
 | RF-8 | Seguridad API + unitaria `proxy.ts` y logout | `RF-8`: `student` recibe `403 FORBIDDEN` en mutaciones; `orgB` recibe `404 RESOURCE_NOT_FOUND` sobre `orgA`; `proxy.ts` redirige roles cruzados en `/contenido-extra` y `/extra`; `no-store` activo y logout vacía `queryClient`. |
-| RF-9 | Unitaria temas + `@axe-core/playwright` | `RF-9`: `🔊 Escuchar` operativo en `kids`; `0` violaciones `axe` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`), controles `>= 48 × 48 px` y `:focus-visible >= 2 px` en `/contenido-extra` y `/extra` (`kids` y `teens`). |
+| RF-9 | Unitaria temas + `@axe-core/playwright` | `RF-9`: `🔊 Escuchar` operativo en `kids`; `0` violaciones `axe` (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), controles `>= 48 × 48 px` y `:focus-visible >= 2 px` en `/contenido-extra` y `/extra` (`kids` y `teens`). |
 
 ## 10. Fuera de alcance y decisiones diferidas
 
@@ -247,3 +247,4 @@ Sin pendientes `P-n` en `CONTEXT §15`. Las tres preguntas de diseño (`Q-01` a 
 | 2026-11-04 | Creación del borrador                                                                                                                | Tarea `SPEC-10` del taskboard   |
 | 2026-11-04 | Resolución de `Q-01` a `Q-03` (decisiones 124–126), definición de tareas técnicas `T-01` a `T-05` y paso de la spec a estado `Aprobada` | Aprobación del líder del proyecto |
 | 2026-11-04 | Implementación integral de `ENG-120` y `ENG-121`, suite Playwright E2E y axe (8/8), 537/537 tests y paso de la spec a `Verificada`   | Verificación completa de Etapa 10 |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-06) | Actualización de compuerta axe a WCAG 2.2 AA (wcag22aa, Decisión 133) y alineación con TanStack Query |

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white flex items-center justify-center p-6 text-center">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-to-b from-amber-50/60 to-white flex items-center justify-center p-6 text-center outline-none">
       <div className="max-w-md w-full bg-white rounded-3xl border border-amber-200/80 p-8 sm:p-10 shadow-lg space-y-6">
         <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mx-auto">
           🧭

@@ -1,31 +1,40 @@
+import { z } from 'zod';
 import { ActivityStatus, ActivityType, Level } from '../enums';
 
-export interface ActivitySummary {
-  id: string;
-  title: string;
-  type: ActivityType;
-  level: Level;
-  status: ActivityStatus;
-  version: number;
-  parentId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+export const ActivitySummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  type: z.nativeEnum(ActivityType),
+  level: z.nativeEnum(Level),
+  status: z.nativeEnum(ActivityStatus).optional().default(ActivityStatus.published),
+  version: z.number().int().optional().default(1),
+  parentId: z.string().nullable().optional().default(null),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  createdAt: z.string().optional().default(() => new Date().toISOString()),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  updatedAt: z.string().optional().default(() => new Date().toISOString()),
+});
 
-export interface ActivityEditor extends ActivitySummary {
-  expectedDurationSeconds: number | null;
-  minPlausibleSeconds: number | null;
-  config: unknown;
-  answerKey?: unknown;
-  weightsAdjusted: boolean;
-}
+export type ActivitySummary = z.infer<typeof ActivitySummarySchema>;
 
-export interface ActivityListResponse {
-  items: ActivitySummary[];
-  total: number;
-  offset: number;
-  limit: number;
-}
+export const ActivityEditorSchema = ActivitySummarySchema.extend({
+  expectedDurationSeconds: z.number().nullable().optional().default(null),
+  minPlausibleSeconds: z.number().nullable().optional().default(null),
+  config: z.unknown().optional().default({}),
+  answerKey: z.unknown().optional(),
+  weightsAdjusted: z.boolean().optional().default(false),
+});
+
+export type ActivityEditor = z.infer<typeof ActivityEditorSchema>;
+
+export const ActivityListResponseSchema = z.object({
+  items: z.array(ActivitySummarySchema),
+  total: z.number().int().optional().default(0),
+  offset: z.number().int().optional(),
+  limit: z.number().int().optional(),
+});
+
+export type ActivityListResponse = z.infer<typeof ActivityListResponseSchema>;
 
 export interface ActivityListQuery {
   offset?: number;

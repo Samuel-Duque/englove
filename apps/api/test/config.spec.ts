@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { validateEnvironment, AppEnv } from '../src/config/env.validation';
 
@@ -22,7 +24,18 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     expect(env.COOKIE_PREFIX).toBe('englove_');
   });
 
-  it('requires RESEND_API_KEY in staging or production', () => {
+  it('requires RESEND_API_KEY, COOKIE_DOMAIN, and secure JWT_SECRET in staging or production (SEC-01, RF-02)', () => {
+    const stagingConfigWithoutCookieDomain = {
+      ...baseValidLocalConfig,
+      APP_ENV: 'staging',
+      RESEND_API_KEY: 're_test_key_placeholder',
+      JWT_SECRET: 'a-secure-production-jwt-secret-min-32-chars!',
+    };
+
+    expect(() => validateEnvironment(stagingConfigWithoutCookieDomain)).toThrowError(
+      /Configuración de entorno inválida para staging\. Variables faltantes o inseguras:.*COOKIE_DOMAIN/,
+    );
+
     const stagingConfig = {
       ...baseValidLocalConfig,
       APP_ENV: 'staging',
@@ -30,15 +43,18 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     };
 
     expect(() => validateEnvironment(stagingConfig)).toThrowError(
-      /Configuración de entorno inválida para staging\. Variables faltantes: RESEND_API_KEY/,
+      /Configuración de entorno inválida para staging\. Variables faltantes o inseguras:.*(RESEND_API_KEY|JWT_SECRET)/,
     );
 
     const validStagingConfig = {
       ...stagingConfig,
       RESEND_API_KEY: 're_test_key_placeholder',
+      JWT_SECRET: 'a-secure-production-jwt-secret-min-32-chars!',
     };
     const env = validateEnvironment(validStagingConfig);
     expect(env.APP_ENV).toBe(AppEnv.staging);
+    expect(env.COOKIE_DOMAIN).toBe('.englove.org');
+    expect(env.JWT_SECRET).toBe('a-secure-production-jwt-secret-min-32-chars!');
   });
 
   it('rejects missing mandatory variables and reports ONLY variable names, never values', () => {
@@ -78,5 +94,47 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
         PORT: '-1',
       }),
     ).toThrowError(/PORT/);
+  });
+
+  it('RT-10: docker-compose.yml publishes admin/dev ports strictly on 127.0.0.1 loopback', () => {
+    const composePath = path.resolve(process.cwd(), '../../docker-compose.yml');
+    const compose = fs.readFileSync(composePath, 'utf8');
+    const portMappings = [...compose.matchAll(/^\s*-\s*"([^"]+)"/gm)].map((m) => m[1] ?? '');
+
+    expect(portMappings).toEqual([
+      '127.0.0.1:5433:5432',
+      '127.0.0.1:9000:9000',
+      '127.0.0.1:9001:9001',
+      '127.0.0.1:1025:1025',
+      '127.0.0.1:8025:8025',
+    ]);
+  });
+
+  it('SUPPLY-01: docker-compose.yml fija imágenes de servicios con digest @sha256 inmutable (sin :latest)', () => {
+    const composePath = path.resolve(process.cwd(), '../../docker-compose.yml');
+    const compose = fs.readFileSync(composePath, 'utf8');
+    expect(compose).toContain('pgsty/minio@sha256:');
+    expect(compose).toContain('pgsty/mc@sha256:');
+    expect(compose).toContain('axllent/mailpit@sha256:');
+    expect(compose).not.toMatch(/image:\s+\S+:latest\b/);
+  });
+
+  it('SEED-01: seedMinimal exige PILOT_TEACHER_PASSWORD explícita fuera del entorno local', async () => {
+    const { seedMinimal } = await import('../prisma/seeds/seed');
+    const prevEnv = process.env.APP_ENV;
+    const prevPass = process.env.PILOT_TEACHER_PASSWORD;
+    try {
+      process.env.APP_ENV = 'staging';
+      delete process.env.PILOT_TEACHER_PASSWORD;
+      await expect(seedMinimal()).rejects.toThrow(/PILOT_TEACHER_PASSWORD/);
+
+      process.env.PILOT_TEACHER_PASSWORD = 'short';
+      await expect(seedMinimal()).rejects.toThrow(/PILOT_TEACHER_PASSWORD/);
+    } finally {
+      if (prevEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevEnv;
+      if (prevPass === undefined) delete process.env.PILOT_TEACHER_PASSWORD;
+      else process.env.PILOT_TEACHER_PASSWORD = prevPass;
+    }
   });
 });

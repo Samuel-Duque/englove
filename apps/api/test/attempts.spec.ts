@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -61,6 +61,19 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
   };
   let mockMediaService: { confirmUpload: MockFn };
   let mockFeatureFlagsService: { isEnabled: MockFn };
+
+  // TEN-01: toda mutación ejecutada conserva el filtro explícito del servicio.
+  afterEach(() => {
+    for (const mutation of [
+      mockPrisma.attempt.update,
+    ]) {
+      for (const [args] of mutation.mock.calls) {
+        expect(args).toEqual(expect.objectContaining({
+          where: expect.objectContaining({ organization_id: orgId }),
+        }));
+      }
+    }
+  });
 
   beforeEach(() => {
     mockPrisma = {
@@ -204,6 +217,7 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
         attemptId,
         studentId,
         organizationId: orgId,
+        typ: 'attempt',
       }),
     };
 
@@ -376,7 +390,7 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
       expect(response.acceptedEventIds).toContain('ev-2');
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: attemptId },
+          where: { id: attemptId, organization_id: orgId },
           data: {
             payload: {
               answers: { 'item-1': 'cat', 'item-2': 'dog' },
@@ -432,7 +446,7 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
 
       expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: attemptId },
+          where: { id: attemptId, organization_id: orgId },
           data: expect.objectContaining({
             payload: {
               answers: {
@@ -583,6 +597,289 @@ describe('SPEC-05: AttemptsService & Ciclo de Vida de Intentos (RF-1 a RF-11)', 
       expect(completion.attempt.status).toBe(AttemptStatus.graded);
       expect(mockGamificationService.recordAttemptCompleted).not.toHaveBeenCalled();
       expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
+    });
+
+    it('devuelve correction en reintentos idempotentes consultando answer_key (P2-04, T3.2)', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.graded,
+        started_at: new Date(Date.now() - 120000),
+        finished_at: new Date(Date.now() - 60000),
+        graded_at: new Date(Date.now() - 60000),
+        score: 4.5,
+        flags: [],
+        payload: { answers: { b1: 'correct' } },
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.fill_blank,
+            title: 'Fill blank',
+            level: Level.A1,
+            fill_blank_detail: {
+              config: { items: [] },
+            },
+          },
+        },
+      });
+
+      mockPrisma.fillBlankDetail.findFirst.mockResolvedValueOnce({
+        answer_key: { items: { i1: { b1: 'correct' } } },
+      });
+
+      mockScoringService.calculateFillBlank.mockReturnValueOnce({
+        score: 4.5,
+        fraction: 0.9,
+        correction: { b1: { isCorrect: true } },
+        flags: [],
+      });
+
+      const completion = await service.completeAttempt(orgId, studentId, attemptId, validToken, {});
+
+      expect(completion.attempt.status).toBe(AttemptStatus.graded);
+      expect(mockPrisma.fillBlankDetail.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ answer_key: true }),
+        }),
+      );
+      expect(completion.correction).toEqual({ b1: { isCorrect: true } });
+    });
+
+    it('detecta finalización concurrente bajo bloqueo FOR UPDATE y no duplica insignias (P1-06, T3.1)', async () => {
+      // Simula que al hacer SELECT ... FOR UPDATE el intento ya pasó a graded por otra petición concurrente
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: attemptId,
+          status: AttemptStatus.graded,
+          payload: { answers: {} },
+          started_at: new Date(Date.now() - 60000),
+          finished_at: new Date(Date.now() - 10000),
+          graded_at: new Date(Date.now() - 10000),
+          score: 5.0,
+          flags: [],
+          attempt_number: 1,
+          assignment_id: assignmentId,
+          activity_id: activityId,
+          previous_attempt_id: null,
+        },
+      ]);
+
+      const completion = await service.completeAttempt(orgId, studentId, attemptId, validToken, {});
+
+      expect(completion.attempt.status).toBe(AttemptStatus.graded);
+      expect(mockGamificationService.recordAttemptCompleted).not.toHaveBeenCalled();
+      expect(mockPrisma.attempt.update).not.toHaveBeenCalled();
+    });
+
+    it('rechaza respuestas que superen el límite de tamaño en completeAttempt (P1-04, T3.3)', async () => {
+      const hugeAnswers: Record<string, string> = {};
+      for (let i = 0; i < 101; i++) {
+        hugeAnswers[`key_${i}`] = 'val';
+      }
+
+      await expect(
+        service.completeAttempt(orgId, studentId, attemptId, validToken, {
+          answers: hugeAnswers,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('P1-04: rechaza de forma recursiva claves peligrosas (__proto__, constructor, prototype) en dto.answers', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 60000),
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.fill_blank,
+            title: 'Fill blank',
+            level: Level.A1,
+            fill_blank_detail: {
+              config: { items: [] },
+              answer_key: { items: {} },
+            },
+          },
+        },
+      });
+
+      const nestedDangerousAnswers = JSON.parse(
+        '{"question1": {"valid": "ok", "__proto__": {"polluted": true}}}',
+      );
+
+      await expect(
+        service.completeAttempt(orgId, studentId, attemptId, validToken, {
+          answers: nestedDangerousAnswers,
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 422,
+          code: 'INVALID_ACTIVITY_PAYLOAD',
+        },
+      });
+    });
+
+    it('P1-04: rechaza de forma recursiva claves peligrosas en ev.answer en submitEvents', async () => {
+      const nestedDangerousAnswer = JSON.parse(
+        '{"subItem": {"constructor": "bad"}}',
+      );
+
+      await expect(
+        service.submitEvents(orgId, studentId, attemptId, validToken, {
+          events: [
+            {
+              clientEventId: '00000000-0000-4000-8000-000000000001',
+              itemId: 'q1',
+              answer: nestedDangerousAnswer,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 422,
+          code: 'INVALID_ACTIVITY_PAYLOAD',
+        },
+      });
+    });
+
+    it('P1-07: acepta itemId "text" en submitEvents cuando open_question es mono-pregunta', async () => {
+      mockPrisma.attempt.findFirst.mockResolvedValueOnce({
+        id: attemptId,
+        organization_id: orgId,
+        student_id: studentId,
+        assignment_id: assignmentId,
+        status: AttemptStatus.in_progress,
+        started_at: new Date(Date.now() - 60000),
+        assignment: {
+          due_at: new Date(Date.now() + 86400000),
+          activity: {
+            id: activityId,
+            type: ActivityType.open_question,
+            title: 'Open question',
+            level: Level.A1,
+            open_question_detail: {
+              config: {
+                instructions: 'Write your answer',
+                prompt: 'What did you do today?',
+              },
+            },
+          },
+        },
+      });
+
+      const res = await service.submitEvents(orgId, studentId, attemptId, validToken, {
+        events: [
+          {
+            clientEventId: '00000000-0000-4000-8000-000000000002',
+            itemId: 'text',
+            answer: 'I learned English today.',
+          },
+        ],
+      });
+
+      expect(res.acceptedEventIds).toContain('00000000-0000-4000-8000-000000000002');
+    });
+
+    it('P2-04: serializa fechas en formato ISO sin error si started_at es string', async () => {
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: attemptId,
+          status: AttemptStatus.graded,
+          payload: { answers: {} },
+          started_at: '2026-11-09T20:00:00.000Z',
+          finished_at: '2026-11-09T20:05:00.000Z',
+          graded_at: '2026-11-09T20:05:00.000Z',
+          score: 5.0,
+          flags: [],
+          attempt_number: 1,
+          assignment_id: assignmentId,
+          activity_id: activityId,
+          previous_attempt_id: null,
+        },
+      ]);
+
+      const completion = await service.completeAttempt(orgId, studentId, attemptId, validToken, {});
+
+      expect(completion.attempt.startedAt).toBe('2026-11-09T20:00:00.000Z');
+      expect(completion.attempt.finishedAt).toBe('2026-11-09T20:05:00.000Z');
+    });
+
+    it('T5.1 Edge Case: degrada predeciblemente y preserva valores null y anidados sin fallar al serializar payload', async () => {
+      mockPrisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: attemptId,
+          status: AttemptStatus.in_progress,
+          payload: 'corrupted-non-object-payload',
+          started_at: new Date(),
+          finished_at: null,
+          graded_at: null,
+          score: null,
+          flags: [],
+          attempt_number: 1,
+          assignment_id: assignmentId,
+          activity_id: activityId,
+          previous_attempt_id: null,
+        },
+      ]);
+
+      mockPrisma.assignment.findFirst.mockResolvedValueOnce({
+        id: assignmentId,
+        due_at: new Date(Date.now() + 3600 * 1000),
+        activity: {
+          id: activityId,
+          type: ActivityType.open_question,
+          title: 'Essay',
+          open_question_detail: {
+            config: {
+              prompt: 'Write essay',
+            },
+          },
+        },
+      });
+
+      mockPrisma.attempt.update.mockResolvedValueOnce({
+        id: attemptId,
+        status: AttemptStatus.pending_review,
+        payload: { answers: { q1: null, q2: 'hello' }, processedEventIds: [] },
+        started_at: new Date(),
+        finished_at: new Date(),
+        graded_at: null,
+        score: null,
+        flags: [],
+        attempt_number: 1,
+        assignment_id: assignmentId,
+        activity_id: activityId,
+        previous_attempt_id: null,
+      });
+
+      const res = await service.completeAttempt(orgId, studentId, attemptId, validToken, {
+        answers: {
+          q1: null,
+          q2: 'hello',
+          metadata: { subKey: null, validNum: 42 },
+        },
+      });
+
+      expect(res.attempt.status).toBe(AttemptStatus.pending_review);
+      expect(mockPrisma.attempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payload: expect.objectContaining({
+              answers: expect.objectContaining({
+                q1: null,
+                q2: 'hello',
+              }),
+            }),
+          }),
+        }),
+      );
     });
   });
 });

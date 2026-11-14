@@ -11,6 +11,7 @@ import {
   Role,
 } from '@englove/shared';
 import { StatsService } from '../src/stats/stats.service';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 import { GamificationService } from '../src/gamification/gamification.service';
 import { MaintenanceService } from '../src/maintenance/maintenance.service';
 import { PendingSummaryService } from '../src/dashboard/pending-summary.service';
@@ -18,50 +19,10 @@ import { MailService } from '../src/mail/mail.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
-import * as net from 'net';
+import { isPostgresAvailable } from './postgres-test-helper';
 
-function getPostgresPort(): number {
-  const url = process.env.DATABASE_URL;
-  if (!url) return 5433;
-  try {
-    const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5433;
-  } catch {
-    return 5433;
-  }
-}
-
-async function checkPortOpen(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(port, '127.0.0.1');
-  });
-}
-
-async function checkPostgresRunning(): Promise<boolean> {
-  const configuredPort = getPostgresPort();
-  if (await checkPortOpen(configuredPort)) return true;
-  if (configuredPort !== 5433 && (await checkPortOpen(5433))) return true;
-  if (configuredPort !== 5432 && (await checkPortOpen(5432))) return true;
-  return false;
-}
-
-describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — ENG-100 a ENG-104', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — ENG-100 a ENG-104', () => {
+  let prisma: PrismaService;
   let statsService: StatsService;
   let maintenanceService: MaintenanceService;
 
@@ -87,31 +48,20 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   const asgCancelledId = 'e2e80008-7777-4777-8777-777777777773';
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible en localhost; saltando suite E2E de estadísticas en PostgreSQL.');
-      return;
-    }
-
-    try {
-      if (!process.env.DATABASE_URL && (await checkPortOpen(5433))) {
-        process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/englove_dev?schema=public';
-      }
-
-      prisma = new PrismaService();
+    prisma = new PrismaService();
       await prisma.$connect();
 
     const gamificationService = new GamificationService(prisma);
-    statsService = new StatsService(prisma, gamificationService);
+    statsService = new StatsService(prisma, gamificationService, new FeatureFlagsService(prisma));
 
     const configService = new ConfigService({ APP_ENV: 'local' });
-    const pendingSummaryService = new PendingSummaryService(prisma);
+    const pendingSummaryService = new PendingSummaryService(prisma, {} as any);
     const mailService = new MailService(configService);
     maintenanceService = new MaintenanceService(
       prisma,
       gamificationService,
-      undefined,
-      undefined,
+      {} as any,
+      {} as any,
       pendingSummaryService,
       mailService,
     );
@@ -129,6 +79,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     await prisma.group.deleteMany({ where: { organization_id: orgId } });
     await prisma.student.deleteMany({ where: { organization_id: orgId } });
     await prisma.user.deleteMany({ where: { organization_id: orgId } });
+    await prisma.featureFlag.deleteMany({ where: { organization_id: orgId } });
     await prisma.organization.deleteMany({ where: { id: orgId } });
 
     // 1. Organization
@@ -139,6 +90,11 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
         slug: 'org-e2e-stats',
       },
     });
+
+    await prisma.featureFlag.createMany({ data: [
+      {organization_id: orgId, key: 'games', enabled: false, config: {passing_score: 3, retention_days: 30, pending_upload_ttl_days: 7, ungraded_reminder_days: 3}},
+      {organization_id: orgId, key: 'extra_content', enabled: false, config: {}},
+    ]});
 
     // 2. Teacher
     await prisma.user.create({
@@ -460,10 +416,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
         occurred_at: new Date(now.getTime() - 25 * 24 * 3600 * 1000),
       },
     });
-    } catch (err) {
-      console.warn('Error conectando a Docker PostgreSQL para E2E de estadísticas:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
@@ -481,14 +433,13 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
       await prisma.group.deleteMany({ where: { organization_id: orgId } });
       await prisma.student.deleteMany({ where: { organization_id: orgId } });
       await prisma.user.deleteMany({ where: { organization_id: orgId } });
+      await prisma.featureFlag.deleteMany({ where: { organization_id: orgId } });
       await prisma.organization.deleteMany({ where: { id: orgId } });
       await prisma.$disconnect();
     } catch {}
   });
 
   it('Paso 1: GET /overview en PostgreSQL real verifica último intento calificado, alerta inactividad 14d y exclusión de game/canceladas', async () => {
-    if (!isPostgresAvailable) return;
-
     const overview = await statsService.getOverview(orgId, {});
 
     expect(overview.organizationSummary.totalApprovedStudents).toBe(3);
@@ -521,8 +472,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 2: GET /groups/:id en PostgreSQL real verifica tendencias 30d/7d simultáneas y ordenamiento de grupo', async () => {
-    if (!isPostgresAvailable) return;
-
     const groupStats = await statsService.getGroupStats(orgId, group1Id, {
       trendMode: '30d',
       sortBy: 'studentName',
@@ -545,8 +494,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 3: GET /leaderboard en PostgreSQL real verifica orden determinista y filtrado por groupId y level', async () => {
-    if (!isPostgresAvailable) return;
-
     // 1. Leaderboard without filters
     const allLb = await statsService.getLeaderboard(orgId, {});
     expect(allLb.entries.length).toBe(3);
@@ -571,8 +518,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 4: GET /students/:id en PostgreSQL real verifica scoreSeries (1..N en games), usedExtendedDeadline, banderas y calendario ISO', async () => {
-    if (!isPostgresAvailable) return;
-
     const studentStats = await statsService.getStudentStats(orgId, student1Id, {});
 
     expect(studentStats.student.id).toBe(student1Id);
@@ -580,9 +525,9 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
 
     // Score series:
     // asgFillBlank has latest attempt 2 (score 4.5, usedExtendedDeadline = true, bandera duración = true)
-    // asgGame has BOTH attempt 1 (4.0) and attempt 2 (5.0) because game includes 1..N!
+    // Microgames (game) are excluded from academic scoreSeries per SPEC-11 RF-12 and Decisión 137!
     const series = studentStats.performance.scoreSeries;
-    expect(series.length).toBe(3);
+    expect(series.length).toBe(1);
 
     const fillBlankPoint = series.find((p) => p.activityType === ActivityType.fill_blank);
     expect(fillBlankPoint).toBeDefined();
@@ -593,9 +538,12 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     expect(fillBlankPoint?.implausibleDuration).toBe(true);
 
     const gamePoints = series.filter((p) => p.activityType === ActivityType.game);
-    expect(gamePoints.length).toBe(2);
-    expect(gamePoints[0]!.attemptNumber).toBe(1);
-    expect(gamePoints[1]!.attemptNumber).toBe(2);
+    expect(gamePoints.length).toBe(0);
+
+    // Microgames sessions 1..N appear in gamesPractice per SPEC-11 RF-12
+    expect(studentStats.gamesPractice).toBeDefined();
+    expect(studentStats.gamesPractice?.totalSessions).toBe(2);
+    expect(studentStats.gamesPractice?.sessions?.length).toBe(2);
 
     // Consistency weekly calendar
     expect(studentStats.consistency.weeklyCalendar.length).toBe(12);
@@ -606,8 +554,6 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 5: Presupuesto de latencia < 500 ms verificado directamente contra PostgreSQL', async () => {
-    if (!isPostgresAvailable) return;
-
     const t0 = performance.now();
     await statsService.getOverview(orgId, {});
     const tOverview = performance.now() - t0;
@@ -631,7 +577,11 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
   });
 
   it('Paso 6: Job teacher_pending_summary ejecuta y registra en ScheduledJobRun en PostgreSQL real', async () => {
-    if (!isPostgresAvailable || !prisma) return;
+    // Set student3 to pending_approval so there is a pending registration for teacher_pending_summary (SPEC-11 RF-12)
+    await prisma.student.update({
+      where: { id: student3Id, organization_id: orgId } as unknown as Prisma.StudentWhereUniqueInput,
+      data: { approval_status: ApprovalStatus.pending_approval },
+    });
 
     const periodKey = '2026-10-28';
     await maintenanceService.runTeacherPendingSummary(periodKey, undefined, orgId);
@@ -659,11 +609,15 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
     });
 
     expect(countAfter).toBe(countBefore); // Skipped because 1 day < 3 days!
+
+    // Restore student3 to approved for subsequent steps
+    await prisma.student.update({
+      where: { id: student3Id, organization_id: orgId } as unknown as Prisma.StudentWhereUniqueInput,
+      data: { approval_status: ApprovalStatus.approved },
+    });
   });
 
   it('Paso 7: Traslado de grupo y reincorporación en PostgreSQL real no produce duplicados y consolida cumplimiento', async () => {
-    if (!isPostgresAvailable || !prisma) return;
-
     // Simulate Student 2 transferring from Group 1 to Group 2, then re-enrolling in Group 1
     // 1. Set left_at on current Group 1 membership
     const m2 = await prisma.groupMembership.findFirst({
@@ -673,7 +627,7 @@ describe('SPEC-08: Estadísticas y Leaderboard en PostgreSQL real (Docker) — E
 
     const transferDate = new Date();
     await prisma.groupMembership.update({
-      where: { id: m2!.id },
+      where: { id: m2!.id, organization_id: orgId } as unknown as Prisma.GroupMembershipWhereUniqueInput,
       data: { left_at: transferDate },
     });
 

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-amber-50/70 via-white to-amber-50/40 flex flex-col justify-between p-6 sm:p-10">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-to-b from-amber-50/70 via-white to-amber-50/40 flex flex-col justify-between p-6 sm:p-10 outline-none">
       {/* Top Bar */}
       <header className="max-w-6xl w-full mx-auto flex items-center justify-between pb-6 border-b border-amber-200/60">
         <div className="flex items-center gap-2.5">

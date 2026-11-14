@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   title: 'Contenido extra',
 };
 
-export const instant = false;
-
 export default function ExtraPage() {
   return (
     <Suspense

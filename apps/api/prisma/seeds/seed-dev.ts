@@ -520,9 +520,69 @@ export async function seedDev() {
   }
 
   // 5. exam (fill_blank items only, decision 70)
+  const examConfig = {
+    instructions: 'Selecciona la opción correcta para cada espacio.',
+    items: [
+      {
+        id: '11111111-1111-4111-8111-111111111601',
+        weight: 50,
+        prompt: 'I {{22222222-2222-4222-8222-222222222601}} happy.',
+        blanks: [
+          {
+            id: '22222222-2222-4222-8222-222222222601',
+            options: [
+              { id: '33333333-3333-4333-8333-333333333601', text: 'am' },
+              { id: '33333333-3333-4333-8333-333333333602', text: 'is' },
+            ],
+          },
+        ],
+      },
+      {
+        id: '11111111-1111-4111-8111-111111111602',
+        weight: 50,
+        prompt: 'They {{22222222-2222-4222-8222-222222222602}} students.',
+        blanks: [
+          {
+            id: '22222222-2222-4222-8222-222222222602',
+            options: [
+              { id: '33333333-3333-4333-8333-333333333603', text: 'are' },
+              { id: '33333333-3333-4333-8333-333333333604', text: 'was' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const examAnswerKey = {
+    items: {
+      '11111111-1111-4111-8111-111111111601': {
+        '22222222-2222-4222-8222-222222222601': '33333333-3333-4333-8333-333333333601',
+      },
+      '11111111-1111-4111-8111-111111111602': {
+        '22222222-2222-4222-8222-222222222602': '33333333-3333-4333-8333-333333333603',
+      },
+    },
+  };
+
   const actExam = await prisma.activity.upsert({
     where: { id: '20000000-0000-4000-8000-000000000005' },
-    update: {},
+    update: {
+      title: 'Midterm Exam A1',
+      exam_detail: {
+        upsert: {
+          update: {
+            config: examConfig,
+            answer_key: examAnswerKey,
+          },
+          create: {
+            organization_id: org.id,
+            config: examConfig,
+            answer_key: examAnswerKey,
+          },
+        },
+      },
+    },
     create: {
       id: '20000000-0000-4000-8000-000000000005',
       organization_id: org.id,
@@ -535,51 +595,8 @@ export async function seedDev() {
       exam_detail: {
         create: {
           organization_id: org.id,
-          config: {
-            title: 'Midterm Evaluation',
-            items: [
-              {
-                id: 'ex1',
-                weight: 50,
-                item: {
-                  id: '11111111-1111-4111-8111-111111111501',
-                  prompt: 'I {{22222222-2222-4222-8222-222222222501}} happy.',
-                  blanks: [
-                    {
-                      id: '22222222-2222-4222-8222-222222222501',
-                      options: [
-                        { id: '33333333-3333-4333-8333-333333333501', text: 'am' },
-                        { id: '33333333-3333-4333-8333-333333333502', text: 'is' },
-                      ],
-                    },
-                  ],
-                },
-              },
-              {
-                id: 'ex2',
-                weight: 50,
-                item: {
-                  id: '11111111-1111-4111-8111-111111111502',
-                  prompt: 'They {{22222222-2222-4222-8222-222222222502}} students.',
-                  blanks: [
-                    {
-                      id: '22222222-2222-4222-8222-222222222502',
-                      options: [
-                        { id: '33333333-3333-4333-8333-333333333503', text: 'are' },
-                        { id: '33333333-3333-4333-8333-333333333504', text: 'was' },
-                      ],
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-          answer_key: {
-            items: {
-              '22222222-2222-4222-8222-222222222501': '33333333-3333-4333-8333-333333333501',
-              '22222222-2222-4222-8222-222222222502': '33333333-3333-4333-8333-333333333503',
-            },
-          },
+          config: examConfig,
+          answer_key: examAnswerKey,
         },
       },
     },
@@ -644,34 +661,56 @@ export async function seedDev() {
     },
   });
 
-  // Open microgame assignments for groupKids
-  for (let idx = 0; idx < gameDefinitions.length; idx++) {
-    const def = gameDefinitions[idx]!;
-    const assignId = `30000000-0000-4000-8000-00000000001${idx + 1}`;
-    await prisma.assignment.upsert({
-      where: { id: assignId },
-      update: {
-        opens_at: pastOpens,
-        due_at: futureDue,
-      },
-      create: {
-        id: assignId,
-        organization_id: org.id,
-        activity_id: def.actId,
-        group_id: groupKids.id,
-        opens_at: pastOpens,
-        due_at: futureDue,
-      },
-    });
-  }
-
   const firstStudent = students[0]!;
   const secondStudent = students[1]!;
   const thirdStudent = students[2]!;
 
+  // Autonomous microgame practice attempts (Decision 130, 137)
+  for (let idx = 0; idx < gameDefinitions.length; idx++) {
+    const def = gameDefinitions[idx]!;
+    const attemptId = `40000000-0000-4000-8000-00000000002${idx + 1}`;
+    const gameAttempt = await prisma.attempt.upsert({
+      where: { id: attemptId },
+      update: {
+        score: 5.0,
+        status: AttemptStatus.graded,
+        graded_at: pastOpens,
+      },
+      create: {
+        id: attemptId,
+        organization_id: org.id,
+        assignment_id: null,
+        activity_id: def.actId,
+        student_id: firstStudent.id,
+        attempt_number: 1,
+        status: AttemptStatus.graded,
+        score: 5.0,
+        graded_at: pastOpens,
+        started_at: pastOpens,
+        finished_at: pastOpens,
+        payload: { answers: {} },
+      },
+    });
+    if (gameAttempt.finished_at) {
+      await prisma.progressEvent.upsert({
+        where: { id: `61000000-0000-4000-8000-00000000002${idx + 1}` },
+        update: { occurred_at: gameAttempt.finished_at },
+        create: {
+          id: `61000000-0000-4000-8000-00000000002${idx + 1}`,
+          organization_id: org.id,
+          student_id: firstStudent.id,
+          attempt_id: gameAttempt.id,
+          type: ProgressEventType.attempt_completed,
+          value: gameAttempt.score,
+          occurred_at: gameAttempt.finished_at,
+        },
+      });
+    }
+  }
+
   // Attempts: graded, pending_review, abandoned
   // 1. Graded attempt
-  await prisma.attempt.upsert({
+  const gradedAttempt = await prisma.attempt.upsert({
     where: { id: '40000000-0000-4000-8000-000000000001' },
     update: {
       graded_at: new Date(now.getTime() - 3 * 24 * 3600 * 1000),
@@ -777,6 +816,27 @@ export async function seedDev() {
       retry_extend_until: new Date(now.getTime() + 5 * 24 * 3600 * 1000), // unconsumed future deadline!
     },
   });
+
+  for (const [eventId, attempt, type] of [
+    ['61000000-0000-4000-8000-000000000001', gradedAttempt, ProgressEventType.attempt_completed],
+    ['61000000-0000-4000-8000-000000000002', pendingAttempt, ProgressEventType.audio_submitted],
+    ['61000000-0000-4000-8000-000000000004', attemptWithRetry, ProgressEventType.attempt_completed],
+  ] as const) {
+    if (!attempt.finished_at) continue;
+    await prisma.progressEvent.upsert({
+      where: { id: eventId },
+      update: { occurred_at: attempt.finished_at },
+      create: {
+        id: eventId,
+        organization_id: org.id,
+        student_id: attempt.student_id,
+        attempt_id: attempt.id,
+        type,
+        value: type === ProgressEventType.audio_submitted ? 1 : attempt.score,
+        occurred_at: attempt.finished_at,
+      },
+    });
+  }
 
   // Streaks: active and forgiven (ProgressEvent with type streak_week)
   await prisma.progressEvent.upsert({

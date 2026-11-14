@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  TimedChoiceSettings,
-  TimedChoiceSolution,
+  TimedChoiceSettingsSchema,
+  TimedChoiceSolutionSchema,
 } from '@englove/shared';
 import { soundManager } from '../../../lib/sound';
 
@@ -18,8 +18,10 @@ export function TimedChoiceGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as TimedChoiceSettings;
-  const solution = config.answerKey?.solution as TimedChoiceSolution | undefined;
+  const parsedSettings = TimedChoiceSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = TimedChoiceSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const questions = settings?.questions || [];
   const timeLimitSeconds = settings?.timeLimitSeconds || 20;
@@ -31,6 +33,7 @@ export function TimedChoiceGame({
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [isWaitingFeedback, setIsWaitingFeedback] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string>('');
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,6 +61,7 @@ export function TimedChoiceGame({
     setSecondsLeft(timeLimitSeconds);
     setSelectedOptionId(null);
     setIsTimedOut(false);
+    setLiveStatus(`Pregunta ${currentIndex + 1} de ${questions.length}: ${currentQuestion.prompt}`);
 
     timerRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -81,6 +85,7 @@ export function TimedChoiceGame({
 
     setIsTimedOut(true);
     setIsWaitingFeedback(true);
+    setLiveStatus('Se agotó el tiempo para esta pregunta.');
     soundManager.play('miss', soundEnabled);
 
     const nextChoices = { ...choices, [currentQuestion.id]: null };
@@ -102,6 +107,12 @@ export function TimedChoiceGame({
     setIsWaitingFeedback(true);
 
     const isCorrect = expectedOptionId ? expectedOptionId === optionId : false;
+    const opt = currentQuestion.options.find((o) => o.id === optionId);
+    setLiveStatus(
+      isCorrect
+        ? `¡Correcto! Seleccionaste: ${opt?.text ?? ''}`
+        : `Incorrecto. Seleccionaste: ${opt?.text ?? ''}`
+    );
     soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
 
     const nextChoices = { ...choices, [currentQuestion.id]: optionId };
@@ -152,6 +163,11 @@ export function TimedChoiceGame({
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
+
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
 
       {/* Progress & Countdown Header */}
       <div className="flex items-center justify-between gap-4 mb-6">
@@ -219,9 +235,15 @@ export function TimedChoiceGame({
             <button
               key={opt.id}
               type="button"
-              disabled={isWaitingFeedback}
-              onClick={() => handleSelectOption(opt.id)}
-              className={`w-full min-h-14 p-4 rounded-2xl border-2 font-bold text-base flex items-center justify-between text-left transition-all touch-manipulation cursor-pointer select-none active:scale-98 shadow-xs ${btnStyle}`}
+              aria-disabled={isWaitingFeedback}
+              onClick={() => {
+                if (!isWaitingFeedback) {
+                  handleSelectOption(opt.id);
+                }
+              }}
+              className={`w-full min-h-14 p-4 rounded-2xl border-2 font-bold text-base flex items-center justify-between text-left transition-all touch-manipulation select-none active:scale-98 shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                isWaitingFeedback ? 'cursor-default' : 'cursor-pointer'
+              } ${btnStyle}`}
             >
               <span>{opt.text}</span>
               <span className="text-xs font-black" aria-hidden="true">

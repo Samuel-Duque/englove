@@ -133,7 +133,7 @@ ENG-111; SPEC-02 RF-18; G-C13.
 **RF-19 — axe sin violaciones en CI.**
 ENG-112; architecture §10.3; pbp Etapa 9.
 
-- **Dado** el pipeline de CI **Cuando** corre la puerta de accesibilidad **Entonces** un navegador real con axe (reglas `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) recorre las pantallas de §9, con el alumno en Kids y en Teens, y el job falla ante cualquier violación, incluidas las de contraste.
+- **Dado** el pipeline de CI **Cuando** corre la puerta de accesibilidad **Entonces** un navegador real con axe (reglas `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`) recorre las pantallas de §9, con el alumno en Kids y en Teens, y el job falla ante cualquier violación, incluidas las de contraste.
 
 **RF-20 — Foco visible y teclado.**
 ENG-112; architecture §10.3; decisión 105.
@@ -196,7 +196,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | Recursos estáticos versionados del build | Precaché | Sí, por versión |
 | Navegaciones (HTML) y cargas RSC | Red; sin red, pantalla sin conexión | No |
-| API `/api/v1/*` | Red siempre (lectura de `NetworkFirst` sin respaldo de respuestas autenticadas, architecture §3.8 y §10.2) | No |
+| API `/api/v1/*` | Red siempre (exclusión estricta de Cache Storage, decisiones 116 y 117; nunca cacheado) | No |
 | URLs firmadas de R2 | Red, sin intervención | No |
 
 **Rendimiento (RF-23).** Dispositivo: tablet Android de gama media o baja, con 4 GB de RAM o menos. Umbrales de referencia: LCP ≤ 2,5 s en `/inicio`, INP ≤ 200 ms en el renderizador y en cada mecánica de juego, CLS ≤ 0,1. Son control de higiene (CONTEXT §11.2), no puerta de CI.
@@ -328,3 +328,4 @@ Sin P-n asignados a esta spec (CONTEXT §15). El líder del proyecto respondió 
 | --- | --- | --- |
 | 2026-11-01 | Creación del borrador con 24 RF y respuestas del líder a Q-01 a Q-08; propuesta En revisión | Tarea SPEC-09 del taskboard |
 | 2026-11-04 | Implementación de ENG-110, ENG-111, ENG-112 y ENG-113; verificación de 24 RFs (unitarios, E2E con axe, informe en tablet real); estado pasa a Verificada | Finalización de Etapa 9 y pase de calidad |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-06) | Adopción de Serwist real (QA-01), unificación en openOfflineDb(), userId obligatorio en grabaciones y deleteDatabase en logout (P0-05), y compuerta axe con wcag22aa (Decisión 133) |

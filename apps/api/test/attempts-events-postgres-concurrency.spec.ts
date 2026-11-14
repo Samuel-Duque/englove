@@ -10,42 +10,11 @@ import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import * as net from 'net';
+import { TenantContext } from '../src/common/tenant/tenant.context';
+import { isPostgresAvailable } from './postgres-test-helper';
 
-function getPostgresPort(): number {
-  const url = process.env.DATABASE_URL;
-  if (!url) return 5432;
-  try {
-    const parsed = new URL(url);
-    return parsed.port ? parseInt(parsed.port, 10) : 5432;
-  } catch {
-    return 5432;
-  }
-}
-
-async function checkPostgresRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1500);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.connect(getPostgresPort(), '127.0.0.1');
-  });
-}
-
-describe('SPEC-05 RF-7 (ENG-074): lotes de eventos concurrentes en PostgreSQL real', () => {
-  let isPostgresAvailable = false;
-  let prisma: PrismaService | null = null;
+describe.skipIf(!isPostgresAvailable)('SPEC-05 RF-7 (ENG-074): lotes de eventos concurrentes en PostgreSQL real', () => {
+  let prisma: PrismaService;
   let attemptsService: AttemptsService;
 
   const orgId = 'e2e74074-1111-4111-8111-111111111111';
@@ -75,15 +44,8 @@ describe('SPEC-05 RF-7 (ENG-074): lotes de eventos concurrentes en PostgreSQL re
   }
 
   beforeAll(async () => {
-    isPostgresAvailable = await checkPostgresRunning();
-    if (!isPostgresAvailable) {
-      console.warn('PostgreSQL no está disponible; saltando prueba concurrente de eventos.');
-      return;
-    }
-
-    try {
-      prisma = new PrismaService();
-      await prisma.$connect();
+    prisma = new PrismaService();
+    await prisma.$connect();
 
       const secret = 'eng-074-concurrency-test-jwt-secret-min-32-chars!';
       const configService = new ConfigService({ JWT_SECRET: secret });
@@ -142,70 +104,77 @@ describe('SPEC-05 RF-7 (ENG-074): lotes de eventos concurrentes en PostgreSQL re
       });
 
       const parsed = parseFillBlankSimpleSyntax('The cat is [sleeping|barking]');
-      const activity = await activitiesService.createActivity(orgId, teacherId, {
-        title: 'ENG-074 concurrencia',
-        type: ActivityType.fill_blank,
-        level: Level.A1,
-        config: {
-          items: itemIds.map((id) => ({ id, prompt: parsed.prompt, blanks: parsed.blanks })),
+      const assigned = await TenantContext.run(
+        { organizationId: orgId, userId: teacherId, role: Role.teacher },
+        async () => {
+          const activity = await activitiesService.createActivity(orgId, teacherId, {
+            title: 'ENG-074 concurrencia',
+            type: ActivityType.fill_blank,
+            level: Level.A1,
+            config: {
+              items: itemIds.map((id) => ({ id, prompt: parsed.prompt, blanks: parsed.blanks })),
+            },
+            answerKey: {
+              items: Object.fromEntries(itemIds.map((id) => [id, parsed.answerKey])),
+            },
+          });
+          await activitiesService.publishActivity(orgId, activity.id);
+          return assignmentsService.createAssignments(orgId, {
+            activityId: activity.id,
+            groupIds: [groupId],
+            opensAt: new Date(Date.now() - 3600000).toISOString(),
+            dueAt: new Date(Date.now() + 86400000).toISOString(),
+          });
         },
-        answerKey: {
-          items: Object.fromEntries(itemIds.map((id) => [id, parsed.answerKey])),
-        },
-      });
-      await activitiesService.publishActivity(orgId, activity.id);
-      const assigned = await assignmentsService.createAssignments(orgId, {
-        activityId: activity.id,
-        groupIds: [groupId],
-        opensAt: new Date(Date.now() - 3600000).toISOString(),
-        dueAt: new Date(Date.now() + 86400000).toISOString(),
-      });
+      );
 
-      const started = await attemptsService.startAttempt(orgId, studentId, assigned.items[0]!.id);
+      const started = await TenantContext.run(
+        { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+        async () => attemptsService.startAttempt(orgId, studentId, assigned.items[0]!.id),
+      );
       attemptId = started.attempt.id;
       if (!started.attemptToken) throw new Error('attemptToken ausente');
       attemptToken = started.attemptToken;
-    } catch (err: unknown) {
-      console.warn('Error inicializando PostgreSQL para ENG-074:', err);
-      isPostgresAvailable = false;
-    }
   });
 
   afterAll(async () => {
-    if (prisma && isPostgresAvailable) {
+    if (prisma) {
       try {
         await cleanup(prisma);
       } finally {
         await prisma.$disconnect();
       }
-    } else if (prisma) {
-      await prisma.$disconnect();
     }
   });
 
   it('SPEC-05 RF-7: lotes concurrentes con IDs distintos no pierden respuestas ni IDs procesados', async () => {
-    if (!isPostgresAvailable || !prisma) return;
+    const activePrisma = prisma;
 
-    const results = await Promise.allSettled(
-      itemIds.map((itemId, i) =>
-        attemptsService.submitEvents(orgId, studentId, attemptId, attemptToken, {
-          events: [{ itemId, answer: { blank: `option-${i}` }, clientEventId: `eng074-ev-${i}` }],
-        }),
-      ),
-    );
-    expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    return TenantContext.run(
+      { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
+      async () => {
+        const results = await Promise.allSettled(
+          itemIds.map((itemId, i) =>
+            attemptsService.submitEvents(orgId, studentId, attemptId, attemptToken, {
+              events: [{ itemId, answer: { blank: `option-${i}` }, clientEventId: `eng074-ev-${i}` }],
+            }),
+          ),
+        );
+        expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
 
-    const stored = await prisma.attempt.findFirst({
-      where: { id: attemptId, organization_id: orgId },
-    });
-    const payload = stored?.payload as {
-      answers?: Record<string, unknown>;
-      processedEventIds?: string[];
-    } | null;
+        const stored = await activePrisma.attempt.findFirst({
+          where: { id: attemptId, organization_id: orgId },
+        });
+        const payload = stored?.payload as {
+          answers?: Record<string, unknown>;
+          processedEventIds?: string[];
+        } | null;
 
-    expect(Object.keys(payload?.answers ?? {}).sort()).toEqual([...itemIds].sort());
-    expect([...(payload?.processedEventIds ?? [])].sort()).toEqual(
-      itemIds.map((_, i) => `eng074-ev-${i}`).sort(),
+        expect(Object.keys(payload?.answers ?? {}).sort()).toEqual([...itemIds].sort());
+        expect([...(payload?.processedEventIds ?? [])].sort()).toEqual(
+          itemIds.map((_, i) => `eng074-ev-${i}`).sort(),
+        );
+      },
     );
   });
 });

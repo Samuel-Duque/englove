@@ -1,18 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+
+interface DecodedJwt {
+  role?: string;
+  exp?: number;
+  typ?: string;
+}
 
 /**
- * Extracts the user role from a JWT payload without cryptographic verification (Decision A45 & A75).
+ * Construye la política CSP y cabeceras HTTP de defensa para todas las respuestas
+ * emitidas por proxy.ts (incluyendo Worker/SSR y redirecciones de rol).
+ */
+function buildContentSecurityPolicy(): string {
+  const appEnv = process.env.NEXT_PUBLIC_APP_ENV || process.env.APP_ENV || "local";
+  const isLocal = appEnv === "local";
+  const localHttpSources = isLocal
+    ? " http://localhost:3001 http://127.0.0.1:3001 http://localhost:9000 http://127.0.0.1:9000"
+    : "";
+  const localMediaSources = isLocal ? " http://localhost:9000 http://127.0.0.1:9000" : "";
+  const localWsSources = isLocal ? " ws:" : "";
+  const localScriptEval = isLocal ? " 'unsafe-eval'" : "";
+
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${localScriptEval}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    `img-src 'self' data: blob: https:${localMediaSources}`,
+    `media-src 'self' blob: https:${localMediaSources}`,
+    `connect-src 'self' https: wss:${localHttpSources}${localWsSources}`,
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
+function withSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy());
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  return response;
+}
+
+/**
+ * Extracts payload fields from a JWT payload without cryptographic verification (Decision A45 & A75).
  * Only used for perimeter UI routing/redirection in proxy.ts; business authorization remains in NestJS.
  */
-function extractRoleFromJwt(token: string): string | null {
+function decodeJwtPayload(token: string): DecodedJwt | null {
   try {
-    const parts = token.split('.');
+    const parts = token.split(".");
     const part1 = parts[1];
     if (!part1) return null;
-    const base64 = part1.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
-    const payload = JSON.parse(jsonStr) as { role?: unknown };
-    return typeof payload.role === 'string' ? payload.role : null;
+    const base64 = part1.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonStr = Buffer.from(base64, "base64").toString("utf8");
+    const parsed: unknown = JSON.parse(jsonStr);
+    const rec = typeof parsed === "object" && parsed !== null ? parsed : {};
+    const roleVal = Reflect.get(rec, "role");
+    const expVal = Reflect.get(rec, "exp");
+    const typVal = Reflect.get(rec, "typ");
+    return {
+      role: typeof roleVal === "string" ? roleVal : undefined,
+      exp: typeof expVal === "number" ? expVal : undefined,
+      typ: typeof typVal === "string" ? typVal : undefined,
+    };
   } catch {
     return null;
   }
@@ -28,101 +81,117 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // Static assets and operational endpoints pass through directly
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/static') ||
-    pathname.startsWith('/icons/') ||
-    pathname === '/manifest.webmanifest' ||
-    pathname === '/manifest.json' ||
-    pathname === '/sw.js' ||
-    /\.(?:ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot|webp|map|txt|webmanifest|json)$/i.test(pathname)
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/static") ||
+    pathname.startsWith("/icons/") ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
+    /\.(?:ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot|webp|map|txt|webmanifest|json)$/i.test(
+      pathname,
+    )
   ) {
-    return NextResponse.next();
+    return withSecurityHeaders(NextResponse.next());
   }
 
-  // Session cookie detection (with prefix convention, Decision 58)
-  const cookiePrefix = process.env.COOKIE_PREFIX || 'englove_';
-  const sessionCookie =
-    request.cookies.get(`${cookiePrefix}access_token`) ||
-    request.cookies.get('access_token') ||
-    request.cookies.get('englove_access_token') ||
-    request.cookies.get('englove_session');
+  // Session cookie detection: strictly with prefix convention (Decision 58, RF-2)
+  const cookiePrefix =
+    process.env.COOKIE_PREFIX ||
+    process.env.NEXT_PUBLIC_COOKIE_PREFIX ||
+    "englove_";
+  const sessionCookie = request.cookies.get(`${cookiePrefix}access_token`);
+
+  const jwt = sessionCookie ? decodeJwtPayload(sessionCookie.value) : null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const isExpired = Boolean(
+    jwt && typeof jwt.exp === "number" && jwt.exp <= nowSec,
+  );
+  const logoutPending =
+    request.cookies.get("englove_logout_pending")?.value === "1";
+  const isSessionValid = Boolean(sessionCookie && !isExpired && !logoutPending);
 
   const isPublicAuthRoute =
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/registro') ||
-    pathname.startsWith('/recuperar') ||
-    pathname.startsWith('/restablecer');
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/registro") ||
+    pathname.startsWith("/recuperar") ||
+    pathname.startsWith("/restablecer");
 
   const isPublicRoute =
-    pathname === '/' ||
-    pathname === '/offline' ||
-    pathname === '/manifest.webmanifest' ||
-    pathname === '/manifest.json' ||
-    pathname === '/sw.js' ||
-    pathname.startsWith('/icons/') ||
+    pathname === "/" ||
+    pathname === "/terminos" ||
+    pathname.startsWith("/terminos/") ||
+    pathname === "/offline" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
+    pathname.startsWith("/icons/") ||
     isPublicAuthRoute;
 
   // If unauthenticated and attempting private route, redirect to login with safe next parameter (RF-17)
-  if (!sessionCookie && !isPublicRoute) {
-    const loginUrl = new URL('/login', request.url);
+  if (!isSessionValid && !isPublicRoute) {
+    const loginUrl = new URL("/login", request.url);
+    const search = request.nextUrl.search || "";
+    const nextCandidate = `${pathname}${search}`;
+    const hasControlChars = Array.from(nextCandidate).some((c) => {
+      const code = c.charCodeAt(0);
+      return code <= 31 || code === 127;
+    });
     if (
-      pathname.startsWith('/') &&
-      !pathname.startsWith('//') &&
-      !pathname.includes('\\') &&
+      pathname.startsWith("/") &&
+      !pathname.startsWith("//") &&
+      !pathname.includes("\\") &&
+      !hasControlChars &&
       !isPublicAuthRoute
     ) {
-      const search = request.nextUrl.search || '';
-      loginUrl.searchParams.set('next', `${pathname}${search}`);
+      loginUrl.searchParams.set("next", nextCandidate);
     }
-    return NextResponse.redirect(loginUrl);
+    return withSecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
   // If authenticated and visiting root or public auth routes, redirect to /inicio (H11)
-  if (sessionCookie && (isPublicAuthRoute || pathname === '/')) {
-    return NextResponse.redirect(new URL('/inicio', request.url));
+  if (isSessionValid && (isPublicAuthRoute || pathname === "/")) {
+    return withSecurityHeaders(NextResponse.redirect(new URL("/inicio", request.url)));
   }
 
   // Role segregation redirection (Decisions A45, A75, H9)
-  if (sessionCookie) {
-    const role = extractRoleFromJwt(sessionCookie.value);
-    if (role === 'student') {
+  if (isSessionValid && jwt) {
+    const role = jwt.role;
+    if (role === "student") {
       const isTeacherRoute =
-        pathname === '/alumnos' ||
-        pathname.startsWith('/alumnos/') ||
-        pathname === '/actividades' ||
-        pathname.startsWith('/actividades/') ||
-        pathname === '/asignaciones' ||
-        pathname.startsWith('/asignaciones/') ||
-        pathname === '/revision' ||
-        pathname.startsWith('/revision/') ||
-        pathname === '/estadisticas' ||
-        pathname.startsWith('/estadisticas/') ||
-        pathname === '/grupos' ||
-        pathname.startsWith('/grupos/') ||
-        pathname === '/contenido-extra' ||
-        pathname.startsWith('/contenido-extra/');
+        pathname === "/alumnos" ||
+        pathname.startsWith("/alumnos/") ||
+        pathname === "/actividades" ||
+        pathname.startsWith("/actividades/") ||
+        pathname === "/asignaciones" ||
+        pathname.startsWith("/asignaciones/") ||
+        pathname === "/revision" ||
+        pathname.startsWith("/revision/") ||
+        pathname === "/estadisticas" ||
+        pathname.startsWith("/estadisticas/") ||
+        pathname === "/grupos" ||
+        pathname.startsWith("/grupos/") ||
+        pathname === "/contenido-extra" ||
+        pathname.startsWith("/contenido-extra/");
       if (isTeacherRoute) {
-        return NextResponse.redirect(new URL('/inicio', request.url));
+        return withSecurityHeaders(NextResponse.redirect(new URL("/inicio", request.url)));
       }
-    } else if (role === 'teacher') {
+    } else if (role === "teacher") {
       const isStudentRoute =
-        pathname === '/perfil' ||
-        pathname.startsWith('/perfil/') ||
-        pathname === '/progreso' ||
-        pathname.startsWith('/progreso/') ||
-        pathname === '/juegos' ||
-        pathname.startsWith('/juegos/') ||
-        pathname === '/feedback' ||
-        pathname.startsWith('/feedback/') ||
-        pathname === '/actividad' ||
-        pathname.startsWith('/actividad/') ||
-        pathname === '/extra' ||
-        pathname.startsWith('/extra/');
+        pathname === "/perfil" ||
+        pathname.startsWith("/perfil/") ||
+        pathname === "/progreso" ||
+        pathname.startsWith("/progreso/") ||
+        pathname === "/juegos" ||
+        pathname.startsWith("/juegos/") ||
+        pathname === "/feedback" ||
+        pathname.startsWith("/feedback/") ||
+        pathname === "/actividad" ||
+        pathname.startsWith("/actividad/") ||
+        pathname === "/extra" ||
+        pathname.startsWith("/extra/");
       if (isStudentRoute) {
-        return NextResponse.redirect(new URL('/inicio', request.url));
+        return withSecurityHeaders(NextResponse.redirect(new URL("/inicio", request.url)));
       }
     }
   }
 
-  return NextResponse.next();
+  return withSecurityHeaders(NextResponse.next());
 }

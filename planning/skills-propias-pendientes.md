@@ -1,6 +1,7 @@
 # Englove — Skills propias pendientes de crear
 
 > Estado: **2 de 5 creadas.** `englove-spec` se creó el 2026-10-08 (tarea DOC-07 del taskboard) y `englove-guardrails` el 2026-10-19 (tarea DOC-08); las otras tres siguen como ideas aprobadas, todavía no creadas (decisión del equipo: se crearán en sus hitos correspondientes).
+> Seguimiento (2026-11-08, Etapa 12, decisiones 127 a 137): las skills propias existentes se revisaron en las tareas ENG-158 y DOC-09 del taskboard: `englove-guardrails` amplió `check-guardrails.mjs` para detectar aserciones `as Type` (regla G-C12) y actualizó `KNOWN_MAX_DECISION` a 137 (cubriendo las decisiones 127 a 137), y `englove-spec` retiró la referencia a Supabase de `check-spec.mjs` y `references/validacion.md` en favor de Neon. Cada cambio se replicó en `.claude/skills/` y `.kiro/skills/` y se calculó el `computedHash` en `skills-lock.json`. El objetivo de accesibilidad es WCAG 2.2 AA (decisión 133).
 > Origen: análisis de skills del proyecto (octubre 2026). No se encontró ninguna skill pública confiable para este dominio y reglas de negocio específicas, por eso se proponen propias.
 > Actualización técnica (2026-10-19): adaptado a las decisiones 81 a 92 de `CONTEXT.md` §14 y `planning/architecture-overview.md` §11 (despliegue en Cloudflare Workers mediante `vinext` para frontend, backend en Render con instancia única y cola serial, almacenamiento en Cloudflare R2, motor SQL exclusivo PostgreSQL 18 en Neon en sustitución de Supabase, y validación superada del PoC ENG-140).
 > Herramienta recomendada para crearlas: la skill `skill-creator` (ya instalada en `.agents/skills/`).
@@ -11,7 +12,7 @@
 
 | Skill propia | Prioridad | Momento recomendado | Estado |
 |---|---|---|---|
-| `englove-spec` | alta | Antes de redactar las specs `SPEC-00` a `SPEC-10` (Etapa 0 / inicio de Etapa 1) | **Creada** 2026-10-08 (DOC-07) |
+| `englove-spec` | alta | Antes de redactar las specs `SPEC-00` a `SPEC-11` (Etapa 0 / inicio de Etapa 1) | **Creada** 2026-10-08 (DOC-07) |
 | `englove-guardrails` | alta | Antes de escribir el primer código de producción (Etapa 1 / inicio de Etapa 2) | **Creada** 2026-10-19 (DOC-08) |
 | `englove-activity-type` | media | Cuando exista `packages/shared` y la primera actividad implementada | Pendiente |
 | `englove-kids-ux` | media | Cuando empiece el frontend (tokens de tema Kids/Teens) | Pendiente |
@@ -155,7 +156,7 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 - Tokens de diseño por tema (`data-theme="kids"` / `"teens"`) y cómo los bundles de animación se cargan dinámicamente con `next/dynamic` según el tema activo.
 - Reglas por edad: Kids (7–10) bloqueado en su interfaz lúdica; Teens (11+) puede alternar tema desde el perfil si `can_switch_interface = true`.
 - Ergonomía táctil: zonas táctiles grandes, nivel de lectura adaptado, mensajes breves, retroalimentación positiva e inmediata.
-- Celebraciones (`canvas-confetti`), efectos de sonido (Howler.js), animación con Framer Motion y respeto riguroso de `prefers-reduced-motion`.
+- Celebraciones (`canvas-confetti`), efectos de sonido nativos (Web Audio API / sound.ts, decisión 107), animación CSS y respeto riguroso de `prefers-reduced-motion`.
 - Microjuegos de arrastrar y soltar con `@atlaskit/pragmatic-drag-and-drop` optimizados para tablets táctiles.
 - Contraste WCAG 2.2 nivel AA (auditado con axe-core en CI).
 - Síntesis de voz con Web Speech API (`en-US` y `es-CO`).

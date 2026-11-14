@@ -10,5 +10,23 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS"
+  },
+  "env": {
+    "staging": {
+      "name": "englove-web-staging",
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "staging",
+        "COOKIE_PREFIX": "englove_stg_",
+        "NEXT_PUBLIC_COOKIE_PREFIX": "englove_stg_"
+      }
+    },
+    "production": {
+      "name": "englove-web-production",
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "production",
+        "COOKIE_PREFIX": "englove_",
+        "NEXT_PUBLIC_COOKIE_PREFIX": "englove_"
+      }
+    }
   }
 }

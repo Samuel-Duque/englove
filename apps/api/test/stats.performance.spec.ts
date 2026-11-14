@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StatsService } from '../src/stats/stats.service';
+import { mockStatsConfiguration } from './stats-config.fixture';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { GamificationService } from '../src/gamification/gamification.service';
 import {
@@ -131,10 +132,11 @@ describe('SPEC-08 RF-4: Presupuesto de latencia < 500 ms e índices de rendimien
     service = new StatsService(
       mockPrisma as unknown as PrismaService,
       mockGamification as unknown as GamificationService,
+      mockStatsConfiguration(),
     );
   });
 
-  it('los 4 endpoints de estadísticas procesan volumen de 3 meses en < 500 ms', async () => {
+  it('los 5 endpoints de estadísticas (incluyendo games-leaderboard) procesan volumen de 3 meses en < 500 ms', async () => {
     const t0 = performance.now();
     await service.getOverview(orgId, {});
     const tOverview = performance.now() - t0;
@@ -151,10 +153,15 @@ describe('SPEC-08 RF-4: Presupuesto de latencia < 500 ms e índices de rendimien
     await service.getStudentStats(orgId, studentId, {});
     const tStudent = performance.now() - t3;
 
+    const t4 = performance.now();
+    await service.getGamesLeaderboard(orgId, {});
+    const tGamesLeaderboard = performance.now() - t4;
+
     expect(tOverview).toBeLessThan(500);
     expect(tGroup).toBeLessThan(500);
     expect(tLeaderboard).toBeLessThan(500);
     expect(tStudent).toBeLessThan(500);
+    expect(tGamesLeaderboard).toBeLessThan(500);
   });
 
   it('los índices compuestos sobre Attempt y ProgressEvent están definidos en schema.prisma', () => {

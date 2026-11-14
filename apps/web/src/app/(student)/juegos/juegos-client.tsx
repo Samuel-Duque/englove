@@ -3,108 +3,119 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  ActivityType,
-  AttemptStatus,
-  AssignmentCard,
-  AssignmentCardListResponse,
-  scoreToStars,
+  StudentGameCard,
+  StudentGamesListResponse,
+  StudentGamesListResponseSchema,
   GAME_MECHANIC_LABELS,
+  scoreToGameStars,
+  getGameMotivationMessage,
+  z,
 } from '@englove/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
-
+import { fetchSharedProfile } from '../../../lib/auth-session';
+import { speak } from '../../../lib/speech';
 
 export function JuegosClient() {
   const router = useRouter();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [gamesEnabled, setGamesEnabled] = useState(false);
-  const [assignments, setAssignments] = useState<AssignmentCard[]>([]);
+  const profileQuery = useQuery({
+    queryKey: ['student', 'profile', 'shell'],
+    queryFn: () => fetchSharedProfile(),
+  });
+  const ageSegment = profileQuery.data?.student?.ageSegment ?? 'kids';
+  const isKids = ageSegment === 'kids';
+
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
-  const [startingAssignmentId, setStartingAssignmentId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [startingGameId, setStartingGameId] = useState<string | null>(null);
+  const [speakingGameId, setSpeakingGameId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const flagsQuery = useQuery({
+    queryKey: ['feature-flags'],
+    queryFn: async () => {
+      const flagRes = await fetchSharedFeatureFlags();
+      if (!flagRes) throw new Error('No se pudieron obtener las feature flags');
+      return flagRes;
+    },
+  });
+
+  const gamesEnabled = Boolean(flagsQuery.data?.flags?.games);
+
+  const gamesQuery = useQuery({
+    queryKey: ['student', 'games'],
+    queryFn: () =>
+      apiFetch<StudentGamesListResponse>('/api/v1/me/games', {
+        schema: StudentGamesListResponseSchema,
+      }),
+    enabled: gamesEnabled,
+  });
 
   useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // 1. Check feature flags
-        const flagRes = await fetchSharedFeatureFlags();
-        if (!flagRes) throw new Error('No se pudieron obtener las feature flags');
-        if (!isMounted) return;
-
-        const isGamesOn = Boolean(flagRes.flags?.games);
-        setGamesEnabled(isGamesOn);
-
-        if (isGamesOn) {
-          // 2. Fetch available & continuity assignment cards
-          const [availRes, contRes] = await Promise.all([
-            apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments?scope=available'),
-            apiFetch<AssignmentCardListResponse>('/api/v1/me/assignments?scope=continuity').catch(() => ({
-              items: [],
-              total: 0,
-              offset: 0,
-              limit: 0,
-            })),
-          ]);
-
-          if (!isMounted) return;
-
-          // Merge and filter only game activities (availRes takes precedence)
-          const combinedMap = new Map<string, AssignmentCard>();
-          for (const card of [...contRes.items, ...availRes.items]) {
-            if (card.activity.type === ActivityType.game) {
-              combinedMap.set(card.id, card);
-            }
-          }
-          setAssignments(Array.from(combinedMap.values()));
-        }
-      } catch (err) {
-        if (isMounted) {
-          if (err instanceof ApiError) setError(err.message);
-          else setError('No se pudieron cargar los juegos.');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadData();
     return () => {
-      isMounted = false;
-      setStartingAssignmentId(null);
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 
-  const handleStartGame = async (assignmentId: string) => {
-    setStartingAssignmentId(assignmentId);
-    setError(null);
-    try {
-      const res = await apiFetch<{ attempt: { id: string } }>(
-        `/api/v1/assignments/${assignmentId}/attempts`,
-        {
-          method: 'POST',
-        },
-      );
+  const startGameMutation = useMutation({
+    mutationFn: (gameId: string) =>
+      apiFetch<{ attempt: { id: string } }>(`/api/v1/activities/${gameId}/attempts`, {
+        method: 'POST',
+        schema: z.object({ attempt: z.object({ id: z.string() }) }),
+      }),
+    onSuccess: (res) => {
       router.push(`/actividad/${res.attempt.id}`);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else setError('No se pudo iniciar el juego');
-    } finally {
-      setStartingAssignmentId(null);
+    },
+    onError: (err: unknown, gameId: string) => {
+      const game = games.find((g) => g.id === gameId);
+      if (err instanceof ApiError) {
+        if (err.code === 'ATTEMPT_ALREADY_EXISTS' && game?.inProgressAttemptId) {
+          router.push(`/actividad/${game.inProgressAttemptId}`);
+          return;
+        }
+        setActionError(err.message);
+      } else {
+        setActionError('No se pudo iniciar el juego');
+      }
+      setStartingGameId(null);
+    },
+  });
+
+  const isLoading = flagsQuery.isLoading || (gamesEnabled && gamesQuery.isLoading);
+  const games: StudentGameCard[] = gamesQuery.data?.items || [];
+  const error = actionError || (flagsQuery.error instanceof Error ? flagsQuery.error.message : null) || (gamesQuery.error instanceof Error ? gamesQuery.error.message : null);
+
+  const handleSpeak = (game: StudentGameCard) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (speakingGameId === game.id) {
+      window.speechSynthesis.cancel();
+      setSpeakingGameId(null);
+      return;
     }
+    setSpeakingGameId(game.id);
+    speak(game.title, () => setSpeakingGameId(null));
+  };
+
+  const handleStartGame = (game: StudentGameCard) => {
+    // If there is already an in-progress attempt, navigate directly to it
+    if (game.status === 'in_progress' && game.inProgressAttemptId) {
+      router.push(`/actividad/${game.inProgressAttemptId}`);
+      return;
+    }
+
+    setStartingGameId(game.id);
+    setActionError(null);
+    startGameMutation.mutate(game.id);
   };
 
   // Filtered cards
-  const filteredAssignments = assignments.filter((card) => {
-    const latest = card.latestAttempt;
-    const isCompleted = latest && latest.status === AttemptStatus.graded;
-
-    if (filter === 'pending') return !isCompleted;
-    if (filter === 'completed') return isCompleted;
+  const filteredGames = games.filter((game) => {
+    if (filter === 'pending') return game.status !== 'completed';
+    if (filter === 'completed') return game.status === 'completed';
     return true;
   });
 
@@ -117,25 +128,25 @@ export function JuegosClient() {
     );
   }
 
-  // Feature Flag disabled state (SPEC-06 RF-11)
+  // Feature flag check (SPEC-06 RF-11)
   if (!gamesEnabled) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8 text-center space-y-6">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-xs">
-          🎮
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black text-amber-950">Zona de Juegos en preparación</h2>
-          <p className="text-sm font-medium text-amber-900/80 max-w-md mx-auto leading-relaxed">
-            La zona de juegos no está habilitada en este momento por la administración de tu institución.
-          </p>
-        </div>
-        <div>
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center space-y-4">
+        <div className="text-5xl" aria-hidden="true">🎮</div>
+        <h1 className={`text-2xl font-black ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>
+          Microjuegos no disponibles
+        </h1>
+        <p className={`text-sm ${isKids ? 'text-zinc-600' : 'text-zinc-400'}`}>
+          La zona de juegos interactivos no está habilitada en este momento. Por favor, consulta más tarde con tu profesora.
+        </p>
+        <div className="pt-4">
           <Link
             href="/inicio"
-            className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-sm shadow-md transition-all min-h-12"
+            className={`inline-flex items-center px-4 py-2.5 rounded-2xl font-black text-sm transition-colors ${
+              isKids ? 'bg-amber-500 hover:bg-amber-400 text-amber-950' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+            }`}
           >
-            ← Volver al inicio
+            Volver al inicio
           </Link>
         </div>
       </div>
@@ -144,175 +155,241 @@ export function JuegosClient() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-amber-200/80 pb-6">
-        <div className="space-y-1">
+      {/* Page Header */}
+      <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b ${
+        isKids ? 'border-amber-200/80' : 'border-zinc-800'
+      } pb-6`}>
+        <div>
           <div className="flex items-center gap-2">
-            <span className="text-3xl">🎮</span>
-            <h1 className="text-2xl sm:text-3xl font-black text-amber-950">Zona de Juegos</h1>
+            <span className="text-3xl" aria-hidden="true">🎮</span>
+            <h1 className={`text-3xl font-black tracking-tight ${isKids ? 'text-amber-950' : 'text-zinc-100'}`}>
+              Zona de Microjuegos
+            </h1>
           </div>
-          <p className="text-sm font-medium text-amber-900/80">
-            Aprende y practica inglés divirtiéndote con microjuegos interactivos.
+          <p className={`text-sm font-medium ${isKids ? 'text-amber-950' : 'text-zinc-400'} mt-1`}>
+            Practica inglés jugando de forma autónoma. ¡Gana estrellas y repasa todas las veces que quieras!
           </p>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-amber-200/50 border border-amber-300/60 self-start sm:self-auto">
-          {(
-            [
-              { key: 'all', label: 'Todos' },
-              { key: 'pending', label: 'Por jugar' },
-              { key: 'completed', label: 'Completados' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setFilter(tab.key)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all min-h-9 ${
-                filter === tab.key
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-amber-950/70 hover:bg-amber-200/80 hover:text-amber-950'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className={`flex items-center gap-2 ${
+          isKids ? 'bg-amber-100/60' : 'bg-zinc-800'
+        } p-1.5 rounded-2xl self-start sm:self-auto`}>
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
+              filter === 'all'
+                ? isKids
+                  ? 'bg-amber-500 text-amber-950 shadow-xs'
+                  : 'bg-indigo-600 text-white shadow-xs'
+                : isKids
+                  ? 'text-amber-900 hover:bg-amber-200/60'
+                  : 'text-zinc-300 hover:bg-zinc-700'
+            }`}
+          >
+            Todos ({games.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('pending')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
+              filter === 'pending'
+                ? isKids
+                  ? 'bg-amber-500 text-amber-950 shadow-xs'
+                  : 'bg-indigo-600 text-white shadow-xs'
+                : isKids
+                  ? 'text-amber-900 hover:bg-amber-200/60'
+                  : 'text-zinc-300 hover:bg-zinc-700'
+            }`}
+          >
+            Por practicar ({games.filter((g) => g.status !== 'completed').length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('completed')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
+              filter === 'completed'
+                ? isKids
+                  ? 'bg-amber-500 text-amber-950 shadow-xs'
+                  : 'bg-indigo-600 text-white shadow-xs'
+                : isKids
+                  ? 'text-amber-900 hover:bg-amber-200/60'
+                  : 'text-zinc-300 hover:bg-zinc-700'
+            }`}
+          >
+            Jugados ({games.filter((g) => g.status === 'completed').length})
+          </button>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-bold text-center">
-          {error}
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="text-xs font-bold underline hover:no-underline"
+          >
+            Cerrar
+          </button>
         </div>
       )}
 
-      {/* Games Grid */}
-      {filteredAssignments.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-amber-50/50 border border-dashed border-amber-300 space-y-3">
-          <span className="text-4xl block">🎲</span>
-          <p className="text-base font-bold text-amber-950">Aún no tienes juegos asignados</p>
-          <p className="text-xs text-amber-900/70 max-w-sm mx-auto">
-            Cuando tu profesora te asigne actividades lúdicas, aparecerán aquí para que juegues cuantas veces quieras.
+      {/* Games Grid or Empty State */}
+      {filteredGames.length === 0 ? (
+        <div className={`p-12 text-center rounded-3xl border border-dashed space-y-3 ${
+          isKids
+            ? 'bg-amber-50/50 border-amber-300 text-amber-950'
+            : 'bg-zinc-900 border-zinc-800 text-zinc-100'
+        }`}>
+          <span className="text-4xl block" aria-hidden="true">🎲</span>
+          <p className="text-base font-bold">
+            Todavía no hay juegos publicados para practicar. ¡Vuelve pronto!
+          </p>
+          <p className={`text-xs max-w-sm mx-auto ${isKids ? 'text-amber-950 font-medium' : 'text-zinc-400'}`}>
+            Cuando tu profesora publique microjuegos interactivos, aparecerán aquí para que practiques cuantas veces quieras.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAssignments.map((card) => {
-            const latest = card.latestAttempt;
-            const isFinished = latest && latest.status === AttemptStatus.graded;
-            const isInProgress = latest && latest.status === AttemptStatus.in_progress;
-            const stars = latest ? scoreToStars(latest.score) : 0;
-            const isStarting = startingAssignmentId === card.id;
+          {filteredGames.map((game) => {
+            const isCompleted = game.status === 'completed';
+            const isInProgress = game.status === 'in_progress';
+            const stars =
+              game.bestStars ??
+              (game.bestScore !== undefined && game.bestScore !== null
+                ? scoreToGameStars(game.bestScore)
+                : (game.lastStars ?? 0));
+            const motivationMessage =
+              game.bestScore !== undefined && game.bestScore !== null
+                ? getGameMotivationMessage(game.bestScore)
+                : stars > 0
+                  ? getGameMotivationMessage(stars === 3 ? 5.0 : stars === 2 ? 3.5 : 1.5)
+                  : null;
+            const isStarting = startingGameId === game.id;
+            const isSpeaking = speakingGameId === game.id;
 
             return (
               <div
-                key={card.id}
-                className="rounded-3xl bg-white border-2 border-amber-200/80 p-5 shadow-xs hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                key={game.id}
+                className={`rounded-3xl border-2 p-5 shadow-xs transition-all flex flex-col justify-between space-y-4 ${
+                  isKids
+                    ? 'bg-white border-amber-200/80 hover:border-amber-400 hover:shadow-md'
+                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
-                      Nivel {card.activity.level}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                      isKids
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                    }`}>
+                      Nivel {game.level}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-100 text-purple-900 border border-purple-200">
-                      🎮 {card.activity.mechanic ? GAME_MECHANIC_LABELS[card.activity.mechanic] : 'Microjuego'}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold border ${
+                      isKids
+                        ? 'bg-purple-100 text-purple-900 border-purple-200'
+                        : 'bg-purple-950/80 text-purple-200 border-purple-800'
+                    }`}>
+                      🎮 {game.mechanic ? GAME_MECHANIC_LABELS[game.mechanic] : 'Microjuego'}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-black text-amber-950 leading-snug line-clamp-2">
-                    {card.activity.title}
-                  </h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className={`text-lg font-black leading-snug line-clamp-2 ${
+                      isKids ? 'text-amber-950' : 'text-zinc-100'
+                    }`}>
+                      {game.title}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => handleSpeak(game)}
+                      aria-label={isSpeaking ? `Detener lectura de ${game.title}` : `Escuchar ${game.title}`}
+                      className={`shrink-0 inline-flex items-center justify-center min-h-[48px] min-w-[48px] p-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        isKids
+                          ? 'bg-amber-100 hover:bg-amber-200 text-amber-950'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                      }`}
+                    >
+                      {isSpeaking ? '⏹' : '🔊'}
+                    </button>
+                  </div>
 
-                  {/* Stars and Attempt Info */}
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3].map((star) => (
-                        <span
-                          key={star}
-                          className={`text-base ${
-                            star <= stars ? 'opacity-100 scale-110' : 'opacity-25 grayscale'
-                          }`}
-                        >
-                          ⭐
-                        </span>
-                      ))}
-                      {latest?.score !== null && latest?.score !== undefined && (
-                        <span className="text-xs font-extrabold text-amber-900 ml-1.5">
-                          {Number(latest.score).toFixed(1)}
+                  {/* Stars and Practice Info */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1" aria-label={`Estrellas de práctica: ${stars} de 3`}>
+                        {[1, 2, 3].map((star) => (
+                          <span
+                            key={star}
+                            className={`text-base ${
+                              star <= stars ? 'opacity-100 scale-110' : 'opacity-25 grayscale'
+                            }`}
+                            aria-hidden="true"
+                          >
+                            ⭐
+                          </span>
+                        ))}
+                      </div>
+
+                      {game.attemptsCount > 0 && (
+                        <span className={`text-xs font-bold ${isKids ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                          {game.attemptsCount} {game.attemptsCount === 1 ? 'partida' : 'partidas'}
                         </span>
                       )}
                     </div>
 
-                    {latest && (
-                      <span className="text-xs font-bold text-zinc-500">
-                        Intento #{latest.attemptNumber}
-                      </span>
+                    {motivationMessage && (
+                      <p className={`text-xs font-semibold leading-snug ${isKids ? 'text-amber-950' : 'text-zinc-300'}`}>
+                        {motivationMessage}
+                      </p>
                     )}
                   </div>
                 </div>
 
-                {/* Card Action Buttons (<= 3 clicks from /inicio) */}
-                <div className="pt-3 border-t border-amber-100 space-y-2">
-                  {isInProgress ? (
-                    <div className="space-y-2">
-                      {latest?.completeUntil && (
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100/90 px-2.5 py-1.5 rounded-xl border border-amber-300">
-                          <span>⏳</span>
-                          <span>
-                            Termina antes de:{' '}
-                            {new Date(latest.completeUntil).toLocaleDateString('es-CO', {
-                              day: 'numeric',
-                              month: 'short',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      <Link
-                        href={`/actividad/${latest!.id}`}
-                        className="w-full min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
-                      >
-                        <span>▶️</span>
-                        <span>Continuar juego</span>
-                      </Link>
-                    </div>
-                  ) : isFinished ? (
-                    <div className="flex flex-col gap-2">
-                      {card.canStart ? (
-                        <button
-                          type="button"
-                          disabled={isStarting}
-                          onClick={() => handleStartGame(card.id)}
-                          className="w-full min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50"
-                        >
-                          <span>🔄</span>
-                          <span>{isStarting ? 'Iniciando…' : 'Jugar de nuevo'}</span>
-                        </button>
-                      ) : (
-                        <div className="text-center py-2.5 text-xs font-bold text-zinc-500 bg-zinc-100 rounded-xl border border-zinc-200">
-                          🔒 Juego cerrado (plazo finalizado)
-                        </div>
-                      )}
-
-                      <Link
-                        href={`/actividad/${latest!.id}`}
-                        className="w-full min-h-10 rounded-xl bg-amber-100/70 hover:bg-amber-200 text-amber-900 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
-                      >
-                        <span>👀 Ver último resultado</span>
-                      </Link>
-                    </div>
+                {/* Card Action Buttons (SPEC-11 §7.1) */}
+                <div className={`pt-3 border-t space-y-2 ${isKids ? 'border-amber-100' : 'border-zinc-800'}`}>
+                  {isInProgress && game.inProgressAttemptId ? (
+                    <Link
+                      href={`/actividad/${game.inProgressAttemptId}`}
+                      className={`w-full min-h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      }`}
+                    >
+                      <span aria-hidden="true">▶️</span>
+                      <span>Reanudar partida</span>
+                    </Link>
+                  ) : isCompleted ? (
+                    <button
+                      type="button"
+                      disabled={isStarting}
+                      onClick={() => handleStartGame(game)}
+                      className={`w-full min-h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50 cursor-pointer ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      }`}
+                    >
+                      <span aria-hidden="true">🔄</span>
+                      <span>{isStarting ? 'Iniciando…' : 'Jugar de nuevo'}</span>
+                    </button>
                   ) : (
                     <button
                       type="button"
                       disabled={isStarting}
-                      onClick={() => handleStartGame(card.id)}
-                      className="w-full min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50"
+                      onClick={() => handleStartGame(game)}
+                      className={`w-full min-h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform disabled:opacity-50 cursor-pointer ${
+                        isKids
+                          ? 'bg-amber-500 hover:bg-amber-400 text-amber-950'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      }`}
                     >
-                      <span>🎮</span>
-                      <span>{isStarting ? 'Iniciando…' : 'Empezar juego'}</span>
+                      <span aria-hidden="true">🎮</span>
+                      <span>{isStarting ? 'Iniciando…' : 'Jugar'}</span>
                     </button>
                   )}
                 </div>

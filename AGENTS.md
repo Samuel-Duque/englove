@@ -1,6 +1,6 @@
 # Englove — Guía para agentes
 
-Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. El proyecto avanza por etapas bajo Spec-Driven Development (Etapas 0–8 implementadas; SPEC-01 a SPEC-08 Verificadas; cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding de usuarios y tablets reales): no se escribe código de producción sin una spec aprobada en `specs/`.
+Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. La base funcional de las etapas 1–10 está implementada bajo Spec-Driven Development, con verificación histórica de SPEC-01 a SPEC-11; el aprovisionamiento de Etapa 0 sigue el taskboard. La auditoría del 2026-11-12 y su remediación están en `planning/auditoria-general-2026-11-12.md` y `planning/remediacion-auditoria-2026-11-12.md`; la enmienda NEG-01 de SPEC-08 requiere re-verificación en CI. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding y tablets reales antes de cerrar la Etapa 11. No se escribe código de producción sin spec aprobada; consultar estados vigentes en `specs/README.md`.
 
 ## Dónde está cada cosa
 
@@ -8,17 +8,19 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 1. `.agents/CONTEXT.md` — fuente única de verdad.
    - §2.4: lo que queda **fuera del piloto**.
-   - §14: registro de decisiones (1–115).
-   - §15: pendientes abiertos (cerrados para el piloto).
+   - §14: registro de decisiones (1–145).
+   - §15: pendientes abiertos (sin P-n abiertos para el piloto; preguntas Q-01 a Q-08 de SPEC-11 todas decididas).
    - §16: **convenciones obligatorias para agentes**.
    - §17: **glosario** del dominio.
 2. `planning/architecture-overview.md` — arquitectura.
 3. `planning/sdd-process.md` — proceso SDD y plantilla de spec (§5).
 4. `planning/pbp-development.md` — etapas e hitos.
 5. `planning/taskboard.md` — tareas.
-6. `specs/` — especificaciones (`SPEC-00` a `SPEC-10`).
+6. `specs/` — contratos y estados actuales; la verificación histórica no sustituye re-verificar una enmienda ni aceptar staging.
 
-Otros documentos: `planning/incongruencias-y-decisiones-definitivas.md`, `planning/decisiones-modelo-de-datos.md`, `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
+Auditorías y pendientes operativos vigentes: `planning/pendientes-cierre-auditorias.md` (consolidado accionable de lo pendiente para la próxima sesión), `planning/auditoria-general-2026-11-12.md`, `planning/remediacion-auditoria-2026-11-12.md`, `planning/auditoria-adversarial-2026-11-13.md` y `planning/despliegue-staging.md` (los documentos históricos cerrados de Etapa 12 y rondas previas fueron retirados del árbol y permanecen en el historial de Git; la fuente única de verdad es `.agents/CONTEXT.md`).
+
+Otros documentos: `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
 
 ## Para las skills que buscan `GLOSSARY.md` y `docs/adr/`
 
@@ -43,6 +45,7 @@ Si una skill pide crear un ADR o un término de glosario, añádelo en esas secc
 - Privacidad y seguridad: cero PII en logs y Sentry; sin `dangerouslySetInnerHTML`; limpiar IndexedDB y caché al hacer logout en tablets compartidas.
 - No reintroducir `Guardian`, `ConsentRecord` ni Supabase Storage (los archivos van a Cloudflare R2).
 - No construir nada de la lista fuera de alcance del piloto (§2.4).
+- Etapa 12 (decisiones 127 a 129): las tareas de corrección no añaden funcionalidades (única excepción: ENG-162, decisión 137) y no pasan a `Hecho` sin una prueba de regresión nombrada por el hallazgo. Decisiones vigentes de la etapa: 130 a 145 (microjuegos abiertos a todos sin `Assignment`, descarte de intentos de juego de prueba, estrellas de práctica, ranking de juegos privado de la profesora, WCAG 2.2 AA, MinIO y Mailpit locales, Serwist real, sesión continua y coordinación de refresh, editor multi-oración/huecos, migración integral a TanStack Query, ffprobe real con /media/:id/confirm, y cookies seguras por entorno, entre otras).
 
 ## Skills
 

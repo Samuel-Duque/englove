@@ -248,7 +248,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       await page.goto('/contenido-extra');
 
       const axeResults = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(axeResults.violations).toEqual([]);
     });
@@ -436,7 +436,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       // 1. Kids theme
       await page.goto('/extra');
       const kidsAxe = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(kidsAxe.violations).toEqual([]);
 
@@ -468,8 +468,10 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       });
 
       await page.goto('/extra');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(300);
       const teensAxe = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(teensAxe.violations).toEqual([]);
     });

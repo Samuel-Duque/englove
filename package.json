@@ -19,6 +19,7 @@
     "seed:volume": "pnpm --filter @englove/api seed:volume",
     "db:migrate": "pnpm --filter @englove/api db:migrate",
     "db:generate": "pnpm --filter @englove/api db:generate",
+    "postinstall": "pnpm --filter @englove/api db:generate",
     "guardrails": "node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs --all",
     "check:no-db-push": "node scripts/check-no-db-push.mjs"
   },
@@ -27,6 +28,7 @@
     "prettier": "^3.5.3",
     "turbo": "^2.4.4",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.71.2",
+    "yaml": "^2.9.1"
   }
 }

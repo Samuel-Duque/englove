@@ -5,8 +5,8 @@ import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
-  MatchSettings,
-  MatchSolution,
+  MatchSettingsSchema,
+  MatchSolutionSchema,
   deterministicShuffle,
 } from '@englove/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -21,8 +21,10 @@ export function MatchGame({
   onEvent,
   onComplete,
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
-  const settings = config.settings as MatchSettings;
-  const solution = config.answerKey?.solution as MatchSolution | undefined;
+  const parsedSettings = MatchSettingsSchema.safeParse(config.settings);
+  const settings = parsedSettings.success ? parsedSettings.data : null;
+  const parsedSol = MatchSolutionSchema.safeParse(config.answerKey?.solution);
+  const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const leftItems = settings?.left || [];
   const rightOriginal = settings?.right || [];
@@ -55,6 +57,7 @@ export function MatchGame({
 
   // Selected left item for 2-step click/touch & keyboard
   const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<string>('');
 
   // Inverted map for quick lookup: rightId -> leftId
   const rightToLeftMap = useMemo(() => {
@@ -80,6 +83,10 @@ export function MatchGame({
     setPairs(next);
     setSelectedLeftId(null);
 
+    const leftTxt = leftItems.find((l) => l.id === leftId)?.text ?? '';
+    const rightTxt = shuffledRight.find((r) => r.id === rightId)?.text ?? '';
+    setLiveStatus(`Pareja unida: ${leftTxt} con ${rightTxt}`);
+
     // Sound & feedback
     if (solution?.pairs) {
       const isCorrect = solution.pairs[leftId] === rightId;
@@ -93,6 +100,8 @@ export function MatchGame({
     const next = { ...pairs };
     delete next[leftId];
     setPairs(next);
+    const leftTxt = leftItems.find((l) => l.id === leftId)?.text ?? '';
+    setLiveStatus(`Pareja desvinculada para ${leftTxt}`);
     onEvent?.({ itemId: 'pairs', answer: next });
   };
 
@@ -116,6 +125,11 @@ export function MatchGame({
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
+
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
 
       {config.instructions && (
         <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
@@ -212,8 +226,8 @@ export function MatchGame({
           onClick={handleComplete}
           className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
             isKids
-              ? 'bg-amber-500 hover:bg-amber-600 text-white'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
           Finalizar emparejamiento ✨
@@ -258,55 +272,60 @@ function DraggableLeftItem({
   return (
     <div
       ref={elRef}
-      className={`min-h-12 p-3 sm:p-4 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation cursor-pointer select-none ${
+      className={`min-h-12 p-2 sm:p-2.5 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation select-none ${
         isSelected
           ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-100/90 shadow-md'
           : isPaired
-            ? 'border-emerald-400 bg-emerald-50/70'
+            ? isKids
+              ? 'border-emerald-400 bg-emerald-50/70'
+              : 'border-emerald-600 bg-emerald-950/80'
             : isKids
               ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
               : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
       }`}
-      role="button"
-      tabIndex={0}
-      aria-pressed={isSelected}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        } else if (e.key === 'Escape') {
-          if (isSelected) onSelect();
-        }
-      }}
     >
-      <div className="flex items-center gap-2">
-        <span className={`text-sm font-bold ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{text}</span>
-        {isPaired && pairedText && (
-          <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
-            🔗 {pairedText}
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={isSelected}
+        className="flex-1 flex items-center justify-between text-left p-1.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+      >
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-bold ${
+            isSelected
+              ? 'text-zinc-900'
+              : isPaired
+                ? isKids
+                  ? 'text-emerald-950'
+                  : 'text-emerald-100'
+                : isKids
+                  ? 'text-zinc-900'
+                  : 'text-zinc-100'
+          }`}>
+            {text}
           </span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        {isPaired && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUnlink();
-            }}
-            className="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-1 rounded-md"
-            title="Desvincular"
-          >
-            ✕
-          </button>
-        )}
-        <span className="text-xs text-zinc-400 font-bold" aria-hidden="true">
+          {isPaired && pairedText && (
+            <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
+              🔗 {pairedText}
+            </span>
+          )}
+        </div>
+        <span className={`text-xs font-bold mr-1 ${isSelected ? 'text-zinc-900' : 'text-zinc-400'}`} aria-hidden="true">
           {isSelected ? '✓ Activo' : '👉'}
         </span>
-      </div>
+      </button>
+
+      {isPaired && (
+        <button
+          type="button"
+          onClick={onUnlink}
+          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-bold text-rose-600 hover:text-rose-800 p-1 rounded-md ml-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-500"
+          title="Desvincular"
+          aria-label={`Desvincular ${text}`}
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
@@ -342,7 +361,8 @@ function DropTargetRightItem({
       onDragLeave: () => setIsOver(false),
       onDrop: ({ source }) => {
         setIsOver(false);
-        const droppedLeftId = source.data?.leftId as string | undefined;
+        const droppedLeftId =
+          typeof source.data?.leftId === 'string' ? source.data.leftId : undefined;
         if (droppedLeftId) {
           onDropLink(droppedLeftId);
         }
@@ -359,7 +379,9 @@ function DropTargetRightItem({
           : isTargetActive
             ? 'border-dashed border-amber-400 bg-amber-50/60 animate-pulse'
             : isPaired
-              ? 'border-emerald-300 bg-emerald-50/60'
+              ? isKids
+                ? 'border-emerald-300 bg-emerald-50/60'
+                : 'border-emerald-600 bg-emerald-950/80'
               : isKids
                 ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
                 : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
@@ -374,7 +396,15 @@ function DropTargetRightItem({
         }
       }}
     >
-      <span className={`text-sm font-bold ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{text}</span>
+      <span className={`text-sm font-bold ${
+        isPaired
+          ? isKids
+            ? 'text-emerald-950'
+            : 'text-emerald-100'
+          : isKids
+            ? 'text-zinc-900'
+            : 'text-zinc-100'
+      }`}>{text}</span>
       <span className="text-xs text-zinc-400 font-bold" aria-hidden="true">
         {isPaired ? '✅' : isTargetActive ? '👈 Tocar aquí' : '🎯'}
       </span>

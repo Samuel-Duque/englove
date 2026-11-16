@@ -3,23 +3,27 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "env": ["CLOUDFLARE_ENV", "API_URL", "COOKIE_PREFIX", "NEXT_PUBLIC_*"],
+      "dependsOn": ["^build", "db:generate"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
     },
     "lint": {
       "dependsOn": ["^build"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "db:generate"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REQUIRE_POSTGRES_TESTS", "RUN_AUDIT_MIGRATION_POSTGRES", "AUDIT_MIGRATION_ADMIN_URL"],
+      "dependsOn": ["build", "^build"]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "db:migrate": {
+      "passThroughEnv": ["MIGRATION_DATABASE_URL", "DATABASE_URL"],
       "cache": false
     },
     "db:generate": {

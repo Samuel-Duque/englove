@@ -5,27 +5,42 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     // Add teacher session cookies
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: 'mock-teacher-token',
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: 'mock-teacher-token',
         domain: 'localhost',
         path: '/',
       },
     ]);
 
-    // Mock teacher auth refresh & me
+    // Mock teacher auth refresh & me & session
+    await page.route('**/api/v1/auth/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          user: {
+            id: 'tch-e2e-1',
+            email: 'teacher@upwardenglish.local',
+            name: 'Profesora Clara Gómez',
+            role: 'teacher',
+          },
+          organizationId: 'org-e2e',
+        },
+      });
+    });
+
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
           user: {
             id: 'tch-e2e-1',
-            email: 'teacher@englove.local',
+            email: 'teacher@upwardenglish.local',
             name: 'Profesora Clara Gómez',
             role: 'teacher',
           },
@@ -41,7 +56,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
           user: {
             id: 'tch-e2e-1',
             name: 'Profesora Clara Gómez',
-            email: 'teacher@englove.local',
+            email: 'teacher@upwardenglish.local',
             role: 'teacher',
           },
         },
@@ -194,7 +209,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(previewBtn).toBeVisible();
     await previewBtn.click();
 
-    const dialog = page.locator('div[role="dialog"]');
+    const dialog = page.getByRole('dialog', { name: 'Previsualización Docente' });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('h2:has-text("Previsualización Docente")')).toBeVisible();
     await expect(
@@ -205,7 +220,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
 
     // 4.2 Cambiar a open_question y previsualizar
     await page.selectOption('select#activity-type', 'open_question');
-    await expect(page.locator('textarea#oq-prompt')).toBeVisible();
+    await expect(page.locator('textarea#oq-prompt-0, textarea#oq-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
     await dialog.locator('button:has-text("✕")').click();
@@ -257,6 +272,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       });
     });
 
+    await page.fill('input#activity-title', 'Actividad Multitipo E2E');
     await page.click('button:has-text("Crear borrador")');
     await expect(page.locator('h1:has-text("Editor de actividad")')).toBeVisible();
   });
@@ -317,7 +333,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
         status: 200,
         json: {
           items: [
-            { id: 'std-m-1', name: 'Mateo Miembro', email: 'mateo.m@englove.local', level: 'A1', birthDate: '2016-01-01' },
+            { id: 'std-m-1', name: 'Mateo Miembro', email: 'mateo.m@upwardenglish.local', level: 'A1', birthDate: '2016-01-01' },
           ],
           total: 1,
         },
@@ -336,7 +352,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       {
         id: 'std-1',
         name: 'Camila Morales',
-        email: 'camila@englove.local',
+        email: 'camila@upwardenglish.local',
         birthDate: '2016-04-10',
         level: 'A1',
         approvalStatus: 'approved',
@@ -349,7 +365,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       {
         id: 'std-req-1',
         name: 'Nicolás Rojas',
-        email: 'nicolas@englove.local',
+        email: 'nicolas@upwardenglish.local',
         birthDate: '2015-08-20',
         level: null,
         approvalStatus: 'pending_approval',
@@ -363,7 +379,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       {
         id: 'std-lck-1',
         name: 'Mateo Bloqueado',
-        email: 'mateo@englove.local',
+        email: 'mateo@upwardenglish.local',
         birthDate: '2015-03-12',
         level: 'A1',
         approvalStatus: 'approved',
@@ -421,7 +437,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
           json: {
             id: 'std-1',
             name: 'Camila Morales Editada',
-            email: 'camila@englove.local',
+            email: 'camila@upwardenglish.local',
             birthDate: '2016-04-10',
             level: 'A1',
             guardianName: 'Mamá Actualizada',
@@ -434,7 +450,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
           json: {
             id: 'std-1',
             name: 'Camila Morales',
-            email: 'camila@englove.local',
+            email: 'camila@upwardenglish.local',
             birthDate: '2016-04-10',
             level: 'A1',
             approvalStatus: 'approved',
@@ -486,7 +502,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.click('button:has-text("Cambiar correo de acceso")');
     const emailDialog = page.locator('div[role="dialog"]');
     await expect(emailDialog).toBeVisible();
-    await emailDialog.locator('input#change-new-email').fill('camila.nueva@englove.local');
+    await emailDialog.locator('input#change-new-email').fill('camila.nueva@upwardenglish.local');
     await emailDialog.locator('input[type="checkbox"]').check();
     await emailDialog.locator('button:has-text("Confirmar cambio")').click();
     await expect(page.locator('text=Correo actualizado exitosamente')).toBeVisible();

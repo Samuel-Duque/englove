@@ -25,8 +25,8 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
-    await expect(page.locator('text=Olvidé mi contraseña')).toBeVisible();
-    await expect(page.locator('text=Crear cuenta')).toBeVisible();
+    await expect(page.locator('*:has-text("¿Olvidaste tu contraseña?"), *:has-text("Olvidé mi contraseña")').first()).toBeVisible();
+    await expect(page.locator('*:has-text("Regístrate aquí"), *:has-text("Crear cuenta")').first()).toBeVisible();
 
     // 1.2 Credenciales inválidas (401)
     await page.route('**/api/v1/auth/login', async (route) => {
@@ -36,7 +36,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input[type="email"]', 'wrong@englove.local');
+    await page.fill('input[type="email"]', 'wrong@upwardenglish.local');
     await page.fill('input[type="password"]', 'WrongPass123');
     await page.click('button[type="submit"]');
     await expect(page.locator('text=El correo o la contraseña no son correctos')).toBeVisible();
@@ -61,7 +61,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input[type="email"]', 'pending@englove.local');
+    await page.fill('input[type="email"]', 'pending@upwardenglish.local');
     await page.click('button[type="submit"]');
     await expect(page.locator('text=Tu cuenta está pendiente de aprobación por tu profesora')).toBeVisible();
 
@@ -70,7 +70,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'usr-1', email: 'valid@englove.local', name: 'Usuario Valido', role: 'teacher' },
+          user: { id: 'usr-1', email: 'valid@upwardenglish.local', name: 'Usuario Valido', role: 'teacher' },
           organizationId: 'org-1',
         },
       });
@@ -81,7 +81,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'usr-1', email: 'valid@englove.local', name: 'Usuario Valido', role: 'teacher' },
+          user: { id: 'usr-1', email: 'valid@upwardenglish.local', name: 'Usuario Valido', role: 'teacher' },
           organizationId: 'org-1',
         },
       });
@@ -94,11 +94,11 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     });
 
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
     ]);
 
-    await page.fill('input[type="email"]', 'valid@englove.local');
+    await page.fill('input[type="email"]', 'valid@upwardenglish.local');
     await page.fill('input[type="password"]', 'ValidPass123');
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/inicio/);
@@ -108,19 +108,19 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     page,
   }) => {
     await page.goto('/registro');
-    await expect(page.locator('h1:has-text("Crear cuenta")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Crea tu cuenta"), h1:has-text("Crear cuenta")')).toBeVisible();
 
     // 2.1 Validación client-side de política de contraseña (8–16 caracteres, sin espacios)
-    await page.fill('input#name', 'Sofía Gómez');
-    await page.fill('input#email', 'sofia@englove.local');
-    await page.fill('input#birthDate', '2016-05-15');
-    await page.fill('input#password', 'short');
+    await page.fill('input[name="name"], input#name-input, input#name', 'Sofía Gómez');
+    await page.fill('input[name="email"], input#email-input, input#email', 'sofia@upwardenglish.local');
+    await page.fill('input[name="birthDate"], input#birth-date-input, input#birthDate', '2016-05-15');
+    await page.fill('input[name="password"], input#password-input, input#password', 'short');
     await page.check('input[type="checkbox"]');
     await page.click('button[type="submit"]');
     await expect(page.locator('div[role="alert"]:has-text("Usa entre 8 y 16 caracteres, sin espacios")')).toBeVisible();
 
     // Contraseña con espacios rechazada
-    await page.fill('input#password', 'pass with space');
+    await page.fill('input[name="password"], input#password-input, input#password', 'pass with space');
     await page.click('button[type="submit"]');
     await expect(page.locator('div[role="alert"]:has-text("Usa entre 8 y 16 caracteres, sin espacios")')).toBeVisible();
 
@@ -134,15 +134,15 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input#password', 'SecurePass123');
-    await page.fill('input#guardianName', 'Padre de Sofía');
-    await page.fill('input#guardianContact', 'padre@correo.com');
+    await page.fill('input[name="password"], input#password-input, input#password', 'SecurePass123');
+    await page.fill('input[name="guardianName"], input#guardian-name-input, input#guardianName', 'Padre de Sofía');
+    await page.fill('input[name="guardianContact"], input#guardian-contact-input, input#guardianContact', 'padre@correo.com');
     await page.click('button[type="submit"]');
 
     // Mensaje uniforme de confirmación
-    await expect(page.locator('text=Solicitud recibida')).toBeVisible();
+    await expect(page.locator('h1:has-text("Solicitud")')).toBeVisible();
     await expect(page.locator('text=Recibimos tu solicitud. Revisa tu correo.')).toBeVisible();
-    await expect(page.locator('a:has-text("Ir a iniciar sesión")')).toBeVisible();
+    await expect(page.locator('a:has-text("inicio de sesión"), a:has-text("iniciar sesión")')).toBeVisible();
   });
 
   test('3. /recuperar-contrasena: Flujo de recuperación sin enumeración de correos', async ({ page }) => {
@@ -158,7 +158,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input#email', 'alguien@englove.local');
+    await page.fill('input#email', 'alguien@upwardenglish.local');
     await page.click('button[type="submit"]');
 
     await expect(page.locator('h1:has-text("Revisa tu correo")')).toBeVisible();

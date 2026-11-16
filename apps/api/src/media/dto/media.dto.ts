@@ -5,7 +5,7 @@ export class MediaUploadUrlDto {
   attemptId!: string;
 
   @IsString({ message: 'mimeType debe ser una cadena válida' })
-  @Matches(/^audio\/(webm|mp4|ogg)(;codecs=[a-zA-Z0-9.,_-]+)?$/, {
+  @Matches(/^audio\/(webm|mp4|ogg)(\s*;\s*codecs=(?:"[^"]+"|[a-zA-Z0-9.,_-]+))?$/i, {
     message: 'mimeType debe ser audio/webm, audio/mp4 o audio/ogg',
   })
   mimeType!: string;

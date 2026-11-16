@@ -79,8 +79,8 @@ describe('RF-18: client-side storage hygiene on shared devices', () => {
     // Await genuinely completes the purge without hacky external sleep
     await clearSharedDeviceSession();
 
-    expect(mockOpen).toHaveBeenCalledWith('englove_offline');
-    expect(mockOpen).toHaveBeenCalledWith('englove_storage');
+    expect(mockOpen).toHaveBeenCalledWith('upward_english_offline');
+    expect(mockOpen).toHaveBeenCalledWith('upward_english_storage');
     expect(mockStoreClear1).toHaveBeenCalled();
     expect(mockStoreClear2).toHaveBeenCalled();
     expect(mockClose).toHaveBeenCalled();
@@ -172,7 +172,66 @@ describe('RF-18: client-side storage hygiene on shared devices', () => {
     await clearSharedDeviceSession();
 
     expect(mockClose).toHaveBeenCalled();
-    expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_offline');
-    expect(mockDeleteDatabase).toHaveBeenCalledWith('englove_storage');
+    expect(mockDeleteDatabase).toHaveBeenCalledWith('upward_english_offline');
+    expect(mockDeleteDatabase).toHaveBeenCalledWith('upward_english_storage');
+  });
+
+  it('clears session_hint and upward_english_user_logged in document.cookie upon logout (P0-02, P0-05)', async () => {
+    let cookieVal = 'upward_english_stg_session_hint=1; upward_english_user_logged=1; other=abc';
+    const mockDoc = {
+      get cookie() {
+        return cookieVal;
+      },
+      set cookie(val: string) {
+        if (val.includes('max-age=0')) {
+          const name = val.split('=')[0]?.trim();
+          cookieVal = cookieVal
+            .split(';')
+            .filter((c) => !c.trim().startsWith(`${name}=`))
+            .join(';');
+        }
+      },
+    };
+    (globalThis as unknown as { document: unknown }).document = mockDoc;
+    (globalThis as unknown as { window: unknown }).window = {
+      sessionStorage: { clear: vi.fn() },
+    };
+
+    await clearSharedDeviceSession();
+
+    expect(cookieVal).not.toContain('upward_english_stg_session_hint');
+    expect(cookieVal).not.toContain('upward_english_user_logged');
+    delete (globalThis as unknown as { document?: unknown }).document;
+  });
+
+  it('preserves Serwist static precache and deletes runtime caches from CacheStorage on logout (RF-5, RF-18, Decisión 135)', async () => {
+    const deletedCaches: string[] = [];
+    const mockCaches = {
+      keys: vi.fn().mockResolvedValue([
+        'serwist-precache-v2-https://upwardenglish.edu/',
+        'upward-english-static-v1',
+        'static-image-assets',
+        'google-fonts',
+      ]),
+      delete: vi.fn().mockImplementation((name: string) => {
+        deletedCaches.push(name);
+        return Promise.resolve(true);
+      }),
+    };
+
+    (globalThis as unknown as { window: unknown }).window = {
+      caches: mockCaches,
+      sessionStorage: { clear: vi.fn() },
+    };
+
+    await clearSharedDeviceSession();
+
+    expect(mockCaches.keys).toHaveBeenCalled();
+    // Static precaches are preserved
+    expect(deletedCaches).not.toContain('serwist-precache-v2-https://upwardenglish.edu/');
+    expect(deletedCaches).not.toContain('upward-english-static-v1');
+    // Runtime caches are deleted
+    expect(deletedCaches).toContain('static-image-assets');
+    expect(deletedCaches).toContain('google-fonts');
   });
 });

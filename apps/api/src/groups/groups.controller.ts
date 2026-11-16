@@ -28,7 +28,7 @@ import {
   GroupView,
   GroupListResponse,
   StudentListResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',

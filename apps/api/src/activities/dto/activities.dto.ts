@@ -10,7 +10,7 @@ import {
   IsDefined,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ActivityStatus, ActivityType, Level } from '@englove/shared';
+import { ActivityStatus, ActivityType, Level } from '@upward-english/shared';
 
 export class CreateActivityDto {
   @IsString()

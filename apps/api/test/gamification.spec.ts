@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GamificationService } from '../src/gamification/gamification.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ProgressEventType } from '@englove/shared';
+import { ProgressEventType } from '@upward-english/shared';
 
 type MockFn = ReturnType<typeof vi.fn>;
 

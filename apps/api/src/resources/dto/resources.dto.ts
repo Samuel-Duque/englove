@@ -15,7 +15,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { isValidHttpsResourceUrl, Level } from '@englove/shared';
+import { isValidHttpsResourceUrl, Level } from '@upward-english/shared';
 
 export function IsHttpsResourceUrl(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {

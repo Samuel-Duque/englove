@@ -3,6 +3,8 @@ import {
   IsDefined,
   IsArray,
   ArrayMinSize,
+  ArrayMaxSize,
+  MaxLength,
   ValidateNested,
   IsOptional,
   IsUUID,
@@ -16,18 +18,20 @@ import { Type } from 'class-transformer';
 
 export class SubmitAnswerEventDto {
   @IsString({ message: 'itemId debe ser una cadena válida' })
+  @MaxLength(100, { message: 'itemId no puede superar 100 caracteres' })
   itemId!: string;
 
   @IsDefined({ message: 'answer es obligatorio' })
   answer!: unknown;
 
-  @IsString({ message: 'clientEventId debe ser una cadena válida' })
+  @IsUUID('4', { message: 'clientEventId debe ser un UUID v4 válido' })
   clientEventId!: string;
 }
 
 export class SubmitEventsDto {
   @IsArray({ message: 'events debe ser una lista' })
   @ArrayMinSize(1, { message: 'El lote de eventos no puede estar vacío' })
+  @ArrayMaxSize(50, { message: 'El lote de eventos no puede superar 50 elementos' })
   @ValidateNested({ each: true })
   @Type(() => SubmitAnswerEventDto)
   events!: SubmitAnswerEventDto[];

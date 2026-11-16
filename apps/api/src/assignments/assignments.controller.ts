@@ -10,8 +10,6 @@ import {
   UseInterceptors,
   ParseUUIDPipe,
   BadRequestException,
-  Optional,
-  NotFoundException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -26,7 +24,7 @@ import {
   AssignmentView,
   CreateAssignmentResponse,
   AssignmentListResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',
@@ -44,7 +42,6 @@ const uuidPipe = new ParseUUIDPipe({
 export class AssignmentsController {
   constructor(
     private readonly assignmentsService: AssignmentsService,
-    @Optional()
     @Inject(forwardRef(() => AttemptsService))
     private readonly attemptsService?: AttemptsService,
   ) {}
@@ -55,7 +52,7 @@ export class AssignmentsController {
   async startAttempt(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', uuidPipe) id: string,
-  ): Promise<import('@englove/shared').RuntimeView> {
+  ): Promise<import('@upward-english/shared').RuntimeView> {
     if (!user.studentId) {
       throw new BadRequestException({
         statusCode: 400,
@@ -65,8 +62,8 @@ export class AssignmentsController {
     }
 
     if (!this.attemptsService) {
-      throw new NotFoundException({
-        statusCode: 404,
+      throw new BadRequestException({
+        statusCode: 400,
         code: 'ATTEMPTS_NOT_CONFIGURED',
         message: 'Módulo de intentos no disponible',
       });

@@ -1,32 +1,58 @@
+import { z } from 'zod';
 import { ActivityStatus, ActivityType, Level, AssignmentAvailability } from '../enums';
 
-export interface AssignmentActivitySummary {
-  id: string;
-  title: string;
-  type: ActivityType;
-  level: Level;
-  version: number;
-  status: ActivityStatus;
-}
+export const AssignmentActivitySummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  type: z.nativeEnum(ActivityType),
+  level: z.nativeEnum(Level),
+  version: z.number().int().optional().default(1),
+  status: z.nativeEnum(ActivityStatus).optional().default(ActivityStatus.published),
+});
 
-export interface AssignmentGroupSummary {
-  id: string;
-  name: string;
-  archivedAt: string | null;
-}
+export type AssignmentActivitySummary = z.infer<typeof AssignmentActivitySummarySchema>;
 
-export interface AssignmentView {
-  id: string;
-  activity: AssignmentActivitySummary;
-  group: AssignmentGroupSummary;
-  opensAt: string;
-  dueAt: string;
-  cancelledAt: string | null;
-  historicalStudentCount: number | null;
-  availability: AssignmentAvailability;
-  createdAt: string;
-  updatedAt: string;
-}
+export const AssignmentGroupSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  archivedAt: z.string().nullable().optional().default(null),
+});
+
+export type AssignmentGroupSummary = z.infer<typeof AssignmentGroupSummarySchema>;
+
+export const AssignmentViewSchema = z.object({
+  id: z.string(),
+  activity: AssignmentActivitySummarySchema.optional().default({
+    id: '',
+    title: '',
+    type: ActivityType.fill_blank,
+    level: Level.A1,
+    version: 1,
+    status: ActivityStatus.published,
+  }),
+  group: AssignmentGroupSummarySchema.optional().default({
+    id: '',
+    name: '',
+    archivedAt: null,
+  }),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  opensAt: z.string().optional().default(''),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  dueAt: z.string().optional().default(''),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  cancelledAt: z.string().nullable().optional().default(null),
+  historicalStudentCount: z.number().int().nullable().optional().default(null),
+  availability: z.nativeEnum(AssignmentAvailability).optional().default(AssignmentAvailability.open),
+  totalAttempts: z.number().int().optional(),
+  submittedAttempts: z.number().int().optional(),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  createdAt: z.string().optional().default(() => new Date().toISOString()),
+  // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
+  updatedAt: z.string().optional().default(() => new Date().toISOString()),
+});
+
+export type AssignmentView = z.infer<typeof AssignmentViewSchema>;
 
 export interface CreateAssignmentInput {
   activityId: string;
@@ -35,16 +61,21 @@ export interface CreateAssignmentInput {
   dueAt: string;
 }
 
-export interface CreateAssignmentResponse {
-  items: AssignmentView[];
-}
+export const CreateAssignmentResponseSchema = z.object({
+  items: z.array(AssignmentViewSchema),
+  count: z.number().int().optional(),
+});
 
-export interface AssignmentListResponse {
-  items: AssignmentView[];
-  total: number;
-  offset: number;
-  limit: number;
-}
+export type CreateAssignmentResponse = z.infer<typeof CreateAssignmentResponseSchema>;
+
+export const AssignmentListResponseSchema = z.object({
+  items: z.array(AssignmentViewSchema),
+  total: z.number().int().optional().default(0),
+  offset: z.number().int().optional(),
+  limit: z.number().int().optional(),
+});
+
+export type AssignmentListResponse = z.infer<typeof AssignmentListResponseSchema>;
 
 export interface AssignmentListQuery {
   offset?: number;
@@ -80,15 +111,17 @@ export function getExtendedDueAt(dueAt: Date | string): Date {
   return new Date(d.getTime() + 24 * 60 * 60 * 1000);
 }
 
+const bogotaDateTimeFormatter = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
 export function formatBogotaDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(d);
+  return bogotaDateTimeFormatter.format(d);
 }

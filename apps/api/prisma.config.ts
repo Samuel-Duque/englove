@@ -13,6 +13,6 @@ export default defineConfig({
     url:
       process.env.MIGRATION_DATABASE_URL ||
       process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/englove_dev?schema=public',
+      'postgresql://postgres:postgres@localhost:5432/upward_english_dev?schema=public',
   },
 });

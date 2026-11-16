@@ -32,22 +32,41 @@ export function validatePasswordPolicy(password: string): void {
   }
 }
 
-export function extractClientIp(request: Request): string {
-  if (request.ip) {
-    return request.ip;
-  }
-  const forwarded = request.headers['x-forwarded-for'];
-  if (forwarded) {
-    const raw = Array.isArray(forwarded) ? forwarded[forwarded.length - 1] : forwarded;
-    if (raw) {
-      const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
-      const last = parts[parts.length - 1];
-      if (last) {
-        return last;
-      }
+export function resolveTrustProxySetting(
+  appEnv: string,
+  trustProxyEnv?: string,
+): boolean | number | string {
+  const trimmed = trustProxyEnv?.trim();
+  if (trimmed) {
+    const lower = trimmed.toLowerCase();
+    if (lower === 'false' || lower === '0' || lower === 'off' || lower === 'no') {
+      return false;
     }
+    if (lower === 'true' || lower === 'on' || lower === 'yes') {
+      return true;
+    }
+    if (/^\d+$/.test(trimmed)) {
+      return parseInt(trimmed, 10);
+    }
+    return trimmed;
   }
-  return request.socket.remoteAddress || '127.0.0.1';
+
+  // En local o acceso directo sin proxy verificado, jamás confiar en X-Forwarded-For (RT-05).
+  if (appEnv === 'local') {
+    return false;
+  }
+
+  // En staging/production (Render/proxy interno), confiar únicamente en saltos loopback/privados verificados.
+  return 'loopback, linklocal, uniquelocal';
+}
+
+export function extractClientIp(request: Request): string {
+  // Usar request.ip resuelto por Express conforme a `trust proxy` y nunca leer
+  // X-Forwarded-For manualmente en acceso directo no confiable (RT-05).
+  if (typeof request.ip === 'string' && request.ip.trim().length > 0) {
+    return request.ip.trim();
+  }
+  return request.socket?.remoteAddress || '127.0.0.1';
 }
 
 export function validateCivilBirthDate(birthDateStr: string): number {

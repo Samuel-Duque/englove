@@ -29,16 +29,24 @@ export function resolveActivityDurations(
       break;
 
     case ActivityType.open_question: {
-      const cfg = config as { items?: unknown[] } | undefined;
-      const count = Array.isArray(cfg?.items) ? Math.max(1, cfg.items.length) : 1;
+      const items =
+        typeof config === 'object' && config !== null && 'items' in config && Array.isArray(config.items)
+          ? config.items
+          : undefined;
+      const count = items ? Math.max(1, items.length) : 1;
       defaultExpected = 180 * count;
       defaultMinPlausible = 3 * count;
       break;
     }
 
     case ActivityType.speaking: {
-      const cfg = config as { maxDurationSeconds?: number } | undefined;
-      const maxSec = typeof cfg?.maxDurationSeconds === 'number' ? cfg.maxDurationSeconds : 120;
+      const maxSec =
+        typeof config === 'object' &&
+        config !== null &&
+        'maxDurationSeconds' in config &&
+        typeof config.maxDurationSeconds === 'number'
+          ? config.maxDurationSeconds
+          : 120;
       defaultExpected = Math.max(2, maxSec);
       defaultMinPlausible = 2;
       break;
@@ -50,8 +58,11 @@ export function resolveActivityDurations(
       break;
 
     case ActivityType.exam: {
-      const cfg = config as { items?: unknown[] } | undefined;
-      const itemCount = Array.isArray(cfg?.items) ? Math.max(1, cfg.items.length) : 1;
+      const items =
+        typeof config === 'object' && config !== null && 'items' in config && Array.isArray(config.items)
+          ? config.items
+          : undefined;
+      const itemCount = items ? Math.max(1, items.length) : 1;
       defaultExpected = 60 * itemCount;
       defaultMinPlausible = 3 * itemCount;
       break;

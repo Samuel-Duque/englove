@@ -16,7 +16,7 @@ import {
   Role,
   StudentFeedbackListResponse,
   StudentFeedbackItemView,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 @Controller('student')
 @Roles(Role.student)

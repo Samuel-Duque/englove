@@ -4,7 +4,7 @@ import {
   STICKER_CODES,
   StickerCode,
   scoreToStars,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 describe('SPEC-07: Teacher Revision & Student Feedback UI Rules (ENG-091, ENG-093)', () => {
   describe('Paquete cerrado de stickers (Decisión 108, RF-4, RF-8, RF-10)', () => {

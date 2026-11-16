@@ -9,6 +9,7 @@ import {
   Min,
   Max,
   IsEmail,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -19,7 +20,7 @@ import {
   StudentListQuery,
   TransferStudentGroupInput,
   ChangeStudentEmailInput,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 export class ApproveStudentDto implements ApproveStudentInput {
   @IsEnum(Level, { message: 'El nivel debe ser A1, A2, B1 o B2' })
@@ -96,6 +97,10 @@ export class StudentQueryDto implements StudentListQuery {
 export class TransferStudentGroupDto implements TransferStudentGroupInput {
   @IsUUID('4', { message: 'groupId debe ser un UUID válido' })
   groupId!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmLostRetries?: boolean;
 }
 
 export class ChangeStudentEmailDto implements ChangeStudentEmailInput {

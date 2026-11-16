@@ -26,7 +26,7 @@ Depende de SPEC-02, SPEC-05 y SPEC-06; toca SPEC-08 solo para mostrar los intent
 **RF-1 — Manifest e instalabilidad.**
 ENG-110; decisión 12; architecture §10.2.
 
-- **Dado** el portal por HTTPS **Cuando** un navegador lo evalúa **Entonces** encuentra un manifest con `name` y `short_name` «Englove» (provisional, §11), `lang` `es-CO`, `start_url` `/inicio`, `scope` `/`, `display` `standalone`, sin orientación fija, `theme_color`, `background_color`, iconos PNG de 192 y 512 px (`any`), uno de 512 px `maskable` y `apple-touch-icon` de 180 px; Chrome Android ofrece instalarla y la app instalada abre en `/inicio` (o `/login` sin sesión).
+- **Dado** el portal por HTTPS **Cuando** un navegador lo evalúa **Entonces** encuentra un manifest con `name` y `short_name` «Upward English» (decisión 146), `lang` `es-CO`, `start_url` `/inicio`, `scope` `/`, `display` `standalone`, sin orientación fija, `theme_color`, `background_color`, iconos PNG de 192 y 512 px (`any`), uno de 512 px `maskable` y `apple-touch-icon` de 180 px; Chrome Android ofrece instalarla y la app instalada abre en `/inicio` (o `/login` sin sesión).
 - **Dado** un usuario sin sesión **Cuando** pide el manifest, los iconos, el script del service worker o la pantalla sin conexión **Entonces** recibe `200`: `proxy.ts` no los redirige.
 
 **RF-2 — Registro del service worker.**
@@ -133,7 +133,7 @@ ENG-111; SPEC-02 RF-18; G-C13.
 **RF-19 — axe sin violaciones en CI.**
 ENG-112; architecture §10.3; pbp Etapa 9.
 
-- **Dado** el pipeline de CI **Cuando** corre la puerta de accesibilidad **Entonces** un navegador real con axe (reglas `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) recorre las pantallas de §9, con el alumno en Kids y en Teens, y el job falla ante cualquier violación, incluidas las de contraste.
+- **Dado** el pipeline de CI **Cuando** corre la puerta de accesibilidad **Entonces** un navegador real con axe (reglas `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`) recorre las pantallas de §9, con el alumno en Kids y en Teens, y el job falla ante cualquier violación, incluidas las de contraste.
 
 **RF-20 — Foco visible y teclado.**
 ENG-112; architecture §10.3; decisión 105.
@@ -196,7 +196,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | Recursos estáticos versionados del build | Precaché | Sí, por versión |
 | Navegaciones (HTML) y cargas RSC | Red; sin red, pantalla sin conexión | No |
-| API `/api/v1/*` | Red siempre (lectura de `NetworkFirst` sin respaldo de respuestas autenticadas, architecture §3.8 y §10.2) | No |
+| API `/api/v1/*` | Red siempre (exclusión estricta de Cache Storage, decisiones 116 y 117; nunca cacheado) | No |
 | URLs firmadas de R2 | Red, sin intervención | No |
 
 **Rendimiento (RF-23).** Dispositivo: tablet Android de gama media o baja, con 4 GB de RAM o menos. Umbrales de referencia: LCP ≤ 2,5 s en `/inicio`, INP ≤ 200 ms en el renderizador y en cada mecánica de juego, CLS ≤ 0,1. Son control de higiene (CONTEXT §11.2), no puerta de CI.
@@ -239,7 +239,7 @@ Textos en español de Colombia; Kids más visual y cálido, Teens y panel direct
 
 | Elemento | Kids | Teens y panel |
 | --- | --- | --- |
-| Aviso de actualización (RF-6, RF-7) | Ilustración + «¡Englove tiene novedades! Toca Actualizar para verlas.» Botones «Actualizar» y «Ahora no» | «Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.» Botones «Reiniciar y actualizar» y «Ahora no» |
+| Aviso de actualización (RF-6, RF-7) | Ilustración + «¡Upward English tiene novedades! Toca Actualizar para verlas.» Botones «Actualizar» y «Ahora no» | «Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.» Botones «Reiniciar y actualizar» y «Ahora no» |
 | Pantalla sin conexión (RF-3) | «¡Ups! No hay internet. Revisa la conexión y vuelve a intentarlo.» Botón «Reintentar» | «Sin conexión. Revisa tu red e inténtalo de nuevo.» Botón «Reintentar» |
 | Barra sin red en el portal (RF-10) | «Sin internet. Tus respuestas se guardan aquí mientras tanto.» | «Sin conexión. Tus respuestas se guardan en este dispositivo.» |
 | Entrega en cola (RF-12) | «¡Listo! Tu trabajo quedó guardado y se enviará solo cuando vuelva el internet.» | «Guardado en este dispositivo. Se enviará cuando vuelva la conexión.» |
@@ -302,7 +302,7 @@ Nombres trazables `SPEC-09 RF-n: …`. Los niveles de navegador corren con Playw
 - Capacitor y tiendas: Fase 2 (CONTEXT §2.4, decisión 12).
 - Auditoría WCAG manual más allá de RF-19 a RF-22: fuera del piloto.
 - Sentry con `release` y rol: Etapa 11 (ENG-131).
-- Nombre e icono definitivos: pendiente de CONTEXT §15; solo tocan manifest e iconos.
+- Nombre del producto: «Upward English», decidido en CONTEXT §14 (decisión 146); véase Q-05 en la sección 11.
 - Tokens definitivos: ENG-007; este pase corrige los colores que axe marque, sin rediseñar.
 
 ## 11. Preguntas abiertas
@@ -315,7 +315,7 @@ Sin P-n asignados a esta spec (CONTEXT §15). El líder del proyecto respondió 
 | Q-02 | Visibilidad de `offline_sync` (architecture §10.1) | Resuelta: marcar en la API y mostrar en la ficha (RF-16, RF-17) | Líder del proyecto | Al aprobar | No |
 | Q-03 | Logout con trabajo sin enviar | Resuelta: intentar enviar y confirmar (RF-18); amplía SPEC-02 RF-18, que recibirá fila en su registro | Líder del proyecto | Al aprobar | No |
 | Q-04 | Interfaz de instalación | Resuelta: solo nativa; instrucciones en DOC-06 | Líder del proyecto | Al aprobar | No |
-| Q-05 | Nombre e icono del manifest | Resuelta: «Englove» e icono provisionales y centralizados; el pendiente del nombre sigue en CONTEXT §15 | Líder del proyecto | Al aprobar | No |
+| Q-05 | Nombre e icono del manifest | Cerrada (decisión 146): nombre definitivo «Upward English» | Líder del proyecto | 2026-11-16 | No |
 | Q-06 | Umbrales de rendimiento | Resuelta: LCP, INP y CLS de referencia (§4) | Líder del proyecto | Al aprobar | No |
 | Q-07 | Alcance de axe en CI | Resuelta: alumno en Kids y Teens, públicas y panel (RF-19) | Líder del proyecto | Al aprobar | No |
 | Q-08 | Defectos de SPEC-05: el cliente lee `assetId` en lugar de `mediaId` al subir audio, y `events` combina el `payload` sin atomicidad (SPEC-05 RF-7, A70) | Resuelta: corrección aparte como defectos de SPEC-05, con fila en su registro | Líder del proyecto | Antes de ENG-111 | No |
@@ -328,3 +328,4 @@ Sin P-n asignados a esta spec (CONTEXT §15). El líder del proyecto respondió 
 | --- | --- | --- |
 | 2026-11-01 | Creación del borrador con 24 RF y respuestas del líder a Q-01 a Q-08; propuesta En revisión | Tarea SPEC-09 del taskboard |
 | 2026-11-04 | Implementación de ENG-110, ENG-111, ENG-112 y ENG-113; verificación de 24 RFs (unitarios, E2E con axe, informe en tablet real); estado pasa a Verificada | Finalización de Etapa 9 y pase de calidad |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-06) | Adopción de Serwist real (QA-01), unificación en openOfflineDb(), userId obligatorio en grabaciones y deleteDatabase en logout (P0-05), y compuerta axe con wcag22aa (Decisión 133) |

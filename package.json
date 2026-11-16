@@ -1,5 +1,5 @@
 {
-  "name": "englove",
+  "name": "upward-english",
   "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@11.5.1",
@@ -13,13 +13,14 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:e2e": "pnpm --filter @englove/web test:e2e",
-    "seed": "pnpm --filter @englove/api seed",
-    "seed:dev": "pnpm --filter @englove/api seed:dev",
-    "seed:volume": "pnpm --filter @englove/api seed:volume",
-    "db:migrate": "pnpm --filter @englove/api db:migrate",
-    "db:generate": "pnpm --filter @englove/api db:generate",
-    "guardrails": "node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs --all",
+    "test:e2e": "pnpm --filter @upward-english/web test:e2e",
+    "seed": "pnpm --filter @upward-english/api seed",
+    "seed:dev": "pnpm --filter @upward-english/api seed:dev",
+    "seed:volume": "pnpm --filter @upward-english/api seed:volume",
+    "db:migrate": "pnpm --filter @upward-english/api db:migrate",
+    "db:generate": "pnpm --filter @upward-english/api db:generate",
+    "postinstall": "pnpm --filter @upward-english/api db:generate",
+    "guardrails": "node .agents/skills/upward-english-guardrails/scripts/check-guardrails.mjs --all",
     "check:no-db-push": "node scripts/check-no-db-push.mjs"
   },
   "devDependencies": {
@@ -27,6 +28,7 @@
     "prettier": "^3.5.3",
     "turbo": "^2.4.4",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.71.2",
+    "yaml": "^2.9.1"
   }
 }

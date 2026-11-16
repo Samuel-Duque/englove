@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "englove-web",
+  "name": "upward-english-web",
   "main": "vinext/server/fetch-handler",
   "compatibility_date": "2024-09-23",
   "compatibility_flags": [
@@ -10,5 +10,23 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS"
+  },
+  "env": {
+    "staging": {
+      "name": "upward-english-web-staging",
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "staging",
+        "COOKIE_PREFIX": "upward_english_stg_",
+        "NEXT_PUBLIC_COOKIE_PREFIX": "upward_english_stg_"
+      }
+    },
+    "production": {
+      "name": "upward-english-web-production",
+      "vars": {
+        "NEXT_PUBLIC_APP_ENV": "production",
+        "COOKIE_PREFIX": "upward_english_",
+        "NEXT_PUBLIC_COOKIE_PREFIX": "upward_english_"
+      }
+    }
   }
 }

@@ -1,15 +1,14 @@
-import type { Level } from '../enums';
+import { z } from 'zod';
+import { Level } from '../enums';
 
-interface ParsedUrlLike {
-  protocol: string;
-  hostname: string;
-  username: string;
-  password: string;
-}
-
-interface UrlConstructorLike {
-  new (url: string): ParsedUrlLike;
-}
+declare const URL: {
+  new (url: string, base?: string): {
+    protocol: string;
+    hostname: string;
+    username: string;
+    password: string;
+  };
+};
 
 /**
  * Validador puro para URLs de recursos externos en https:// (decisión 79, G-C13).
@@ -21,9 +20,8 @@ export function isValidHttpsResourceUrl(raw: unknown): boolean {
   if (trimmed.length < 1 || trimmed.length > 2048) return false;
   if (/\s/.test(trimmed)) return false;
   try {
-    const UrlCtor = (globalThis as unknown as { URL?: UrlConstructorLike }).URL;
-    if (!UrlCtor) return false;
-    const parsed = new UrlCtor(trimmed);
+    if (typeof URL === 'undefined') return false;
+    const parsed = new URL(trimmed);
     if (parsed.protocol !== 'https:') return false;
     if (!parsed.hostname || parsed.hostname.trim() === '') return false;
     if (parsed.username !== '' || parsed.password !== '') return false;
@@ -33,24 +31,30 @@ export function isValidHttpsResourceUrl(raw: unknown): boolean {
   }
 }
 
-export interface ExternalResourceItem {
-  id: string;
-  title: string;
-  url: string;
-  description: string | null;
-  level: Level | null;
-  position: number;
-  createdBy: string;
+export const ExternalResourceItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  url: z.string(),
+  description: z.string().nullable().optional().default(null),
+  level: z.nativeEnum(Level).nullable().optional().default(null),
+  position: z.number().int().optional().default(0),
+  createdBy: z.string().optional().default(''),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  createdAt: string;
+  createdAt: z.string().optional().default(() => new Date().toISOString()),
   // guardrails-ignore G-C03: timestamps de solo lectura devueltos por el servidor
-  updatedAt: string;
-}
+  updatedAt: z.string().optional().default(() => new Date().toISOString()),
+});
 
-export interface ExternalResourceListResponse {
-  items: ExternalResourceItem[];
-  total: number;
-}
+export type ExternalResourceItem = z.infer<typeof ExternalResourceItemSchema>;
+
+export const ExternalResourceListResponseSchema = z.object({
+  items: z.array(ExternalResourceItemSchema),
+  total: z.number().int().optional().default(0),
+  offset: z.number().int().optional(),
+  limit: z.number().int().optional(),
+});
+
+export type ExternalResourceListResponse = z.infer<typeof ExternalResourceListResponseSchema>;
 
 export interface CreateExternalResourceRequest {
   title: string;

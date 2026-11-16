@@ -11,7 +11,7 @@ export default function TeacherLayout({
       <Suspense fallback={<header className="h-16 border-b border-zinc-200 bg-white" />}>
         <TeacherNav />
       </Suspense>
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 outline-none">
         <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando…</div>}>
           {children}
         </Suspense>

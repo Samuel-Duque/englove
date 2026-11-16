@@ -1,7 +1,7 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
-import { RemindersResponse, ApprovalStatus, AttemptStatus, ActivityType } from '@englove/shared';
+import { RemindersResponse, ApprovalStatus, AttemptStatus, ActivityType } from '@upward-english/shared';
 
 @Injectable()
 export class PendingSummaryService {
@@ -9,7 +9,7 @@ export class PendingSummaryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly featureFlagsService?: FeatureFlagsService,
+    private readonly featureFlagsService?: FeatureFlagsService,
   ) {}
 
   async getReminders(organizationId: string): Promise<RemindersResponse> {

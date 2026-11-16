@@ -1,39 +1,28 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { StudentNav } from './student-nav';
 import { OfflineStatusBanner } from './offline-status-banner';
 import { fetchSharedProfile } from '../lib/auth-session';
 import { purgeOtherUsersEntries } from '../lib/offline-queue';
-import type { StudentProfileView } from '@englove/shared';
 
 interface StudentShellProps {
   children: React.ReactNode;
 }
 
 export function StudentShell({ children }: StudentShellProps) {
-  const [profile, setProfile] = useState<StudentProfileView | null>(null);
+  const { data: profile = null } = useQuery({
+    queryKey: ['student', 'profile', 'shell'],
+    queryFn: () => fetchSharedProfile(),
+    retry: false,
+  });
 
   useEffect(() => {
-    let isMounted = true;
-    async function fetchMe() {
-      try {
-        const data = await fetchSharedProfile();
-        if (isMounted && data) {
-          setProfile(data);
-          if (data.user?.id) {
-            void purgeOtherUsersEntries(data.user.id);
-          }
-        }
-      } catch {
-        // Fallback to default kids theme if not loaded yet
-      }
+    if (profile?.user?.id) {
+      void purgeOtherUsersEntries(profile.user.id);
     }
-    fetchMe();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [profile?.user?.id]);
 
   const ageSegment = profile?.student?.ageSegment ?? 'kids';
   const isKids = ageSegment === 'kids';
@@ -53,7 +42,7 @@ export function StudentShell({ children }: StudentShellProps) {
         level={profile?.student?.level}
       />
       <OfflineStatusBanner />
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 outline-none">
         {children}
       </main>
     </div>

@@ -4,7 +4,7 @@ import {
   formatBogotaDateTime,
   getExtendedDueAt,
   deriveAssignmentAvailability,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 describe('SPEC-04: Asignación — Teacher UI & Rules (ENG-051, ENG-052)', () => {
   beforeEach(() => {

@@ -35,7 +35,7 @@ Entrega gestión docente, no ejecución del alumno; el cierre limita el inicio. 
 
 **RF-3 — Referencias asignables verificadas en servidor.** ENG-050; decisiones 79, 89 y 95.
 
-- **Dado** una actividad `draft`/`archived`, de tipo `game` (decisión 111) o un grupo archivado **Cuando** intenta asignarlos directamente por API **Entonces** recibe respectivamente `409 ACTIVITY_NOT_ASSIGNABLE` o `409 GROUP_ARCHIVED`, sin escrituras. IDs inexistentes o de otra organización, incluso dentro de un lote, producen `404 NOT_FOUND`.
+- **Dado** una actividad `draft`/`archived`, de tipo `game` (decisión 111) o un grupo archivado **Cuando** intenta asignarlos directamente por API **Entonces** recibe respectivamente `422 GAME_ASSIGNMENT_NOT_ALLOWED` (para actividades de tipo `game`, conforme a SPEC-11 §5.1 y decisión 111), `409 ACTIVITY_NOT_ASSIGNABLE` (para `draft`/`archived`) o `409 GROUP_ARCHIVED`, sin escrituras. IDs inexistentes o de otra organización, incluso dentro de un lote, producen `404 NOT_FOUND`.
 - **Dado** un archivo/borrado de actividad o grupo concurrente **Cuando** compite con la creación **Entonces** las operaciones quedan serializadas: la asignación solo se confirma si sus referencias eran propias y asignables en ese orden; nunca queda huérfana ni se omite la validación por una lectura previa.
 
 **RF-4 — Ventana coherente.** ENG-050; pbp Etapa 4, architecture §6.2.
@@ -123,7 +123,7 @@ stateDiagram-v2
 - Creación, comprobación de duplicados y referencias son atómicas; publicación/archivo/borrado/cancelación concurrentes respetan el mismo orden de serialización (99). No basta con consultar y después insertar, ni con deshabilitar el botón. Los lotes no admiten éxito parcial.
 - Sin jobs de apertura/cierre ni `ScheduledJobRun`: estados según reloj. Futuras tareas periódicas: architecture §4.5.
 - Destinatarios históricos: alumnos distintos cuya membresía se solapa con `[opensAt, dueAt]`, no una foto de miembros al asignar. Para concretar el solape con membresías `[joinedAt, leftAt)`: `joinedAt ≤ dueAt`, (`leftAt == null` o `leftAt > opensAt`) y (`leftAt == null` o `joinedAt < leftAt`); se excluyen estancias de duración cero y un regreso al grupo no duplica al alumno. Su conteo/congelación, incluidos esos casos de prueba, se implementa en SPEC-05 y su uso estadístico en SPEC-08, sin filtrar por nivel ni ampliar la ventana con las 24 h (decisión 73).
-- La pertenencia vigente rige nuevos inicios; no es requisito para leer/finalizar un intento propio anterior. Ni traslado ni archivo de grupo/actividad revocan ese derecho (decisiones 90 y 95). Cancelar también conserva ese derecho (98).
+- La pertenencia vigente rige nuevos inicios; no es requisito para leer/finalizar un intento propio anterior. Ni traslado ni archivo de grupo/actividad revocan ese derecho (decisiones 90 y 95). Cancelar también conserva ese derecho (98). Si el alumno tiene autorizaciones de nuevo intento pendientes en asignaciones del grupo saliente, el cambio de grupo avisa a la profesora y exige confirmación con `409 UNCONSUMED_RETRY_WARNING` (decisión 131).
 
 ## 5. Contrato de API
 
@@ -135,7 +135,7 @@ Rutas exclusivas de **`teacher`**: JWT/sesión → roles → contexto de tenant;
 
 | Método y ruta | Entrada | Éxito / errores propios |
 | --- | --- | --- |
-| `POST /api/v1/assignments` | Cuerpo de creación | `201 { items: AssignmentView[] }`, en orden de `groupIds`; `409 ACTIVITY_NOT_ASSIGNABLE`, `GROUP_ARCHIVED`, `ASSIGNMENT_ALREADY_ACTIVE` (99) |
+| `POST /api/v1/assignments` | Cuerpo de creación | `201 { items: AssignmentView[] }`, en orden de `groupIds`; `422 GAME_ASSIGNMENT_NOT_ALLOWED` (para `type = 'game'`), `409 ACTIVITY_NOT_ASSIGNABLE`, `GROUP_ARCHIVED`, `ASSIGNMENT_ALREADY_ACTIVE` (99) |
 | `GET /api/v1/assignments` | `groupId?`, `availability?`, `offset`, `limit` | `200 { items, total, offset, limit }`; sin filtros incluye todo el historial, también canceladas por defecto |
 | `GET /api/v1/assignments/:id` | UUID; sin cuerpo | `200 AssignmentView` |
 | `POST /api/v1/assignments/:id/cancel` | Sin cuerpo | `200 AssignmentView`; repetición inocua |
@@ -240,4 +240,5 @@ Ninguna pregunta bloqueante ni P-n abierto del piloto (CONTEXT §15). Q-01/Q-02 
 | 2026-10-22 | Revisión semántica y concisión: garantía concurrente solo con cierres no vencidos, exclusión de membresías vacías y separación de obligaciones futuras | Corregir casos límite, respetar etapas y mantener lectura inferior a 20 minutos |
 | 2026-10-22 | Borrador → En revisión; Q-01/Q-02 cerradas por decisiones 98/99, contratos/modelo y pruebas alineados; seguimiento de H1 corregido | Aceptación de recomendaciones sin aprobación integral ni implementación; preservar cierre técnico e identificar compuertas globales pendientes |
 | 2026-10-22 | Estado En revisión → Aprobada tras auditoría integral | Aprobación formal por el líder del proyecto; contratos de API, modelo de datos, UI y plan de pruebas validados para iniciar implementación de la Etapa 4 (ENG-050 a ENG-053) |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-01) | Sustitución de 409 por 422 GAME_ASSIGNMENT_NOT_ALLOWED para actividades game en POST /assignments, retiro de filtro de game y aviso de pérdida de reintentos 409 UNCONSUMED_RETRY_WARNING (decisión 131) |
 | 2026-10-22 | Estado Aprobada → Verificada tras implementación completa de ENG-050 a ENG-053 | Verificación automatizada con 254/254 tests en monorepo (151 api, 54 shared, 49 web), suite de concurrencia advisory locks en PostgreSQL 18, guardrails en verde y builds exitosos |

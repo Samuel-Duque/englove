@@ -25,6 +25,10 @@ export interface OrganizationConfiguration {
   config: OrganizationParameters;
 }
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
 @Injectable()
 export class FeatureFlagsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -61,10 +65,10 @@ export class FeatureFlagsService {
       );
     }
 
-    const gamesConfig = gamesRow.config as Record<string, unknown>;
-    if (!gamesConfig || typeof gamesConfig !== 'object') {
+    if (!isRecord(gamesRow.config)) {
       throw new ConfigurationError(`games.config no es un objeto válido`);
     }
+    const gamesConfig = gamesRow.config;
 
     const passingScore = gamesConfig.passing_score;
     const retentionDays = gamesConfig.retention_days;

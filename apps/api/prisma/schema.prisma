@@ -292,6 +292,7 @@ model Activity {
   game_detail          GameDetail?
   exam_detail          ExamDetail?
   assignments          Assignment[]
+  attempts             Attempt[]
 
   @@index([organization_id, level, type, status])
   @@map("activities")
@@ -399,7 +400,8 @@ model Assignment {
 model Attempt {
   id                 String        @id @default(uuid()) @db.Uuid
   organization_id    String        @db.Uuid
-  assignment_id      String        @db.Uuid
+  assignment_id      String?       @db.Uuid
+  activity_id        String?       @db.Uuid
   student_id         String        @db.Uuid
   attempt_number     Int           @db.SmallInt @map("attempt_number")
   status             AttemptStatus @default(in_progress)
@@ -417,7 +419,8 @@ model Attempt {
   updated_at         DateTime      @updatedAt @db.Timestamptz
 
   organization     Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  assignment       Assignment      @relation(fields: [assignment_id], references: [id], onDelete: Restrict)
+  assignment       Assignment?     @relation(fields: [assignment_id], references: [id], onDelete: Restrict)
+  activity         Activity?       @relation(fields: [activity_id], references: [id], onDelete: Restrict)
   student          Student         @relation(fields: [student_id], references: [id], onDelete: Cascade)
   previous_attempt Attempt?        @relation("AttemptChain", fields: [previous_attempt_id], references: [id], onDelete: NoAction)
   next_attempt     Attempt?        @relation("AttemptChain")
@@ -427,6 +430,8 @@ model Attempt {
   progress_events  ProgressEvent[]
 
   @@unique([assignment_id, student_id, attempt_number])
+  @@unique([activity_id, student_id, attempt_number])
+  @@index([organization_id, activity_id, status, graded_at])
   @@index([student_id, finished_at])
   @@index([previous_attempt_id])
   @@index([organization_id, status, graded_at])
@@ -533,6 +538,7 @@ model MediaAsset {
   student      Student      @relation(fields: [student_id], references: [id], onDelete: Cascade)
 
   @@index([attempt_id])
+  @@index([student_id])
   @@index([status, created_at])
   @@index([retention_until])
   @@map("media_assets")

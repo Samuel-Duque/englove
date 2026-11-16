@@ -8,14 +8,14 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-amber-50/70 via-white to-amber-50/40 flex flex-col justify-between p-6 sm:p-10">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-to-b from-amber-50/70 via-white to-amber-50/40 flex flex-col justify-between p-6 sm:p-10 outline-none">
       {/* Top Bar */}
       <header className="max-w-6xl w-full mx-auto flex items-center justify-between pb-6 border-b border-amber-200/60">
         <div className="flex items-center gap-2.5">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-white text-xl shadow-xs">
             ⭐
           </span>
-          <span className="text-xl font-black text-amber-950 tracking-tight">Englove</span>
+          <span className="text-xl font-black text-amber-950 tracking-tight">Upward English</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="max-w-6xl w-full mx-auto pt-6 border-t border-amber-200/60 text-center text-xs text-zinc-400">
-        <p>© 2026 Englove. Plataforma educativa de enseñanza de inglés.</p>
+        <p>© 2026 Upward English. Plataforma educativa de enseñanza de inglés.</p>
       </footer>
     </main>
   );

@@ -5,7 +5,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
   const teacherPayload = Buffer.from(
     JSON.stringify({
       sub: '22222222-2222-4222-8222-222222222222',
-      email: 'profesora@englove.org',
+      email: 'profesora@upwardenglish.org',
       role: 'teacher',
       org: '11111111-1111-4111-8111-111111111111',
       sid: 'sid-teacher-1',
@@ -16,7 +16,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
   const studentPayload = Buffer.from(
     JSON.stringify({
       sub: '33333333-3333-4333-8333-333333333333',
-      email: 'alumno@englove.org',
+      email: 'alumno@upwardenglish.org',
       role: 'student',
       org: '11111111-1111-4111-8111-111111111111',
       sid: 'sid-student-1',
@@ -30,13 +30,13 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
     test.beforeEach(async ({ context, page }) => {
       await context.addCookies([
         {
-          name: 'englove_local_access_token',
+          name: 'upward_english_local_access_token',
           value: teacherToken,
           domain: 'localhost',
           path: '/',
         },
         {
-          name: 'englove_access_token',
+          name: 'upward_english_access_token',
           value: teacherToken,
           domain: 'localhost',
           path: '/',
@@ -50,7 +50,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
             accessToken: teacherToken,
             user: {
               id: '22222222-2222-4222-8222-222222222222',
-              email: 'profesora@englove.org',
+              email: 'profesora@upwardenglish.org',
               role: 'teacher',
               organizationId: '11111111-1111-4111-8111-111111111111',
               name: 'Profesora Principal',
@@ -248,7 +248,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       await page.goto('/contenido-extra');
 
       const axeResults = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(axeResults.violations).toEqual([]);
     });
@@ -258,13 +258,13 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
     test.beforeEach(async ({ context, page }) => {
       await context.addCookies([
         {
-          name: 'englove_local_access_token',
+          name: 'upward_english_local_access_token',
           value: studentToken,
           domain: 'localhost',
           path: '/',
         },
         {
-          name: 'englove_access_token',
+          name: 'upward_english_access_token',
           value: studentToken,
           domain: 'localhost',
           path: '/',
@@ -278,7 +278,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
             accessToken: studentToken,
             user: {
               id: '33333333-3333-4333-8333-333333333333',
-              email: 'alumno@englove.org',
+              email: 'alumno@upwardenglish.org',
               role: 'student',
               organizationId: '11111111-1111-4111-8111-111111111111',
               name: 'Lucas Diaz',
@@ -293,7 +293,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
           json: {
             user: {
               id: '33333333-3333-4333-8333-333333333333',
-              email: 'alumno@englove.org',
+              email: 'alumno@upwardenglish.org',
               name: 'Lucas Diaz',
               role: 'student',
             },
@@ -436,7 +436,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       // 1. Kids theme
       await page.goto('/extra');
       const kidsAxe = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(kidsAxe.violations).toEqual([]);
 
@@ -447,7 +447,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
           json: {
             user: {
               id: '33333333-3333-4333-8333-333333333333',
-              email: 'teens@englove.org',
+              email: 'teens@upwardenglish.org',
               name: 'Camila Torres',
               role: 'student',
             },
@@ -468,8 +468,10 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       });
 
       await page.goto('/extra');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(300);
       const teensAxe = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(teensAxe.violations).toEqual([]);
     });

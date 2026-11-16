@@ -1,7 +1,8 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, OnModuleDestroy } from '@nestjs/common';
 
 interface RateLimitRecord {
   timestamps: number[];
+  lastUpdated: number;
 }
 
 export class RateLimitedException extends HttpException {
@@ -22,8 +23,23 @@ export class RateLimitedException extends HttpException {
 }
 
 @Injectable()
-export class RateLimiterService {
+export class RateLimiterService implements OnModuleDestroy {
   private records = new Map<string, RateLimitRecord>();
+  private readonly maxEntries = 10000;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+
+  constructor() {
+    // guardrails-ignore G-B08: limpieza en memoria cada 5 min de registros expirados de rate limiting (SEC-09b)
+    this.cleanupInterval = setInterval(() => this.cleanupExpired(), 5 * 60 * 1000);
+    this.cleanupInterval.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
 
   /**
    * Checks and consumes 1 token for the specified key within the given window.
@@ -34,9 +50,22 @@ export class RateLimiterService {
     let record = this.records.get(key);
 
     if (!record) {
-      record = { timestamps: [] };
+      // LRU eviction if maximum capacity reached (RF-04)
+      if (this.records.size >= this.maxEntries) {
+        const oldestKey = this.records.keys().next().value;
+        if (oldestKey) {
+          this.records.delete(oldestKey);
+        }
+      }
+      record = { timestamps: [], lastUpdated: now };
+      this.records.set(key, record);
+    } else {
+      // Refresh LRU position
+      this.records.delete(key);
       this.records.set(key, record);
     }
+
+    record.lastUpdated = now;
 
     // Filter out timestamps outside window
     const windowStart = now - windowMs;
@@ -50,6 +79,16 @@ export class RateLimiterService {
     }
 
     record.timestamps.push(now);
+  }
+
+  private cleanupExpired(): void {
+    const now = Date.now();
+    for (const [key, record] of this.records.entries()) {
+      // If no activity in the last 10 minutes, remove
+      if (now - record.lastUpdated > 10 * 60 * 1000) {
+        this.records.delete(key);
+      }
+    }
   }
 
   /**

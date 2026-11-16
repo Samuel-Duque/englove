@@ -14,7 +14,7 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ActivityType, STICKER_CODES, StickerCode } from '@englove/shared';
+import { ActivityType, STICKER_CODES, StickerCode } from '@upward-english/shared';
 
 export class ReviewQueryDto {
   @IsOptional()
@@ -50,9 +50,7 @@ export class ReviewQueryDto {
 export class SubmitReviewDto {
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(5)
-  // guardrails-ignore G-C02: calificacion manual exclusiva del profesor en revision
+  // guardrails-ignore G-C02: calificacion manual exclusiva del profesor en revision (validada con 422 SCORE_OUT_OF_RANGE en dominio)
   score?: number;
 
   @IsOptional()

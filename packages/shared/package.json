@@ -1,7 +1,8 @@
 {
-  "name": "@englove/shared",
+  "name": "@upward-english/shared",
   "version": "0.0.1",
   "private": true,
+  "files": ["dist"],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -39,12 +40,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "^3.24.2"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@englove/tsconfig": "workspace:*",
-    "@englove/eslint-config": "workspace:*",
-    "@englove/prettier-config": "workspace:*",
+    "@upward-english/tsconfig": "workspace:*",
+    "@upward-english/eslint-config": "workspace:*",
+    "@upward-english/prettier-config": "workspace:*",
     "tsup": "^8.4.0",
     "typescript": "~5.9.3",
     "vitest": "^3.0.7",

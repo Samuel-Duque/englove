@@ -19,10 +19,7 @@ import { AttemptsModule } from '../attempts/attempts.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>(
-          'JWT_SECRET',
-          'englove-dev-jwt-secret-min-32-chars-long-local-secret!',
-        ),
+        secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: { expiresIn: '15m' },
       }),
     }),

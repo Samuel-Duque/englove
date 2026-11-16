@@ -8,6 +8,7 @@ export const AUTH_ERROR_MAP: Record<string, string> = {
   RATE_LIMITED: 'Has hecho varios intentos. Espera un momento y vuelve a intentar',
   AUTH_UNAUTHORIZED: 'Tu sesión terminó. Inicia sesión de nuevo',
   FORBIDDEN: 'No tienes acceso a esta sección',
+  AUTH_FORBIDDEN: 'No tienes acceso a esta sección',
   STUDENT_NOT_PENDING: 'La solicitud ya no está pendiente. Actualiza la lista',
   PASSWORD_RESET_INVALID: 'El enlace no es válido o ya venció. Solicita uno nuevo',
   VALIDATION_ERROR: 'Los datos ingresados no son válidos',
@@ -16,7 +17,11 @@ export const AUTH_ERROR_MAP: Record<string, string> = {
   INTERNAL_ERROR: 'Ocurrió un error inesperado. Intenta de nuevo más tarde',
 };
 
-export function getAuthErrorMessage(code?: string, defaultMessage = 'Ocurrió un error. Intenta de nuevo'): string {
+export function getAuthErrorMessage(
+  codeOrData?: string | { code?: string } | null,
+  defaultMessage = 'Ocurrió un error. Intenta de nuevo',
+): string {
+  const code = typeof codeOrData === 'string' ? codeOrData : codeOrData?.code;
   if (!code) {
     return defaultMessage;
   }

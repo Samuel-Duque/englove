@@ -1,6 +1,7 @@
-# Englove — Skills propias pendientes de crear
+# Upward English — Skills propias pendientes de crear
 
-> Estado: **2 de 5 creadas.** `englove-spec` se creó el 2026-10-08 (tarea DOC-07 del taskboard) y `englove-guardrails` el 2026-10-19 (tarea DOC-08); las otras tres siguen como ideas aprobadas, todavía no creadas (decisión del equipo: se crearán en sus hitos correspondientes).
+> Estado: **3 de 5 creadas.** `upward-english-spec` se creó el 2026-10-08 (DOC-07), `upward-english-guardrails` el 2026-10-19 (DOC-08) y `upward-english-kids-ux` el 2026-11-16 (DOC-10; solicitada como `englove-kids-ux`). `upward-english-activity-type` y `upward-english-cefr-content` siguen pendientes para sus hitos correspondientes.
+> Seguimiento (2026-11-08, Etapa 12, decisiones 127 a 137): las skills propias existentes se revisaron en las tareas ENG-158 y DOC-09 del taskboard: `upward-english-guardrails` amplió `check-guardrails.mjs` para detectar aserciones `as Type` (regla G-C12) y actualizó `KNOWN_MAX_DECISION` a 137 (cubriendo las decisiones 127 a 137), y `upward-english-spec` retiró la referencia a Supabase de `check-spec.mjs` y `references/validacion.md` en favor de Neon. Cada cambio se replicó en `.claude/skills/` y `.kiro/skills/` y se calculó el `computedHash` en `skills-lock.json`. El objetivo de accesibilidad es WCAG 2.2 AA (decisión 133).
 > Origen: análisis de skills del proyecto (octubre 2026). No se encontró ninguna skill pública confiable para este dominio y reglas de negocio específicas, por eso se proponen propias.
 > Actualización técnica (2026-10-19): adaptado a las decisiones 81 a 92 de `CONTEXT.md` §14 y `planning/architecture-overview.md` §11 (despliegue en Cloudflare Workers mediante `vinext` para frontend, backend en Render con instancia única y cola serial, almacenamiento en Cloudflare R2, motor SQL exclusivo PostgreSQL 18 en Neon en sustitución de Supabase, y validación superada del PoC ENG-140).
 > Herramienta recomendada para crearlas: la skill `skill-creator` (ya instalada en `.agents/skills/`).
@@ -11,11 +12,11 @@
 
 | Skill propia | Prioridad | Momento recomendado | Estado |
 |---|---|---|---|
-| `englove-spec` | alta | Antes de redactar las specs `SPEC-00` a `SPEC-10` (Etapa 0 / inicio de Etapa 1) | **Creada** 2026-10-08 (DOC-07) |
-| `englove-guardrails` | alta | Antes de escribir el primer código de producción (Etapa 1 / inicio de Etapa 2) | **Creada** 2026-10-19 (DOC-08) |
-| `englove-activity-type` | media | Cuando exista `packages/shared` y la primera actividad implementada | Pendiente |
-| `englove-kids-ux` | media | Cuando empiece el frontend (tokens de tema Kids/Teens) | Pendiente |
-| `englove-cefr-content` | baja | Cuando se necesiten seeds de contenido (incongruencia #16: seeds de datos operativos) | Pendiente |
+| `upward-english-spec` | alta | Antes de redactar las specs `SPEC-00` a `SPEC-11` (Etapa 0 / inicio de Etapa 1) | **Creada** 2026-10-08 (DOC-07) |
+| `upward-english-guardrails` | alta | Antes de escribir el primer código de producción (Etapa 1 / inicio de Etapa 2) | **Creada** 2026-10-19 (DOC-08) |
+| `upward-english-activity-type` | media | Cuando exista `packages/shared` y la primera actividad implementada | Pendiente |
+| `upward-english-kids-ux` | media | Cuando empiece el frontend (tokens de tema Kids/Teens) | **Creada** 2026-11-16 (DOC-10) |
+| `upward-english-cefr-content` | baja | Cuando se necesiten seeds de contenido (incongruencia #16: seeds de datos operativos) | Pendiente |
 
 ---
 
@@ -38,18 +39,18 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 - **`render-deploy` y `render-docker`:** se usan para la configuración del Web Service en Render (`apps/api`), el Dockerfile multi-etapa con `ffmpeg`/`ffprobe` y el aprovisionamiento de variables de entorno.
 - **`ci-cd-and-automation`:** se usa para estructurar los flujos de GitHub Actions (checks de PR, despliegue con Wrangler a Cloudflare Workers, despliegue a Render y ejecución de `prisma migrate deploy` contra Neon).
 - **`prisma-cli` y `prisma-client-api`:** se usan para la gestión del ORM (modelos, migraciones y extensiones de tenant en Prisma 7).
-- **`supabase-postgres-best-practices` (Aviso crítico de alcance):** se conserva en el proyecto exclusivamente por sus buenas prácticas de diseño relacional, indexación, planes de consulta y optimización SQL para PostgreSQL genérico. **Englove no utiliza Supabase como proveedor de base de datos** (sustituido por Neon según decisión 82). Queda estrictamente prohibido aplicar recomendaciones de esa skill que involucren Supabase Auth, Supabase Storage, Edge Functions o RLS como mecanismo de autorización de negocio.
+- **`supabase-postgres-best-practices` (Aviso crítico de alcance):** se conserva en el proyecto exclusivamente por sus buenas prácticas de diseño relacional, indexación, planes de consulta y optimización SQL para PostgreSQL genérico. **Upward English no utiliza Supabase como proveedor de base de datos** (sustituido por Neon según decisión 82). Queda estrictamente prohibido aplicar recomendaciones de esa skill que involucren Supabase Auth, Supabase Storage, Edge Functions o RLS como mecanismo de autorización de negocio.
 
 ---
 
-## 1. `englove-spec`
+## 1. `upward-english-spec`
 
-> **Estado: creada el 2026-10-08** (tarea DOC-07 del taskboard). Vive en `.agents/skills/englove-spec/`, con copias en `.claude/skills/` y `.kiro/skills/`, y está registrada en `skills-lock.json` como skill local. Contenido:
+> **Estado: creada el 2026-10-08** (tarea DOC-07 del taskboard). Vive en `.agents/skills/upward-english-spec/`, con copias en `.claude/skills/` y `.kiro/skills/`, y está registrada en `skills-lock.json` como skill local. Contenido:
 >
 > - `SKILL.md`: reglas de oro (jerarquía, sin código sin spec Aprobada, el agente redacta y el líder aprueba, enlazar en vez de copiar), fuentes que leer y cuatro modos: **Arranque (SPEC-00)**, **Redactar**, **Revisar** y **Actualizar** (estados y transiciones de `sdd-process.md` §6), con el cierre del cambio (`specs/README.md`, taskboard, CONTEXT) y el informe final.
-> - `references/guia-de-secciones.md`: cómo rellenar en Englove la cabecera y cada una de las 12 secciones de la plantilla.
+> - `references/guia-de-secciones.md`: cómo rellenar en Upward English la cabecera y cada una de las 12 secciones de la plantilla.
 > - `references/validacion.md`: lista de comprobación contra CONTEXT §14, §2.4, §15 y §16, y formato del informe de revisión.
-> - `scripts/check-spec.mjs`: verificación estructural sin dependencias (`node .agents/skills/englove-spec/scripts/check-spec.mjs specs/SPEC-NN-nombre.md`). Lee en cada ejecución la plantilla de `sdd-process.md` §5, los pendientes de CONTEXT §15 y el taskboard. Comprueba secciones, cabecera y estado, texto de plantilla sin reemplazar, RF con Dado/Cuando/Entonces, RF sin prueba, P-n asignados, tareas `ENG` cubiertas, tamaño, índice y señales de alarma (términos eliminados o fuera de alcance).
+> - `scripts/check-spec.mjs`: verificación estructural sin dependencias (`node .agents/skills/upward-english-spec/scripts/check-spec.mjs specs/SPEC-NN-nombre.md`). Lee en cada ejecución la plantilla de `sdd-process.md` §5, los pendientes de CONTEXT §15 y el taskboard. Comprueba secciones, cabecera y estado, texto de plantilla sin reemplazar, RF con Dado/Cuando/Entonces, RF sin prueba, P-n asignados, tareas `ENG` cubiertas, tamaño, índice y señales de alarma (términos eliminados o fuera de alcance).
 >
 > Prueba y evolución: validada inicialmente con un borrador de SPEC-01. Actualizada tras el PoC ENG-140 (decisiones 81–92) para verificar que las specs reflejen Cloudflare Workers con `vinext`, Neon como motor SQL y el cierre formal de P-1 a P-5.
 
@@ -71,13 +72,13 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 
 ---
 
-## 2. `englove-guardrails`
+## 2. `upward-english-guardrails`
 
-> **Estado: creada el 2026-10-19** (tarea DOC-08 del taskboard). Vive en `.agents/skills/englove-guardrails/`, con copias en `.claude/skills/` y `.kiro/skills/`, y está registrada en `skills-lock.json` como skill local. Contenido:
+> **Estado: creada el 2026-10-19** (tarea DOC-08 del taskboard). Vive en `.agents/skills/upward-english-guardrails/`, con copias en `.claude/skills/` y `.kiro/skills/`, y está registrada en `skills-lock.json` como skill local. Contenido:
 >
 > - `SKILL.md`: reglas de oro (jerarquía, compuerta SDD previa al código, evidencia antes de afirmar cumplimiento, enlazar en vez de copiar y delimitación frente a `supabase-postgres-best-practices`), fuentes que consultar, modos de uso (Preventivo, Cambios locales, Rama/PR, Auditoría y Mantenimiento), procedimiento en 5 pasos, gestión de supresiones justificadas (`guardrails-ignore G-XNN: motivo`) y plantilla obligatoria del informe estructurado.
 > - `references/reglas.md`: catálogo explicativo de las 33 reglas invariantes (`G-A01`–`G-A10`, `G-B01`–`G-B12`, `G-C01`–`G-C11`), con su fuente normativa, modo de verificación (`Automática`, `Heurística`, `Manual`) y excepciones legítimas.
-> - `scripts/check-guardrails.mjs`: escáner estático sin dependencias (`node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs [--base REF | --all | RUTAS...] [--json] [--self-check]`). Lee en cada ejecución la matriz de tablas de tenant de `architecture-overview.md` §6.2, las tablas de detalle de `CONTEXT.md` §7.2, las decisiones de `CONTEXT.md` §14 y la tabla de fuera de alcance de `CONTEXT.md` §2.4. Incluye `--self-check` para verificar que el catálogo y el script permanezcan sincronizados.
+> - `scripts/check-guardrails.mjs`: escáner estático sin dependencias (`node .agents/skills/upward-english-guardrails/scripts/check-guardrails.mjs [--base REF | --all | RUTAS...] [--json] [--self-check]`). Lee en cada ejecución la matriz de tablas de tenant de `architecture-overview.md` §6.2, las tablas de detalle de `CONTEXT.md` §7.2, las decisiones de `CONTEXT.md` §14 y la tabla de fuera de alcance de `CONTEXT.md` §2.4. Incluye `--self-check` para verificar que el catálogo y el script permanezcan sincronizados.
 
 **Qué hace:** lista de verificación automatizada e interactiva de las reglas invariantes del proyecto (`.agents/CONTEXT.md` §16 y `planning/architecture-overview.md`). Se usa de forma mandatoria junto con `code-review` y `security-review` antes de aprobar PRs o cerrar tareas en el taskboard.
 
@@ -126,7 +127,7 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 
 ---
 
-## 3. `englove-activity-type`
+## 3. `upward-english-activity-type`
 
 **Qué haría:** guiar el recorrido de desarrollo completo para añadir o modificar un tipo de actividad pedagógica o una mecánica de juego.
 
@@ -147,25 +148,36 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 
 ---
 
-## 4. `englove-kids-ux`
+## 4. `upward-english-kids-ux`
 
-**Qué haría:** verificar y aplicar las reglas de diseño y experiencia de usuario (UX) para las dos audiencias del producto (Kids y Teens).
+> **Estado: creada el 2026-11-16** (DOC-10). Fuente en `.agents/skills/upward-english-kids-ux/`, copias completas en `.claude/skills/` y `.kiro/skills/`, y registro local en `skills-lock.json`. Conserva `englove-kids-ux` como alias de descubrimiento en la descripción, no como otra carpeta de skill.
+
+**Qué hace:** guía el diseño, implementación y revisión de UX del alumno Kids/Teens sin ampliar el piloto ni modificar requisitos aprobados. No sustituye contenido MCER ni una revisión exclusiva del panel docente o backend.
+
+**Estructura compacta:**
+- `SKILL.md`: alcance, autoridad, camino corto, reglas esenciales y mapa de fuentes. Objetivo de mantenimiento: máximo 100 líneas y 900 palabras; sin obligar a cargar todas las referencias.
+- `references/interaccion.md`: bloques consultables de temas/componentes, navegación/estados, tacto/foco/arrastre, movimiento/audio/voz y privacidad, con fuentes normativas y helpers reales.
+- `references/verificacion.md`: evidencia por cambio, comandos existentes y límites de las pruebas automáticas frente a tablet real y observación con niños.
+- `evals/evals.json`: tres escenarios de evaluación de comportamiento y seis casos de activación/no activación; no son pruebas E2E ni una certificación WCAG de la aplicación.
 
 **Cubre:**
-- Tokens de diseño por tema (`data-theme="kids"` / `"teens"`) y cómo los bundles de animación se cargan dinámicamente con `next/dynamic` según el tema activo.
-- Reglas por edad: Kids (7–10) bloqueado en su interfaz lúdica; Teens (11+) puede alternar tema desde el perfil si `can_switch_interface = true`.
-- Ergonomía táctil: zonas táctiles grandes, nivel de lectura adaptado, mensajes breves, retroalimentación positiva e inmediata.
-- Celebraciones (`canvas-confetti`), efectos de sonido (Howler.js), animación con Framer Motion y respeto riguroso de `prefers-reduced-motion`.
-- Microjuegos de arrastrar y soltar con `@atlaskit/pragmatic-drag-and-drop` optimizados para tablets táctiles.
-- Contraste WCAG 2.2 nivel AA (auditado con axe-core en CI).
-- Síntesis de voz con Web Speech API (`en-US` y `es-CO`).
-- Textos de interfaz en español de Colombia con tono cercano, cálido y motivador.
+- Un sistema visual compartido con `data-theme="kids"` / `"teens"`, sin asumir que los tokens ya estén completos ni introducir dos aplicaciones.
+- Kids 7–10 sin cambio de tema; desde 11, elección explícita desde perfil según `can_switch_interface` de la API, nunca cambio automático.
+- Controles de 48 × 48 px CSS, lectura adaptada, feedback claro y alternativas equivalentes de arrastre, toque/clic en dos pasos y teclado.
+- CSS/Tailwind, `canvas-confetti`, Web Audio API (`sound.ts`, decisiones 105/107), movimiento reducido y degradación sin sonido/voz; no Framer Motion ni Howler.js. La propuesta antigua de bundles de animación por tema no es un requisito vigente.
+- WCAG 2.2 AA: contraste/foco en ambos temas, axe con reglas 2.2 y comprobaciones de interacción; sin presentar axe como conformidad completa.
+- Web Speech API (`en-US`/`es-CO`), ocultando «Escuchar» sin API o voces; mensajes en español de Colombia, neutrales y motivadores.
+- Ranking privado docente, nota calculada en servidor, distinción de guardado local/envío confirmado y privacidad en tablets compartidas.
 
-**Se apoya en:** `frontend-design`, `accessibility`, `animate` y `web-design-guidelines`.
+**Se apoya de forma selectiva en:** `frontend-design`, `accessibility`, `animate`, `web-design-guidelines` y `playwright-best-practices`. `upward-english-guardrails` y `upward-english-spec` conservan sus compuertas de producción/SDD.
+
+**Alcance del cierre:** se desarrolla la skill y su documentación; no se cambia UI, se cierran hitos operativos ni se afirma haber probado tablets o participantes reales. Las verificaciones de estructura, sincronización y guardrails se registran en DOC-10 del taskboard.
+
+**Verificación del 2026-11-16:** entrada de 56 líneas y 776 palabras; cuatro archivos por copia, enlaces locales y 22 rutas de fuentes/pruebas comprobados; SHA-256 calculado con las funciones del CLI de skills y las 37 entradas anteriores del lock preservadas. Los tres escenarios se contrastaron con/sin skill en agentes de solo lectura; se revisaron los seis casos de selección, sin afirmar un benchmark automático de activación. Guardrails globales: 0 errores, 24 avisos y 72 supresiones; catálogo de 37 reglas sincronizado. El aviso de decisiones llega a 146 mientras el escáner conoce hasta 145 (146 cambia el nombre a Upward English, ya respetado por esta skill). La revisión nativa quedó no disponible (`invalid_request`), sin iniciar ni aprobar una transacción; el formato previo de `skills-lock.json` ya producía aviso de Prettier y se preservó fuera de la nueva entrada.
 
 ---
 
-## 5. `englove-cefr-content`
+## 5. `upward-english-cefr-content`
 
 **Qué haría:** generar o validar contenido de actividades alineado a los niveles A1, A2, B1 y B2 del MCER (Marco Común Europeo de Referencia), pedagógicamente apropiado para niños de 7 a 14 años.
 
@@ -180,6 +192,6 @@ El repositorio cuenta con skills públicas instaladas en `.agents/skills/`. Su i
 
 ## Ideas descartadas o cubiertas por herramientas existentes
 
-- **Skill propia para despliegue / infraestructura (`englove-deploy`):** descartada. La topología técnica ya está automatizada con Wrangler (`apps/web` a Cloudflare Workers con `vinext`), Docker en Render (`apps/api`) y Prisma Migrate en GitHub Actions. La verificación de invariantes de hosting y base de datos se delega a `englove-guardrails`, mientras que las skills públicas `render-deploy`, `render-docker` y `ci-cd-and-automation` ofrecen soporte suficiente para la configuración de proveedores.
-- **Skill propia para el pipeline de audio (`MediaRecorder` → R2 → `ffmpeg`):** descartada. El flujo está completamente documentado y acotado en `planning/architecture-overview.md` §3.5 y en SPEC-05; `englove-guardrails` vigila que no se alteren la cola serial, la rutina de recuperación ni la subida directa a R2. Reconsiderar únicamente si la transcodificación genera fallos reiterados en producción.
+- **Skill propia para despliegue / infraestructura (`upward-english-deploy`):** descartada. La topología técnica ya está automatizada con Wrangler (`apps/web` a Cloudflare Workers con `vinext`), Docker en Render (`apps/api`) y Prisma Migrate en GitHub Actions. La verificación de invariantes de hosting y base de datos se delega a `upward-english-guardrails`, mientras que las skills públicas `render-deploy`, `render-docker` y `ci-cd-and-automation` ofrecen soporte suficiente para la configuración de proveedores.
+- **Skill propia para el pipeline de audio (`MediaRecorder` → R2 → `ffmpeg`):** descartada. El flujo está completamente documentado y acotado en `planning/architecture-overview.md` §3.5 y en SPEC-05; `upward-english-guardrails` vigila que no se alteren la cola serial, la rutina de recuperación ni la subida directa a R2. Reconsiderar únicamente si la transcodificación genera fallos reiterados en producción.
 - **Skills de fase 2:** Phaser (juegos avanzados) y Capacitor (aplicaciones móviles nativas). Existen skills públicas del ecosistema (`phaserjs/phaser`, `capawesome-team/skills`) que se evaluarán cuando comience esa fase.

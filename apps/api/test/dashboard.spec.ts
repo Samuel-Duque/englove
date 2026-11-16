@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PendingSummaryService } from '../src/dashboard/pending-summary.service';
 import { DashboardController } from '../src/dashboard/dashboard.controller';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ApprovalStatus } from '@englove/shared';
+import { ApprovalStatus } from '@upward-english/shared';
 
 describe('SPEC-03: Gestor de Contenidos — Dashboard reminders (ENG-045)', () => {
   const orgId = '11111111-1111-4111-8111-111111111111';
@@ -18,7 +18,14 @@ describe('SPEC-03: Gestor de Contenidos — Dashboard reminders (ENG-045)', () =
       },
     };
 
-    service = new PendingSummaryService(mockPrisma as unknown as PrismaService);
+    const mockFeatureFlags = {
+      getConfiguration: vi.fn().mockResolvedValue({ config: { ungraded_reminder_days: 3 } }),
+    };
+
+    service = new PendingSummaryService(
+      mockPrisma as unknown as PrismaService,
+      mockFeatureFlags as any,
+    );
     controller = new DashboardController(service);
   });
 

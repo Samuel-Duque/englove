@@ -1,5 +1,5 @@
 {
-  "extends": "@englove/tsconfig/base.json",
+  "extends": "@upward-english/tsconfig/base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",

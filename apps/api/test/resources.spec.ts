@@ -9,7 +9,7 @@ import { ResourcesService } from '../src/resources/resources.service';
 import { ResourcesController } from '../src/resources/resources.controller';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
-import { Role, Level } from '@englove/shared';
+import { Role, Level } from '@upward-english/shared';
 import { AuthenticatedUser } from '../src/common/decorators/current-user.decorator';
 import { ExternalResource } from '@prisma/client';
 import { validate } from 'class-validator';
@@ -63,7 +63,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
       student: {
         findFirst: vi.fn(),
       },
-      $transaction: vi.fn(async (actions) => Promise.all(actions)),
+      $transaction: vi.fn(async (arg) => (typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg))),
     };
 
     mockFeatureFlags = {
@@ -330,7 +330,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
     it('despacha a listForTeacher cuando el rol autenticado es teacher', async () => {
       const teacherUser: AuthenticatedUser = {
         id: teacherUserId,
-        email: 'profe@englove.org',
+        email: 'profe@upwardenglish.org',
         role: Role.teacher,
         organizationId: orgId,
         sessionId: 'sid-1',
@@ -344,7 +344,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
     it('despacha a listForStudent cuando el rol autenticado es student', async () => {
       const studentUser: AuthenticatedUser = {
         id: studentUserId,
-        email: 'alumno@englove.org',
+        email: 'alumno@upwardenglish.org',
         role: Role.student,
         organizationId: orgId,
         sessionId: 'sid-2',
@@ -358,7 +358,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
     it('llama a create, reorder, update y delete con los argumentos esperados', async () => {
       const teacherUser: AuthenticatedUser = {
         id: teacherUserId,
-        email: 'profe@englove.org',
+        email: 'profe@upwardenglish.org',
         role: Role.teacher,
         organizationId: orgId,
         sessionId: 'sid-1',

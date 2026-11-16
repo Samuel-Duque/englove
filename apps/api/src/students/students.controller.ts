@@ -32,7 +32,7 @@ import {
   StudentListResponse,
   MembershipListResponse,
   MessageResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',
@@ -150,7 +150,12 @@ export class StudentsController {
     @Param('id', uuidPipe) id: string,
     @Body() dto: TransferStudentGroupDto,
   ): Promise<StudentView> {
-    return this.studentsService.transferStudentGroup(user.organizationId, id, dto.groupId);
+    return this.studentsService.transferStudentGroup(
+      user.organizationId,
+      id,
+      dto.groupId,
+      dto.confirmLostRetries,
+    );
   }
 
   @Post(':id/change-email')

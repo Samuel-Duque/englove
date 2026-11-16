@@ -13,7 +13,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ActivityType, AttemptStatus, MediaAssetStatus } from '@englove/shared';
+import { ActivityType, AttemptStatus, MediaAssetStatus } from '@upward-english/shared';
 
 type MockFn = ReturnType<typeof vi.fn>;
 

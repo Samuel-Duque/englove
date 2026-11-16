@@ -6,7 +6,7 @@ import {
   Role,
   ApprovalStatus,
   AgeSegment,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
 import { ConfigService } from '@nestjs/config';
@@ -71,7 +71,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
       JWT_SECRET: jwtSecret,
       APP_ENV: 'local',
       WEB_BASE_URL: 'http://localhost:3000',
-      COOKIE_PREFIX: 'englove_test_',
+      COOKIE_PREFIX: 'upward_english_test_',
       COOKIE_DOMAIN: '',
     });
 
@@ -258,13 +258,13 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
       'test-secret-value-32-chars-long!',
     );
 
-    expect(cookies['englove_test_session_hint']).toBeDefined();
-    expect(cookies['englove_test_session_hint']?.value).toBe('1');
-    expect(cookies['englove_test_session_hint']?.options.httpOnly).toBe(false);
-    expect(cookies['englove_test_session_hint']?.options.sameSite).toBe('lax');
-    expect(cookies['englove_test_session_hint']?.options.path).toBe('/');
+    expect(cookies['upward_english_test_session_hint']).toBeDefined();
+    expect(cookies['upward_english_test_session_hint']?.value).toBe('1');
+    expect(cookies['upward_english_test_session_hint']?.options.httpOnly).toBe(false);
+    expect(cookies['upward_english_test_session_hint']?.options.sameSite).toBe('lax');
+    expect(cookies['upward_english_test_session_hint']?.options.path).toBe('/');
     // En local sin https, secure es false
-    expect(cookies['englove_test_session_hint']?.options.secure).toBe(false);
+    expect(cookies['upward_english_test_session_hint']?.options.secure).toBe(false);
   });
 
   // ============================================================================
@@ -284,7 +284,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     );
 
     // Path de refresh_token debe ser /api/v1/auth
-    expect(cookies['englove_test_refresh_token']?.options.path).toBe('/api/v1/auth');
+    expect(cookies['upward_english_test_refresh_token']?.options.path).toBe('/api/v1/auth');
 
     // Endpoint de solo lectura getSession
     const sessionResult = await authService.getSession({
@@ -337,8 +337,8 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
       prisma.authSession.findUnique({ where: { id: sessionAId } }),
     );
     expect(sessionInDb?.revoked_at).not.toBeNull();
-    expect(clearedCookies['englove_test_session_hint']).toBeDefined();
-    expect(clearedCookies['englove_test_refresh_token']?.path).toBe('/api/v1/auth');
+    expect(clearedCookies['upward_english_test_session_hint']).toBeDefined();
+    expect(clearedCookies['upward_english_test_refresh_token']?.path).toBe('/api/v1/auth');
   });
 
   // ============================================================================
@@ -359,7 +359,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     const contextNoTyp = {
       switchToHttp: () => ({
         getRequest: () => ({
-          cookies: { englove_test_access_token: tokenNoTyp },
+          cookies: { upward_english_test_access_token: tokenNoTyp },
           headers: {},
         }),
       }),
@@ -378,7 +378,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     const contextWrongTyp = {
       switchToHttp: () => ({
         getRequest: () => ({
-          cookies: { englove_test_access_token: tokenWrongTyp },
+          cookies: { upward_english_test_access_token: tokenWrongTyp },
           headers: {},
         }),
       }),
@@ -410,7 +410,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     const contextLocked = {
       switchToHttp: () => ({
         getRequest: () => ({
-          cookies: { englove_test_access_token: tokenValidTyp },
+          cookies: { upward_english_test_access_token: tokenValidTyp },
           headers: {},
         }),
       }),
@@ -549,8 +549,8 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     const prodConfigService = new ConfigService({
       JWT_SECRET: jwtSecret,
       APP_ENV: 'staging',
-      WEB_BASE_URL: 'https://staging.englove.org',
-      COOKIE_PREFIX: 'englove_staging_',
+      WEB_BASE_URL: 'https://staging.upwardenglish.org',
+      COOKIE_PREFIX: 'upward_english_staging_',
     });
 
     const prodAuthService = new AuthService(
@@ -571,9 +571,9 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
       'test-secret-value-32-chars-long!',
     );
 
-    expect(cookies['englove_staging_access_token']?.options.secure).toBe(true);
-    expect(cookies['englove_staging_refresh_token']?.options.secure).toBe(true);
-    expect(cookies['englove_staging_session_hint']?.options.secure).toBe(true);
+    expect(cookies['upward_english_staging_access_token']?.options.secure).toBe(true);
+    expect(cookies['upward_english_staging_refresh_token']?.options.secure).toBe(true);
+    expect(cookies['upward_english_staging_session_hint']?.options.secure).toBe(true);
   });
 
   // ============================================================================
@@ -612,8 +612,8 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
       prisma.authSession.findUnique({ where: { id: sessionBId } }),
     );
     expect(sessionInDb?.revoked_at).not.toBeNull();
-    expect(clearedCookies['englove_test_session_hint']).toBeDefined();
-    expect(clearedCookies['englove_test_access_token']).toBeDefined();
+    expect(clearedCookies['upward_english_test_session_hint']).toBeDefined();
+    expect(clearedCookies['upward_english_test_access_token']).toBeDefined();
   });
 
   // ============================================================================
@@ -695,9 +695,9 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     ).resolves.not.toThrow();
 
     // Las cookies de sesión deben haber sido limpiadas
-    expect(clearedCookies['englove_test_access_token']).toBeDefined();
-    expect(clearedCookies['englove_test_refresh_token']).toBeDefined();
-    expect(clearedCookies['englove_test_session_hint']).toBeDefined();
+    expect(clearedCookies['upward_english_test_access_token']).toBeDefined();
+    expect(clearedCookies['upward_english_test_refresh_token']).toBeDefined();
+    expect(clearedCookies['upward_english_test_session_hint']).toBeDefined();
   });
 
   // ============================================================================
@@ -820,9 +820,9 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     const err = await authService.refresh('not-a-uuid.some-secret', res).catch((e) => e);
     expect(err).toBeInstanceOf(UnauthorizedException);
     expect(err.getResponse().code).toBe('AUTH_UNAUTHORIZED');
-    expect(clearedCookies['englove_test_access_token']).toBeDefined();
-    expect(clearedCookies['englove_test_refresh_token']).toBeDefined();
-    expect(clearedCookies['englove_test_session_hint']).toBeDefined();
+    expect(clearedCookies['upward_english_test_access_token']).toBeDefined();
+    expect(clearedCookies['upward_english_test_refresh_token']).toBeDefined();
+    expect(clearedCookies['upward_english_test_session_hint']).toBeDefined();
   });
 
   // ============================================================================
@@ -919,7 +919,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     try {
       const loginMock = createMockResponse();
       await authService.login({ email: c01Email, password: c01Password }, '127.0.0.1', loginMock.res);
-      const initialRefresh = loginMock.cookies['englove_test_refresh_token']?.value;
+      const initialRefresh = loginMock.cookies['upward_english_test_refresh_token']?.value;
       expect(initialRefresh).toBeDefined();
       const [sid] = (initialRefresh ?? '').split('.');
       expect(sid).toMatch(/^[0-9a-f-]{36}$/i);
@@ -939,7 +939,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
       const validMock = createMockResponse();
       const refreshed = await authService.refresh(initialRefresh ?? '', validMock.res);
       expect(refreshed.user.id).toBe(c01UserId);
-      const rotatedRefresh = validMock.cookies['englove_test_refresh_token']?.value;
+      const rotatedRefresh = validMock.cookies['upward_english_test_refresh_token']?.value;
       expect(rotatedRefresh).toBeDefined();
       expect(rotatedRefresh).not.toBe(initialRefresh);
 

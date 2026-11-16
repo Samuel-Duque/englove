@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { z } from '@englove/shared';
+import { z } from '@upward-english/shared';
 import { ApiError, apiFetch, getApiBaseUrl } from '../src/lib/api';
 
 describe('T1.1 / P0-09: apiFetch Zod validation and ApiError details preservation', () => {

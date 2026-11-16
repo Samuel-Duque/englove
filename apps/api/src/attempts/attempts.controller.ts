@@ -24,7 +24,7 @@ import {
   CompletionView,
   AttemptReviewDetailView,
   GrantRetryResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',

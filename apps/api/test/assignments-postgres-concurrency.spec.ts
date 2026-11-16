@@ -6,7 +6,7 @@ import {
   AssignmentAvailability,
   Level,
   Role,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AssignmentsService } from '../src/assignments/assignments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpException, HttpStatus } from '@nestjs/common';

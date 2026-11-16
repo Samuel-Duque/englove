@@ -16,7 +16,7 @@ import {
   CreateAssignmentResponseSchema,
   formatBogotaDateTime,
   getExtendedDueAt,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 
 const typeLabels: Record<ActivityType, string> = {

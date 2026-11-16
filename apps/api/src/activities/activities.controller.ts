@@ -29,7 +29,7 @@ import {
   ActivityEditor,
   ActivityListResponse,
   RuntimeView,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',

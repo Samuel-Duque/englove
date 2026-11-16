@@ -1,4 +1,4 @@
-import baseConfig from '@englove/eslint-config';
+import baseConfig from '@upward-english/eslint-config';
 
 export default [
   {

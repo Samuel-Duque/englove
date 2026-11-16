@@ -8,7 +8,7 @@ import {
   MemorySettingsSchema,
   MemorySolutionSchema,
   deterministicShuffle,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { soundManager } from '../../../lib/sound';
 
 export function MemoryGame({

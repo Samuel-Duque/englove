@@ -15,7 +15,7 @@ import { reconcilePendingLogout } from "../../../lib/auth-hygiene";
 import { clearSharedFeatureFlags } from "../../../lib/feature-flags-client";
 import { purgeOtherUsersEntries } from "../../../lib/offline-queue";
 import { getQueryClient } from "../../../lib/query-client";
-import type { SessionView } from "@englove/shared";
+import type { SessionView } from "@upward-english/shared";
 
 function isSafeNextDestination(next: string | null | undefined): boolean {
   if (
@@ -197,7 +197,7 @@ export function LoginClient() {
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-            Englove
+            Upward English
           </h1>
           <p className="text-sm text-zinc-600 mt-2">
             Aprende inglés jugando con tu profesora y compañeros.
@@ -292,21 +292,21 @@ export function LoginClient() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("profesora@englove.org");
-                  setPassword("Englove2026!");
+                  setEmail("profesora@upwardenglish.org");
+                  setPassword("UpwardEnglish2026!");
                   setErrorMessage(null);
                 }}
                 className="p-2 text-left rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 transition cursor-pointer"
               >
                 <div className="font-bold">👩‍🏫 Docente Principal</div>
                 <div className="text-[11px] text-blue-700 truncate">
-                  profesora@englove.org
+                  profesora@upwardenglish.org
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("lucas.kids@englove.org");
+                  setEmail("lucas.kids@upwardenglish.org");
                   setPassword("Estudiante2026!");
                   setErrorMessage(null);
                 }}
@@ -314,13 +314,13 @@ export function LoginClient() {
               >
                 <div className="font-bold">👦 Alumno (Kids)</div>
                 <div className="text-[11px] text-amber-700 truncate">
-                  lucas.kids@englove.org
+                  lucas.kids@upwardenglish.org
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setEmail("camila.teens@englove.org");
+                  setEmail("camila.teens@upwardenglish.org");
                   setPassword("Estudiante2026!");
                   setErrorMessage(null);
                 }}
@@ -328,7 +328,7 @@ export function LoginClient() {
               >
                 <div className="font-bold">🧑 Alumna (Teens)</div>
                 <div className="text-[11px] text-purple-700 truncate">
-                  camila.teens@englove.org
+                  camila.teens@upwardenglish.org
                 </div>
               </button>
             </div>

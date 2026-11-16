@@ -13,7 +13,7 @@ import {
   MediaAssetStatus,
   ProgressEventType,
   Role,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { TenantContext } from '../common/tenant/tenant.context';
 
 function getErrorCode(err: unknown): string | undefined {

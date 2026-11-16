@@ -10,7 +10,7 @@ import {
   AgeSegment,
   SessionView,
   MessageResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { RateLimiterService } from '../common/rate-limiting/rate-limiter.service';
@@ -99,7 +99,7 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly rateLimiterService: RateLimiterService,
   ) {
-    this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'englove_');
+    this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'upward_english_');
     this.cookieDomain = this.configService.get<string>('COOKIE_DOMAIN', '');
     this.jwtSecret =
       typeof this.configService.getOrThrow === 'function'

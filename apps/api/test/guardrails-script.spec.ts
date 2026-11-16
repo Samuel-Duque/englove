@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 
 const repoRoot = path.resolve(__dirname, '../../..');
-const scriptPath = path.resolve(repoRoot, '.agents/skills/englove-guardrails/scripts/check-guardrails.mjs');
+const scriptPath = path.resolve(repoRoot, '.agents/skills/upward-english-guardrails/scripts/check-guardrails.mjs');
 
 interface GuardrailFinding {
   id: string;
@@ -26,7 +26,7 @@ interface GuardrailJsonOutput {
 }
 
 function createTempRoot(): string {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'englove-guardrail-root-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'upward-english-guardrail-root-'));
   fs.mkdirSync(path.join(tempDir, '.agents'), { recursive: true });
   fs.mkdirSync(path.join(tempDir, 'planning'), { recursive: true });
 
@@ -171,7 +171,7 @@ services:
   minio:
     image: minio/minio
   init:
-    command: /bin/sh -c "mc anonymous set download localminio/englove-dev"
+    command: /bin/sh -c "mc anonymous set download localminio/upward-english-dev"
 `,
       );
 
@@ -448,7 +448,7 @@ export function GoodClient() {
 
       fs.writeFileSync(
         path.join(webDir, 'package.json'),
-        JSON.stringify({ name: '@englove/web', dependencies: { react: '19.3.1' } }, null, 2),
+        JSON.stringify({ name: '@upward-english/web', dependencies: { react: '19.3.1' } }, null, 2),
       );
       fs.writeFileSync(path.join(publicDir, 'sw.js'), '// manual service worker');
 

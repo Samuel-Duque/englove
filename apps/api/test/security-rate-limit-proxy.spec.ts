@@ -8,7 +8,7 @@ import { MODULE_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { describe, expect, it } from 'vitest';
-import { Role } from '@englove/shared';
+import { Role } from '@upward-english/shared';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/all-exceptions.filter';
 import { OriginGuard } from '../src/common/guards/origin.guard';
@@ -148,7 +148,7 @@ describe('RT-05 & RT-06: Trust Proxy anti-spoofing y Rate Limit pre-autenticaci√
     const mockConfig = new ConfigService({
       APP_ENV: 'local',
       WEB_BASE_URL: 'http://localhost:3000',
-      COOKIE_PREFIX: 'englove_',
+      COOKIE_PREFIX: 'upward_english_',
       JWT_SECRET: jwtSecret,
     });
     const mockPrisma = {

@@ -8,8 +8,8 @@ for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
     await context.addCookies([
-      { name: 'englove_access_token', value: token, domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: token, domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: token, domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: token, domain: 'localhost', path: '/' },
     ]);
     await page.route('**/api/v1/auth/session', (route) =>
       route.fulfill({

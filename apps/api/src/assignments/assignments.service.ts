@@ -13,7 +13,7 @@ import {
   AssignmentView,
   CreateAssignmentResponse,
   deriveAssignmentAvailability,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   AssignmentQueryDto,
   CreateAssignmentDto,

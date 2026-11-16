@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Términos y Condiciones',
-  description: 'Términos y condiciones de uso de la plataforma educativa Englove.',
+  description: 'Términos y condiciones de uso de la plataforma educativa Upward English.',
 };
 
 export default function TerminosPage() {
@@ -22,7 +22,7 @@ export default function TerminosPage() {
             Términos y Condiciones de Uso
           </h1>
           <p className="text-sm text-zinc-500 mt-2">
-            Versión v1.0 — Vigente para el entorno educativo de Englove
+            Versión v1.0 — Vigente para el entorno educativo de Upward English
           </p>
         </header>
 
@@ -35,7 +35,7 @@ export default function TerminosPage() {
           </span>
           <div>
             <strong className="font-bold">Aviso legal provisional:</strong> Este documento es un
-            borrador informativo para el piloto educativo de Englove y se encuentra pendiente de
+            borrador informativo para el piloto educativo de Upward English y se encuentra pendiente de
             validación jurídica definitiva antes del lanzamiento oficial.
           </div>
         </div>
@@ -43,7 +43,7 @@ export default function TerminosPage() {
         <section className="space-y-4 text-zinc-700 leading-relaxed text-sm sm:text-base">
           <h2 className="text-xl font-bold text-zinc-900">1. Propósito de la Plataforma</h2>
           <p>
-            Englove es una plataforma educativa diseñada para facilitar la enseñanza y aprendizaje
+            Upward English es una plataforma educativa diseñada para facilitar la enseñanza y aprendizaje
             del idioma inglés en niños y adolescentes mediante actividades pedagógicas gamificadas,
             supervisadas por docentes.
           </p>
@@ -79,7 +79,7 @@ export default function TerminosPage() {
         </section>
 
         <footer className="pt-6 border-t border-zinc-200 flex flex-wrap gap-4 items-center justify-between text-sm text-zinc-500">
-          <span>Englove — Plataforma Educativa de Inglés</span>
+          <span>Upward English — Plataforma Educativa de Inglés</span>
           <div className="flex gap-4">
             <Link href="/registro" className="text-blue-600 hover:underline font-medium">
               Ir a Registro

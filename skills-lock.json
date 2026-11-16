@@ -43,16 +43,6 @@
       "skillPath": "skills/email-best-practices/SKILL.md",
       "computedHash": "cf53e0d7ad72c440818c64a104ab220f527f26f10c7d8163fa99e066bf747eed"
     },
-    "englove-guardrails": {
-      "source": "./.agents/skills/englove-guardrails",
-      "sourceType": "local",
-      "computedHash": "0166b210664687c6627f0f6b16b3a52a50cc4e980cc80a5263700f3ebc77745f"
-    },
-    "englove-spec": {
-      "source": "./.agents/skills/englove-spec",
-      "sourceType": "local",
-      "computedHash": "4fa3b783fb77e8713e4fcdfd639b1d66558ef6a0f7a0573bde6a7ec272009b02"
-    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",
@@ -190,6 +180,21 @@
       "sourceType": "github",
       "skillPath": "skills/turborepo/SKILL.md",
       "computedHash": "9681d8dfeb5e6cdff767f1bcaba5d7ac55732a9d6c02ee120f44229f8ec25e7e"
+    },
+    "upward-english-guardrails": {
+      "source": "./.agents/skills/upward-english-guardrails",
+      "sourceType": "local",
+      "computedHash": "0166b210664687c6627f0f6b16b3a52a50cc4e980cc80a5263700f3ebc77745f"
+    },
+    "upward-english-kids-ux": {
+      "source": "./.agents/skills/upward-english-kids-ux",
+      "sourceType": "local",
+      "computedHash": "9d22055d4b6326610df06b7b8ae8cc0903753c2d38014b0adac532f4d1766610"
+    },
+    "upward-english-spec": {
+      "source": "./.agents/skills/upward-english-spec",
+      "sourceType": "local",
+      "computedHash": "4fa3b783fb77e8713e4fcdfd639b1d66558ef6a0f7a0573bde6a7ec272009b02"
     },
     "vercel-composition-patterns": {
       "source": "vercel-labs/agent-skills",

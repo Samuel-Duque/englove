@@ -11,7 +11,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
 import { ReviewQueryDto } from './dto/reviews.dto';
-import { Role, ReviewListResponse } from '@englove/shared';
+import { Role, ReviewListResponse } from '@upward-english/shared';
 
 @Controller('reviews')
 @Roles(Role.teacher)

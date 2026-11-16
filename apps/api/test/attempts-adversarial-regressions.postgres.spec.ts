@@ -19,7 +19,7 @@ import {
   Level,
   Role,
   parseFillBlankSimpleSyntax,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AssignmentsService } from '../src/assignments/assignments.service';
@@ -81,7 +81,7 @@ describe.skipIf(!isPostgresAvailable)(
         R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID || 'local',
         R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID || 'minioadmin',
         R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY || 'minioadmin',
-        R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || 'englove-dev',
+        R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || 'upward-english-dev',
         R2_ENDPOINT: process.env.R2_ENDPOINT || 'http://127.0.0.1:9000',
       });
       const jwtService = new JwtService({ secret });
@@ -704,7 +704,7 @@ describe.skipIf(!isPostgresAvailable)(
       const attemptId = started.attempt.id;
 
       const s3Endpoint = process.env.R2_ENDPOINT || 'http://127.0.0.1:9000';
-      const s3Bucket = process.env.R2_BUCKET_NAME || 'englove-dev';
+      const s3Bucket = process.env.R2_BUCKET_NAME || 'upward-english-dev';
       const s3Client = new S3Client({
         endpoint: s3Endpoint,
         region: 'auto',

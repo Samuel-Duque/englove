@@ -15,13 +15,13 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     // 1. Simular cookie de sesión para proxy.ts
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: 'mock-student-token',
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: 'mock-student-token',
         domain: 'localhost',
         path: '/',
@@ -32,7 +32,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     const sessionPayload1 = {
       user: {
         id: 'std-e2e-1',
-        email: 'student@englove.local',
+        email: 'student@upwardenglish.local',
         name: 'Juanita Pérez',
         role: 'student',
       },
@@ -70,7 +70,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
           user: {
             id: 'std-e2e-1',
             name: 'Juanita Pérez',
-            email: 'student@englove.local',
+            email: 'student@upwardenglish.local',
             role: 'student',
           },
           student: {
@@ -287,12 +287,12 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     context,
   }) => {
     await context.addCookies([
-      { name: 'englove_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
     ]);
 
     const sessionPayload2 = {
-      user: { id: 'std-e2e-open', name: 'Laura Gómez', email: 'laura@englove.local', role: 'student' },
+      user: { id: 'std-e2e-open', name: 'Laura Gómez', email: 'laura@upwardenglish.local', role: 'student' },
       student: { id: 'std-e2e-open', level: 'A2', ageSegment: 'teens', canSwitchInterface: false },
       organizationId: 'org-e2e',
     };
@@ -373,12 +373,12 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     context,
   }) => {
     await context.addCookies([
-      { name: 'englove_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
     ]);
 
     const sessionPayload3 = {
-      user: { id: 'std-e2e-spk', name: 'Tomás Speaking', email: 'tomas@englove.local', role: 'student' },
+      user: { id: 'std-e2e-spk', name: 'Tomás Speaking', email: 'tomas@upwardenglish.local', role: 'student' },
       student: { id: 'std-e2e-spk', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
       organizationId: 'org-e2e',
     };
@@ -434,13 +434,13 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
         status: 201,
         json: {
           mediaId: 'asset-r2-mock-123',
-          uploadUrl: 'https://r2.englove.test/bucket/audio-mock.webm',
+          uploadUrl: 'https://r2.upwardenglish.test/bucket/audio-mock.webm',
           expiresAt: '2026-12-01T19:00:00Z',
         },
       });
     });
 
-    await page.route('https://r2.englove.test/bucket/**', async (route) => {
+    await page.route('https://r2.upwardenglish.test/bucket/**', async (route) => {
       await route.fulfill({ status: 200 });
     });
 

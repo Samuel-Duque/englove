@@ -8,7 +8,7 @@ import {
   GroupViewSchema,
   GroupListResponse,
   GroupListResponseSchema,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { ConfirmDialog } from '../../../components/ui/modal';
 

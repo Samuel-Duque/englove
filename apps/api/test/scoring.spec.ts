@@ -6,7 +6,7 @@ import {
   ExamConfig,
   ExamAnswerKey,
   scoreToStars,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 describe('SPEC-05: ScoringService & Algoritmos de Calificación', () => {
   const scoringService = new ScoringService();

@@ -33,7 +33,7 @@ describe('RF-15: ocho plantillas cumplen contenido y privacidad', () => {
       expect(rendered.subject).toBeTruthy();
       expect(rendered.html).toBeTruthy();
       expect(rendered.text).toBeTruthy();
-      expect(rendered.html).toContain('Englove');
+      expect(rendered.html).toContain('Upward English');
     }
   });
 
@@ -68,7 +68,7 @@ describe('RF-16: log privado, error SDK y resumen skipped', () => {
     const mockConfig = {
       get: vi.fn((key: string, defaultVal?: unknown) => {
         if (key === 'APP_ENV') return 'local';
-        if (key === 'MAIL_FROM') return 'notificaciones@englove.org';
+        if (key === 'MAIL_FROM') return 'notificaciones@upwardenglish.org';
         return defaultVal;
       }),
     } as unknown as ConfigService;
@@ -98,7 +98,7 @@ describe('RF-16: log privado, error SDK y resumen skipped', () => {
 
     const result = await mailService.sendMail({
       template: 'teacher-pending-summary',
-      to: 'teacher@englove.org',
+      to: 'teacher@upwardenglish.org',
       variables: {
         pendingRequests: 0,
         ungradedActivities: 0,

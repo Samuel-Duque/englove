@@ -3,7 +3,7 @@ import {
   ScoreTrendDirection,
   Level,
   WeekCalendarStatus,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 describe('SPEC-08: Teacher Stats UI Rules & Formatting (ENG-101, ENG-102, ENG-103)', () => {
   describe('Formateo de calificaciones (Decisiones 20, 23, 34 §5)', () => {

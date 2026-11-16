@@ -2,8 +2,8 @@ import { getSharedSession } from './auth-session';
 
 export type UserSegment = 'kids' | 'teens' | 'teacher';
 
-export const USER_SEGMENT_KEY = 'englove_segment';
-export const USER_SEGMENT_EVENT = 'englove_segment_change';
+export const USER_SEGMENT_KEY = 'upward_english_segment';
+export const USER_SEGMENT_EVENT = 'upward_english_segment_change';
 
 /**
  * Type guard for UserSegment without blind type assertions.
@@ -21,7 +21,7 @@ export function isTeensOrTeacherSegment(segment?: string | null): boolean {
 }
 
 /**
- * Syncs the user's active segment to localStorage under `englove_segment`
+ * Syncs the user's active segment to localStorage under `upward_english_segment`
  * and dispatches an in-tab event so offline pages and PWA update banners have
  * immediate, reactive access to the real segment without waiting for cross-tab events.
  */
@@ -51,7 +51,7 @@ export function syncUserSegment(segment: UserSegment | null): void {
  * Checks in order:
  * 1. Active shared in-memory session (role === 'teacher' | 'admin' -> 'teacher', else student.ageSegment)
  * 2. Current route pathname (panel routes -> 'teacher')
- * 3. `englove_segment` in localStorage
+ * 3. `upward_english_segment` in localStorage
  * 4. `data-theme` attribute on document.documentElement
  * Defaults to 'kids' if unauthenticated or unknown.
  */

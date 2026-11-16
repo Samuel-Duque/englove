@@ -9,7 +9,7 @@ import {
   AgeSegment,
   AuditAction,
   AttemptStatus,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { StudentsService } from '../src/students/students.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { MailService } from '../src/mail/mail.service';

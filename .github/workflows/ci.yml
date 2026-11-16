@@ -20,14 +20,14 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: englove_ci
+          POSTGRES_DB: upward_english_ci
         ports: ['5433:5432']
         options: >-
-          --health-cmd "pg_isready -U postgres -d englove_ci"
+          --health-cmd "pg_isready -U postgres -d upward_english_ci"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/englove_ci
-      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/englove_ci
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/upward_english_ci
+      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/upward_english_ci
       REQUIRE_POSTGRES_TESTS: '1'
       RUN_AUDIT_MIGRATION_POSTGRES: '1'
       AUDIT_MIGRATION_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5433/postgres
@@ -61,10 +61,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - run: docker build -f apps/api/Dockerfile -t englove-api:ci .
+      - run: docker build -f apps/api/Dockerfile -t upward-english-api:ci .
       - name: Verificar binarios y cliente generado en la imagen final
         run: |
-          docker run --rm --entrypoint sh englove-api:ci -c 'ffmpeg -version && ffprobe -version && node -e "require(\"@prisma/client\"); require(\"argon2\"); require(\"@englove/shared\")"'
+          docker run --rm --entrypoint sh upward-english-api:ci -c 'ffmpeg -version && ffprobe -version && node -e "require(\"@prisma/client\"); require(\"argon2\"); require(\"@upward-english/shared\")"'
 
   e2e-tests:
     name: Playwright y accesibilidad
@@ -80,8 +80,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @englove/shared build
-      - run: pnpm --filter @englove/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @upward-english/shared build
+      - run: pnpm --filter @upward-english/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - name: Evidencia de navegador incluso ante fallo
         if: always()
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     concurrency:
-      group: englove-staging
+      group: upward-english-staging
       cancel-in-progress: false
     env:
       MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
@@ -116,8 +116,8 @@ jobs:
       NEXT_PUBLIC_API_URL: ${{ vars.STAGING_API_URL }}
       STAGING_WEB_URL: ${{ vars.STAGING_WEB_URL }}
       NEXT_PUBLIC_APP_ENV: staging
-      COOKIE_PREFIX: englove_stg_
-      NEXT_PUBLIC_COOKIE_PREFIX: englove_stg_
+      COOKIE_PREFIX: upward_english_stg_
+      NEXT_PUBLIC_COOKIE_PREFIX: upward_english_stg_
       DEPLOY_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -140,6 +140,6 @@ jobs:
       - name: API en Render, commit exacto y health satisfactorio
         run: node scripts/deploy-render.mjs
       - name: Worker construido desde el mismo commit
-        run: pnpm --filter @englove/web exec wrangler deploy --config dist/server/wrangler.json
+        run: pnpm --filter @upward-english/web exec wrangler deploy --config dist/server/wrangler.json
       - name: Comprobar frontend publicado
         run: node scripts/deploy-render.mjs --check-web

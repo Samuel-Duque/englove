@@ -1,7 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Optional } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { Role } from '@englove/shared';
+import { Role } from '@upward-english/shared';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { RateLimiterService } from '../rate-limiting/rate-limiter.service';
 import { consumeAnonymousIpBudgetOnce } from '../rate-limiting/rate-limiter.guard';

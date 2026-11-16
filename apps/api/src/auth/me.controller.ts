@@ -31,7 +31,7 @@ import {
   AssignmentCardListResponse,
   StudentProgressView,
   StudentGamesListResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 @Controller('me')
 @UseInterceptors(NoCacheInterceptor)

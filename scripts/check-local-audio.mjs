@@ -54,7 +54,7 @@ try {
     },
   });
   try {
-    await client.send(new HeadBucketCommand({ Bucket: config.R2_BUCKET_NAME || 'englove-dev' }), {
+    await client.send(new HeadBucketCommand({ Bucket: config.R2_BUCKET_NAME || 'upward-english-dev' }), {
       abortSignal: AbortSignal.timeout(5000),
     });
     console.log('S3 local: bucket autenticado disponible (sin mutaciones).');

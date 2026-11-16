@@ -5,13 +5,13 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     // 1. Simular sesión de profesora
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: 'mock-teacher-token',
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: 'mock-teacher-token',
         domain: 'localhost',
         path: '/',
@@ -25,7 +25,7 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
         body: JSON.stringify({
           user: {
             id: 'tch-e2e-2',
-            email: 'teacher@englove.local',
+            email: 'teacher@upwardenglish.local',
             name: 'Profesora Clara',
             role: 'teacher',
           },

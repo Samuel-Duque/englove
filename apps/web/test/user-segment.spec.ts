@@ -10,7 +10,7 @@ import {
   setSharedSession,
   clearSharedSession,
 } from '../src/lib/auth-session';
-import { Role, AgeSegment } from '@englove/shared';
+import { Role, AgeSegment } from '@upward-english/shared';
 
 describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
   let mockStorage: Record<string, string> = {};
@@ -113,7 +113,7 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
       syncUserSegment('teens');
       expect(dispatchSpy).toHaveBeenCalledTimes(1);
       const eventArg = dispatchSpy.mock.calls[0]?.[0] as CustomEvent;
-      expect(eventArg.type).toBe('englove_segment_change');
+      expect(eventArg.type).toBe('upward_english_segment_change');
       expect(eventArg.detail).toBe('teens');
     });
 
@@ -136,7 +136,7 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
         user: {
           id: 'u-1',
           name: 'Teacher One',
-          email: 'teacher@englove.edu',
+          email: 'teacher@upwardenglish.edu',
           role: Role.teacher,
         },
         student: null,
@@ -150,7 +150,7 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
         user: {
           id: 'u-2',
           name: 'Teen Student',
-          email: 'teen@englove.edu',
+          email: 'teen@upwardenglish.edu',
           role: Role.student,
         },
         student: {
@@ -168,7 +168,7 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
         user: {
           id: 'u-3',
           name: 'Kid Student',
-          email: 'kid@englove.edu',
+          email: 'kid@upwardenglish.edu',
           role: Role.student,
         },
         student: {
@@ -181,7 +181,7 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
       expect(resolveUserSegment()).toBe('kids');
     });
 
-    it('resolves from localStorage englove_segment when no in-memory session', () => {
+    it('resolves from localStorage upward_english_segment when no in-memory session', () => {
       mockStorage[USER_SEGMENT_KEY] = 'teacher';
       expect(resolveUserSegment()).toBe('teacher');
 
@@ -202,7 +202,7 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
         user: {
           id: 'u-admin',
           name: 'Admin User',
-          email: 'admin@englove.edu',
+          email: 'admin@upwardenglish.edu',
           role: Role.admin,
         },
         student: null,
@@ -223,12 +223,12 @@ describe('User Segment Resolution (SPEC-09 §7, RF-7, P2-10)', () => {
       expect(resolveUserSegment()).toBe('teacher');
     });
 
-    it('clearSharedSession cleans englove_segment from localStorage', () => {
+    it('clearSharedSession cleans upward_english_segment from localStorage', () => {
       setSharedSession({
         user: {
           id: 'u-1',
           name: 'Teacher',
-          email: 't@englove.edu',
+          email: 't@upwardenglish.edu',
           role: Role.teacher,
         },
         student: null,

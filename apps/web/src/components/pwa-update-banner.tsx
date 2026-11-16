@@ -66,7 +66,7 @@ export function PwaUpdateBanner() {
             <p className="text-sm font-semibold text-zinc-100">
               {effectiveTeensOrPanel
                 ? 'Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.'
-                : '¡Englove tiene novedades! Toca Actualizar para verlas.'}
+                : '¡Upward English tiene novedades! Toca Actualizar para verlas.'}
             </p>
           </div>
         </div>

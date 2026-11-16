@@ -1,4 +1,4 @@
-import { FeatureFlagsResponseSchema, type FeatureFlagsResponse } from '@englove/shared';
+import { FeatureFlagsResponseSchema, type FeatureFlagsResponse } from '@upward-english/shared';
 import { apiFetch } from './api';
 
 export type { FeatureFlagsResponse };

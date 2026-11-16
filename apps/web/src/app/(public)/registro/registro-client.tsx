@@ -114,7 +114,7 @@ export function RegistroClient() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight">Crea tu cuenta</h1>
           <p className="text-sm text-zinc-600 mt-2">
-            Registro de estudiante para aprender inglés en Englove.
+            Registro de estudiante para aprender inglés en Upward English.
           </p>
         </div>
 

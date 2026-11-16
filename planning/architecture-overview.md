@@ -1,6 +1,6 @@
-# Englove — Architecture Overview
+# Upward English — Architecture Overview
 
-> **Propósito.** Vista técnica de cómo se construye Englove: piezas, fronteras, flujos y reglas de implementación. Desarrolla lo que `.agents/CONTEXT.md` fija en §4, §6, §7, §10 y §11. Ante cualquier conflicto, manda `CONTEXT.md`.
+> **Propósito.** Vista técnica de cómo se construye Upward English: piezas, fronteras, flujos y reglas de implementación. Desarrolla lo que `.agents/CONTEXT.md` fija en §4, §6, §7, §10 y §11. Ante cualquier conflicto, manda `CONTEXT.md`.
 >
 > Estados usados en este documento:
 >
@@ -46,7 +46,7 @@
 
 ## 1. Vista general
 
-Englove es una aplicación web con dos superficies (panel de la profesora y portal del alumno) servidas por una misma app Next.js, una API NestJS que concentra toda la lógica de negocio, Neon usado únicamente como PostgreSQL (decisión 82) y Cloudflare R2 como almacenamiento de archivos (Decidido, decisión 34 §21).
+Upward English es una aplicación web con dos superficies (panel de la profesora y portal del alumno) servidas por una misma app Next.js, una API NestJS que concentra toda la lógica de negocio, Neon usado únicamente como PostgreSQL (decisión 82) y Cloudflare R2 como almacenamiento de archivos (Decidido, decisión 34 §21).
 
 ```mermaid
 flowchart LR
@@ -98,7 +98,7 @@ Despliegue (Decidido, CONTEXT §6, decisión 87): `apps/web` como **Cloudflare W
 Herramientas: pnpm workspaces + Turborepo. Justificación: caché de builds y ejecución de tareas por paquete con configuración mínima, sin generadores de código ni capas adicionales.
 
 ```
-englove/
+upward-english/
 ├── .agents/CONTEXT.md          # fuente de verdad de producto y decisiones
 ├── planning/                   # este documento, proceso SDD, etapas, taskboard
 ├── specs/                      # especificaciones por capacidad (SPEC-01 … SPEC-11), ver sdd-process.md
@@ -825,7 +825,7 @@ El panel consulta `GET /stats/students/:id`, `GET /stats/groups/:id`, `GET /stat
 Las cookies de sesión requieren que frontend y API compartan dominio registrable: `app.<dominio>` (Cloudflare) y `api.<dominio>` (Render). Así `SameSite=Lax` funciona y las peticiones `fetch` entre subdominios llevan la cookie. Una cookie host-only emitida por `api.<dominio>` no sería visible para `app.<dominio>`, y el `proxy.ts` de Next.js necesita verla para redirigir por rol (§3.1); por eso **las cookies se comparten entre los subdominios del mismo entorno** (decisión 58), sin BFF ni rewrite obligatorio. Configuración:
 
 - Atributos: `Domain=.<dominio>`, `SameSite=Lax` y `Secure` obligatorio en staging/producción. Los tokens son HttpOnly; `session_hint` es la excepción explícita no HttpOnly y sin PII (decisión 139). En `local` no se fija `Domain` y `Secure=false` permite HTTP local (decisión 145); se conserva el `Path` de cada cookie (§7.1).
-- **Separación entre entornos.** Staging (`app-staging.` / `api-staging.`) y producción (`app.` / `api.`) cuelgan de la misma raíz, así que una cookie con `Domain=.<dominio>` de un entorno también viajaría al otro. Para que no choquen, el nombre de cada cookie lleva un prefijo por entorno (`COOKIE_PREFIX`, por ejemplo `englove_stg_` en staging y `englove_` o vacío en producción, coherente con `render.yaml` y `SPEC-11`) y cada entorno firma sus JWT con secretos distintos, de modo que un token de un entorno nunca es válido en el otro.
+- **Separación entre entornos.** Staging (`app-staging.` / `api-staging.`) y producción (`app.` / `api.`) cuelgan de la misma raíz, así que una cookie con `Domain=.<dominio>` de un entorno también viajaría al otro. Para que no choquen, el nombre de cada cookie lleva un prefijo por entorno (`COOKIE_PREFIX`, por ejemplo `upward_english_stg_` en staging y `upward_english_` o vacío en producción, coherente con `render.yaml` y `SPEC-11`) y cada entorno firma sus JWT con secretos distintos, de modo que un token de un entorno nunca es válido en el otro.
 - **Subdominios bajo control.** El dominio raíz y todos sus subdominios son del proyecto. No se publica ningún subdominio no controlado (por ejemplo, un CNAME a un servicio de terceros que permita alojar contenido ajeno): una vulnerabilidad en otro subdominio pondría en riesgo una cookie compartida. Cualquier subdominio nuevo se registra en la tarea de dominio (ENG-003).
 - **La autorización no depende de la cookie en el frontend.** El `proxy.ts` solo redirige; la API valida en cada petición JWT, rol, familia de sesión (`sid`) y tenant (§4.3).
 - CORS con allowlist explícita (`https://app.<dominio>` en producción, `https://app-staging.<dominio>` en staging) y `credentials: true`.
@@ -1001,9 +1001,9 @@ Serwist como service worker: precache estricto de assets estáticos versionados 
 
 | Entorno      | Web                       | API                                           | Base de datos                | Archivos (Cloudflare R2)                           | Correo                     | Uso                          |
 | ------------ | ------------------------- | --------------------------------------------- | ---------------------------- | -------------------------------------------------- | -------------------------- | ---------------------------- |
-| `local`      | `next dev`                | `nest start --watch` (con `ffmpeg` instalado) | Postgres 18 en Docker        | bucket R2 `englove-dev` (o MinIO local por S3 API) | log sanitizado (plantilla/resultado/ID) | desarrollo diario            |
-| `staging`    | Cloudflare Free (rama `main`) | Render Free (rama `main`)                 | proyecto Neon Free staging   | bucket R2 `englove-staging`                        | Resend, dominio de pruebas | CI, E2E, **demo** (~11 personas, $0) |
-| `production` | Cloudflare Workers Paid (promoción manual) | Render Starter (promoción manual) | proyecto Neon Launch producción | bucket R2 `englove-prod`                  | Resend, dominio real       | piloto inicial (~10; preparado para ~30 activos, ~$16–19/mes) |
+| `local`      | `next dev`                | `nest start --watch` (con `ffmpeg` instalado) | Postgres 18 en Docker        | bucket R2 `upward-english-dev` (o MinIO local por S3 API) | log sanitizado (plantilla/resultado/ID) | desarrollo diario            |
+| `staging`    | Cloudflare Free (rama `main`) | Render Free (rama `main`)                 | proyecto Neon Free staging   | bucket R2 `upward-english-staging`                        | Resend, dominio de pruebas | CI, E2E, **demo** (~11 personas, $0) |
+| `production` | Cloudflare Workers Paid (promoción manual) | Render Starter (promoción manual) | proyecto Neon Launch producción | bucket R2 `upward-english-prod`                  | Resend, dominio real       | piloto inicial (~10; preparado para ~30 activos, ~$16–19/mes) |
 
 Supabase Storage no se usa en ningún entorno (Decidido, decisión 34 §21). Los planes de cada entorno son los de la decisión 82; el paso de la demo al piloto cambia planes, no arquitectura.
 

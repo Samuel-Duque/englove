@@ -25,7 +25,7 @@ Aplicar el blueprint `render.yaml` con `autoDeployTrigger: 'off'` al servicio co
 
 1. Un push a `develop` o `master`, o una ejecución manual sobre esas ramas, verifica lint, tipos, guardrails, pruebas con PostgreSQL 18 efímero, build, tamaño gzip y Docker Linux. Playwright debe pasar y conserva evidencia ante fallos. No hay promoción desde PR.
 2. Solo después de todas las compuertas se adquiere el bloqueo de staging. `cancel-in-progress: false` evita interrumpir una migración con otro commit; migración y ambas publicaciones están en el mismo job serializado.
-3. El job hace checkout del SHA del evento, verifica configuración y autodeploy, construye con `CLOUDFLARE_ENV=staging` y prefijos `englove_stg_`, y empaqueta sin publicar. Turbo recibe esas variables explícitamente; no se reutiliza un build de otro entorno.
+3. El job hace checkout del SHA del evento, verifica configuración y autodeploy, construye con `CLOUDFLARE_ENV=staging` y prefijos `upward_english_stg_`, y empaqueta sin publicar. Turbo recibe esas variables explícitamente; no se reutiliza un build de otro entorno.
 4. Aplica migraciones con la conexión directa. Publica ese mismo SHA en Render mediante `commitId`; espera `live`, comprueba `commit.id` y `/health`. Después publica el Worker construido y comprueba `/login`.
 5. Conservar los logs del SHA, los resultados de los gates y la evidencia de aceptación en staging. La consulta Render y los thresholds de Worker son comprobaciones, no sustituyen cookies/audio/PWA/dispositivos reales.
 

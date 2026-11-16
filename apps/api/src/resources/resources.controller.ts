@@ -18,7 +18,7 @@ import { ResourcesService } from './resources.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
-import { Role } from '@englove/shared';
+import { Role } from '@upward-english/shared';
 import {
   CreateResourceDto,
   UpdateResourceDto,
@@ -28,7 +28,7 @@ import {
 import {
   ExternalResourceItem,
   ExternalResourceListResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',

@@ -11,7 +11,7 @@ import { FeatureFlagsService, OrganizationConfiguration } from './feature-flags.
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
-import { Role } from '@englove/shared';
+import { Role } from '@upward-english/shared';
 import { UpdateExtraContentDto } from './dto/update-extra-content.dto';
 
 @Controller('feature-flags')

@@ -1,5 +1,5 @@
 {
-  "name": "@englove/api",
+  "name": "@upward-english/api",
   "version": "0.0.1",
   "private": true,
   "files": ["dist", "prisma"],
@@ -19,7 +19,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
-    "@englove/shared": "workspace:*",
+    "@upward-english/shared": "workspace:*",
     "@nestjs/common": "^11.0.11",
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.0.11",
@@ -45,9 +45,9 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@englove/eslint-config": "workspace:*",
-    "@englove/prettier-config": "workspace:*",
-    "@englove/tsconfig": "workspace:*",
+    "@upward-english/eslint-config": "workspace:*",
+    "@upward-english/prettier-config": "workspace:*",
+    "@upward-english/tsconfig": "workspace:*",
     "@nestjs/cli": "^12.0.11",
     "@prisma/config": "^7.0.0",
     "@types/cookie-parser": "^1.4.10",

@@ -16,7 +16,7 @@ import {
   ActivityType,
   Level,
   AgeSegment,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 describe('SPEC-09: PWA, offline y accesibilidad — API (RF-7, RF-16, RF-17)', () => {
   describe('RF-7: Header X-App-Min-Version expuesto por CORS', () => {

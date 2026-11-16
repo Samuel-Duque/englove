@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 
-const DEV_SW_FALLBACK = `// Englove Service Worker (Development Fallback)
+const DEV_SW_FALLBACK = `// Upward English Service Worker (Development Fallback)
 self.addEventListener('install', () => {
   self.skipWaiting();
 });

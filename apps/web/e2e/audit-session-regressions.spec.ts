@@ -18,28 +18,28 @@ for (const failure of ["network", "500"] as const) {
     let refreshRequests = 0;
     await context.addCookies([
       {
-        name: "englove_access_token",
+        name: "upward_english_access_token",
         value: "synthetic-access",
         domain: "localhost",
         path: "/",
         httpOnly: true,
       },
       {
-        name: "englove_local_access_token",
+        name: "upward_english_local_access_token",
         value: "synthetic-access",
         domain: "localhost",
         path: "/",
         httpOnly: true,
       },
       {
-        name: "englove_refresh_token",
+        name: "upward_english_refresh_token",
         value: "synthetic-refresh",
         domain: "localhost",
         path: "/api/v1/auth",
         httpOnly: true,
       },
       {
-        name: "englove_session_hint",
+        name: "upward_english_session_hint",
         value: "1",
         domain: "localhost",
         path: "/",
@@ -85,7 +85,7 @@ for (const failure of ["network", "500"] as const) {
     ).toContainText("No se pudo confirmar el cierre");
     expect(
       (await context.cookies()).some(
-        (cookie) => cookie.name === "englove_access_token" && cookie.httpOnly,
+        (cookie) => cookie.name === "upward_english_access_token" && cookie.httpOnly,
       ),
     ).toBe(true);
     expect(refreshRequests).toBe(0);
@@ -101,7 +101,7 @@ for (const failure of ["network", "500"] as const) {
     await expect
       .poll(async () =>
         (await context.cookies()).some(
-          (cookie) => cookie.name === "englove_logout_pending",
+          (cookie) => cookie.name === "upward_english_logout_pending",
         ),
       )
       .toBe(false);
@@ -134,21 +134,21 @@ test("RT-04: multi-tab logout clears second tab immediately and removes private 
 
   await context.addCookies([
     {
-      name: "englove_access_token",
+      name: "upward_english_access_token",
       value: makeUnsignedJwtCookie("teacher"),
       domain: "localhost",
       path: "/",
       httpOnly: true,
     },
     {
-      name: "englove_local_access_token",
+      name: "upward_english_local_access_token",
       value: makeUnsignedJwtCookie("teacher"),
       domain: "localhost",
       path: "/",
       httpOnly: true,
     },
     {
-      name: "englove_session_hint",
+      name: "upward_english_session_hint",
       value: "1",
       domain: "localhost",
       path: "/",
@@ -235,27 +235,27 @@ test("RT-04: multi-tab account switch clears stale teacher identity in backgroun
 
   await context.addCookies([
     {
-      name: "englove_access_token",
+      name: "upward_english_access_token",
       value: makeUnsignedJwtCookie("teacher"),
       domain: "localhost",
       path: "/",
       httpOnly: true,
     },
     {
-      name: "englove_local_access_token",
+      name: "upward_english_local_access_token",
       value: makeUnsignedJwtCookie("teacher"),
       domain: "localhost",
       path: "/",
       httpOnly: true,
     },
     {
-      name: "englove_session_hint",
+      name: "upward_english_session_hint",
       value: "1",
       domain: "localhost",
       path: "/",
     },
     {
-      name: "englove_local_session_hint",
+      name: "upward_english_local_session_hint",
       value: "1",
       domain: "localhost",
       path: "/",
@@ -307,27 +307,27 @@ test("RT-04: multi-tab account switch clears stale teacher identity in backgroun
     activeSession = studentSession;
     await context.addCookies([
       {
-        name: "englove_access_token",
+        name: "upward_english_access_token",
         value: makeUnsignedJwtCookie("student"),
         domain: "localhost",
         path: "/",
         httpOnly: true,
       },
       {
-        name: "englove_local_access_token",
+        name: "upward_english_local_access_token",
         value: makeUnsignedJwtCookie("student"),
         domain: "localhost",
         path: "/",
         httpOnly: true,
       },
       {
-        name: "englove_session_hint",
+        name: "upward_english_session_hint",
         value: "1",
         domain: "localhost",
         path: "/",
       },
       {
-        name: "englove_local_session_hint",
+        name: "upward_english_local_session_hint",
         value: "1",
         domain: "localhost",
         path: "/",

@@ -20,7 +20,7 @@ import {
   MembershipView,
   MembershipListResponse,
   MessageResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   ApproveStudentDto,
   UpdateStudentDto,

@@ -1,6 +1,6 @@
-# Englove — Índice de especificaciones
+# Upward English — Índice de especificaciones
 
-Índice único de las especificaciones de capacidades de Englove y su estado en el proceso SDD.
+Índice único de las especificaciones de capacidades de Upward English y su estado en el proceso SDD.
 
 ## Referencias del proceso
 

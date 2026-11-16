@@ -21,7 +21,7 @@ import {
   MemorySettingsSchema,
   MemorySolutionSchema,
   TimedChoiceSolutionSchema,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 import { MatchGame } from './games/MatchGame';
 import { OrderWordsGame } from './games/OrderWordsGame';

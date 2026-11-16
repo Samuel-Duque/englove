@@ -14,7 +14,7 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ActivityType, STICKER_CODES, StickerCode } from '@englove/shared';
+import { ActivityType, STICKER_CODES, StickerCode } from '@upward-english/shared';
 
 export class ReviewQueryDto {
   @IsOptional()

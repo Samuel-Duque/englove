@@ -42,7 +42,7 @@ export function TeacherNav({ teacherName }: TeacherNavProps) {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-extrabold text-sm">
               E
             </span>
-            <span>Englove</span>
+            <span>Upward English</span>
           </Link>
 
           <nav className="hidden xl:flex items-center gap-1" aria-label="Navegación principal">

@@ -24,7 +24,7 @@ import {
   AssignmentView,
   CreateAssignmentResponse,
   AssignmentListResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 const uuidPipe = new ParseUUIDPipe({
   version: '4',
@@ -52,7 +52,7 @@ export class AssignmentsController {
   async startAttempt(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', uuidPipe) id: string,
-  ): Promise<import('@englove/shared').RuntimeView> {
+  ): Promise<import('@upward-english/shared').RuntimeView> {
     if (!user.studentId) {
       throw new BadRequestException({
         statusCode: 400,

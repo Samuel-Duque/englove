@@ -9,7 +9,7 @@ import {
   Level,
   ProgressEventType,
   Role,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { StatsService } from '../src/stats/stats.service';
 import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 import { GamificationService } from '../src/gamification/gamification.service';
@@ -101,7 +101,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
       data: {
         id: teacherUserId,
         organization_id: orgId,
-        email: 'teacher.stats@englove.org',
+        email: 'teacher.stats@upwardenglish.org',
         name: 'Profesora Stats',
         password_hash: 'dummyhash',
         role: Role.teacher,
@@ -122,7 +122,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
       data: {
         id: studentUser1Id,
         organization_id: orgId,
-        email: 'student1.stats@englove.org',
+        email: 'student1.stats@upwardenglish.org',
         name: 'Ana Gomez',
         password_hash: 'dummyhash',
         role: Role.student,
@@ -154,7 +154,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
       data: {
         id: studentUser2Id,
         organization_id: orgId,
-        email: 'student2.stats@englove.org',
+        email: 'student2.stats@upwardenglish.org',
         name: 'Beto Lopez',
         password_hash: 'dummyhash',
         role: Role.student,
@@ -186,7 +186,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-08: Estadísticas y Leaderboard en P
       data: {
         id: studentUser3Id,
         organization_id: orgId,
-        email: 'student3.stats@englove.org',
+        email: 'student3.stats@upwardenglish.org',
         name: 'Carlos Diaz',
         password_hash: 'dummyhash',
         role: Role.student,

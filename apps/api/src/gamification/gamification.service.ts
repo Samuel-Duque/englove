@@ -5,7 +5,7 @@ import { TransactionContext } from '../common/tenant/transaction.context';
 import {
   ProgressEventType,
   BadgeAwardView,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 export interface StreakState {
   weeks: number;

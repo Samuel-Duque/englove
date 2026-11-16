@@ -1,4 +1,4 @@
-# Englove — Desarrollo etapa por etapa (PBP Development)
+# Upward English — Desarrollo etapa por etapa (PBP Development)
 
 > **Propósito.** Plan de construcción del piloto en etapas secuenciales, con objetivo, alcance, entregables, criterios de salida, dependencias, riesgos y tamaño de cada una. Sigue el orden de construcción **Decidido** en `.agents/CONTEXT.md` §12, la arquitectura de [`architecture-overview.md`](./architecture-overview.md) y la metodología SDD de [`sdd-process.md`](./sdd-process.md). Las tareas concretas y su estado están en [`taskboard.md`](./taskboard.md).
 >
@@ -599,7 +599,7 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 
 **Dependencias.** Todas las anteriores, incluida la Etapa 12 (ENG-137 y ENG-138 dependen de ENG-161, decisión 127).
 
-**Riesgos.** Alumnos que no consiguen entrar el primer día por contraseñas olvidadas; mitigación: la profesora envía el enlace de recuperación a un clic desde la ficha del alumno y tiene la pestaña de bloqueados visible. Nombre definitivo del producto sin decidir: se lanza con "Englove" como provisional (CONTEXT §15).
+**Riesgos.** Alumnos que no consiguen entrar el primer día por contraseñas olvidadas; mitigación: la profesora envía el enlace de recuperación a un clic desde la ficha del alumno y tiene la pestaña de bloqueados visible. Nombre definitivo del producto decidido como "Upward English" (CONTEXT §14, decisión 146).
 
 **Tamaño.** M, 1–2 semanas, más el tiempo de carga de contenido de la profesora, que empieza en H1.
 

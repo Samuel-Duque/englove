@@ -4,7 +4,7 @@ import { InicioClient } from './inicio-client';
 
 export const metadata: Metadata = {
   title: 'Inicio',
-  description: 'Panel de inicio de actividades y misiones en Englove.',
+  description: 'Panel de inicio de actividades y misiones en Upward English.',
 };
 
 export default function InicioPage() {

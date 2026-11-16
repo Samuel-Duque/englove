@@ -3,7 +3,7 @@ import { StatsController } from '../src/stats/stats.controller';
 import { StatsService } from '../src/stats/stats.service';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { Reflector } from '@nestjs/core';
-import { Role } from '@englove/shared';
+import { Role } from '@upward-english/shared';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { AuthenticatedUser } from '../src/common/decorators/current-user.decorator';
 
@@ -13,14 +13,14 @@ describe('SPEC-08: StatsController & RBAC Security (ENG-101, ENG-102)', () => {
     id: 'u-1',
     sessionId: 'sess-1',
     organizationId: orgId,
-    email: 'profesora@englove.org',
+    email: 'profesora@upwardenglish.org',
     role: Role.teacher,
   };
   const studentUser: AuthenticatedUser = {
     id: 'u-2',
     sessionId: 'sess-2',
     organizationId: orgId,
-    email: 'estudiante@englove.org',
+    email: 'estudiante@upwardenglish.org',
     role: Role.student,
     studentId: 'st-1',
   };

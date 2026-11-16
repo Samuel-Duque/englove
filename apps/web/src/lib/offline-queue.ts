@@ -1,5 +1,5 @@
 /**
- * Englove Offline Queue & Sync Service (SPEC-09 ENG-111, RF-5, RF-10 to RF-18)
+ * Upward English Offline Queue & Sync Service (SPEC-09 ENG-111, RF-5, RF-10 to RF-18)
  *
  * Implements persistent queue in IndexedDB (pendingEvents, pendingUploads),
  * automatic flush with single-tab concurrency lock, exponential backoff,
@@ -42,7 +42,7 @@ export interface OfflineStatus {
   justFlushed: boolean;
 }
 
-const DB_NAME = "englove_offline";
+const DB_NAME = "upward_english_offline";
 const DB_VERSION = 2;
 const EVENTS_STORE = "pendingEvents";
 const UPLOADS_STORE = "pendingUploads";
@@ -604,7 +604,7 @@ export async function triggerFlush(activeUserId: string): Promise<void> {
   ) {
     try {
       await navigator.locks.request(
-        "englove_offline_flush",
+        "upward_english_offline_flush",
         { ifAvailable: true },
         async (lock) => {
           if (!lock) return; // Another tab is flushing

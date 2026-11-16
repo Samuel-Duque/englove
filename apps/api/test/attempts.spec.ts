@@ -12,7 +12,7 @@ import {
   ActivityStatus,
   AttemptStatus,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   ConflictException,
   NotFoundException,

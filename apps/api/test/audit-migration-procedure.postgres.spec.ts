@@ -21,7 +21,7 @@ function localAdminUrl(value: string): URL {
 
 describe('DAT-01: seguridad del runner de regresión', () => {
   it.each([
-    'postgresql://localhost/englove_dev',
+    'postgresql://localhost/upward_english_dev',
     'postgresql://example.com/postgres',
     'postgresql://localhost/postgres?host=example.com',
   ])('rechaza un destino no aislable: %s', (url) => {

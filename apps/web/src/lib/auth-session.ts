@@ -2,7 +2,7 @@ import {
   StudentProfileViewSchema,
   type SessionView,
   type StudentProfileView,
-} from "@englove/shared";
+} from "@upward-english/shared";
 import { apiFetch } from "./api";
 import {
   resumeOfflineQueueAfterAuth,
@@ -23,11 +23,11 @@ let cachedProfile: { data: StudentProfileView; timestamp: number } | null =
 let refreshPromise: Promise<boolean> | null = null;
 let lastSuccessfulRefresh = 0;
 
-const TAB_SYNC_KEY = "englove_tab_sync_ts";
+const TAB_SYNC_KEY = "upward_english_tab_sync_ts";
 const PROFILE_CACHE_TTL_MS = 60 * 1000;
-const LOGOUT_PENDING_KEY = "englove_logout_pending";
-export const SESSION_EPOCH_KEY = "englove_session_epoch";
-export const AUTH_SYNC_CHANNEL = "englove_auth_sync";
+const LOGOUT_PENDING_KEY = "upward_english_logout_pending";
+export const SESSION_EPOCH_KEY = "upward_english_session_epoch";
+export const AUTH_SYNC_CHANNEL = "upward_english_auth_sync";
 
 export interface SessionEpoch {
   gen: number;
@@ -430,7 +430,7 @@ export async function requestSharedRefresh(): Promise<boolean> {
     typeof navigator.locks?.request === "function"
   ) {
     try {
-      return await navigator.locks.request("englove_auth_refresh", async () => {
+      return await navigator.locks.request("upward_english_auth_refresh", async () => {
         if (
           isLogoutPending() ||
           generation !== sessionGeneration ||

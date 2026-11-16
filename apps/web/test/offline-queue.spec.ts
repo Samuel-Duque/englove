@@ -714,7 +714,7 @@ describe("SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service", () => {
       });
 
       expect(mockClose).toHaveBeenCalled();
-      expect(mockDeleteDatabase).toHaveBeenCalledWith("englove_offline");
+      expect(mockDeleteDatabase).toHaveBeenCalledWith("upward_english_offline");
       expect(openedCount).toBeGreaterThanOrEqual(2);
       expect(eventId).toBeDefined();
     });

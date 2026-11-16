@@ -8,7 +8,7 @@ import {
   StudentStatsResponse,
   StudentStatsResponseSchema,
   WeekCalendarStatus,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../../lib/api';
 import { POLLING_INTERVAL_MS } from '../../../../../lib/query-client';
 

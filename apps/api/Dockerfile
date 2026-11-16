@@ -21,10 +21,10 @@ COPY packages/shared/ ./packages/shared/
 COPY apps/api/ ./apps/api/
 
 # Generate prisma client and build shared & api
-RUN pnpm --filter @englove/shared build
-RUN pnpm --filter @englove/api db:generate
-RUN pnpm --filter @englove/api build
-RUN pnpm --filter @englove/api deploy --prod --legacy --offline --ignore-scripts /out/api
+RUN pnpm --filter @upward-english/shared build
+RUN pnpm --filter @upward-english/api db:generate
+RUN pnpm --filter @upward-english/api build
+RUN pnpm --filter @upward-english/api deploy --prod --legacy --offline --ignore-scripts /out/api
 # Prisma genera fuera del paquete @prisma/client; conservar ese artefacto en el despliegue aislado.
 RUN cd apps/api && node -e "const fs = require('node:fs'); const path = require('node:path'); const generated = path.resolve(path.dirname(require.resolve('@prisma/client/package.json')), '../../.prisma'); const deployed = path.resolve(path.dirname(require.resolve('@prisma/client/package.json', { paths: ['/out/api'] })), '../../.prisma'); fs.cpSync(generated, deployed, { recursive: true });"
 

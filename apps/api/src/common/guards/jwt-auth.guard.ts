@@ -13,7 +13,7 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
-import { ApprovalStatus, Role, AgeSegment } from '@englove/shared';
+import { ApprovalStatus, Role, AgeSegment } from '@upward-english/shared';
 import { RateLimiterService } from '../rate-limiting/rate-limiter.service';
 import { consumeAnonymousIpBudgetOnce } from '../rate-limiting/rate-limiter.guard';
 import { extractClientIp } from '../utils/identity.utils';
@@ -41,7 +41,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly prisma: PrismaService,
     @Optional() private readonly rateLimiterService?: RateLimiterService,
   ) {
-    this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'englove_');
+    this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'upward_english_');
     this.jwtSecret =
       typeof this.configService.getOrThrow === 'function'
         ? this.configService.getOrThrow<string>('JWT_SECRET')

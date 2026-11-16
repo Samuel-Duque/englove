@@ -4,7 +4,7 @@ import { RegistroClient } from './registro-client';
 
 export const metadata: Metadata = {
   title: 'Registro de Estudiante',
-  description: 'Crea tu cuenta de estudiante en Englove.',
+  description: 'Crea tu cuenta de estudiante en Upward English.',
 };
 
 export default function RegistroPage() {

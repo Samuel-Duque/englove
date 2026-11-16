@@ -8,13 +8,13 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     // 1. Simular cookie de sesión
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: 'mock-student-token',
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: 'mock-student-token',
         domain: 'localhost',
         path: '/',
@@ -29,7 +29,7 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
         body: JSON.stringify({
           user: {
             id: 'std-e2e-2',
-            email: 'gamer@englove.local',
+            email: 'gamer@upwardenglish.local',
             name: 'Carlos Gamer',
             role: 'student',
           },
@@ -53,7 +53,7 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
           user: {
             id: 'std-e2e-2',
             name: 'Carlos Gamer',
-            email: 'gamer@englove.local',
+            email: 'gamer@upwardenglish.local',
             role: 'student',
           },
           student: {
@@ -251,15 +251,15 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     context,
   }) => {
     await context.addCookies([
-      { name: 'englove_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-e2e-nogames', email: 'nogames@englove.local', name: 'Sin Juegos', role: 'student' },
+          user: { id: 'std-e2e-nogames', email: 'nogames@upwardenglish.local', name: 'Sin Juegos', role: 'student' },
           student: { id: 'std-e2e-nogames', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
           organizationId: 'org-e2e',
         },

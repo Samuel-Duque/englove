@@ -36,7 +36,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input[type="email"]', 'wrong@englove.local');
+    await page.fill('input[type="email"]', 'wrong@upwardenglish.local');
     await page.fill('input[type="password"]', 'WrongPass123');
     await page.click('button[type="submit"]');
     await expect(page.locator('text=El correo o la contraseña no son correctos')).toBeVisible();
@@ -61,7 +61,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input[type="email"]', 'pending@englove.local');
+    await page.fill('input[type="email"]', 'pending@upwardenglish.local');
     await page.click('button[type="submit"]');
     await expect(page.locator('text=Tu cuenta está pendiente de aprobación por tu profesora')).toBeVisible();
 
@@ -70,7 +70,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'usr-1', email: 'valid@englove.local', name: 'Usuario Valido', role: 'teacher' },
+          user: { id: 'usr-1', email: 'valid@upwardenglish.local', name: 'Usuario Valido', role: 'teacher' },
           organizationId: 'org-1',
         },
       });
@@ -81,7 +81,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'usr-1', email: 'valid@englove.local', name: 'Usuario Valido', role: 'teacher' },
+          user: { id: 'usr-1', email: 'valid@upwardenglish.local', name: 'Usuario Valido', role: 'teacher' },
           organizationId: 'org-1',
         },
       });
@@ -94,11 +94,11 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     });
 
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
     ]);
 
-    await page.fill('input[type="email"]', 'valid@englove.local');
+    await page.fill('input[type="email"]', 'valid@upwardenglish.local');
     await page.fill('input[type="password"]', 'ValidPass123');
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/inicio/);
@@ -112,7 +112,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
 
     // 2.1 Validación client-side de política de contraseña (8–16 caracteres, sin espacios)
     await page.fill('input[name="name"], input#name-input, input#name', 'Sofía Gómez');
-    await page.fill('input[name="email"], input#email-input, input#email', 'sofia@englove.local');
+    await page.fill('input[name="email"], input#email-input, input#email', 'sofia@upwardenglish.local');
     await page.fill('input[name="birthDate"], input#birth-date-input, input#birthDate', '2016-05-15');
     await page.fill('input[name="password"], input#password-input, input#password', 'short');
     await page.check('input[type="checkbox"]');
@@ -158,7 +158,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await page.fill('input#email', 'alguien@englove.local');
+    await page.fill('input#email', 'alguien@upwardenglish.local');
     await page.click('button[type="submit"]');
 
     await expect(page.locator('h1:has-text("Revisa tu correo")')).toBeVisible();

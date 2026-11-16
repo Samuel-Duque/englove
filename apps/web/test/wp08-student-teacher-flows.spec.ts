@@ -5,7 +5,7 @@ import {
   scoreToGameStars,
   getGameMotivationMessage,
   AgeSegment,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   buildSentencePromptWithMarkers,
   parseInitialFillBlankItems,
@@ -156,7 +156,7 @@ describe('WP-08: Student and Teacher Flows UI & Logic (P0-09, P1-03, P1-05, P1-0
       const res2 = buildSentencePromptWithMarkers(prompt2, blanks);
       expect(res2).toBe(prompt2);
 
-      // 3. Schema validation against FillBlankItemSchema from @englove/shared
+      // 3. Schema validation against FillBlankItemSchema from @upward-english/shared
       const itemPayload = {
         id: '33333333-3333-4333-8333-333333333333',
         prompt: res2,
@@ -181,7 +181,7 @@ describe('WP-08: Student and Teacher Flows UI & Logic (P0-09, P1-03, P1-05, P1-0
       const parsedSchema = FillBlankItemSchema.safeParse(itemPayload);
       expect(parsedSchema.success).toBe(true);
 
-      // 4. Schema validation against ExamItemSchema from @englove/shared
+      // 4. Schema validation against ExamItemSchema from @upward-english/shared
       const examItemPayload = {
         ...itemPayload,
         weight: 50,

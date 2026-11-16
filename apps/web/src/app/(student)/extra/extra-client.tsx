@@ -12,7 +12,7 @@ import {
   FeatureFlagsResponse,
   FeatureFlagsResponseSchema,
   isValidHttpsResourceUrl,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 
 export function ExtraClient() {

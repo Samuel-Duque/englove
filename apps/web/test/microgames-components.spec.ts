@@ -9,7 +9,7 @@ import {
   deterministicShuffle,
   GameMechanic,
   GAME_MECHANIC_LABELS,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { playSound } from '../src/lib/sound';
 import { fireCelebrationConfetti } from '../src/lib/confetti';
 

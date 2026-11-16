@@ -10,7 +10,7 @@ import {
   AttemptStatus,
   GameMechanic,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 

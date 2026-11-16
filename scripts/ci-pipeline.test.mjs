@@ -18,7 +18,7 @@ test('CI-01: fallo de navegador bloquea promoción y conserva evidencia', () => 
 test('CI-02: la base efímera se migra y las pruebas la reciben bajo Turbo strict', () => {
   const quality = workflow.jobs['quality-gates'];
   assert.equal(quality.services.postgres.image, 'postgres:18-alpine');
-  assert.match(quality.env.DATABASE_URL, /127\.0\.0\.1:5433\/englove_ci$/);
+  assert.match(quality.env.DATABASE_URL, /127\.0\.0\.1:5433\/upward_english_ci$/);
   assert.equal(quality.env.REQUIRE_POSTGRES_TESTS, '1');
   const migration = quality.steps.findIndex(step => step.run === 'pnpm db:migrate');
   const tests = quality.steps.findIndex(step => step.run === 'pnpm test');

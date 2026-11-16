@@ -23,7 +23,7 @@ const baseEnvSchema = z.object({
   R2_ENDPOINT: z.string().optional().default(''),
   R2_PUBLIC_URL: z.string().optional().default(''),
   COOKIE_DOMAIN: z.string().optional().default(''),
-  COOKIE_PREFIX: z.string().default('englove_'),
+  COOKIE_PREFIX: z.string().default('upward_english_'),
   WEB_BASE_URL: z.string().url('WEB_BASE_URL must be a valid URL'),
   NEXT_PUBLIC_API_URL: z.string().url('NEXT_PUBLIC_API_URL must be a valid URL'),
   MAIL_FROM: z.string().min(1, 'MAIL_FROM is required'),
@@ -35,7 +35,7 @@ const baseEnvSchema = z.object({
     .pipe(z.number().int().min(1).max(65535)),
   MAILPIT_API_URL: z.string().url().optional(),
   RESEND_API_KEY: z.string().optional().default(''),
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').default('englove-dev-jwt-secret-min-32-chars-long-local-secret!'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters').default('upward-english-dev-jwt-secret-min-32-chars-long-local-secret!'),
   APP_MIN_VERSION: z
     .string()
     .regex(/^\d+\.\d+\.\d+$/, 'APP_MIN_VERSION must be valid SemVer (MAJOR.MINOR.PATCH)')
@@ -74,7 +74,7 @@ export function validateEnvironment(config: Record<string, unknown>): ValidatedE
     if (
       !env.JWT_SECRET ||
       env.JWT_SECRET.trim() === '' ||
-      env.JWT_SECRET === 'englove-dev-jwt-secret-min-32-chars-long-local-secret!'
+      env.JWT_SECRET === 'upward-english-dev-jwt-secret-min-32-chars-long-local-secret!'
     ) {
       extraMissing.push('JWT_SECRET');
     }

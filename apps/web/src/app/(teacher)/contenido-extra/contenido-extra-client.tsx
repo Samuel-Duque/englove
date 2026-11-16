@@ -11,7 +11,7 @@ import {
   FeatureFlagsResponseSchema,
   isValidHttpsResourceUrl,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { AccessibleModal, ConfirmDialog } from '../../../components/ui/modal';
 

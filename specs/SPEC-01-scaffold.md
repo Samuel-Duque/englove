@@ -142,7 +142,7 @@ Nombres adicionales son concreciones técnicas; los `R2_*` y `COOKIE_*` proviene
 | `APP_ENV`, `PORT` | Enum `local/staging/production`; puerto entero 1–65535. `NODE_ENV` es distinto: staging ejecuta build de producción. |
 | `DATABASE_URL`, `MIGRATION_DATABASE_URL` | Conexión runtime obligatoria por el pooler de Neon (`-pooler`, PgBouncer); segunda conexión directa obligatoria solo para CI / `prisma migrate deploy` (G-A03), retirada del runtime de la API en Render. |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | Strings no vacíos; bucket privado por entorno (en local provistos por MinIO emulador S3 sin acceso anónimo, decisión 134). `R2_PUBLIC_URL` opcional/vacía en el piloto: no habilita acceso público. |
-| `COOKIE_DOMAIN`, `COOKIE_PREFIX` | Dominio vacío local; `.<dominio>` controlado en staging/producción; prefijo en staging `englove_stg_` (`englove_` en local/prod). No se emiten cookies hasta SPEC-02. |
+| `COOKIE_DOMAIN`, `COOKIE_PREFIX` | Dominio vacío local; `.<dominio>` controlado en staging/producción; prefijo en staging `upward_english_stg_` (`upward_english_` en local/prod). No se emiten cookies hasta SPEC-02. |
 | `WEB_BASE_URL`, `NEXT_PUBLIC_API_URL` | Orígenes del entorno; HTTPS fuera de local. Solo dirección pública de API va al bundle web, nunca secretos. |
 | `MAIL_FROM`, `RESEND_API_KEY` | Obligatorios para envío en staging/producción; local usa transporte SMTP hacia Mailpit sin clave (decisión 134). Remitente de dominio verificado, común a todas las plantillas del entorno; no se fija aquí un dominio real inexistente. |
 
@@ -158,14 +158,14 @@ Sin endpoint: entrada interna `{ template, to, variables, idempotencyKey }`, cla
 
 | Plantilla | Entradas de contenido / acción | Asunto y contenido mínimo |
 | --- | --- | --- |
-| `signup-received` | Sin token ni contraseña | «Recibimos tu solicitud en Englove». Cuenta pendiente de aprobación; se avisará cuando pueda entrar. |
-| `signup-existing-account` | `recoveryUrl` a `/recuperar-contrasena` | «Ya tienes una cuenta en Englove». Solicitar recuperación; ignorar si no pidió registrarse. No revela organización ni genera reset automático. |
-| `approved` | `loginUrl` a `/login` | «Tu cuenta de Englove fue aprobada». Entrar con credenciales elegidas al registrarse. |
-| `password-reset` | `resetUrl` a `/restablecer/<token>` | «Restablece tu contraseña de Englove». Enlace de un uso, 30 min desde emisión; no consume token por GET. |
-| `email-change-otp` | `otp` string de 6 dígitos, ceros conservados; destino nuevo | «Confirma tu nuevo correo en Englove». Código de un uso, 10 min desde emisión; no compartir. |
-| `email-changed` | `changeSource` (`student/teacher`), `recipientKind` (`previous/new`) | «Tu correo de acceso a Englove cambió». Aviso informativo; no permite deshacer. Alumno: anterior; profesora: nuevo y anterior cuando sea posible. |
-| `grading-notification` | `activityTitle`, `feedbackUrl` a `/feedback` | «Tu actividad ya fue calificada». «Entra a Englove para consultar el resultado». Sin evaluación en asunto, HTML, texto o URL. |
-| `teacher-pending-summary` | Contadores por categoría y enlaces a solicitudes/revisión | «Tienes pendientes en Englove». Desglose sin nombres ni respuestas; no envía si no hay pendientes. Cómputo y cadencia se fijan en SPEC-08. |
+| `signup-received` | Sin token ni contraseña | «Recibimos tu solicitud en Upward English». Cuenta pendiente de aprobación; se avisará cuando pueda entrar. |
+| `signup-existing-account` | `recoveryUrl` a `/recuperar-contrasena` | «Ya tienes una cuenta en Upward English». Solicitar recuperación; ignorar si no pidió registrarse. No revela organización ni genera reset automático. |
+| `approved` | `loginUrl` a `/login` | «Tu cuenta de Upward English fue aprobada». Entrar con credenciales elegidas al registrarse. |
+| `password-reset` | `resetUrl` a `/restablecer/<token>` | «Restablece tu contraseña de Upward English». Enlace de un uso, 30 min desde emisión; no consume token por GET. |
+| `email-change-otp` | `otp` string de 6 dígitos, ceros conservados; destino nuevo | «Confirma tu nuevo correo en Upward English». Código de un uso, 10 min desde emisión; no compartir. |
+| `email-changed` | `changeSource` (`student/teacher`), `recipientKind` (`previous/new`) | «Tu correo de acceso a Upward English cambió». Aviso informativo; no permite deshacer. Alumno: anterior; profesora: nuevo y anterior cuando sea posible. |
+| `grading-notification` | `activityTitle`, `feedbackUrl` a `/feedback` | «Tu actividad ya fue calificada». «Entra a Upward English para consultar el resultado». Sin evaluación en asunto, HTML, texto o URL. |
+| `teacher-pending-summary` | Contadores por categoría y enlaces a solicitudes/revisión | «Tienes pendientes en Upward English». Desglose sin nombres ni respuestas; no envía si no hay pendientes. Cómputo y cadencia se fijan en SPEC-08. |
 
 ## 6. Modelo de datos
 
@@ -197,7 +197,7 @@ Concreciones para la migración y generación del cliente:
 
 ## 7. Interfaz
 
-Web vacía: «Englove — Plataforma en preparación». Sin navegación de usuario ni conteo de clics aplicable; se materializan en sus specs. Los grupos vacíos no crean dos páginas `/inicio`.
+Web vacía: «Upward English — Plataforma en preparación». Sin navegación de usuario ni conteo de clics aplicable; se materializan en sus specs. Los grupos vacíos no crean dos páginas `/inicio`.
 
 Estados reutilizables simulados, sin login, subida ni actividad real:
 
@@ -264,7 +264,7 @@ No hay P-n asignados a SPEC-01 (P-1 a P-4 quedaron cerrados por las decisiones 8
 | --- | --- | --- | --- | --- |
 | Q-1 | Prefijo operacional y docs en producción. **Cerrada (Decidido, decisión 83):** excepción explícita para `/health` y `/docs`, negocio `/api/v1`; docs deshabilitado en producción (`404`). | Líder del proyecto | 2026-10-10 | No (cerrada) |
 | Q-2 | Fuente canónica y activación inicial en `FeatureFlag`. **Cerrada (Decidido, decisión 83):** claves `games` y `extra_content` (ambas `enabled: false`), parámetros en `games.config`, `extra_content.config = {}`. | Líder del proyecto | 2026-10-10 | No (cerrada) |
-| Q-4 | Adaptador de Cloudflare, `proxy.ts`, React Compiler y bundle de 3 MB (decisiones 81, 82 y 85). **Cerrada (Decidido, decisión 85):** PoC ENG-140 en verde (7/7 comprobaciones, informe en [`planning/poc-eng-140-informe.md`](../planning/poc-eng-140-informe.md)). Seleccionado `vinext`; Worker de 91.69 kB gzip verificado; `proxy.ts` con cookies `Domain=.englove.org` validado. Desbloquea RF-1, RF-2 y RF-18. | Líder del proyecto | 2026-10-10 | No (cerrada) |
+| Q-4 | Adaptador de Cloudflare, `proxy.ts`, React Compiler y bundle de 3 MB (decisiones 81, 82 y 85). **Cerrada (Decidido, decisión 85):** PoC ENG-140 en verde (7/7 comprobaciones, informe en [`planning/poc-eng-140-informe.md`](../planning/poc-eng-140-informe.md)). Seleccionado `vinext`; Worker de 91.69 kB gzip verificado; `proxy.ts` con cookies `Domain=.englove.org` validado en el PoC con el dominio anterior. Desbloquea RF-1, RF-2 y RF-18. | Líder del proyecto | 2026-10-10 | No (cerrada) |
 | P-1 | Inicio antes de apertura. **Cerrada (Decidido, decisión 84):** `409 ATTEMPT_NOT_OPEN`, no crear intento y mostrar fecha de apertura (CONTEXT §14). El mapa funcional lo completa SPEC-05. | Líder del proyecto | 2026-10-10 | No |
 | P-2 | Comentario autocalificados. **Cerrada (Decidido, decisión 84):** obligatorio solo en revisión manual, opcional en autocalificados. Comentario nullable permite ambos en el esquema; SPEC-07 adapta fixtures/validación. | Líder del proyecto | 2026-10-10 | No |
 | P-3 | Transcodificación. **Cerrada (Decidido, decisión 84):** máximo 3 intentos totales persistidos; fallo definitivo y raw como fallback, sin reconversión manual. Scaffold crea campos; SPEC-05 completa rutina. | Líder del proyecto | 2026-10-10 | No |
@@ -286,5 +286,5 @@ Incongruencias aplicadas por jerarquía, sin corregir decisiones en silencio: en
 | 2026-10-20 | Implementación completa de SPEC-01 Scaffold (ENG-010 a ENG-019, RF-1 a RF-19): monorepo, web, api, shared, Prisma, migraciones, seeds, docker-compose, render.yaml, CI y pruebas | Pasa a estado Implementada tras verificar suites de pruebas y guardrails |
 | 2026-10-20 | Limpieza de referencias residuales en §4, §5, §9 y §11: P-4 alineado con la decisión 92 (`onDelete: SetNull` y redacción de `details`), Q-2 marcada como Decidida (decisión 83) y PG18 en tabla de pruebas | Sincronización documental con las decisiones 83, 88 y 92 |
 | 2026-10-20 | Estado Implementada → Verificada y sincronización del índice y seguimiento | Solicitud explícita del líder del proyecto; se conserva el cierre previo del scaffold, sin atribuir una nueva ejecución de CI o validación de staging a este cambio documental |
-| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-01) | Precisión de render.yaml (plan: free en staging, sin MIGRATION_DATABASE_URL en runtime), MinIO y Mailpit estándar en docker-compose.yml (decisión 134), puerto local PostgreSQL 5433 y prefijo englove_stg_ |
+| 2026-11-09 | Alineación técnica con Etapa 12 y auditoría QA (WP-01) | Precisión de render.yaml (plan: free en staging, sin MIGRATION_DATABASE_URL en runtime), MinIO y Mailpit estándar en docker-compose.yml (decisión 134), puerto local PostgreSQL 5433 y prefijo upward_english_stg_ |
 | 2026-11-11 | Precisión léxica en RF-17 (db-push) para evitar colisión con el linter de red flags sin alterar requisitos de migración | Auditoría de especificaciones Etapa 12 |

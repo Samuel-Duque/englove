@@ -37,7 +37,7 @@ import {
   MediaPlaybackUrlResponse,
   MediaConfirmResponse,
   ActivityType,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
@@ -78,11 +78,11 @@ export class MediaService implements OnModuleInit {
     const accountId = this.configService.get<string>('R2_ACCOUNT_ID') || 'mock-account';
     const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID') || 'mock-key';
     const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || 'mock-secret';
-    this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || 'englove-dev';
+    this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || 'upward-english-dev';
     this.jwtSecret =
       this.configService.get<string>('JWT_ATTEMPT_SECRET') ||
       this.configService.get<string>('JWT_SECRET') ||
-      'dev-secret-attempt-englove';
+      'dev-secret-attempt-upward-english';
     const r2Endpoint = this.configService.get<string>('R2_ENDPOINT');
 
     const endpoint = r2Endpoint || `https://${accountId}.r2.cloudflarestorage.com`;

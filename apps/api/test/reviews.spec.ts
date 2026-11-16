@@ -11,7 +11,7 @@ import {
   MediaAssetStatus,
   ProgressEventType,
   AgeSegment,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   NotFoundException,
   ConflictException,

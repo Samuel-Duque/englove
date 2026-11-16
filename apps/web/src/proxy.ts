@@ -97,7 +97,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const cookiePrefix =
     process.env.COOKIE_PREFIX ||
     process.env.NEXT_PUBLIC_COOKIE_PREFIX ||
-    "englove_";
+    "upward_english_";
   const sessionCookie = request.cookies.get(`${cookiePrefix}access_token`);
 
   const jwt = sessionCookie ? decodeJwtPayload(sessionCookie.value) : null;
@@ -106,7 +106,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     jwt && typeof jwt.exp === "number" && jwt.exp <= nowSec,
   );
   const logoutPending =
-    request.cookies.get("englove_logout_pending")?.value === "1";
+    request.cookies.get("upward_english_logout_pending")?.value === "1";
   const isSessionValid = Boolean(sessionCookie && !isExpired && !logoutPending);
 
   const isPublicAuthRoute =

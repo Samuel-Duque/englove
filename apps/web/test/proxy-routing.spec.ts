@@ -5,7 +5,7 @@ import { proxy } from "../src/proxy";
 describe("RF-17: proxy routing and redirect logic", () => {
   it("SEG-01: pending logout ignores retained HttpOnly session cookies on login and private routes", async () => {
     const headers = {
-      cookie: "englove_access_token=valid-jwt-token; englove_logout_pending=1",
+      cookie: "upward_english_access_token=valid-jwt-token; upward_english_logout_pending=1",
     };
     const login = await proxy(
       new NextRequest("http://localhost:3000/login", { headers }),
@@ -46,7 +46,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("redirects authenticated user on public auth route to /inicio", async () => {
     const req = new NextRequest("http://localhost:3000/login", {
       headers: {
-        cookie: "englove_access_token=valid-jwt-token",
+        cookie: "upward_english_access_token=valid-jwt-token",
       },
     });
     const res = await proxy(req);
@@ -57,7 +57,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("allows authenticated user on private route to pass through", async () => {
     const req = new NextRequest("http://localhost:3000/inicio", {
       headers: {
-        cookie: "englove_access_token=valid-jwt-token",
+        cookie: "upward_english_access_token=valid-jwt-token",
       },
     });
     const res = await proxy(req);
@@ -93,7 +93,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const expiredToken = `header.${expiredPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/inicio", {
       headers: {
-        cookie: `englove_access_token=${expiredToken}`,
+        cookie: `upward_english_access_token=${expiredToken}`,
       },
     });
     const res = await proxy(req);
@@ -137,7 +137,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("redirects authenticated user on root / to /inicio", async () => {
     const req = new NextRequest("http://localhost:3000/", {
       headers: {
-        cookie: "englove_access_token=valid-jwt-token",
+        cookie: "upward_english_access_token=valid-jwt-token",
       },
     });
     const res = await proxy(req);
@@ -152,7 +152,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const studentToken = `header.${studentPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/alumnos", {
       headers: {
-        cookie: `englove_access_token=${studentToken}`,
+        cookie: `upward_english_access_token=${studentToken}`,
       },
     });
     const res = await proxy(req);
@@ -167,7 +167,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const teacherToken = `header.${teacherPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/perfil", {
       headers: {
-        cookie: `englove_access_token=${teacherToken}`,
+        cookie: `upward_english_access_token=${teacherToken}`,
       },
     });
     const res = await proxy(req);
@@ -182,7 +182,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const studentToken = `header.${studentPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/contenido-extra", {
       headers: {
-        cookie: `englove_access_token=${studentToken}`,
+        cookie: `upward_english_access_token=${studentToken}`,
       },
     });
     const res = await proxy(req);
@@ -197,7 +197,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const teacherToken = `header.${teacherPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/extra", {
       headers: {
-        cookie: `englove_access_token=${teacherToken}`,
+        cookie: `upward_english_access_token=${teacherToken}`,
       },
     });
     const res = await proxy(req);
@@ -214,7 +214,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/contenido-extra",
       {
         headers: {
-          cookie: `englove_access_token=${teacherToken}`,
+          cookie: `upward_english_access_token=${teacherToken}`,
         },
       },
     );
@@ -227,7 +227,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const studentToken = `header.${studentPayload}.sig`;
     const reqStudent = new NextRequest("http://localhost:3000/extra", {
       headers: {
-        cookie: `englove_access_token=${studentToken}`,
+        cookie: `upward_english_access_token=${studentToken}`,
       },
     });
     const resStudent = await proxy(reqStudent);
@@ -241,7 +241,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const teacherToken = `header.${teacherPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/actividades", {
       headers: {
-        cookie: `englove_access_token=${teacherToken}`,
+        cookie: `upward_english_access_token=${teacherToken}`,
       },
     });
     const res = await proxy(req);
@@ -251,7 +251,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/actividades/nueva",
       {
         headers: {
-          cookie: `englove_access_token=${teacherToken}`,
+          cookie: `upward_english_access_token=${teacherToken}`,
         },
       },
     );
@@ -268,7 +268,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/actividades",
       {
         headers: {
-          cookie: `englove_access_token=${studentToken}`,
+          cookie: `upward_english_access_token=${studentToken}`,
         },
       },
     );
@@ -280,7 +280,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/actividad/attempt-123",
       {
         headers: {
-          cookie: `englove_access_token=${studentToken}`,
+          cookie: `upward_english_access_token=${studentToken}`,
         },
       },
     );
@@ -306,7 +306,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("allows authenticated access to /offline without redirecting to /inicio", async () => {
     const req = new NextRequest("http://localhost:3000/offline", {
       headers: {
-        cookie: "englove_access_token=valid-token",
+        cookie: "upward_english_access_token=valid-token",
       },
     });
     const res = await proxy(req);
@@ -338,7 +338,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       process.env.NEXT_PUBLIC_APP_ENV = "local";
       const localAuthRes = await proxy(
         new NextRequest("http://localhost:3000/inicio", {
-          headers: { cookie: "englove_access_token=valid-token" },
+          headers: { cookie: "upward_english_access_token=valid-token" },
         }),
       );
       expect(localAuthRes.headers.get("x-content-type-options")).toBe("nosniff");

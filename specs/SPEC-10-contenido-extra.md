@@ -102,7 +102,7 @@ Con `flags.extra_content === true`, `StudentNav` muestra «Extra» (`/extra`, `a
 
 Tarea: `ENG-121`. Referencias: Decisión 17, `CONTEXT §2.4`, `§10`, `G-C13`.
 
-Todo recurso en `/extra` y `/contenido-extra` se renderiza únicamente como `<a href={resource.url} target="_blank" rel="noopener noreferrer">` avisando que se abre fuera de Englove, sin incrustar contenido externo en el DOM ni adjuntar datos del usuario en la URL.
+Todo recurso en `/extra` y `/contenido-extra` se renderiza únicamente como `<a href={resource.url} target="_blank" rel="noopener noreferrer">` avisando que se abre fuera de Upward English, sin incrustar contenido externo en el DOM ni adjuntar datos del usuario en la URL.
 
 **Criterios de aceptación:**
 

@@ -9,7 +9,7 @@ import {
   ApprovalStatus,
   ProgressEventType,
   MediaAssetStatus,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { ReviewsService } from '../src/reviews/reviews.service';
 import { PendingSummaryService } from '../src/dashboard/pending-summary.service';
@@ -54,7 +54,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de 
         R2_ACCOUNT_ID: 'mock-account',
         R2_ACCESS_KEY_ID: 'mock-key',
         R2_SECRET_ACCESS_KEY: 'mock-secret',
-        R2_BUCKET_NAME: 'englove-test-bucket',
+        R2_BUCKET_NAME: 'upward-english-test-bucket',
       });
       const jwtService = new JwtService({
         secret: 'e2e-review-flow-test-jwt-secret-min-32-chars-long!',

@@ -1,46 +1,57 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   StudentFeedbackListResponse,
   StudentFeedbackListResponseSchema,
   StudentFeedbackItemView,
   RuntimeView,
   RuntimeViewSchema,
-} from '@upward-english/shared';
-import { apiFetch, ApiError } from '../../../lib/api';
-import { AccessibleModal } from '../../../components/ui/modal';
+} from "@upward-english/shared";
+import { apiFetch, ApiError } from "../../../lib/api";
+import Link from "next/link";
+import { AccessibleModal } from "../../../components/ui/modal";
 
 const TYPE_LABELS: Record<string, string> = {
-  fill_blank: '✍️ Espacios en blanco',
-  speaking: '🎙️ Expresión oral (Speaking)',
-  open_question: '📄 Pregunta abierta',
-  exam: '📝 Examen',
-  game: '🎮 Juego',
+  fill_blank: "✍️ Espacios en blanco",
+  speaking: "🎙️ Expresión oral (Speaking)",
+  open_question: "📄 Pregunta abierta",
+  exam: "📝 Examen",
+  game: "🎮 Juego",
 };
 
 export function FeedbackClient() {
   const router = useRouter();
   const [retryError, setRetryError] = useState<string | null>(null);
-  const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
-  const [startingAssignmentId, setStartingAssignmentId] = useState<string | null>(null);
+  const [expandedHistory, setExpandedHistory] = useState<
+    Record<string, boolean>
+  >({});
+  const [startingAssignmentId, setStartingAssignmentId] = useState<
+    string | null
+  >(null);
 
-  const { data: feedbackData, isLoading, error: queryError, refetch: loadFeedback } = useQuery({
-    queryKey: ['student', 'feedback'],
+  const {
+    data: feedbackData,
+    isLoading,
+    error: queryError,
+    refetch: loadFeedback,
+  } = useQuery({
+    queryKey: ["student", "feedback"],
     queryFn: () =>
-      apiFetch<StudentFeedbackListResponse>('/api/v1/student/feedback', {
+      apiFetch<StudentFeedbackListResponse>("/api/v1/student/feedback", {
         schema: StudentFeedbackListResponseSchema,
       }),
   });
 
   const items: StudentFeedbackItemView[] = feedbackData?.items || [];
-  const error = queryError instanceof ApiError
-    ? queryError.message
-    : queryError instanceof Error
+  const error =
+    queryError instanceof ApiError
       ? queryError.message
-      : null;
+      : queryError instanceof Error
+        ? queryError.message
+        : null;
 
   const toggleHistory = (assignmentId: string) => {
     setExpandedHistory((prev) => ({
@@ -52,14 +63,18 @@ export function FeedbackClient() {
   const retryMutation = useMutation({
     mutationFn: (assignmentId: string) =>
       apiFetch<RuntimeView>(`/api/v1/assignments/${assignmentId}/attempts`, {
-        method: 'POST',
+        method: "POST",
         schema: RuntimeViewSchema,
       }),
     onSuccess: (runtime) => {
       router.push(`/actividad/${runtime.attempt.id}`);
     },
     onError: (err: unknown) => {
-      setRetryError(err instanceof ApiError ? err.message : 'No fue posible iniciar el nuevo intento.');
+      setRetryError(
+        err instanceof ApiError
+          ? err.message
+          : "No fue posible iniciar el nuevo intento.",
+      );
       setStartingAssignmentId(null);
     },
   });
@@ -76,16 +91,22 @@ export function FeedbackClient() {
     return (
       <div className="py-20 text-center space-y-3">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
-        <p className="text-sm font-semibold text-zinc-600">Cargando tus comentarios y notas…</p>
+        <p className="text-sm font-semibold text-[var(--origami-text-secondary)]">
+          Cargando tus comentarios y notas…
+        </p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="py-12 max-w-lg mx-auto bg-white p-8 rounded-3xl border border-rose-200 shadow-xs text-center space-y-3">
-        <span className="text-4xl" aria-hidden="true">⚠️</span>
-        <h2 className="text-base font-extrabold text-rose-950">No pudimos cargar tu retroalimentación</h2>
+      <div className="origami-card space-y-4">
+        <span className="text-4xl" aria-hidden="true">
+          ⚠️
+        </span>
+        <h2 className="origami-card-title">
+          No pudimos cargar tu retroalimentación
+        </h2>
         <p className="text-xs text-rose-700">{error}</p>
         <button
           type="button"
@@ -109,12 +130,14 @@ export function FeedbackClient() {
         title="Aviso de Intento"
       >
         <div className="space-y-4">
-          <p className="text-sm text-zinc-600">{retryError}</p>
+          <p className="text-sm text-[var(--origami-text-secondary)]">
+            {retryError}
+          </p>
           <div className="flex justify-end">
             <button
               type="button"
               onClick={() => setRetryError(null)}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-colors"
+              className="origami-button"
             >
               Entendido
             </button>
@@ -124,80 +147,81 @@ export function FeedbackClient() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-amber-950">
-          💬 Tus Calificaciones y Retroalimentación
+        <h1 className="origami-page-title">
+          Tus Calificaciones y Retroalimentación
         </h1>
-        <p className="mt-1 text-xs sm:text-sm text-zinc-600">
-          Revisa las notas, los comentarios de tu profesora y los stickers que ganaste en cada actividad.
+        <p className="mt-1 text-xs sm:text-sm text-[var(--origami-text-secondary)]">
+          Revisa las notas, los comentarios de tu profesora y los stickers que
+          recibiste.
         </p>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-amber-200 bg-white p-12 text-center space-y-3 shadow-2xs">
-          <span className="text-4xl" aria-hidden="true">📚</span>
-          <h2 className="text-base font-extrabold text-amber-950">
+        <div className="origami-card space-y-4">
+          <span className="text-4xl" aria-hidden="true">
+            📚
+          </span>
+          <h2 className="origami-card-title">
             Aún no tienes actividades calificadas
           </h2>
-          <p className="text-xs text-zinc-500 max-w-md mx-auto">
-            En cuanto tu profesora revise y califique tus entregas de ejercicios y speaking, verás aquí su mensaje y tus estrellas.
+          <p className="text-xs text-[var(--origami-text-secondary)] max-w-md mx-auto">
+            Cuando tu profesora revise tus entregas, podrás leer su mensaje y
+            consultar la nota.
           </p>
+          <Link
+            href="/inicio"
+            className="origami-button origami-button--secondary"
+          >
+            Ver mis actividades
+          </Link>
         </div>
       ) : (
         <div className="space-y-6">
           {items.map((item) => {
             const latest = item.latestAttempt;
-            const scoreFormatted = latest.score.toFixed(1).replace('.', ',');
+            const scoreFormatted = latest.score.toFixed(1).replace(".", ",");
             const isHistoryOpen = Boolean(expandedHistory[item.assignmentId]);
-            const isRetrying = isStartingAttempt && startingAssignmentId === item.assignmentId;
+            const isRetrying =
+              isStartingAttempt && startingAssignmentId === item.assignmentId;
 
             return (
-              <div
-                key={item.assignmentId}
-                className="rounded-3xl border border-amber-200/90 bg-white p-6 shadow-xs space-y-5 hover:shadow-md transition-all"
-              >
-                {/* Top bar: Type & Stars */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 pb-3">
+              <div key={item.assignmentId} className="origami-card space-y-4">
+                {/* Type and academic grade */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--origami-border-subtle)] pb-3">
                   <div>
-                    <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
+                    <span className="text-[11px] font-bold text-[var(--origami-text-secondary)] uppercase tracking-wider block">
                       {TYPE_LABELS[item.activityType] || item.activityType}
                     </span>
-                    <h2 className="text-lg sm:text-xl font-black text-amber-950 leading-snug">
-                      {item.activityTitle}
-                    </h2>
+                    <h2 className="origami-card-title">{item.activityTitle}</h2>
                   </div>
 
-                  <div className="flex items-center gap-3 self-start sm:self-auto bg-amber-50/80 px-4 py-2 rounded-2xl border border-amber-200/60">
+                  <div className="origami-state space-y-2">
                     <div>
-                      <span className="text-xs text-zinc-500 font-bold block text-right">Nota</span>
-                      <span className="text-xl font-black text-amber-950">
+                      <span className="origami-label block">Nota</span>
+                      <span className="text-xl font-black">
                         {scoreFormatted}
                       </span>
-                      <span className="text-xs font-semibold text-zinc-500"> / 5,0</span>
-                    </div>
-
-                    <div className="flex gap-0.5" aria-label={`Calificación: ${latest.stars} estrellas`}>
-                      {[1, 2, 3].map((star) => (
-                        <span key={star} className="text-lg">
-                          {star <= latest.stars ? '⭐' : '☆'}
-                        </span>
-                      ))}
+                      <span className="text-xs font-semibold text-[var(--origami-text-secondary)]">
+                        {" "}
+                        / 5,0
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Teacher Comment */}
                 {latest.comment ? (
-                  <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/50 space-y-1">
-                    <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                  <div className="origami-state space-y-2">
+                    <span className="text-xs font-black text-[var(--origami-text-secondary)] flex items-center gap-1.5">
                       <span aria-hidden="true">👩‍🏫</span>
                       <span>Mensaje de tu profesora:</span>
                     </span>
-                    <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed font-medium">
+                    <p className="text-xs sm:text-sm text-[var(--origami-text-secondary)] leading-relaxed font-medium">
                       {latest.comment}
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-400 italic">
+                  <p className="text-xs text-[var(--origami-text-secondary)] italic">
                     Sin comentario personalizado para esta entrega.
                   </p>
                 )}
@@ -205,16 +229,15 @@ export function FeedbackClient() {
                 {/* Stickers Awarded */}
                 {latest.stickers.length > 0 && (
                   <div className="space-y-2">
-                    <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
+                    <span className="text-[11px] font-bold text-[var(--origami-text-secondary)] uppercase tracking-wider block">
                       Stickers recibidos
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {latest.stickers.map((st) => (
-                        <div
-                          key={st.code}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-950 text-xs font-bold shadow-2xs"
-                        >
-                          <span className="text-base">{st.emoji}</span>
+                        <div key={st.code} className="origami-state space-y-2">
+                          <span className="text-base" aria-hidden="true">
+                            {st.emoji}
+                          </span>
                           <span>{st.label}</span>
                         </div>
                       ))}
@@ -224,22 +247,25 @@ export function FeedbackClient() {
 
                 {/* Retry Banner if available (RF-9, RF-10) */}
                 {item.hasAvailableRetry && (
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="origami-state origami-state--success flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                      <span className="text-xs font-black text-[var(--origami-text-secondary)] flex items-center gap-1.5">
                         <span aria-hidden="true">🔄</span>
                         <span>¡Tu profesora te habilitó un nuevo intento!</span>
                       </span>
-                      <p className="text-[11px] text-emerald-800">
-                        Tienes plazo hasta el{' '}
+                      <p className="text-[11px] text-[var(--origami-text-secondary)]">
+                        Tienes plazo hasta el{" "}
                         <strong>
-                          {new Date(item.effectiveDueAt).toLocaleDateString('es-CO', {
-                            timeZone: 'America/Bogota',
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {new Date(item.effectiveDueAt).toLocaleDateString(
+                            "es-CO",
+                            {
+                              timeZone: "America/Bogota",
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
                         </strong>
                       </p>
                     </div>
@@ -248,62 +274,56 @@ export function FeedbackClient() {
                       type="button"
                       onClick={() => handleStartRetry(item.assignmentId)}
                       disabled={isRetrying}
-                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs transition-colors shadow-xs shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                      className="origami-button"
                     >
-                      {isRetrying ? 'Iniciando…' : 'Intentar de nuevo'}
+                      {isRetrying ? "Iniciando…" : "Intentar de nuevo"}
                     </button>
                   </div>
                 )}
 
                 {/* Attempt History Accordion */}
                 {item.attempts.length > 1 && (
-                  <div className="pt-2 border-t border-zinc-100">
+                  <div className="pt-2 border-t border-[var(--origami-border-subtle)]">
                     <button
                       type="button"
                       onClick={() => toggleHistory(item.assignmentId)}
-                      className="text-xs font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1.5 transition-colors focus:outline-none"
+                      aria-expanded={isHistoryOpen}
+                      className="origami-button origami-button--text"
                     >
-                      <span>{isHistoryOpen ? '▲' : '▼'}</span>
+                      <span>{isHistoryOpen ? "▲" : "▼"}</span>
                       <span>
                         {isHistoryOpen
-                          ? 'Ocultar historial de intentos'
+                          ? "Ocultar historial de intentos"
                           : `Ver historial de intentos anteriores (${item.attempts.length})`}
                       </span>
                     </button>
 
                     {isHistoryOpen && (
-                      <div className="mt-3 space-y-3 pl-3 border-l-2 border-amber-200">
+                      <div className="mt-3 space-y-3 pl-3 border-l-2 border-[var(--origami-border-subtle)]">
                         {item.attempts.map((att) => (
-                          <div
-                            key={att.id}
-                            className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-xs space-y-1.5"
-                          >
-                            <div className="flex items-center justify-between font-bold text-zinc-700">
+                          <div key={att.id} className="origami-state space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 font-bold">
                               <span>Intento #{att.attemptNumber}</span>
-                              <span className="text-zinc-500 text-[11px]">
-                                {new Date(att.gradedAt).toLocaleDateString('es-CO', {
-                                  timeZone: 'America/Bogota',
-                                  day: 'numeric',
-                                  month: 'short',
-                                })}
+                              <span className="text-[var(--origami-text-secondary)] text-[11px]">
+                                {new Date(att.gradedAt).toLocaleDateString(
+                                  "es-CO",
+                                  {
+                                    timeZone: "America/Bogota",
+                                    day: "numeric",
+                                    month: "short",
+                                  },
+                                )}
                               </span>
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <span className="font-black text-zinc-900">
-                                {att.score.toFixed(1).replace('.', ',')} / 5,0
-                              </span>
-                              <span>
-                                {[1, 2, 3].map((s) => (
-                                  <span key={s} className="text-xs">
-                                    {s <= att.stars ? '⭐' : '☆'}
-                                  </span>
-                                ))}
+                              <span className="font-black">
+                                {att.score.toFixed(1).replace(".", ",")} / 5,0
                               </span>
                             </div>
 
                             {att.comment && (
-                              <p className="text-[11px] text-zinc-600 italic">
+                              <p className="text-[11px] text-[var(--origami-text-secondary)] italic">
                                 &ldquo;{att.comment}&rdquo;
                               </p>
                             )}

@@ -1,0 +1,232 @@
+:global(.origami-student-frame):has(.catalog) {
+  background: var(--origami-canvas);
+}
+
+.catalog {
+  display: grid;
+  gap: var(--origami-space-6);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--origami-space-4);
+}
+
+.headerCopy {
+  display: grid;
+  gap: var(--origami-space-1);
+}
+
+.headerCopy p {
+  color: var(--origami-text-secondary);
+}
+
+.header .crane {
+  display: none;
+  flex: none;
+  inline-size: 5rem;
+  block-size: 5rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-2);
+}
+
+.filters .filter {
+  border-radius: 999px;
+  padding-inline: var(--origami-space-3);
+  font: var(--origami-label);
+}
+
+.filter:not([aria-pressed="true"]) .filterMark {
+  display: none;
+}
+
+.cabinets {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--origami-column-gap);
+}
+
+.cabinet {
+  --cabinet-accent: var(--origami-honey);
+  display: flex;
+  flex-direction: column;
+  gap: var(--origami-space-2);
+}
+
+.cabinet[data-mechanic="order_words"],
+.cabinet[data-mechanic="timed_choice"] {
+  --cabinet-accent: var(--origami-orange);
+}
+
+.marquee {
+  display: grid;
+  gap: var(--origami-space-1);
+  padding-block-end: var(--origami-space-2);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-1) var(--origami-space-3);
+  color: var(--origami-text-secondary);
+  font: var(--origami-meta);
+}
+
+.frame {
+  padding: var(--origami-space-2);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-control-radius);
+  background: var(--origami-surface-soft);
+}
+
+.frame::before {
+  display: none;
+}
+
+.art {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+}
+
+.controls {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--origami-space-2);
+  padding-block-start: var(--origami-space-2);
+}
+
+.controls .gameAction {
+  inline-size: 100%;
+  margin-block-start: auto;
+}
+
+.practice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-1) var(--origami-space-2);
+  inline-size: 100%;
+  padding-block-end: var(--origami-space-2);
+}
+
+.practice p {
+  flex: 1 0 100%;
+}
+
+.stars {
+  display: inline-flex;
+  flex: none;
+  gap: var(--origami-space-1);
+  color: var(--origami-text-secondary);
+}
+
+.stars svg {
+  inline-size: var(--origami-icon-meta);
+  block-size: var(--origami-icon-meta);
+}
+
+.stars svg[data-earned="true"] {
+  fill: var(--origami-honey);
+  stroke: var(--origami-on-honey);
+}
+
+:global([data-theme="kids"]) .cabinet {
+  gap: 0;
+  box-shadow: 0 4px 0 var(--origami-shadow);
+}
+
+:global([data-theme="kids"]) .marquee {
+  padding: var(--origami-space-2) var(--origami-space-3);
+  border: 1px solid var(--origami-border-control);
+  border-radius: var(--origami-control-radius) var(--origami-control-radius) 0 0;
+  background: var(--cabinet-accent);
+  color: var(--origami-on-honey);
+}
+
+:global([data-theme="kids"]) .meta {
+  color: currentColor;
+}
+
+:global([data-theme="kids"]) .frame {
+  padding: var(--origami-space-1);
+  border: solid var(--cabinet-accent);
+  border-width: 0 var(--origami-space-3) var(--origami-space-2);
+  border-radius: 0 0 var(--origami-control-radius) var(--origami-control-radius);
+  background: color-mix(
+    in srgb,
+    var(--origami-dark-surface-raised) 55%,
+    var(--origami-surface-soft)
+  );
+}
+
+:global([data-theme="kids"]) .frame::before {
+  display: block;
+}
+
+:global([data-theme="kids"]) .controls {
+  align-items: center;
+  padding-block-start: var(--origami-space-3);
+}
+
+:global([data-theme="kids"]) .practice {
+  justify-content: center;
+  text-align: center;
+}
+
+:global([data-theme="kids"]) .stars svg {
+  inline-size: var(--origami-icon);
+  block-size: var(--origami-icon);
+}
+
+.state {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  min-block-size: 10rem;
+  gap: var(--origami-space-3);
+  max-inline-size: 45rem;
+  inline-size: 100%;
+}
+
+.state > svg {
+  inline-size: 2rem;
+  block-size: 2rem;
+  color: var(--origami-text-secondary);
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--origami-space-2);
+}
+
+@media (min-width: 640px) {
+  .header .crane {
+    display: block;
+  }
+
+  .cabinets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .cabinets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

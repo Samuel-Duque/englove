@@ -1,0 +1,911 @@
+@font-face {
+  font-family: Nunito;
+  src: url("/origami/nunito-variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+}
+
+:root {
+  --origami-scheme: light;
+  --origami-canvas: #fff1d6;
+  --origami-surface: var(--origami-light-surface);
+  --origami-surface-raised: #ffffff;
+  --origami-surface-soft: #ffe6b8;
+  --origami-text-primary: var(--origami-light-text-primary);
+  --origami-text-secondary: var(--origami-light-text-secondary);
+  --origami-border-subtle: #e0b887;
+  --origami-border-control: #a97544;
+  --origami-primary: #b92c35;
+  --origami-on-primary: var(--origami-light-surface);
+  --origami-primary-hover: #ab2931;
+  --origami-primary-pressed: #9b252d;
+  --origami-primary-outline: var(--origami-primary);
+  --origami-honey: #ffd343;
+  --origami-on-honey: var(--origami-light-text-primary);
+  --origami-orange: #f88a17;
+  --origami-on-orange: var(--origami-light-text-primary);
+  --origami-origami-red: #e5363c;
+  --origami-paper-blue: #238ea8;
+  --origami-focus: #2563eb;
+  --origami-disabled-bg: #e8d6bc;
+  --origami-disabled-text: var(--origami-light-text-secondary);
+  --origami-success-bg: #e6f3dd;
+  --origami-success-text: #23613e;
+  --origami-error-bg: #fde7e2;
+  --origami-error-text: #b92735;
+  --origami-warning-bg: #fff0bc;
+  --origami-warning-text: #7a4c00;
+  --origami-info-bg: #e4f4fb;
+  --origami-info-text: #245d7a;
+
+  --origami-light-surface: #fff8e8;
+  --origami-light-text-primary: #48230f;
+  --origami-light-text-secondary: #75513d;
+  --origami-dark-canvas: #241b16;
+  --origami-dark-surface: #35271f;
+  --origami-dark-surface-raised: #483326;
+  --origami-dark-surface-soft: #443126;
+  --origami-dark-text-primary: #fff4dd;
+  --origami-dark-text-secondary: #d8bfa3;
+  --origami-dark-border-subtle: #75563e;
+  --origami-dark-border-control: #af8962;
+  --origami-dark-primary-outline: #f36b6f;
+  --origami-dark-paper-blue: #67c4db;
+  --origami-dark-focus: #87bcff;
+  --origami-dark-disabled-bg: #513f32;
+  --origami-dark-success-bg: #193629;
+  --origami-dark-success-text: #a9d990;
+  --origami-dark-error-bg: #482323;
+  --origami-dark-error-text: #ffb0a6;
+  --origami-dark-warning-bg: #44351a;
+  --origami-dark-warning-text: #ffd477;
+  --origami-dark-info-bg: #203d48;
+  --origami-dark-info-text: #a6dff3;
+  --origami-dark-shadow: #17100c;
+  --origami-shadow: #c79a65;
+  --origami-wood-opacity: 0.12;
+
+  --origami-font: Nunito, system-ui, "Segoe UI", sans-serif;
+  --origami-space-1: 0.25rem;
+  --origami-space-2: 0.5rem;
+  --origami-space-3: 0.75rem;
+  --origami-space-4: 1rem;
+  --origami-space-5: 1.25rem;
+  --origami-space-6: 1.5rem;
+  --origami-space-8: 2rem;
+  --origami-space-10: 2.5rem;
+  --origami-space-12: 3rem;
+  --origami-space-16: 4rem;
+  --origami-target: 3rem;
+  --origami-section-gap: var(--origami-space-8);
+  --origami-control-radius: 0.75rem;
+  --origami-card-radius: 1rem;
+  --origami-dialog-radius: 1.25rem;
+  --origami-card-padding: var(--origami-space-4);
+  --origami-gutter: var(--origami-space-4);
+  --origami-column-gap: var(--origami-space-6);
+  --origami-button-height: var(--origami-target);
+  --origami-header-height: 4rem;
+  --origami-brand-size: 2rem;
+  --origami-icon: 1.5rem;
+  --origami-icon-meta: 1.25rem;
+  --origami-icon-navigation: 1.5rem;
+  --origami-ease-in: cubic-bezier(0.2, 0, 0, 1);
+  --origami-title: 800 1.5rem / 2rem var(--origami-font);
+  --origami-section: 800 1.375rem / 1.875rem var(--origami-font);
+  --origami-card-heading: 800 1.25rem / 1.75rem var(--origami-font);
+  --origami-body: 400 1rem / 1.5rem var(--origami-font);
+  --origami-action: 700 1rem / 1.5rem var(--origami-font);
+  --origami-label: 700 1rem / 1.5rem var(--origami-font);
+  --origami-meta: 600 0.875rem / 1.25rem var(--origami-font);
+  --origami-hero: 900 2.5rem / 2.75rem var(--origami-font);
+}
+
+/* Los dos selectores comparten valores. La preferencia del sistema no pisa una elección explícita. */
+:root[data-appearance="dark"] {
+  --origami-scheme: dark;
+  --origami-canvas: var(--origami-dark-canvas);
+  --origami-surface: var(--origami-dark-surface);
+  --origami-surface-raised: var(--origami-dark-surface-raised);
+  --origami-surface-soft: var(--origami-dark-surface-soft);
+  --origami-text-primary: var(--origami-dark-text-primary);
+  --origami-text-secondary: var(--origami-dark-text-secondary);
+  --origami-border-subtle: var(--origami-dark-border-subtle);
+  --origami-border-control: var(--origami-dark-border-control);
+  --origami-primary-outline: var(--origami-dark-primary-outline);
+  --origami-paper-blue: var(--origami-dark-paper-blue);
+  --origami-focus: var(--origami-dark-focus);
+  --origami-disabled-bg: var(--origami-dark-disabled-bg);
+  --origami-disabled-text: var(--origami-dark-text-secondary);
+  --origami-success-bg: var(--origami-dark-success-bg);
+  --origami-success-text: var(--origami-dark-success-text);
+  --origami-error-bg: var(--origami-dark-error-bg);
+  --origami-error-text: var(--origami-dark-error-text);
+  --origami-warning-bg: var(--origami-dark-warning-bg);
+  --origami-warning-text: var(--origami-dark-warning-text);
+  --origami-info-bg: var(--origami-dark-info-bg);
+  --origami-info-text: var(--origami-dark-info-text);
+  --origami-shadow: var(--origami-dark-shadow);
+  --origami-wood-opacity: 0.08;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance]) {
+    --origami-scheme: dark;
+    --origami-canvas: var(--origami-dark-canvas);
+    --origami-surface: var(--origami-dark-surface);
+    --origami-surface-raised: var(--origami-dark-surface-raised);
+    --origami-surface-soft: var(--origami-dark-surface-soft);
+    --origami-text-primary: var(--origami-dark-text-primary);
+    --origami-text-secondary: var(--origami-dark-text-secondary);
+    --origami-border-subtle: var(--origami-dark-border-subtle);
+    --origami-border-control: var(--origami-dark-border-control);
+    --origami-primary-outline: var(--origami-dark-primary-outline);
+    --origami-paper-blue: var(--origami-dark-paper-blue);
+    --origami-focus: var(--origami-dark-focus);
+    --origami-disabled-bg: var(--origami-dark-disabled-bg);
+    --origami-disabled-text: var(--origami-dark-text-secondary);
+    --origami-success-bg: var(--origami-dark-success-bg);
+    --origami-success-text: var(--origami-dark-success-text);
+    --origami-error-bg: var(--origami-dark-error-bg);
+    --origami-error-text: var(--origami-dark-error-text);
+    --origami-warning-bg: var(--origami-dark-warning-bg);
+    --origami-warning-text: var(--origami-dark-warning-text);
+    --origami-info-bg: var(--origami-dark-info-bg);
+    --origami-info-text: var(--origami-dark-info-text);
+    --origami-shadow: var(--origami-dark-shadow);
+    --origami-wood-opacity: 0.08;
+  }
+}
+
+[data-theme="kids"] {
+  --origami-control-radius: 1rem;
+  --origami-card-radius: 1.25rem;
+  --origami-dialog-radius: 1.5rem;
+  --origami-button-height: 3.5rem;
+  --origami-icon-navigation: 1.75rem;
+  --origami-title: 900 1.75rem / 2.25rem var(--origami-font);
+  --origami-section: 800 1.5rem / 2rem var(--origami-font);
+  --origami-card-heading: 800 1.375rem / 1.75rem var(--origami-font);
+  --origami-body: 400 1.125rem / 1.75rem var(--origami-font);
+  --origami-action: 800 1.125rem / 1.5rem var(--origami-font);
+  --origami-meta: 600 1rem / 1.5rem var(--origami-font);
+}
+
+/* Solo las superficies migradas usan estas clases; no se reescriben las utilidades de color previas. */
+.origami-shell {
+  min-inline-size: 0;
+  color-scheme: var(--origami-scheme);
+  background: var(--origami-canvas);
+  color: var(--origami-text-primary);
+  font: var(--origami-body);
+  overflow-wrap: anywhere;
+}
+
+.origami-shell :focus-visible,
+.origami-shell:focus-visible,
+.origami-button:focus-visible,
+.origami-field:focus-visible {
+  outline: 3px solid var(--origami-focus) !important;
+  outline-offset: 3px !important;
+}
+
+/* Usar sobre texturas o ilustraciones, no sobre superficies sólidas. */
+.origami-focus-backed:focus-visible {
+  box-shadow: 0 0 0 3px var(--origami-surface-raised);
+}
+
+/* Las tablas comparativas mantienen su semántica; el desplazamiento vive aquí, no en la página. */
+.origami-table-scroll {
+  max-inline-size: 100%;
+  overflow-x: auto;
+  padding: var(--origami-space-2);
+}
+
+.origami-container {
+  inline-size: calc(100% - 2 * var(--origami-gutter));
+  max-inline-size: 80rem;
+  margin-inline: auto;
+}
+
+.origami-container--student {
+  max-inline-size: 72rem;
+}
+
+.origami-container--reading {
+  max-inline-size: 45rem;
+}
+
+.origami-container--access {
+  max-inline-size: 30rem;
+}
+
+.origami-container--registration {
+  max-inline-size: 40rem;
+}
+
+.origami-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--origami-column-gap);
+}
+
+.origami-grid > .origami-grid-item--full {
+  grid-column: 1 / -1;
+}
+
+.origami-page-title {
+  font: var(--origami-title);
+}
+
+.origami-section-title {
+  font: var(--origami-section);
+}
+
+.origami-card-title {
+  font: var(--origami-card-heading);
+}
+
+.origami-hero-title {
+  font: var(--origami-hero);
+}
+
+.origami-reading {
+  max-inline-size: 70ch;
+  font: var(--origami-body);
+}
+
+.origami-label {
+  font: var(--origami-label);
+}
+
+.origami-meta {
+  color: var(--origami-text-secondary);
+  font: var(--origami-meta);
+}
+
+.origami-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* La clase base es la acción principal. Los modificadores conservan el tamaño de toque. */
+.origami-button {
+  --origami-button-shadow: 0 2px 0 var(--origami-shadow);
+  display: inline-flex;
+  min-inline-size: var(--origami-target);
+  max-inline-size: 100%;
+  min-block-size: var(--origami-button-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--origami-space-2);
+  padding: var(--origami-space-2) var(--origami-space-4);
+  border: 2px solid var(--origami-primary-outline);
+  border-radius: var(--origami-control-radius);
+  background: var(--origami-primary);
+  color: var(--origami-on-primary);
+  box-shadow: var(--origami-button-shadow);
+  font: var(--origami-action);
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: transform 100ms var(--origami-ease-in);
+}
+
+.origami-button > svg {
+  inline-size: var(--origami-icon);
+  block-size: var(--origami-icon);
+  flex: none;
+  stroke-width: 2;
+}
+
+.origami-button--secondary,
+.origami-button--text {
+  min-block-size: var(--origami-target);
+  color: var(--origami-text-primary);
+}
+
+.origami-button--secondary {
+  border-color: var(--origami-border-control);
+  background: var(--origami-surface);
+}
+
+.origami-button--text {
+  --origami-button-shadow: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .origami-button:not(
+      :disabled,
+      [aria-disabled="true"],
+      .origami-selected
+    ):hover {
+    background: var(--origami-primary-hover);
+  }
+
+  :is(.origami-button--secondary, .origami-button--text):not(
+      :disabled,
+      [aria-disabled="true"],
+      .origami-selected
+    ):hover {
+    background: var(--origami-surface-soft);
+  }
+}
+
+.origami-button:not(
+    :disabled,
+    [aria-disabled="true"],
+    .origami-selected
+  ):active {
+  background: var(--origami-primary-pressed);
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--origami-shadow);
+}
+
+:is(.origami-button--secondary, .origami-button--text):not(
+    :disabled,
+    [aria-disabled="true"],
+    .origami-selected
+  ):active {
+  border-color: var(--origami-border-control);
+  background: var(--origami-surface-soft);
+}
+
+.origami-button:is(:disabled, [aria-disabled="true"]),
+.origami-field:disabled {
+  background: var(--origami-disabled-bg);
+  color: var(--origami-disabled-text);
+  border-color: var(--origami-border-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Acompañar la selección con una indicación semántica y visible, no solo el relleno. */
+.origami-selected:not(:disabled, [aria-disabled="true"]) {
+  position: relative;
+  isolation: isolate;
+  background: var(--origami-honey);
+  color: var(--origami-on-honey);
+  border-color: var(--origami-border-control);
+}
+
+.origami-selected:not(:disabled, [aria-disabled="true"])::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  /* El fondo miel ya es legible desde el primer instante; solo se anima su relieve. */
+  box-shadow: inset 0 0 0 2px var(--origami-orange);
+  content: "";
+  pointer-events: none;
+  animation: origami-selected-in 160ms var(--origami-ease-in);
+}
+
+@keyframes origami-selected-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.origami-field {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--origami-target);
+  padding: var(--origami-space-2) var(--origami-space-3);
+  border: 2px solid var(--origami-border-control);
+  border-radius: var(--origami-control-radius);
+  color-scheme: var(--origami-scheme);
+  background: var(--origami-surface);
+  color: var(--origami-text-primary);
+  font: var(--origami-body);
+}
+
+.origami-field::placeholder {
+  color: var(--origami-text-secondary);
+  opacity: 1;
+}
+
+.origami-field[aria-invalid="true"] {
+  border-color: var(--origami-error-text);
+}
+
+textarea.origami-field {
+  min-block-size: 9rem;
+  resize: vertical;
+}
+
+.origami-card {
+  min-inline-size: 0;
+  padding: var(--origami-card-padding);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-card-radius);
+  background: var(--origami-surface);
+  color: var(--origami-text-primary);
+}
+
+.origami-card--featured {
+  box-shadow: 0 4px 0 var(--origami-shadow);
+}
+
+/* El pliegue es una pieza decorativa: colóquese donde no cubra texto o controles. */
+.origami-fold {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex: none;
+  background: var(--origami-orange);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  pointer-events: none;
+}
+
+.origami-fold--header {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+}
+
+/* Reservar la veta para marcos de Juegos y escenas ilustradas. */
+.origami-wood {
+  position: relative;
+  isolation: isolate;
+}
+
+.origami-wood::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background-image: url("/origami/wood-grain.svg");
+  background-size: 24rem 8rem;
+  opacity: var(--origami-wood-opacity);
+  pointer-events: none;
+  content: "";
+}
+
+.origami-dialog {
+  inline-size: calc(100% - 2 * var(--origami-gutter));
+  max-inline-size: 35rem;
+  max-block-size: calc(100% - 2 * var(--origami-gutter));
+  padding: var(--origami-card-padding);
+  border: 1px solid var(--origami-border-control);
+  border-radius: var(--origami-dialog-radius);
+  color-scheme: var(--origami-scheme);
+  background: var(--origami-surface-raised);
+  color: var(--origami-text-primary);
+  overflow: auto;
+}
+
+.origami-dialog--wide {
+  max-inline-size: 50rem;
+}
+
+.origami-modal-overlay {
+  background: color-mix(in srgb, var(--origami-dark-canvas) 65%, transparent);
+}
+
+.origami-skip-link:focus {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--origami-target);
+  padding-inline: var(--origami-space-4);
+  border-radius: var(--origami-control-radius);
+  background: var(--origami-surface-raised);
+  color: var(--origami-text-primary);
+  font: var(--origami-action);
+}
+
+.origami-banner {
+  inline-size: calc(100% - 2 * var(--origami-gutter));
+  max-inline-size: 80rem;
+  margin: var(--origami-space-2) auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .origami-modal-overlay > .origami-dialog {
+    animation: origami-panel-in 180ms var(--origami-ease-in);
+  }
+
+  @keyframes origami-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.origami-state {
+  padding: var(--origami-space-3) var(--origami-space-4);
+  border-radius: var(--origami-card-radius);
+  background: var(--origami-state-bg, var(--origami-info-bg));
+  color: var(--origami-state-text, var(--origami-info-text));
+}
+
+.origami-state--success {
+  --origami-state-bg: var(--origami-success-bg);
+  --origami-state-text: var(--origami-success-text);
+}
+
+.origami-state--error {
+  --origami-state-bg: var(--origami-error-bg);
+  --origami-state-text: var(--origami-error-text);
+}
+
+.origami-state--warning {
+  --origami-state-bg: var(--origami-warning-bg);
+  --origami-state-text: var(--origami-warning-text);
+}
+
+.origami-brand {
+  position: relative;
+  display: inline-flex;
+  min-inline-size: 0;
+  align-items: center;
+  gap: var(--origami-space-2);
+  color: var(--origami-text-primary);
+  font: 900 1.25rem / 1.5rem var(--origami-font);
+}
+
+.origami-brand .origami-crane {
+  inline-size: var(--origami-brand-size);
+  block-size: var(--origami-brand-size);
+  flex: none;
+}
+
+.origami-crane--unfold .origami-crane__wing {
+  transform-origin: 33px 38px;
+  animation: origami-wing-open 420ms var(--origami-ease-in) backwards;
+}
+
+.origami-crane--unfold .origami-crane__wing--front {
+  animation-delay: 60ms;
+}
+
+@keyframes origami-wing-open {
+  from {
+    transform: rotate(-8deg);
+  }
+}
+
+@media (max-width: 22rem) {
+  /* Se compacta la marca sin borrar el nombre accesible del enlace. */
+  .origami-brand__wordmark {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --origami-gutter: var(--origami-space-6);
+  }
+
+  .origami-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --origami-gutter: var(--origami-space-8);
+    --origami-card-padding: var(--origami-space-6);
+    --origami-header-height: 5rem;
+    --origami-brand-size: 2.5rem;
+    --origami-title: 800 1.75rem / 2.25rem var(--origami-font);
+    --origami-hero: 900 4rem / 4.25rem var(--origami-font);
+  }
+
+  [data-theme="kids"] {
+    --origami-title: 900 2rem / 2.5rem var(--origami-font);
+  }
+
+  .origami-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .origami-grid > :where(*) {
+    grid-column: span 6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .origami-button {
+    transition: none;
+  }
+
+  .origami-button:not(
+      :disabled,
+      [aria-disabled="true"],
+      .origami-selected
+    ):active {
+    transform: none;
+  }
+
+  .origami-selected:not(:disabled, [aria-disabled="true"])::before,
+  .origami-crane--unfold .origami-crane__wing {
+    animation: none;
+  }
+}
+
+.origami-role-header {
+  grid-column: 1 / -1;
+  background: var(--origami-surface);
+  border-block-end: 1px solid var(--origami-border-subtle);
+}
+
+.origami-role-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: var(--origami-header-height);
+  gap: var(--origami-space-2);
+  padding-block: var(--origami-space-2);
+}
+
+.origami-brand-link,
+.origami-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--origami-space-2);
+}
+
+.origami-brand-link {
+  min-block-size: var(--origami-target);
+  min-inline-size: var(--origami-target);
+  border-radius: var(--origami-control-radius);
+}
+
+.origami-icon-action {
+  padding-inline: var(--origami-space-2);
+}
+
+.origami-wide-action {
+  display: none;
+}
+
+.origami-appearance-select {
+  padding-inline-start: var(--origami-space-12);
+}
+
+.origami-teacher-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  min-block-size: 100dvh;
+}
+
+.origami-footer {
+  grid-column: 1 / -1;
+  padding-block: var(--origami-space-6);
+  background: var(--origami-surface);
+  color: var(--origami-text-secondary);
+  border-block-start: 1px solid var(--origami-border-subtle);
+}
+
+.origami-footer--context {
+  padding-block: var(--origami-space-4);
+}
+
+.origami-footer__inner,
+.origami-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-2) var(--origami-space-4);
+}
+
+.origami-footer__inner {
+  justify-content: space-between;
+}
+
+.origami-footer__links a {
+  display: inline-flex;
+  min-block-size: var(--origami-target);
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.origami-teacher-sidebar {
+  display: none;
+  padding: var(--origami-space-4);
+  background: var(--origami-surface);
+  border-inline-end: 1px solid var(--origami-border-subtle);
+}
+
+.origami-teacher-areas {
+  display: grid;
+  gap: var(--origami-space-2);
+}
+
+.origami-area-link {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--origami-target);
+  min-inline-size: var(--origami-target);
+  gap: var(--origami-space-2);
+  padding: var(--origami-space-2);
+  border-radius: var(--origami-control-radius);
+  font-weight: 800;
+}
+
+.origami-area-link svg {
+  flex: none;
+  inline-size: var(--origami-icon-navigation);
+  block-size: var(--origami-icon-navigation);
+}
+
+@media (hover: hover) {
+  .origami-area-link:not([aria-current]):hover {
+    background: var(--origami-surface-soft);
+  }
+}
+
+.origami-teacher-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(18rem, calc(100% - 1rem));
+  max-block-size: 100dvh;
+  block-size: 100%;
+  margin: 0;
+  padding: var(--origami-space-4);
+  overflow: auto;
+  border-inline-end: 1px solid var(--origami-border-subtle);
+  background: var(--origami-surface-raised);
+  color: var(--origami-text-primary);
+}
+
+.origami-teacher-drawer::backdrop {
+  background: color-mix(in srgb, var(--origami-dark-canvas) 65%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .origami-teacher-drawer {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+    transition:
+      opacity 120ms var(--origami-ease-in),
+      transform 120ms var(--origami-ease-in),
+      display 120ms allow-discrete,
+      overlay 120ms allow-discrete;
+  }
+
+  .origami-teacher-drawer[open] {
+    opacity: 1;
+    transform: translateX(0);
+    transition-duration: 180ms;
+  }
+
+  .origami-teacher-drawer:not([open]) {
+    pointer-events: none;
+  }
+
+  @starting-style {
+    .origami-teacher-drawer[open] {
+      opacity: 0;
+      transform: translateX(-0.5rem);
+    }
+  }
+}
+
+html:has(.origami-teacher-drawer[open]) {
+  overflow: hidden;
+}
+
+.origami-student-frame {
+  --origami-student-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  padding-block-end: var(--origami-student-bottom);
+}
+
+html:has(.origami-student-frame) {
+  scroll-padding-block-end: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.origami-student-nav {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 40;
+  background: var(--origami-surface);
+  border-block-start: 1px solid var(--origami-border-subtle);
+  padding-block-end: env(safe-area-inset-bottom, 0px);
+}
+
+.origami-student-nav__items {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 0.125rem;
+  min-block-size: 4.5rem;
+  padding-block: 0.25rem;
+}
+
+.origami-student-nav .origami-area-link {
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.125rem;
+  padding: 0.25rem 0.125rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+@media (max-width: 30rem) {
+  .origami-role-header__inner .origami-brand__wordmark,
+  .origami-appearance-icon {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    clip-path: inset(50%);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .origami-appearance-select {
+    padding-inline: var(--origami-space-2);
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 48rem) {
+  .origami-wide-action {
+    display: inline;
+  }
+}
+
+@media (min-width: 1024px) {
+  .origami-teacher-shell {
+    grid-template-columns: 16rem minmax(0, 1fr);
+  }
+
+  .origami-teacher-sidebar {
+    display: block;
+  }
+
+  .origami-teacher-menu {
+    display: none;
+  }
+
+  .origami-student-frame[data-theme="teens"] {
+    padding-block-end: 0;
+  }
+
+  html:has(.origami-student-frame[data-theme="teens"]) {
+    scroll-padding-block-end: 0;
+  }
+
+  [data-theme="teens"] > .origami-student-nav {
+    position: static;
+    border-block-start: 0;
+    border-block-end: 1px solid var(--origami-border-subtle);
+    padding-block-end: 0;
+  }
+
+  [data-theme="teens"] .origami-student-nav__items {
+    justify-content: flex-start;
+    align-items: center;
+    min-block-size: 4rem;
+    gap: var(--origami-space-2);
+  }
+
+  [data-theme="teens"] .origami-student-nav .origami-area-link {
+    flex: none;
+    flex-direction: row;
+    gap: var(--origami-space-2);
+    padding-inline: var(--origami-space-4);
+    font-size: 1rem;
+  }
+}

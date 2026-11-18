@@ -1,0 +1,58 @@
+.practice {
+  display: grid;
+  gap: var(--origami-space-6);
+  max-inline-size: 45rem;
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.practice > * {
+  min-inline-size: 0;
+}
+
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-2);
+  padding-block-start: var(--origami-space-4);
+  border-block-start: 1px solid var(--origami-border-subtle);
+}
+
+.stars {
+  display: flex;
+  gap: var(--origami-space-2);
+  width: fit-content;
+}
+
+.stars svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--origami-text-secondary);
+}
+
+.stars svg[data-earned="true"] {
+  fill: var(--origami-honey);
+  color: var(--origami-text-primary);
+}
+
+.stars[data-reveal="true"] {
+  animation: reveal-stars 240ms var(--origami-ease-in);
+}
+
+@keyframes reveal-stars {
+  from {
+    opacity: 0.35;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stars[data-reveal="true"] {
+    animation: none;
+  }
+}

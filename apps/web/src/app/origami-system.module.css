@@ -1,0 +1,42 @@
+.document {
+  margin: 0;
+}
+
+.page {
+  display: grid;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  padding-block: var(--origami-space-6);
+  place-items: center;
+}
+
+.page.segment {
+  min-block-size: 50vh;
+}
+
+.sheet,
+.intro {
+  display: grid;
+  gap: var(--origami-space-4);
+  box-sizing: border-box;
+}
+
+.intro > .icon {
+  display: grid;
+  inline-size: var(--origami-target);
+  block-size: var(--origami-target);
+  padding: 0;
+  place-items: center;
+}
+
+.icon > svg {
+  inline-size: var(--origami-icon);
+  block-size: var(--origami-icon);
+  stroke-width: 2;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--origami-space-2);
+}

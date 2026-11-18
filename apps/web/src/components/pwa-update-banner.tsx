@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import React, { useSyncExternalStore, useEffect, useState } from 'react';
-import { Sparkles, RefreshCw } from 'lucide-react';
+import React, { useSyncExternalStore, useEffect, useState } from "react";
+import { Sparkles, RefreshCw } from "lucide-react";
 import {
   getPwaUpdateState,
   subscribePwaUpdate,
   applyUpdate,
   dismissUpdateNotice,
   registerServiceWorker,
-} from '../lib/pwa-manager';
+} from "../lib/pwa-manager";
 import {
   resolveUserSegment,
   isTeensOrTeacherSegment,
   USER_SEGMENT_EVENT,
-} from '../lib/user-segment';
+} from "../lib/user-segment";
 
 export function PwaUpdateBanner() {
   const state = useSyncExternalStore(
@@ -37,10 +37,10 @@ export function PwaUpdateBanner() {
 
     updateSegment();
 
-    window.addEventListener('storage', updateSegment);
+    window.addEventListener("storage", updateSegment);
     window.addEventListener(USER_SEGMENT_EVENT, updateSegment);
     return () => {
-      window.removeEventListener('storage', updateSegment);
+      window.removeEventListener("storage", updateSegment);
       window.removeEventListener(USER_SEGMENT_EVENT, updateSegment);
     };
   }, []);
@@ -49,34 +49,33 @@ export function PwaUpdateBanner() {
     return null;
   }
 
-  const effectiveTeensOrPanel = isTeensOrPanel || isTeensOrTeacherSegment(resolveUserSegment());
+  const effectiveTeensOrPanel =
+    isTeensOrPanel || isTeensOrTeacherSegment(resolveUserSegment());
 
   return (
     <aside
       role="status"
       aria-live="polite"
-      className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 bg-zinc-900/95 text-white shadow-2xl backdrop-blur-md border-t border-zinc-700 transition-transform duration-300 ease-out"
+      className="origami-banner origami-state origami-state--warning"
     >
-      <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-left w-full sm:w-auto">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5" aria-hidden="true" />
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Sparkles className="size-5 shrink-0" aria-hidden="true" />
           <div>
-            <p className="text-sm font-semibold text-zinc-100">
+            <p>
               {effectiveTeensOrPanel
-                ? 'Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.'
-                : '¡Upward English tiene novedades! Toca Actualizar para verlas.'}
+                ? "Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios."
+                : "¡Upward English tiene novedades! Toca Actualizar para verlas."}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2">
           {!state.isMandatory && (
             <button
               type="button"
               onClick={dismissUpdateNotice}
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 text-xs sm:text-sm font-medium text-zinc-300 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="origami-button origami-button--secondary"
             >
               Ahora no
             </button>
@@ -85,10 +84,12 @@ export function PwaUpdateBanner() {
           <button
             type="button"
             onClick={applyUpdate}
-            className="inline-flex items-center justify-center gap-2 min-h-[48px] min-w-[48px] px-5 py-2.5 text-xs sm:text-sm font-bold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-zinc-950 rounded-xl shadow-sm transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="origami-button"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span>{effectiveTeensOrPanel ? 'Reiniciar y actualizar' : 'Actualizar'}</span>
+            <span>
+              {effectiveTeensOrPanel ? "Reiniciar y actualizar" : "Actualizar"}
+            </span>
           </button>
         </div>
       </div>

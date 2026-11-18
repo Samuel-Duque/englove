@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
   GameAnswers,
   TimedChoiceSettingsSchema,
   TimedChoiceSolutionSchema,
-} from '@upward-english/shared';
-import { soundManager } from '../../../lib/sound';
+} from "@upward-english/shared";
+import { soundManager } from "../../../lib/sound";
 
 export function TimedChoiceGame({
   config,
-  theme = 'kids',
+  theme = "kids",
   soundEnabled = true,
   previewMode = false,
   onEvent,
@@ -20,7 +20,9 @@ export function TimedChoiceGame({
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
   const parsedSettings = TimedChoiceSettingsSchema.safeParse(config.settings);
   const settings = parsedSettings.success ? parsedSettings.data : null;
-  const parsedSol = TimedChoiceSolutionSchema.safeParse(config.answerKey?.solution);
+  const parsedSol = TimedChoiceSolutionSchema.safeParse(
+    config.answerKey?.solution,
+  );
   const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const questions = settings?.questions || [];
@@ -33,13 +35,16 @@ export function TimedChoiceGame({
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [isWaitingFeedback, setIsWaitingFeedback] = useState(false);
-  const [liveStatus, setLiveStatus] = useState<string>('');
+  const [liveStatus, setLiveStatus] = useState<string>("");
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentQuestion = questions[currentIndex];
-  const expectedOptionId = currentQuestion && solution?.choices ? solution.choices[currentQuestion.id] : null;
+  const expectedOptionId =
+    currentQuestion && solution?.choices
+      ? solution.choices[currentQuestion.id]
+      : null;
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -51,7 +56,7 @@ export function TimedChoiceGame({
 
   // Decision 106: Always reset choices in attempt payload on initial mount
   useEffect(() => {
-    onEvent?.({ itemId: 'choices', answer: {} });
+    onEvent?.({ itemId: "choices", answer: {} });
   }, []);
 
   // Countdown timer for each question
@@ -61,7 +66,9 @@ export function TimedChoiceGame({
     setSecondsLeft(timeLimitSeconds);
     setSelectedOptionId(null);
     setIsTimedOut(false);
-    setLiveStatus(`Pregunta ${currentIndex + 1} de ${questions.length}: ${currentQuestion.prompt}`);
+    setLiveStatus(
+      `Pregunta ${currentIndex + 1} de ${questions.length}: ${currentQuestion.prompt}`,
+    );
 
     timerRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -85,12 +92,12 @@ export function TimedChoiceGame({
 
     setIsTimedOut(true);
     setIsWaitingFeedback(true);
-    setLiveStatus('Se agotó el tiempo para esta pregunta.');
-    soundManager.play('miss', soundEnabled);
+    setLiveStatus("Se agotó el tiempo para esta pregunta.");
+    soundManager.play("miss", soundEnabled);
 
     const nextChoices = { ...choices, [currentQuestion.id]: null };
     setChoices(nextChoices);
-    onEvent?.({ itemId: 'choices', answer: nextChoices });
+    onEvent?.({ itemId: "choices", answer: nextChoices });
 
     // Show feedback for 800 ms then advance
     feedbackTimeoutRef.current = setTimeout(() => {
@@ -110,14 +117,14 @@ export function TimedChoiceGame({
     const opt = currentQuestion.options.find((o) => o.id === optionId);
     setLiveStatus(
       isCorrect
-        ? `¡Correcto! Seleccionaste: ${opt?.text ?? ''}`
-        : `Incorrecto. Seleccionaste: ${opt?.text ?? ''}`
+        ? `¡Correcto! Seleccionaste: ${opt?.text ?? ""}`
+        : `Incorrecto. Seleccionaste: ${opt?.text ?? ""}`,
     );
-    soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
+    soundManager.play(isCorrect ? "hit" : "miss", soundEnabled);
 
     const nextChoices = { ...choices, [currentQuestion.id]: optionId };
     setChoices(nextChoices);
-    onEvent?.({ itemId: 'choices', answer: nextChoices });
+    onEvent?.({ itemId: "choices", answer: nextChoices });
 
     // Feedback duration: 800 ms (RF-6 Acceptance Criterion 1)
     feedbackTimeoutRef.current = setTimeout(() => {
@@ -133,16 +140,16 @@ export function TimedChoiceGame({
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      soundManager.play('complete', soundEnabled);
+      soundManager.play("complete", soundEnabled);
       onComplete?.({ choices: finalChoices });
     }
   };
 
-  const isKids = theme === 'kids';
+  const isKids = theme === "kids";
 
   if (!currentQuestion) {
     return (
-      <div className="p-8 text-center text-zinc-500 font-semibold">
+      <div className="p-8 text-center text-[var(--origami-text-secondary)] font-semibold">
         No hay preguntas disponibles en este microjuego.
       </div>
     );
@@ -151,15 +158,9 @@ export function TimedChoiceGame({
   const progressPercent = ((currentIndex + 1) / questions.length) * 100;
 
   return (
-    <div
-      className={`w-full max-w-2xl mx-auto p-4 sm:p-6 rounded-3xl ${
-        isKids
-          ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
-      }`}
-    >
+    <div className="w-full min-w-0 space-y-4 [overflow-wrap:anywhere]">
       {previewMode && (
-        <div className="mb-4 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center">
+        <div className="origami-state text-center">
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
@@ -170,14 +171,14 @@ export function TimedChoiceGame({
       </div>
 
       {/* Progress & Countdown Header */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <span className="text-xs font-black uppercase tracking-wider text-amber-800">
+          <span className="text-xs font-black uppercase tracking-wider text-[var(--origami-text-primary)]">
             Pregunta {currentIndex + 1} de {questions.length}
           </span>
-          <div className="w-32 sm:w-44 h-2 bg-amber-200/60 rounded-full mt-1 overflow-hidden">
+          <div className="w-24 sm:w-44 h-2 bg-[var(--origami-surface-soft)] rounded-full mt-1 overflow-hidden">
             <div
-              className="h-full bg-amber-500 rounded-full transition-all"
+              className="h-full bg-[var(--origami-primary)] rounded-full transition-colors"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -188,10 +189,8 @@ export function TimedChoiceGame({
           <div
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border-2 font-mono font-black text-sm transition-colors ${
               secondsLeft <= 5
-                ? 'border-rose-400 bg-rose-100 text-rose-700 animate-pulse'
-                : isKids
-                  ? 'border-amber-300 bg-white text-amber-950'
-                  : 'border-zinc-700 bg-zinc-800 text-zinc-100'
+                ? "border-[var(--origami-error-text)] bg-[var(--origami-error-bg)] text-[var(--origami-error-text)]"
+                : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)]"
             }`}
           >
             <span>⏱️</span>
@@ -201,14 +200,8 @@ export function TimedChoiceGame({
       </div>
 
       {/* Question Prompt */}
-      <div className={`mb-6 p-6 rounded-3xl border shadow-xs text-center ${
-        isKids ? 'bg-white border-amber-200/80' : 'bg-zinc-800/90 border-zinc-700'
-      }`}>
-        <h3 className={`text-lg sm:text-xl font-black leading-snug ${
-          isKids ? 'text-zinc-900' : 'text-zinc-100'
-        }`}>
-          {currentQuestion.prompt}
-        </h3>
+      <div className="origami-card text-center">
+        <h3 className="origami-card-title">{currentQuestion.prompt}</h3>
       </div>
 
       {/* Options List */}
@@ -218,16 +211,17 @@ export function TimedChoiceGame({
           const isExpected = expectedOptionId === opt.id;
 
           let btnStyle = isKids
-            ? 'border-amber-200 bg-white text-zinc-900 hover:border-amber-400 hover:bg-amber-50'
-            : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-zinc-500';
+            ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)]  hover:bg-[var(--origami-surface-soft)]"
+            : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)]";
 
           if (isWaitingFeedback) {
             if (isSelected) {
               btnStyle = isExpected
-                ? 'border-emerald-500 bg-emerald-100 text-emerald-950 ring-4 ring-emerald-300 scale-102 font-black'
-                : 'border-rose-500 bg-rose-100 text-rose-950 ring-4 ring-rose-300 scale-102 font-black';
+                ? "border-[var(--origami-success-text)] bg-[var(--origami-success-bg)] text-[var(--origami-success-text)] ring-4 ring-[var(--origami-focus)] font-black"
+                : "border-[var(--origami-error-text)] bg-[var(--origami-error-bg)] text-[var(--origami-error-text)] ring-4 ring-[var(--origami-focus)] font-black";
             } else if (isExpected && (isSelected || isTimedOut)) {
-              btnStyle = 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-300 font-black';
+              btnStyle =
+                "border-[var(--origami-success-text)] bg-[var(--origami-success-bg)] text-[var(--origami-success-text)] ring-2 ring-[var(--origami-focus)] font-black";
             }
           }
 
@@ -241,19 +235,19 @@ export function TimedChoiceGame({
                   handleSelectOption(opt.id);
                 }
               }}
-              className={`w-full min-h-14 p-4 rounded-2xl border-2 font-bold text-base flex items-center justify-between text-left transition-all touch-manipulation select-none active:scale-98 shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                isWaitingFeedback ? 'cursor-default' : 'cursor-pointer'
+              className={`w-full min-h-[var(--origami-button-height)] p-4 rounded-2xl border-2 font-bold text-base flex flex-wrap items-center justify-between gap-2 text-left transition-colors touch-manipulation select-none shadow-xs focus-visible:outline-[var(--origami-focus)] ${
+                isWaitingFeedback ? "cursor-default" : "cursor-pointer"
               } ${btnStyle}`}
             >
               <span>{opt.text}</span>
               <span className="text-xs font-black" aria-hidden="true">
                 {isWaitingFeedback && isSelected
                   ? isExpected
-                    ? '✅ Correcto'
-                    : '❌ Incorrecto'
+                    ? "✅ Correcto"
+                    : "❌ Incorrecto"
                   : isWaitingFeedback && isExpected && isTimedOut
-                    ? '👈 Correcta'
-                    : '👉'}
+                    ? "👈 Correcta"
+                    : "👉"}
               </span>
             </button>
           );
@@ -261,7 +255,7 @@ export function TimedChoiceGame({
       </div>
 
       {isTimedOut && (
-        <p className="text-center text-xs font-bold text-rose-600 animate-bounce">
+        <p className="text-center text-xs font-bold text-[var(--origami-error-text)]">
           ¡Se acabó el tiempo para esta pregunta!
         </p>
       )}

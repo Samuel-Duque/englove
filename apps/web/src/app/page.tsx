@@ -1,103 +1,231 @@
-import React from 'react';
-import Link from 'next/link';
-import type { Metadata } from 'next';
+import { ClipboardCheck, Gamepad2, Volume2 } from "lucide-react";
+import Link from "next/link";
+import type { Metadata } from "next";
+import React from "react";
+import { LandingAnchorMenu } from "../components/landing-anchor-menu";
+import { PublicFooter } from "../components/origami-footer";
+import { PublicHeader } from "../components/public-header";
+import { OrigamiCrane } from "../components/ui/origami-brand";
+import styles from "./origami-landing.module.css";
 
 export const metadata: Metadata = {
-  title: 'Aprende inglés jugando',
+  title: "Aprende inglés jugando",
 };
+
+const learningSteps = [
+  {
+    title: "Escucha una palabra",
+    description: (
+      <>
+        Escucha cómo suena <span lang="en">bird</span>, que significa pájaro.
+      </>
+    ),
+    icon: Volume2,
+  },
+  {
+    title: "Practica con una actividad",
+    description:
+      "Busca el dibujo del pájaro y relaciónalo con la palabra en inglés.",
+    icon: Gamepad2,
+  },
+  {
+    title: "Revisa lo aprendido",
+    description:
+      "Lee la devolución de tu profesora para saber qué seguir practicando.",
+    icon: ClipboardCheck,
+  },
+];
+
+function PaperScene() {
+  return (
+    <figure className={styles.scene}>
+      <div aria-hidden="true" className={styles.stage}>
+        <svg
+          className={styles.flightPath}
+          viewBox="0 0 400 180"
+          focusable="false"
+        >
+          <path
+            d="M14 147C87 178 105 56 161 89S263 174 387 62"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeDasharray="5 7"
+          />
+        </svg>
+        <div className={styles.wordPaper} lang="en">
+          bird
+        </div>
+        <div className={styles.foldPaper} />
+        <OrigamiCrane className={styles.crane} unfold />
+      </div>
+      <figcaption className={`origami-meta ${styles.sceneCaption}`}>
+        Ejemplo ilustrado: de la palabra a la figura.
+        <span className="sr-only">
+          {" "}
+          Una hoja con la palabra <span lang="en">bird</span> se pliega hasta
+          formar una grulla.
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
+function ActivityExample({ audience }: { audience: "Kids" | "Teens" }) {
+  return (
+    <article
+      className={`${styles.sample} ${audience === "Kids" ? styles.kids : ""}`}
+    >
+      <h3 className="origami-card-title">{audience}</h3>
+      <p>Une la palabra con su imagen.</p>
+      <div className={styles.wordPair}>
+        <svg
+          className={styles.bird}
+          viewBox="0 0 56 40"
+          role="img"
+          aria-label="Un pájaro"
+          focusable="false"
+        >
+          <path
+            d="M5 35h45"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path
+            d="m27 29 3 6m8-6 2 6M10 20h11C28 18 28 6 38 6c5 0 8 3 9 8l6 3-6 2c-2 8-8 11-17 11-11 0-16-5-20-10Z"
+            fill="var(--origami-honey)"
+            stroke="var(--origami-on-honey)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path d="m23 22 14-3-8 8Z" fill="var(--origami-orange)" />
+          <circle cx="42" cy="13" r="1.8" fill="var(--origami-on-honey)" />
+        </svg>
+        <span lang="en">bird</span>
+      </div>
+    </article>
+  );
+}
 
 export default function HomePage() {
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-to-b from-amber-50/70 via-white to-amber-50/40 flex flex-col justify-between p-6 sm:p-10 outline-none">
-      {/* Top Bar */}
-      <header className="max-w-6xl w-full mx-auto flex items-center justify-between pb-6 border-b border-amber-200/60">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-white text-xl shadow-xs">
-            ⭐
-          </span>
-          <span className="text-xl font-black text-amber-950 tracking-tight">Upward English</span>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <>
+      <div className={styles.header}>
+        <PublicHeader>
+          <LandingAnchorMenu />
           <Link
+            className={`origami-button origami-button--text ${styles.headerLogin}`}
             href="/login"
-            className="text-xs sm:text-sm font-extrabold text-amber-950/80 hover:text-amber-950 px-4 py-2 rounded-xl transition-colors"
           >
             Iniciar sesión
           </Link>
-          <Link
-            href="/registro"
-            className="text-xs sm:text-sm font-extrabold bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl shadow-xs transition-all"
+        </PublicHeader>
+      </div>
+      <main className="origami-shell" id="main-content" tabIndex={-1}>
+        <div className={`origami-container ${styles.landing}`}>
+          <section aria-labelledby="landing-heading" className={styles.hero}>
+            <div className={styles.intro}>
+              <h1 className="origami-hero-title" id="landing-heading">
+                Una palabra, un pliegue, una nueva forma de aprender inglés.
+              </h1>
+              <p className="origami-reading">
+                Actividades de inglés para estudiantes de 7 a 14 años, con
+                práctica de escucha, juegos y acompañamiento de su profesora.
+              </p>
+              <div className={styles.heroActions}>
+                <Link className="origami-button" href="/login">
+                  Entrar a mi portal
+                </Link>
+                <Link
+                  className="origami-button origami-button--secondary"
+                  href="/registro"
+                >
+                  Crear cuenta de estudiante
+                </Link>
+              </div>
+            </div>
+            <PaperScene />
+          </section>
+
+          <section
+            aria-labelledby="learning-heading"
+            className={styles.sectionHeading}
+            id="como-se-aprende"
+            tabIndex={-1}
           >
-            Registrarse
-          </Link>
-        </div>
-      </header>
+            <h2 className="origami-section-title" id="learning-heading">
+              Cómo se aprende
+            </h2>
+            <ol className={styles.folds} role="list">
+              {learningSteps.map(({ title, description, icon: Icon }) => (
+                <li className={styles.step} key={title}>
+                  <span aria-hidden="true" className={styles.stepIcon}>
+                    <Icon />
+                  </span>
+                  <h3 className="origami-card-title">{title}</h3>
+                  <p>{description}</p>
+                </li>
+              ))}
+            </ol>
+          </section>
 
-      {/* Hero Section */}
-      <section className="max-w-4xl w-full mx-auto my-auto py-12 text-center space-y-8">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-xs">
-          <span>🚀</span>
-          <span>Aprender inglés nunca fue tan divertido</span>
-        </div>
-
-        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-amber-950 tracking-tight leading-tight">
-          Aprende inglés jugando, superando misiones y ganando medallas
-        </h1>
-
-        <p className="text-base sm:text-lg text-zinc-600 max-w-2xl mx-auto leading-relaxed">
-          Plataforma educativa interactiva diseñada especialmente para niños y adolescentes (7 a 14 años).
-          Microjuegos, práctica oral con audio y seguimiento continuo para profesores y alumnos.
-        </p>
-
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/login"
-            className="w-full sm:w-auto min-h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black px-8 py-3.5 text-base shadow-md transition-all flex items-center justify-center gap-2"
+          <section
+            aria-labelledby="inside-heading"
+            className={styles.sectionHeading}
+            id="por-dentro"
+            tabIndex={-1}
           >
-            <span>🎮</span>
-            <span>Entrar a mi portal</span>
-          </Link>
-          <Link
-            href="/registro"
-            className="w-full sm:w-auto min-h-12 rounded-2xl border-2 border-amber-300 hover:border-amber-400 bg-white text-amber-950 font-black px-8 py-3.5 text-base shadow-xs transition-all flex items-center justify-center"
-          >
-            Crear cuenta de estudiante
-          </Link>
+            <div>
+              <h2 className="origami-section-title" id="inside-heading">
+                Por dentro
+              </h2>
+              <p className="origami-meta">Ejemplo de actividad</p>
+              <p className="origami-reading">
+                La misma práctica aparece con más espacio en Kids y con menos
+                elementos en Teens.
+              </p>
+            </div>
+            <div className={styles.audiences}>
+              <ActivityExample audience="Kids" />
+              <ActivityExample audience="Teens" />
+              <article className={`${styles.sample} ${styles.review}`}>
+                <h3 className="origami-card-title">Revisión de la profesora</h3>
+                <p className="origami-reading">
+                  La profesora revisa la actividad y puede dejar un comentario
+                  para orientar la práctica.
+                </p>
+                <p className="origami-meta">Comentario de ejemplo</p>
+                <blockquote>
+                  Relacionaste <span lang="en">bird</span> con el dibujo. Ahora
+                  intenta decir la palabra en voz alta.
+                </blockquote>
+              </article>
+            </div>
+          </section>
+
+          <section aria-labelledby="close-heading" className={styles.close}>
+            <div className={styles.closeTop}>
+              <h2 className="origami-section-title" id="close-heading">
+                ¿Ya tienes una cuenta?
+              </h2>
+              <Link className="origami-button" href="/login">
+                Iniciar sesión
+              </Link>
+            </div>
+            <div>
+              <p className="origami-reading">
+                Si aún no tienes una cuenta de estudiante, solicita una. Tu
+                profesora debe aprobarla antes de que puedas entrar.
+              </p>
+              <Link className={styles.registrationLink} href="/registro">
+                Crear cuenta de estudiante
+              </Link>
+            </div>
+          </section>
         </div>
-
-        {/* Highlight Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-10 text-left">
-          <div className="p-5 rounded-2xl bg-white border border-amber-200 shadow-xs space-y-2">
-            <span className="text-2xl">🧸 / 🎧</span>
-            <h3 className="font-extrabold text-amber-950 text-sm">Temas Kids y Teens</h3>
-            <p className="text-xs text-zinc-600 leading-relaxed">
-              Interfaces adaptadas a la edad: lúdica y colorida para los más pequeños, sobria para adolescentes.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-amber-200 shadow-xs space-y-2">
-            <span className="text-2xl">🎙️</span>
-            <h3 className="font-extrabold text-amber-950 text-sm">Speaking y Escucha</h3>
-            <p className="text-xs text-zinc-600 leading-relaxed">
-              Práctica de pronunciación guiada con grabación de voz y retroalimentación personalizada de tus docentes.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white border border-amber-200 shadow-xs space-y-2">
-            <span className="text-2xl">🏆</span>
-            <h3 className="font-extrabold text-amber-950 text-sm">Gamificación Real</h3>
-            <p className="text-xs text-zinc-600 leading-relaxed">
-              Insignias desbloqueables, rachas semanales con escudos de perdón y estrellas de logro por actividad.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="max-w-6xl w-full mx-auto pt-6 border-t border-amber-200/60 text-center text-xs text-zinc-400">
-        <p>© 2026 Upward English. Plataforma educativa de enseñanza de inglés.</p>
-      </footer>
-    </main>
+      </main>
+      <PublicFooter />
+    </>
   );
 }

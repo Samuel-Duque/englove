@@ -40,7 +40,12 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
         contentType: 'application/json',
         body: JSON.stringify({
           items: [
-            { id: 'grp-1', name: 'Grupo A1 Mañana', level: 'A1', activeStudentsCount: 12 },
+            {
+              id: 'grp-1',
+              name: 'Grupo A1 Mañana',
+              level: 'A1',
+              activeStudentsCount: 12,
+            },
           ],
           total: 1,
         }),
@@ -56,7 +61,10 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          period: { from: '2026-10-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' },
+          period: {
+            from: '2026-10-01T00:00:00.000Z',
+            to: '2026-11-01T00:00:00.000Z',
+          },
           organizationSummary: {
             totalApprovedStudents: 12,
             activeStudentsInPeriod: 10,
@@ -146,7 +154,10 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          period: { from: '2026-10-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' },
+          period: {
+            from: '2026-10-01T00:00:00.000Z',
+            to: '2026-11-01T00:00:00.000Z',
+          },
           filters: { groupId: null, level: null },
           entries: [
             {
@@ -185,9 +196,13 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     await page.goto('/estadisticas');
 
     // 1.2 Verificar KPIs y Alerta de inactividad de 14 días
-    await expect(page.locator('p:has-text("4.2"), p:has-text("4,2")').first()).toBeVisible({ timeout: 5000 });
+    await expect(
+      page.locator('p:has-text("4.2"), p:has-text("4,2")').first(),
+    ).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=85%').first()).toBeVisible();
-    await expect(page.locator('text=Alumnos en riesgo de deserción o abandono')).toBeVisible();
+    await expect(
+      page.locator('text=Alumnos en riesgo de deserción o abandono'),
+    ).toBeVisible();
     await expect(page.locator('text=Sebastián Inactivo')).toBeVisible();
     await expect(page.locator('text=16 días')).toBeVisible();
 
@@ -204,9 +219,22 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     await expect(monthlyBtn).toBeVisible();
     await monthlyBtn.click();
 
+    const comparison = page.getByRole('table', {
+      name: 'Comparación de alumnos del grupo',
+    });
+    const scoreHeader = comparison.getByRole('columnheader', {
+      name: 'Promedio',
+      exact: true,
+    });
+    await scoreHeader.getByRole('button').press('Enter');
+    await expect(scoreHeader).toHaveAttribute('aria-sort', 'descending');
+    await expect(comparison.getByText('Subió +0,3')).toBeVisible();
+
     // 1.4 Cambiar a pestaña Leaderboard Privado y probar filtros
     await page.click('button:has-text("Leaderboard de Notas")');
-    await expect(page.locator('text=Aviso de confidencialidad docente')).toBeVisible();
+    await expect(
+      page.locator('text=Aviso de confidencialidad docente'),
+    ).toBeVisible();
     await expect(page.locator('text=Ana Sofía')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=Santiago Ruiz')).toBeVisible();
 
@@ -233,7 +261,10 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
             groupName: 'Grupo A1 Mañana',
             joinedAt: '2026-09-01T00:00:00.000Z',
           },
-          period: { from: '2026-10-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' },
+          period: {
+            from: '2026-10-01T00:00:00.000Z',
+            to: '2026-11-01T00:00:00.000Z',
+          },
           filters: { type: null, level: null },
           performance: {
             passingScore: 3.5,
@@ -276,9 +307,24 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
             completionRatePercent: 100,
             totalTimeSpentSeconds: 6000,
             weeklyCalendar: [
-              { weekKey: '2026-W44', weekStart: '2026-10-26', status: 'active', completedCount: 3 },
-              { weekKey: '2026-W43', weekStart: '2026-10-19', status: 'forgiven', completedCount: 0 },
-              { weekKey: '2026-W42', weekStart: '2026-10-12', status: 'active', completedCount: 4 },
+              {
+                weekKey: '2026-W44',
+                weekStart: '2026-10-26',
+                status: 'active',
+                completedCount: 3,
+              },
+              {
+                weekKey: '2026-W43',
+                weekStart: '2026-10-19',
+                status: 'forgiven',
+                completedCount: 0,
+              },
+              {
+                weekKey: '2026-W42',
+                weekStart: '2026-10-12',
+                status: 'active',
+                completedCount: 4,
+              },
             ],
             dailyTime: [],
             weeklyTime: [],
@@ -289,10 +335,14 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     });
 
     await page.goto('/estadisticas/estudiantes/std-1');
-    await expect(page.locator('h1:has-text("Ana Sofía")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('h1:has-text("Ana Sofía")')).toBeVisible({
+      timeout: 5000,
+    });
     await expect(page.locator('text=Activa ✓').first()).toBeVisible();
     await expect(page.locator('text=Perdón aplicado 🛡️')).toBeVisible();
     await expect(page.locator('text=Colors and Animals')).toBeVisible();
-    await expect(page.locator('*:has-text("5,0"), *:has-text("5.0")').first()).toBeVisible();
+    await expect(
+      page.locator('*:has-text("5,0"), *:has-text("5.0")').first(),
+    ).toBeVisible();
   });
 });

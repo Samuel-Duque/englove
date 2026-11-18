@@ -1,5 +1,7 @@
 'use client';
 
+import styles from '../origami-management.module.css';
+
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -18,7 +20,9 @@ import { apiFetch, ApiError } from '../../../lib/api';
 import { ConfirmDialog, AccessibleModal } from '../../../components/ui/modal';
 
 function isLevel(val: string): val is Level {
-  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+  return (
+    val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2
+  );
 }
 
 function isAgeSegment(val: string): val is AgeSegment {
@@ -34,14 +38,18 @@ function StudentsManagementContent() {
   const initialTab: 'students' | 'requests' | 'locked' =
     rawTab === 'requests' || rawTab === 'locked' ? rawTab : 'students';
 
-  const [activeTab, setActiveTab] = useState<'students' | 'requests' | 'locked'>(initialTab);
+  const [activeTab, setActiveTab] = useState<
+    'students' | 'requests' | 'locked'
+  >(initialTab);
 
   // UI state
   const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Approve Modal state
-  const [approvingStudent, setApprovingStudent] = useState<StudentView | null>(null);
+  const [approvingStudent, setApprovingStudent] = useState<StudentView | null>(
+    null,
+  );
   const [selectedLevel, setSelectedLevel] = useState<Level>(Level.A1);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [guardianName, setGuardianName] = useState('');
@@ -135,7 +143,9 @@ function StudentsManagementContent() {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo aprobar al alumno');
+      setActionError(
+        err instanceof ApiError ? err.message : 'No se pudo aprobar al alumno',
+      );
     },
   });
 
@@ -146,7 +156,11 @@ function StudentsManagementContent() {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo rechazar la solicitud');
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo rechazar la solicitud',
+      );
     },
   });
 
@@ -157,7 +171,11 @@ function StudentsManagementContent() {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo desbloquear la cuenta');
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo desbloquear la cuenta',
+      );
     },
   });
 
@@ -177,7 +195,9 @@ function StudentsManagementContent() {
     e.preventDefault();
     if (!approvingStudent) return;
     if (!selectedGroupId) {
-      setActionError('Debes seleccionar un grupo activo para aprobar al alumno');
+      setActionError(
+        'Debes seleccionar un grupo activo para aprobar al alumno',
+      );
       return;
     }
 
@@ -224,21 +244,25 @@ function StudentsManagementContent() {
     });
   };
 
-  const error =
-    actionError ||
-    (studentsQuery.error instanceof ApiError ? studentsQuery.error.message : studentsQuery.error instanceof Error ? studentsQuery.error.message : null) ||
-    (requestsQuery.error instanceof ApiError ? requestsQuery.error.message : requestsQuery.error instanceof Error ? requestsQuery.error.message : null) ||
-    (lockedQuery.error instanceof ApiError ? lockedQuery.error.message : lockedQuery.error instanceof Error ? lockedQuery.error.message : null);
+  const activeQuery =
+    activeTab === 'students'
+      ? studentsQuery
+      : activeTab === 'requests'
+        ? requestsQuery
+        : lockedQuery;
+  const error = actionError || activeQuery.error?.message;
+  const cannotLoad = activeQuery.isError && !activeQuery.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+        <h1 className="origami-page-title text-[var(--origami-text-primary)]">
           Gestión de Alumnos
         </h1>
-        <p className="text-sm text-zinc-600">
-          Administra estudiantes inscritos, solicitudes de acceso y desbloqueo de cuentas.
+        <p className="text-sm text-[var(--origami-text-secondary)]">
+          Administra estudiantes inscritos, solicitudes de acceso y desbloqueo
+          de cuentas.
         </p>
       </div>
 
@@ -246,71 +270,94 @@ function StudentsManagementContent() {
       {error && (
         <div
           role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
+          className="origami-state origami-state--error flex justify-between items-center"
         >
           <span>{error}</span>
-          <button type="button" onClick={() => setActionError(null)} className="text-rose-600 font-bold ml-4">
-            ✕
-          </button>
+          {actionError ? (
+            <button
+              aria-label="Cerrar aviso"
+              type="button"
+              onClick={() => setActionError(null)}
+              className="origami-button origami-button--text"
+            >
+              ✕
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void activeQuery.refetch()}
+              className="origami-button origami-button--secondary"
+            >
+              Reintentar
+            </button>
+          )}
         </div>
       )}
 
       {success && (
         <div
           role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
+          className="origami-state origami-state--success flex justify-between items-center"
         >
           <span>{success}</span>
-          <button type="button" onClick={() => setSuccess(null)} className="text-emerald-600 font-bold ml-4">
+          <button
+            aria-label="Cerrar aviso"
+            type="button"
+            onClick={() => setSuccess(null)}
+            className="origami-button origami-button--text ml-4"
+          >
             ✕
           </button>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="border-b border-zinc-200">
-        <nav className="-mb-px flex space-x-8" aria-label="Pestañas de alumnos">
+      <div className="border-b border-[var(--origami-border-subtle)]">
+        <nav
+          className="flex flex-wrap gap-2 pb-3"
+          aria-label="Pestañas de alumnos"
+        >
           <button
+            aria-pressed={activeTab === 'students'}
             type="button"
             onClick={() => handleTabChange('students')}
-            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-semibold text-sm transition-colors ${
-              activeTab === 'students'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
+            className={
+              'origami-button origami-button--secondary' +
+              (activeTab === 'students' ? ' origami-selected' : '')
+            }
           >
             Alumnos inscritos
           </button>
 
           <button
+            aria-pressed={activeTab === 'requests'}
             type="button"
             onClick={() => handleTabChange('requests')}
-            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-semibold text-sm transition-colors flex items-center gap-2 ${
-              activeTab === 'requests'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
+            className={
+              'origami-button origami-button--secondary' +
+              (activeTab === 'requests' ? ' origami-selected' : '')
+            }
           >
             <span>Solicitudes de registro</span>
             {requests.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--origami-warning-bg)] text-[var(--origami-warning-text)]">
                 {requests.length}
               </span>
             )}
           </button>
 
           <button
+            aria-pressed={activeTab === 'locked'}
             type="button"
             onClick={() => handleTabChange('locked')}
-            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-semibold text-sm transition-colors flex items-center gap-2 ${
-              activeTab === 'locked'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
+            className={
+              'origami-button origami-button--secondary' +
+              (activeTab === 'locked' ? ' origami-selected' : '')
+            }
           >
             <span>Bloqueados</span>
             {locked.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--origami-error-bg)] text-[var(--origami-error-text)]">
                 {locked.length}
               </span>
             )}
@@ -322,59 +369,110 @@ function StudentsManagementContent() {
       {activeTab === 'students' && (
         <div>
           {isLoading ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">Cargando alumnos…</div>
-          ) : students.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-base font-semibold text-zinc-800">No hay alumnos registrados</p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Los alumnos se registran desde el enlace de registro de tu institución y aparecen en la pestaña de Solicitudes.
+            <div role="status" className="origami-state text-center">
+              Cargando alumnos…
+            </div>
+          ) : cannotLoad ? null : students.length === 0 ? (
+            <div className="origami-card text-center">
+              <p className="text-base font-semibold text-[var(--origami-text-primary)]">
+                No hay alumnos registrados
+              </p>
+              <p className="mt-1 text-sm text-[var(--origami-text-secondary)]">
+                Los alumnos se registran desde el enlace de registro de tu
+                institución y aparecen en la pestaña de Solicitudes.
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+            <div className="origami-card">
+              <table
+                role="table"
+                aria-label="Alumnos aprobados"
+                className={styles.operationalTable}
+              >
+                <thead role="rowgroup" className={styles.operationalHead}>
+                  <tr role="row">
+                    <th role="columnheader" scope="col">
                       Nombre
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Correo
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Nivel
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Segmento
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Ficha
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200">
+                <tbody role="rowgroup" className={styles.operationalBody}>
                   {students.map((st) => (
-                    <tr key={st.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-zinc-900">
-                        <Link href={`/alumnos/${st.id}`} className="hover:text-blue-600">
-                          {st.name}
-                        </Link>
+                    <tr
+                      role="row"
+                      key={st.id}
+                      className={
+                        styles.operationalRow +
+                        ' hover:bg-[var(--origami-surface-soft)]'
+                      }
+                    >
+                      <td
+                        role="cell"
+                        className={styles.cardHeading + ' font-semibold'}
+                      >
+                        <h2 className="origami-card-title">
+                          <Link
+                            href={`/alumnos/${st.id}`}
+                            className="hover:text-[var(--origami-info-text)] underline underline-offset-4"
+                          >
+                            {st.name}
+                          </Link>
+                        </h2>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                      <td
+                        role="cell"
+                        className={
+                          styles.cardField +
+                          ' text-[var(--origami-text-secondary)]'
+                        }
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Correo
+                        </span>
                         {st.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-zinc-100 text-zinc-800">
+                      <td role="cell" className={styles.cardField}>
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Nivel
+                        </span>
+                        <span className="flex flex-wrap px-2 py-0.5 rounded text-xs font-bold bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)]">
                           {st.level ?? 'Sin nivel'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600 capitalize">
+                      <td
+                        role="cell"
+                        className={
+                          styles.cardField +
+                          ' text-[var(--origami-text-secondary)] capitalize'
+                        }
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Segmento
+                        </span>
                         {st.ageSegment}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold">
+                      <td
+                        role="cell"
+                        className={styles.cardField + ' font-semibold'}
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Ficha
+                        </span>
                         <Link
                           href={`/alumnos/${st.id}`}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-[var(--origami-info-text)] hover:text-[var(--origami-info-text)] underline underline-offset-4"
                         >
                           Ver ficha →
                         </Link>
@@ -392,62 +490,105 @@ function StudentsManagementContent() {
       {activeTab === 'requests' && (
         <div>
           {isLoading ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">Cargando solicitudes…</div>
-          ) : requests.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-base font-semibold text-zinc-800">
+            <div role="status" className="origami-state text-center">
+              Cargando solicitudes…
+            </div>
+          ) : cannotLoad ? null : requests.length === 0 ? (
+            <div className="origami-card text-center">
+              <p className="text-base font-semibold text-[var(--origami-text-primary)]">
                 No tienes solicitudes pendientes
               </p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Aquí aparecerán los nuevos registros de alumnos para que les asignes nivel y grupo.
+              <p className="mt-1 text-sm text-[var(--origami-text-secondary)]">
+                Aquí aparecerán los nuevos registros de alumnos para que les
+                asignes nivel y grupo.
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+            <div className="origami-card">
+              <table
+                role="table"
+                aria-label="Solicitudes pendientes"
+                className={styles.operationalTable}
+              >
+                <thead role="rowgroup" className={styles.operationalHead}>
+                  <tr role="row">
+                    <th role="columnheader" scope="col">
                       Alumno
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Correo
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Nacimiento / Segmento
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Acciones
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200">
+                <tbody role="rowgroup" className={styles.operationalBody}>
                   {requests.map((req) => (
-                    <tr key={req.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-zinc-900">
-                        {req.name}
+                    <tr
+                      role="row"
+                      key={req.id}
+                      className={
+                        styles.operationalRow +
+                        ' hover:bg-[var(--origami-surface-soft)]'
+                      }
+                    >
+                      <td
+                        role="cell"
+                        className={styles.cardHeading + ' font-semibold'}
+                      >
+                        <h2 className="origami-card-title">{req.name}</h2>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                      <td
+                        role="cell"
+                        className={
+                          styles.cardField +
+                          ' text-[var(--origami-text-secondary)]'
+                        }
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Correo
+                        </span>
                         {req.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                      <td
+                        role="cell"
+                        className={
+                          styles.cardField +
+                          ' text-[var(--origami-text-secondary)]'
+                        }
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Nacimiento / Segmento
+                        </span>
                         {req.birthDate} ({req.ageSegment})
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => openApproveModal(req)}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700"
-                        >
-                          Aprobar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(req)}
-                          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-rose-600 hover:bg-rose-50"
-                        >
-                          Rechazar
-                        </button>
+                      <td
+                        role="cell"
+                        className={styles.cardActions + ' font-semibold'}
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Acciones
+                        </span>
+                        <div className={styles.rowActions}>
+                          <button
+                            type="button"
+                            onClick={() => openApproveModal(req)}
+                            className="origami-button"
+                          >
+                            Aprobar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReject(req)}
+                            className="origami-button origami-button--secondary text-[var(--origami-error-text)]"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -462,52 +603,97 @@ function StudentsManagementContent() {
       {activeTab === 'locked' && (
         <div>
           {isLoading ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">Cargando bloqueados…</div>
-          ) : locked.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-base font-semibold text-zinc-800">
+            <div role="status" className="origami-state text-center">
+              Cargando bloqueados…
+            </div>
+          ) : cannotLoad ? null : locked.length === 0 ? (
+            <div className="origami-card text-center">
+              <p className="text-base font-semibold text-[var(--origami-text-primary)]">
                 No hay alumnos bloqueados
               </p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Las cuentas temporalmente bloqueadas por intentos fallidos aparecerán aquí para desbloqueo inmediato.
+              <p className="mt-1 text-sm text-[var(--origami-text-secondary)]">
+                Las cuentas temporalmente bloqueadas por intentos fallidos
+                aparecerán aquí para desbloqueo inmediato.
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+            <div className="origami-card">
+              <table
+                role="table"
+                aria-label="Alumnos bloqueados"
+                className={styles.operationalTable}
+              >
+                <thead role="rowgroup" className={styles.operationalHead}>
+                  <tr role="row">
+                    <th role="columnheader" scope="col">
                       Alumno
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Correo
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Bloqueado hasta
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase">
+                    <th role="columnheader" scope="col">
                       Acción
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200">
+                <tbody role="rowgroup" className={styles.operationalBody}>
                   {locked.map((st) => (
-                    <tr key={st.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-zinc-900">
-                        {st.name}
+                    <tr
+                      role="row"
+                      key={st.id}
+                      className={
+                        styles.operationalRow +
+                        ' hover:bg-[var(--origami-surface-soft)]'
+                      }
+                    >
+                      <td
+                        role="cell"
+                        className={styles.cardHeading + ' font-semibold'}
+                      >
+                        <h2 className="origami-card-title">{st.name}</h2>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                      <td
+                        role="cell"
+                        className={
+                          styles.cardField +
+                          ' text-[var(--origami-text-secondary)]'
+                        }
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Correo
+                        </span>
                         {st.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-rose-600 font-medium">
-                        {st.lockedUntil ? new Date(st.lockedUntil).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' }) : 'Bloqueado'}
+                      <td
+                        role="cell"
+                        className={
+                          styles.cardField + ' text-[var(--origami-error-text)]'
+                        }
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Bloqueado hasta
+                        </span>
+                        {st.lockedUntil
+                          ? new Date(st.lockedUntil).toLocaleTimeString(
+                              'es-CO',
+                              { timeZone: 'America/Bogota' },
+                            )
+                          : 'Bloqueado'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold">
+                      <td
+                        role="cell"
+                        className={styles.cardField + ' font-semibold'}
+                      >
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Acción
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleUnlock(st)}
-                          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-white hover:bg-zinc-800"
+                          className="origami-button"
                         >
                           Desbloquear en 1 clic
                         </button>
@@ -530,13 +716,11 @@ function StudentsManagementContent() {
       >
         {groups.length === 0 ? (
           <div className="py-4 text-center space-y-3">
-            <p className="text-sm text-amber-800 bg-amber-50 p-4 rounded-lg border border-amber-200">
-              No tienes ningún grupo activo. Debes crear un grupo antes de poder aprobar alumnos.
+            <p className="text-sm text-[var(--origami-warning-text)] bg-[var(--origami-warning-bg)] p-4 rounded-lg border border-[var(--origami-border-subtle)]">
+              No tienes ningún grupo activo. Debes crear un grupo antes de poder
+              aprobar alumnos.
             </p>
-            <Link
-              href="/grupos"
-              className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-            >
+            <Link href="/grupos" className="origami-button">
               Ir a Crear Grupo
             </Link>
           </div>
@@ -544,7 +728,10 @@ function StudentsManagementContent() {
           <form onSubmit={handleConfirmApproval} className="space-y-4">
             {/* Level */}
             <div>
-              <label htmlFor="approve-level" className="block text-xs font-semibold text-zinc-700 mb-1">
+              <label
+                htmlFor="approve-level"
+                className="origami-label block mb-1"
+              >
                 Nivel pedagógico inicial *
               </label>
               <select
@@ -553,7 +740,7 @@ function StudentsManagementContent() {
                 onChange={(e) => {
                   if (isLevel(e.target.value)) setSelectedLevel(e.target.value);
                 }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="origami-field"
               >
                 <option value={Level.A1}>A1</option>
                 <option value={Level.A2}>A2</option>
@@ -564,7 +751,10 @@ function StudentsManagementContent() {
 
             {/* Group (Strictly 1 active group per student, Decision 73) */}
             <div>
-              <label htmlFor="approve-group" className="block text-xs font-semibold text-zinc-700 mb-1">
+              <label
+                htmlFor="approve-group"
+                className="origami-label block mb-1"
+              >
                 Grupo asignado * (Un solo grupo vigente por alumno)
               </label>
               <select
@@ -572,7 +762,7 @@ function StudentsManagementContent() {
                 required
                 value={selectedGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="origami-field"
               >
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -585,7 +775,10 @@ function StudentsManagementContent() {
             {/* Informacion del acudiente */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="approve-guardian" className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label
+                  htmlFor="approve-guardian"
+                  className="origami-label block mb-1"
+                >
                   Nombre del acudiente (opcional)
                 </label>
                 <input
@@ -594,12 +787,15 @@ function StudentsManagementContent() {
                   maxLength={200}
                   value={guardianName}
                   onChange={(e) => setGuardianName(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
 
               <div>
-                <label htmlFor="approve-contact" className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label
+                  htmlFor="approve-contact"
+                  className="origami-label block mb-1"
+                >
                   Contacto del acudiente (opcional)
                 </label>
                 <input
@@ -608,41 +804,45 @@ function StudentsManagementContent() {
                   maxLength={200}
                   value={guardianContact}
                   onChange={(e) => setGuardianContact(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
             </div>
 
             {/* Pedagogical Segment correction */}
             <div>
-              <label htmlFor="approve-segment" className="block text-xs font-semibold text-zinc-700 mb-1">
+              <label
+                htmlFor="approve-segment"
+                className="origami-label block mb-1"
+              >
                 Segmento pedagógico
               </label>
               <select
                 id="approve-segment"
                 value={ageSegment}
                 onChange={(e) => {
-                  if (isAgeSegment(e.target.value)) setAgeSegment(e.target.value);
+                  if (isAgeSegment(e.target.value))
+                    setAgeSegment(e.target.value);
                 }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                className="origami-field"
               >
                 <option value={AgeSegment.kids}>Kids (7 a 10 años)</option>
                 <option value={AgeSegment.teens}>Teens (11 a 14 años)</option>
               </select>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+            <div className="flex justify-end gap-3 pt-3 border-t border-[var(--origami-border-subtle)]">
               <button
                 type="button"
                 onClick={() => setApprovingStudent(null)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                className="origami-button origami-button--secondary"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSubmittingApproval || !selectedGroupId}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="origami-button"
               >
                 {isSubmittingApproval ? 'Aprobando…' : 'Confirmar aprobación'}
               </button>
@@ -657,7 +857,9 @@ function StudentsManagementContent() {
         isDestructive={true}
         confirmText="Rechazar solicitud"
         onConfirm={handleConfirmReject}
-        onCancel={() => setRejectConfirmDialog({ isOpen: false, student: null })}
+        onCancel={() =>
+          setRejectConfirmDialog({ isOpen: false, student: null })
+        }
       />
     </div>
   );
@@ -665,7 +867,13 @@ function StudentsManagementContent() {
 
 export function AlumnosClient() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando gestión de alumnos…</div>}>
+    <Suspense
+      fallback={
+        <div role="status" className="origami-state text-center">
+          Cargando gestión de alumnos…
+        </div>
+      }
+    >
       <StudentsManagementContent />
     </Suspense>
   );

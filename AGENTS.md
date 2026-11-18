@@ -8,7 +8,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 1. `.agents/CONTEXT.md` — fuente única de verdad.
    - §2.4: lo que queda **fuera del piloto**.
-   - §14: registro de decisiones (1–146).
+   - §14: registro de decisiones, incluida la evaluación de Origami en la rama `UI` (decisión 147).
    - §15: pendientes abiertos (sin P-n abiertos para el piloto; preguntas Q-01 a Q-08 de SPEC-11 todas decididas).
    - §16: **convenciones obligatorias para agentes**.
    - §17: **glosario** del dominio.

@@ -11,7 +11,7 @@ export default function ContenidoExtraPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 text-center text-zinc-500 text-sm">
+        <div role="status" className="origami-state text-center">
           Cargando catálogo de contenido extra…
         </div>
       }

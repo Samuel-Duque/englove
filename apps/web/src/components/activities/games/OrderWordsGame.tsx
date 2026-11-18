@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -8,14 +8,17 @@ import {
   OrderWordsSettingsSchema,
   OrderWordsSolutionSchema,
   deterministicShuffle,
-} from '@upward-english/shared';
-import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { soundManager } from '../../../lib/sound';
+} from "@upward-english/shared";
+import {
+  draggable,
+  dropTargetForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { soundManager } from "../../../lib/sound";
 
 export function OrderWordsGame({
   config,
   initialState,
-  theme = 'kids',
+  theme = "kids",
   soundEnabled = true,
   previewMode = false,
   onEvent,
@@ -23,20 +26,26 @@ export function OrderWordsGame({
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
   const parsedSettings = OrderWordsSettingsSchema.safeParse(config.settings);
   const settings = parsedSettings.success ? parsedSettings.data : null;
-  const parsedSol = OrderWordsSolutionSchema.safeParse(config.answerKey?.solution);
+  const parsedSol = OrderWordsSolutionSchema.safeParse(
+    config.answerKey?.solution,
+  );
   const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalTokens = settings?.tokens || [];
 
   // Deterministic bank shuffle (RF-3, §4 Rule 5)
   const initialBankTokens = useMemo(() => {
-    const seed = originalTokens.map((t) => t.id).join('-') + (solution?.tokenIds?.join('-') || 'seed');
+    const seed =
+      originalTokens.map((t) => t.id).join("-") +
+      (solution?.tokenIds?.join("-") || "seed");
     let shuffled = deterministicShuffle(originalTokens, seed);
 
     // If shuffled order matches solution, reverse or rotate to guarantee difference
     if (solution?.tokenIds && shuffled.length >= 2) {
       const shuffledIds = shuffled.map((t) => t.id);
-      const isIdentical = shuffledIds.every((id, idx) => id === solution.tokenIds[idx]);
+      const isIdentical = shuffledIds.every(
+        (id, idx) => id === solution.tokenIds[idx],
+      );
       if (isIdentical) {
         shuffled = [...shuffled].reverse();
       }
@@ -61,7 +70,7 @@ export function OrderWordsGame({
     }
     return [];
   });
-  const [liveStatus, setLiveStatus] = useState<string>('');
+  const [liveStatus, setLiveStatus] = useState<string>("");
 
   const tokenMap = useMemo(() => {
     const map = new Map<string, { id: string; text: string }>();
@@ -82,8 +91,8 @@ export function OrderWordsGame({
     const next = [...tokenIds, tokenId];
     setTokenIds(next);
     const tok = tokenMap.get(tokenId);
-    setLiveStatus(`Palabra ${tok?.text ?? ''} añadida a la oración`);
-    onEvent?.({ itemId: 'tokenIds', answer: next });
+    setLiveStatus(`Palabra ${tok?.text ?? ""} añadida a la oración`);
+    onEvent?.({ itemId: "tokenIds", answer: next });
   };
 
   const handleInsertBankToken = (tokenId: string, atIndex: number) => {
@@ -92,16 +101,18 @@ export function OrderWordsGame({
     next.splice(atIndex, 0, tokenId);
     setTokenIds(next);
     const tok = tokenMap.get(tokenId);
-    setLiveStatus(`Palabra ${tok?.text ?? ''} insertada en la posición ${atIndex + 1}`);
-    onEvent?.({ itemId: 'tokenIds', answer: next });
+    setLiveStatus(
+      `Palabra ${tok?.text ?? ""} insertada en la posición ${atIndex + 1}`,
+    );
+    onEvent?.({ itemId: "tokenIds", answer: next });
   };
 
   const handleRemoveToken = (tokenId: string) => {
     const next = tokenIds.filter((id) => id !== tokenId);
     setTokenIds(next);
     const tok = tokenMap.get(tokenId);
-    setLiveStatus(`Palabra ${tok?.text ?? ''} devuelta al banco`);
-    onEvent?.({ itemId: 'tokenIds', answer: next });
+    setLiveStatus(`Palabra ${tok?.text ?? ""} devuelta al banco`);
+    onEvent?.({ itemId: "tokenIds", answer: next });
   };
 
   const handleMoveToken = (fromIndex: number, toIndex: number) => {
@@ -120,13 +131,15 @@ export function OrderWordsGame({
       next.splice(toIndex, 0, moved);
       setTokenIds(next);
       const tok = tokenMap.get(moved);
-      setLiveStatus(`Palabra ${tok?.text ?? ''} movida a la posición ${toIndex + 1}`);
-      onEvent?.({ itemId: 'tokenIds', answer: next });
+      setLiveStatus(
+        `Palabra ${tok?.text ?? ""} movida a la posición ${toIndex + 1}`,
+      );
+      onEvent?.({ itemId: "tokenIds", answer: next });
     }
   };
 
   const handleComplete = () => {
-    soundManager.play('complete', soundEnabled);
+    soundManager.play("complete", soundEnabled);
     onComplete?.({ tokenIds });
   };
 
@@ -145,7 +158,7 @@ export function OrderWordsGame({
       onDrop: ({ source }) => {
         setIsOverLine(false);
         const data = source.data;
-        if (data?.type === 'bank-token' && typeof data.tokenId === 'string') {
+        if (data?.type === "bank-token" && typeof data.tokenId === "string") {
           handleAddToken(data.tokenId);
         }
       },
@@ -167,25 +180,19 @@ export function OrderWordsGame({
       onDrop: ({ source }) => {
         setIsOverBank(false);
         const data = source.data;
-        if (data?.type === 'placed-token' && typeof data.tokenId === 'string') {
+        if (data?.type === "placed-token" && typeof data.tokenId === "string") {
           handleRemoveToken(data.tokenId);
         }
       },
     });
   }, [tokenIds]);
 
-  const isKids = theme === 'kids';
+  const isKids = theme === "kids";
 
   return (
-    <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
-        isKids
-          ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
-      }`}
-    >
+    <div className="w-full min-w-0 space-y-4 [overflow-wrap:anywhere]">
       {previewMode && (
-        <div className="mb-4 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center">
+        <div className="origami-state text-center">
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
@@ -196,8 +203,8 @@ export function OrderWordsGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
-          <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
+        <div className="origami-state">
+          <p className="text-sm sm:text-base font-semibold text-[var(--origami-text-primary)] leading-relaxed">
             {config.instructions}
           </p>
         </div>
@@ -205,15 +212,17 @@ export function OrderWordsGame({
 
       {/* Sentence Construction Line */}
       <div className="space-y-2 mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h4
             className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+              isKids
+                ? "text-[var(--origami-text-primary)]"
+                : "text-[var(--origami-text-secondary)]"
             }`}
           >
             Línea de construcción de oración:
           </h4>
-          <span className="text-xs font-semibold text-zinc-500">
+          <span className="text-xs font-semibold text-[var(--origami-text-secondary)]">
             {tokenIds.length} de {originalTokens.length} palabras
           </span>
         </div>
@@ -222,23 +231,24 @@ export function OrderWordsGame({
           ref={sentenceLineRef}
           className={`min-h-24 p-4 rounded-2xl border-2 border-dashed flex flex-wrap items-center gap-2.5 transition-colors ${
             isOverLine
-              ? 'border-indigo-500 ring-4 ring-indigo-200 bg-indigo-50/60 shadow-md'
+              ? "border-[var(--origami-paper-blue)] ring-4 ring-[var(--origami-focus)] bg-[var(--origami-info-bg)] shadow-md"
               : tokenIds.length === 0
                 ? isKids
-                  ? 'border-amber-300 bg-amber-50/40 justify-center'
-                  : 'border-zinc-700 bg-zinc-800/40 justify-center'
-                : isKids
-                  ? 'border-amber-400 bg-white shadow-inner'
-                  : 'border-zinc-700 bg-zinc-800 shadow-inner'
+                  ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-soft)] justify-center"
+                  : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] justify-center"
+                : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] shadow-inner"
           }`}
         >
           {tokenIds.length === 0 ? (
             <p
               className={`text-xs sm:text-sm font-semibold text-center select-none ${
-                isKids ? 'text-amber-950 font-medium' : 'text-zinc-400'
+                isKids
+                  ? "text-[var(--origami-text-primary)] font-medium"
+                  : "text-[var(--origami-text-secondary)]"
               }`}
             >
-              Arrastra o toca palabras del banco hacia aquí para construir la frase.
+              Arrastra o toca palabras del banco hacia aquí para construir la
+              frase.
             </p>
           ) : (
             tokenIds.map((id, index) => {
@@ -267,7 +277,9 @@ export function OrderWordsGame({
       <div className="space-y-3 mb-8">
         <h4
           className={`text-xs font-extrabold uppercase tracking-wider ${
-            isKids ? 'text-amber-800' : 'text-zinc-400'
+            isKids
+              ? "text-[var(--origami-text-primary)]"
+              : "text-[var(--origami-text-secondary)]"
           }`}
         >
           Banco de palabras:
@@ -277,12 +289,12 @@ export function OrderWordsGame({
           ref={bankRef}
           className={`flex flex-wrap gap-2.5 p-4 rounded-2xl border min-h-16 items-center transition-colors ${
             isOverBank
-              ? 'border-rose-400 ring-4 ring-rose-200 bg-rose-50/60'
-              : 'bg-white/70 border-amber-200/80'
+              ? "border-[var(--origami-error-text)] ring-4 ring-[var(--origami-focus)] bg-[var(--origami-error-bg)]"
+              : "bg-[var(--origami-surface-raised)] border-[var(--origami-border-control)]"
           }`}
         >
           {bankTokens.length === 0 ? (
-            <p className="text-xs font-medium text-zinc-400 italic">
+            <p className="text-xs font-medium text-[var(--origami-text-secondary)] italic">
               Todas las palabras han sido colocadas en la oración.
             </p>
           ) : (
@@ -300,15 +312,15 @@ export function OrderWordsGame({
       </div>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-amber-200/60 flex items-center justify-between">
+      <div className="pt-4 border-t border-[var(--origami-border-subtle)] flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => {
             setTokenIds([]);
-            onEvent?.({ itemId: 'tokenIds', answer: [] });
+            onEvent?.({ itemId: "tokenIds", answer: [] });
           }}
           disabled={tokenIds.length === 0}
-          className="text-xs font-bold text-zinc-500 hover:text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          className="origami-button origami-button--text"
         >
           Reiniciar orden
         </button>
@@ -316,11 +328,7 @@ export function OrderWordsGame({
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
-            isKids
-              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
-          }`}
+          className="origami-button"
         >
           Comprobar y finalizar ✨
         </button>
@@ -348,7 +356,7 @@ function DraggableBankToken({
 
     return draggable({
       element: el,
-      getInitialData: () => ({ type: 'bank-token', tokenId: id }),
+      getInitialData: () => ({ type: "bank-token", tokenId: id }),
     });
   }, [id]);
 
@@ -357,10 +365,10 @@ function DraggableBankToken({
       ref={elRef}
       type="button"
       onClick={() => onAddToken(id)}
-      className={`min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all active:scale-95 touch-manipulation cursor-grab ${
+      className={`min-h-[var(--origami-target)] min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-colors touch-manipulation cursor-grab ${
         isKids
-          ? 'border-amber-300 bg-amber-200/90 text-amber-950 hover:bg-amber-300 hover:border-amber-400'
-          : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+          ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-soft)] text-[var(--origami-text-primary)] hover:bg-[var(--origami-surface-soft)]"
+          : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)] hover:bg-[var(--origami-surface-raised)]"
       }`}
     >
       + {text}
@@ -396,7 +404,7 @@ function DraggablePlacedToken({
 
     const cleanupDraggable = draggable({
       element: el,
-      getInitialData: () => ({ type: 'placed-token', index, tokenId: id }),
+      getInitialData: () => ({ type: "placed-token", index, tokenId: id }),
     });
 
     const cleanupDropTarget = dropTargetForElements({
@@ -406,9 +414,12 @@ function DraggablePlacedToken({
       onDrop: ({ source }) => {
         setIsOver(false);
         const data = source.data;
-        if (data?.type === 'placed-token' && typeof data.index === 'number') {
+        if (data?.type === "placed-token" && typeof data.index === "number") {
           onMoveToken(data.index, index);
-        } else if (data?.type === 'bank-token' && typeof data.tokenId === 'string') {
+        } else if (
+          data?.type === "bank-token" &&
+          typeof data.tokenId === "string"
+        ) {
           onInsertBankToken(data.tokenId, index);
         }
       },
@@ -423,28 +434,18 @@ function DraggablePlacedToken({
   return (
     <div
       ref={elRef}
-      className={`group inline-flex items-center gap-1 rounded-xl border px-3 py-2 shadow-xs transition-all cursor-grab active:scale-95 ${
-        isOver
-          ? 'ring-2 ring-indigo-500 scale-105'
-          : ''
+      className={`group inline-flex items-center gap-1 rounded-xl border px-3 py-2 shadow-xs transition-colors cursor-grab ${
+        isOver ? "ring-2 ring-[var(--origami-focus)]" : ""
       } ${
         isKids
-          ? 'bg-amber-100 border-amber-300'
-          : 'bg-zinc-700 border-zinc-600'
+          ? "bg-[var(--origami-surface-soft)] border-[var(--origami-border-control)]"
+          : "bg-[var(--origami-surface-raised)] border-[var(--origami-border-control)]"
       }`}
     >
-      <span
-        className={`text-xs font-mono font-bold mr-1 select-none ${
-          isKids ? 'text-amber-700' : 'text-zinc-300'
-        }`}
-      >
+      <span className="text-xs font-mono font-bold mr-1 select-none text-[var(--origami-text-secondary)]">
         #{index + 1}
       </span>
-      <span
-        className={`text-sm sm:text-base font-extrabold ${
-          isKids ? 'text-amber-950' : 'text-zinc-100'
-        }`}
-      >
+      <span className="text-sm sm:text-base font-extrabold text-[var(--origami-text-primary)]">
         {text}
       </span>
 
@@ -456,7 +457,7 @@ function DraggablePlacedToken({
             e.stopPropagation();
             onMoveToken(index, index - 1);
           }}
-          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="origami-button origami-button--text !p-1"
           title="Mover a la izquierda"
           aria-label={`Mover ${text} a la izquierda`}
         >
@@ -472,7 +473,7 @@ function DraggablePlacedToken({
             e.stopPropagation();
             onMoveToken(index, index + 1);
           }}
-          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="origami-button origami-button--text !p-1"
           title="Mover a la derecha"
           aria-label={`Mover ${text} a la derecha`}
         >
@@ -487,7 +488,7 @@ function DraggablePlacedToken({
           e.stopPropagation();
           onRemoveToken(id);
         }}
-        className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-rose-600 hover:text-rose-800 font-black p-1 rounded-md ml-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500"
+        className="origami-button origami-button--text !p-1"
         title="Devolver al banco"
         aria-label={`Devolver ${text} al banco`}
       >

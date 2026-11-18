@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -21,14 +21,14 @@ import {
   MemorySettingsSchema,
   MemorySolutionSchema,
   TimedChoiceSolutionSchema,
-} from '@upward-english/shared';
+} from "@upward-english/shared";
 
-import { MatchGame } from './games/MatchGame';
-import { OrderWordsGame } from './games/OrderWordsGame';
-import { DragDropGame } from './games/DragDropGame';
-import { MemoryGame } from './games/MemoryGame';
-import { TimedChoiceGame } from './games/TimedChoiceGame';
-import { speak } from '../../lib/speech';
+import { MatchGame } from "./games/MatchGame";
+import { OrderWordsGame } from "./games/OrderWordsGame";
+import { DragDropGame } from "./games/DragDropGame";
+import { MemoryGame } from "./games/MemoryGame";
+import { TimedChoiceGame } from "./games/TimedChoiceGame";
+import { speak } from "../../lib/speech";
 
 export interface SimulatedResult {
   score: number;
@@ -36,9 +36,12 @@ export interface SimulatedResult {
   message: string;
 }
 
-export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
+export function GameRenderer(
+  props: ActivityRuntimeProps<GamePublicConfig, GameAnswers>,
+) {
   const { config, previewMode = false, onComplete } = props;
-  const [simulatedResult, setSimulatedResult] = useState<SimulatedResult | null>(null);
+  const [simulatedResult, setSimulatedResult] =
+    useState<SimulatedResult | null>(null);
 
   // In previewMode, simulate scoring in-memory without making network calls
   const handlePreviewComplete = (finalAnswers: GameAnswers) => {
@@ -49,10 +52,15 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
     if (mechanic === GameMechanic.match && solution) {
       const parsedSol = MatchSolutionSchema.safeParse(solution);
       if (parsedSol.success) {
-        fraction = calculateMatchScore(parsedSol.data.pairs, finalAnswers.pairs || {});
+        fraction = calculateMatchScore(
+          parsedSol.data.pairs,
+          finalAnswers.pairs || {},
+        );
       }
     } else if (mechanic === GameMechanic.order_words && solution) {
-      const parsedSettings = OrderWordsSettingsSchema.safeParse(config.settings);
+      const parsedSettings = OrderWordsSettingsSchema.safeParse(
+        config.settings,
+      );
       const parsedSol = OrderWordsSolutionSchema.safeParse(solution);
       if (parsedSettings.success && parsedSol.success) {
         fraction = calculateOrderWordsScore(
@@ -92,7 +100,8 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
 
     const score = Math.round(fraction * 5 * 10) / 10;
     const stars = scoreToGameStars(score);
-    const ageSegment = props.theme === 'teens' ? AgeSegment.teens : AgeSegment.kids;
+    const ageSegment =
+      props.theme === "teens" ? AgeSegment.teens : AgeSegment.kids;
     const message = getGameMotivationMessage(score, ageSegment);
 
     setSimulatedResult({
@@ -123,53 +132,59 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
         return <TimedChoiceGame {...runtimeProps} />;
       default:
         return (
-          <div className="p-8 text-center text-zinc-500 font-semibold">
+          <div className="origami-state origami-state--error">
             Mecánica de juego no reconocida: {String(config?.mechanic)}
           </div>
         );
     }
   };
 
-  const promptToSpeak = config.instructions || '';
+  const promptToSpeak = config.instructions || "";
   const [isPlayingTts, setIsPlayingTts] = useState(false);
 
   const handleSpeakPrompt = () => {
-    if (!promptToSpeak || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (
+      !promptToSpeak ||
+      typeof window === "undefined" ||
+      !("speechSynthesis" in window)
+    )
+      return;
     setIsPlayingTts(true);
     speak(promptToSpeak, () => setIsPlayingTts(false));
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0 [overflow-wrap:anywhere]">
       {promptToSpeak && (
-        <div className="mb-4 flex items-center justify-between gap-3 p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/80">
-          <p className="text-sm font-bold text-amber-950">{promptToSpeak}</p>
+        <div className="origami-state mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="origami-label">{promptToSpeak}</p>
           <button
             type="button"
             onClick={handleSpeakPrompt}
             aria-label="Escuchar enunciado en inglés"
-            className="shrink-0 inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="origami-button origami-button--secondary"
           >
-            <span>{isPlayingTts ? '🔊 Reproduciendo…' : '🔊 Escuchar'}</span>
+            <span>{isPlayingTts ? "🔊 Reproduciendo…" : "🔊 Escuchar"}</span>
           </button>
         </div>
       )}
       {previewMode && (
         <div className="mb-4 space-y-2">
-          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold text-center shadow-xs">
+          <div className="origami-state origami-state--warning">
             Modo de prueba — este intento no se guarda
           </div>
           {simulatedResult && (
-            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center justify-between shadow-xs">
+            <div className="origami-state origami-state--success flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-wider text-emerald-800">
-                  Resultado de prueba:
+                <p className="origami-meta">Resultado de prueba:</p>
+                <p className="text-base font-extrabold">
+                  {simulatedResult.message}
                 </p>
-                <p className="text-base font-extrabold">{simulatedResult.message}</p>
               </div>
               <div className="text-right">
-                <div className="text-amber-500 text-xl font-bold">
-                  {'★'.repeat(simulatedResult.stars) + '☆'.repeat(3 - simulatedResult.stars)}
+                <div className="origami-label">
+                  {"★".repeat(simulatedResult.stars) +
+                    "☆".repeat(3 - simulatedResult.stars)}
                 </div>
               </div>
             </div>

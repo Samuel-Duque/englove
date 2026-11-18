@@ -80,6 +80,7 @@ Upward English une la enseñanza rigurosa del idioma con mecánicas de motivaci�
 
 - Navegación simplificada de **2 a 4 clics** entre la pantalla de inicio y cualquier actividad o juego.
 - Selector de temas visuales que respeta el segmento de edad (`data-theme="kids"` o `"teens"`).
+- [Origami](planning/plan-implementacion-ui-origami.md) es un candidato de diseño de la rama `UI`, no el diseño publicado. Su [especificación](specs/SPEC-12-ui-origami.md) separa apariencia claro/oscuro y segmento; la adopción requiere verificar la implementación completa.
 - Sistema de rachas semanales perdonables: corte dominical (23:59 UTC-5) con 1 semana de inactividad perdonada por ciclo.
 - Registro de hitos, medallas e historial de feedback recibido.
 

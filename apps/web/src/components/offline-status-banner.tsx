@@ -70,9 +70,9 @@ export function OfflineStatusBanner({
       <div
         role="status"
         aria-live="polite"
-        className="bg-emerald-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all"
+        className="origami-banner origami-state origami-state--success flex items-center justify-center gap-2"
       >
-        <CheckCircle2 className="w-4 h-4 text-emerald-200" aria-hidden="true" />
+        <CheckCircle2 className="size-5 shrink-0" aria-hidden="true" />
         <span>
           {effectiveTeensOrPanel
             ? "Tus respuestas pendientes se enviaron."
@@ -88,19 +88,13 @@ export function OfflineStatusBanner({
       <div
         role="status"
         aria-live="polite"
-        className="bg-amber-500 text-zinc-950 px-4 py-2 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 shadow-sm border-b border-amber-600/30"
+        className="origami-banner origami-state origami-state--warning flex flex-wrap items-center justify-between gap-3"
       >
-        <div className="flex items-center gap-2 mx-auto sm:mx-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {status.isOffline ? (
-            <WifiOff
-              className="w-4 h-4 text-zinc-900 shrink-0"
-              aria-hidden="true"
-            />
+            <WifiOff className="size-5 shrink-0" aria-hidden="true" />
           ) : (
-            <CloudUpload
-              className="w-4 h-4 text-zinc-900 shrink-0 animate-pulse"
-              aria-hidden="true"
-            />
+            <CloudUpload className="size-5 shrink-0" aria-hidden="true" />
           )}
           <span>
             {status.isOffline
@@ -116,7 +110,7 @@ export function OfflineStatusBanner({
             type="button"
             onClick={() => void triggerFlush(getOfflineUserId() ?? "")}
             disabled={status.isFlushing}
-            className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3 py-1 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold rounded-lg cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-700 transition-colors"
+            className="origami-button origami-button--secondary"
           >
             {status.isFlushing ? "Enviando…" : "Sincronizar ahora"}
           </button>

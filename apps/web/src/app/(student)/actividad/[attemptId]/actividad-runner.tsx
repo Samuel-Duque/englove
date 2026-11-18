@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityType,
   AttemptStatus,
@@ -22,45 +22,51 @@ import {
   scoreToGameStars,
   getGameMotivationMessage,
   AgeSegment,
-} from '@upward-english/shared';
-import { apiFetch, ApiError } from '../../../../lib/api';
-import { GameRenderer } from '../../../../components/activities/GameRenderer';
-import { CorrectionFeedback } from '../../../../components/activities/CorrectionFeedback';
-import { fireCelebrationConfetti } from '../../../../lib/confetti';
-import { uploadAudioBlob } from '../../../../lib/audio-upload';
-import { renderBadgeIcon } from '../../../../lib/badges';
-import { setActiveAttemptState } from '../../../../lib/pwa-manager';
-import { speak } from '../../../../lib/speech';
-import { formatBlankPrompt, formatBlankPromptForSpeech } from '../../../../lib/blank-prompt';
-import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb, getPendingAttemptAnswers, getOfflineUserId } from '../../../../lib/offline-queue';
-import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
+} from "@upward-english/shared";
+import { apiFetch, ApiError } from "../../../../lib/api";
+import {
+  OpenQuestionRenderer,
+  SentenceRenderer,
+  SpeakingRenderer,
+} from "../../../../components/activities/DidacticRenderers";
+import { GameRenderer } from "../../../../components/activities/GameRenderer";
+import { CorrectionFeedback } from "../../../../components/activities/CorrectionFeedback";
+import { Star } from "lucide-react";
+import styles from "./actividad.module.css";
+import { fireCelebrationConfetti } from "../../../../lib/confetti";
+import { uploadAudioBlob } from "../../../../lib/audio-upload";
+import { renderBadgeIcon } from "../../../../lib/badges";
+import { setActiveAttemptState } from "../../../../lib/pwa-manager";
+import { speak } from "../../../../lib/speech";
+import {
+  enqueueEvent,
+  enqueueUpload,
+  triggerFlush,
+  openOfflineDb,
+  getPendingAttemptAnswers,
+  getOfflineUserId,
+} from "../../../../lib/offline-queue";
+import {
+  fetchSharedProfile,
+  requestSharedRefresh,
+  getSharedSession,
+} from "../../../../lib/auth-session";
 
 function isRecord(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null && !Array.isArray(val);
+  return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
 function getNumberProp(obj: unknown, prop: string): number | undefined {
-  if (obj !== null && typeof obj === 'object') {
+  if (obj !== null && typeof obj === "object") {
     const val = Reflect.get(obj, prop);
-    if (typeof val === 'number') return val;
+    if (typeof val === "number") return val;
   }
   return undefined;
 }
 
-function getStringRecord(val: unknown): Record<string, string> {
-  if (!isRecord(val)) return {};
-  const res: Record<string, string> = {};
-  for (const [k, v] of Object.entries(val)) {
-    if (typeof v === 'string') {
-      res[k] = v;
-    }
-  }
-  return res;
-}
-
 function isGamePublicConfig(config: unknown): config is GamePublicConfig {
   if (!isRecord(config)) return false;
-  return 'mechanic' in config && 'settings' in config;
+  return "mechanic" in config && "settings" in config;
 }
 
 function isGameAnswers(val: unknown): val is GameAnswers {
@@ -69,7 +75,7 @@ function isGameAnswers(val: unknown): val is GameAnswers {
 
 function isFillBlankConfigLike(config: unknown): config is FillBlankConfig {
   if (!isRecord(config)) return false;
-  return 'items' in config && Array.isArray(config.items);
+  return "items" in config && Array.isArray(config.items);
 }
 
 interface ActividadRunnerProps {
@@ -84,22 +90,51 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const [completion, setCompletion] = useState<CompletionView | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [theme, setTheme] = useState<'kids' | 'teens'>('kids');
-  const [isOfflineSaved, setIsOfflineSaved] = useState(false);
+  const [theme, setTheme] = useState<"kids" | "teens">("kids");
+  const [isQueued, setIsQueued] = useState(false);
+  const [revealStars, setRevealStars] = useState(false);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusResultRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      (completion || isQueued) &&
+      focusResultRef.current &&
+      resultHeadingRef.current
+    ) {
+      focusResultRef.current = false;
+      resultHeadingRef.current.focus();
+    }
+  }, [completion, isQueued]);
+
+  useEffect(() => {
+    if (!revealStars) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const stopReveal = (event: MediaQueryListEvent) => {
+      if (event.matches) setRevealStars(false);
+    };
+    motion.addEventListener("change", stopReveal);
+    return () => motion.removeEventListener("change", stopReveal);
+  }, [revealStars]);
+
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    return (typeof window !== 'undefined' && getSharedSession()?.user?.id) || '';
+    return (
+      (typeof window !== "undefined" && getSharedSession()?.user?.id) || ""
+    );
   });
   const [hasTtsSupport, setHasTtsSupport] = useState(false);
 
   // Check TTS support (RF-22)
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const checkVoices = () => {
         const voices = window.speechSynthesis.getVoices();
-        setHasTtsSupport(voices.length > 0 || !('onvoiceschanged' in window.speechSynthesis));
+        setHasTtsSupport(
+          voices.length > 0 || !("onvoiceschanged" in window.speechSynthesis),
+        );
       };
       checkVoices();
-      if ('onvoiceschanged' in window.speechSynthesis) {
+      if ("onvoiceschanged" in window.speechSynthesis) {
         window.speechSynthesis.onvoiceschanged = checkVoices;
       }
     }
@@ -123,19 +158,20 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const pendingEventsRef = useRef<Set<Promise<unknown>>>(new Set());
   const initializedAttemptRef = useRef<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
   // MIME detection in preference order (architecture §3.5)
   const getSupportedMimeType = (): string => {
-    if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') return 'audio/webm';
+    if (typeof window === "undefined" || typeof MediaRecorder === "undefined")
+      return "audio/webm";
     const types = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-      'audio/ogg',
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
     ];
-    return types.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    return types.find((t) => MediaRecorder.isTypeSupported(t)) || "";
   };
 
   // IndexedDB persistence for offline recovery and failure retry (RF-11, RF-28, §7, P0-05)
@@ -146,21 +182,23 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     durationSec: number = 0,
     uploadedMediaId: string | null = null,
   ): Promise<void> => {
-    const effectiveUserId = userId?.trim() || getOfflineUserId() || '';
+    const effectiveUserId = userId?.trim() || getOfflineUserId() || "";
     if (!effectiveUserId) {
-      console.warn('[actividad-runner] Attempted to save local recording without valid userId');
+      console.warn(
+        "[actividad-runner] Attempted to save local recording without valid userId",
+      );
       return;
     }
     try {
       await enqueueUpload({
-          attemptId: id,
-          userId: effectiveUserId,
-          blob,
-          mimeType: blob.type || 'audio/webm',
-          durationMs: Math.max(0, Math.round(durationSec * 1000)),
-          mediaId: uploadedMediaId,
-          attemptToken: runtime?.attemptToken ?? undefined,
-          isDraft: true,
+        attemptId: id,
+        userId: effectiveUserId,
+        blob,
+        mimeType: blob.type || "audio/webm",
+        durationMs: Math.max(0, Math.round(durationSec * 1000)),
+        mediaId: uploadedMediaId,
+        attemptToken: runtime?.attemptToken ?? undefined,
+        isDraft: true,
       });
     } catch {
       // Ignore
@@ -170,17 +208,25 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const loadLocalRecording = async (
     id: string,
     userId: string,
-  ): Promise<{ blob: Blob; durationMs: number; mediaId: string | null } | null> => {
+  ): Promise<{
+    blob: Blob;
+    durationMs: number;
+    mediaId: string | null;
+  } | null> => {
     if (!userId || userId !== getOfflineUserId()) return null;
     try {
       const db = await openOfflineDb();
-      if (!db.objectStoreNames.contains('pendingUploads')) {
+      if (!db.objectStoreNames.contains("pendingUploads")) {
         db.close();
         return null;
       }
-      return new Promise<{ blob: Blob; durationMs: number; mediaId: string | null } | null>((resolve) => {
-        const tx = db.transaction('pendingUploads', 'readonly');
-        const getReq = tx.objectStore('pendingUploads').get(id);
+      return new Promise<{
+        blob: Blob;
+        durationMs: number;
+        mediaId: string | null;
+      } | null>((resolve) => {
+        const tx = db.transaction("pendingUploads", "readonly");
+        const getReq = tx.objectStore("pendingUploads").get(id);
         getReq.onsuccess = () => {
           db.close();
           const rec = getReq.result;
@@ -192,15 +238,20 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               resolve({
                 blob: rec.blob,
                 durationMs:
-                  typeof rec.durationMs === 'number' && rec.durationMs > 0 ? rec.durationMs : 0,
-                mediaId: typeof rec.mediaId === 'string' ? rec.mediaId : null,
+                  typeof rec.durationMs === "number" && rec.durationMs > 0
+                    ? rec.durationMs
+                    : 0,
+                mediaId: typeof rec.mediaId === "string" ? rec.mediaId : null,
               });
             }
           } else {
             resolve(null);
           }
         };
-        getReq.onerror = () => { db.close(); resolve(null); };
+        getReq.onerror = () => {
+          db.close();
+          resolve(null);
+        };
       });
     } catch {
       return null;
@@ -210,15 +261,21 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const clearLocalRecording = async (id: string): Promise<void> => {
     try {
       const db = await openOfflineDb();
-      if (!db.objectStoreNames.contains('pendingUploads')) {
+      if (!db.objectStoreNames.contains("pendingUploads")) {
         db.close();
         return;
       }
       return new Promise<void>((resolve) => {
-        const tx = db.transaction('pendingUploads', 'readwrite');
-        tx.objectStore('pendingUploads').delete(id);
-        tx.oncomplete = () => { db.close(); resolve(); };
-        tx.onerror = () => { db.close(); resolve(); };
+        const tx = db.transaction("pendingUploads", "readwrite");
+        tx.objectStore("pendingUploads").delete(id);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve();
+        };
       });
     } catch {
       // Ignore
@@ -232,10 +289,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     isFetching,
     error: queryError,
   } = useQuery({
-    queryKey: ['attempt', attemptId],
+    queryKey: ["attempt", attemptId],
     queryFn: async () => {
       const profile = await fetchSharedProfile().catch(() => null);
-      const userId = profile?.user?.id || getSharedSession()?.user?.id || '';
+      const userId = profile?.user?.id || getSharedSession()?.user?.id || "";
       const pendingAnswers = await getPendingAttemptAnswers(userId, attemptId);
       const [data, savedRec] = await Promise.all([
         apiFetch<RuntimeView>(`/api/v1/attempts/${attemptId}`, {
@@ -243,9 +300,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         }),
         loadLocalRecording(attemptId, userId),
       ]);
-      const restoredData = data.activity.type === ActivityType.game
-        ? { ...data, answers: { ...data.answers, ...pendingAnswers } }
-        : data;
+      const restoredData =
+        data.activity.type === ActivityType.game
+          ? { ...data, answers: { ...data.answers, ...pendingAnswers } }
+          : data;
       return { data: restoredData, profile, savedRec };
     },
     staleTime: 0,
@@ -261,24 +319,31 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       : queryError instanceof Error
         ? queryError.message
         : queryError
-          ? 'No se pudo cargar la actividad'
+          ? "No se pudo cargar la actividad"
           : null;
 
   useEffect(() => {
-    if (!attemptData || (attemptData.data.activity.type === ActivityType.game && isFetching) || initializedAttemptRef.current === attemptId) {
+    if (
+      !attemptData ||
+      (attemptData.data.activity.type === ActivityType.game && isFetching) ||
+      initializedAttemptRef.current === attemptId
+    ) {
       return;
     }
 
     initializedAttemptRef.current = attemptId;
     const { data, profile, savedRec } = attemptData;
-    const resolvedUserId = profile?.user?.id || getSharedSession()?.user?.id || '';
+    const resolvedUserId =
+      profile?.user?.id || getSharedSession()?.user?.id || "";
     if (resolvedUserId) {
       setCurrentUserId(resolvedUserId);
     }
-    const ageSegment = profile?.student?.ageSegment ?? 'kids';
+    const ageSegment = profile?.student?.ageSegment ?? "kids";
     setTheme(ageSegment);
-    setSoundEnabled(ageSegment === 'kids'); // soundEnabled starts true for kids, false for teens (RF-9)
-    setAnswers((prev) => (Object.keys(prev).length === 0 ? data.answers || {} : prev));
+    setSoundEnabled(ageSegment === "kids"); // soundEnabled starts true for kids, false for teens (RF-9)
+    setAnswers((prev) =>
+      Object.keys(prev).length === 0 ? data.answers || {} : prev,
+    );
     if (data.mediaId) setMediaId(data.mediaId);
     if (data.attempt.status === AttemptStatus.in_progress) {
       setActiveAttemptState(true); // RF-9: defer update notices during active attempt
@@ -288,12 +353,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       data.attempt.status === AttemptStatus.pending_review
     ) {
       setActiveAttemptState(false);
-      setCompletion((prev) =>
-        prev ?? {
-          attempt: data.attempt,
-          correction: data.correction ?? null,
-          newBadges: [],
-        },
+      setCompletion(
+        (prev) =>
+          prev ?? {
+            attempt: data.attempt,
+            correction: data.correction ?? null,
+            newBadges: [],
+          },
       );
     }
 
@@ -314,7 +380,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       if (!runtime?.attemptToken) return Promise.resolve();
       const attemptToken = runtime.attemptToken;
       const clientEventId =
-        typeof crypto !== 'undefined' && crypto.randomUUID
+        typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
           : `evt-${Date.now()}-${Math.random()}`;
 
@@ -323,13 +389,16 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         userId: currentUserId,
         attemptId,
         clientEventId,
-        eventType: 'answered',
+        eventType: "answered",
         payload: { itemId, answer },
         attemptToken,
       })
         .then(() => {})
         .catch((err) => {
-          console.warn('[OfflineQueue] Fallback no fatal al encolar evento:', err);
+          console.warn(
+            "[OfflineQueue] Fallback no fatal al encolar evento:",
+            err,
+          );
         });
 
       pendingEventsRef.current.add(promise);
@@ -351,7 +420,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   // Text-To-Speech for Kids prompts (RF-22)
   const speakText = (text: string) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
       speak(text);
     }
   };
@@ -361,11 +430,14 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
       try {
         mediaRecorderRef.current.stop();
       } catch (err) {
-        console.warn('[actividad-runner] Error al detener mediaRecorder:', err);
+        console.warn("[actividad-runner] Error al detener mediaRecorder:", err);
       }
     }
     setIsRecording(false);
@@ -382,7 +454,10 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state === "recording"
+      ) {
         try {
           mediaRecorderRef.current.stop();
         } catch {
@@ -399,8 +474,14 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setMediaId(null);
       setRecordedAudioBlob(null);
       audioChunksRef.current = [];
-      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setUploadError('El acceso al micrófono requiere una conexión segura HTTPS o localhost.');
+      if (
+        typeof navigator === "undefined" ||
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        setUploadError(
+          "El acceso al micrófono requiere una conexión segura HTTPS o localhost.",
+        );
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -417,16 +498,22 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       };
 
       mediaRecorder.onstop = () => {
-        const mimeType = mediaRecorder.mimeType || preferredMime || 'audio/webm';
+        const mimeType =
+          mediaRecorder.mimeType || preferredMime || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         setRecordedAudioBlob(audioBlob);
-        void saveLocalRecording(attemptId, audioBlob, currentUserId, recordingDurationRef.current);
+        void saveLocalRecording(
+          attemptId,
+          audioBlob,
+          currentUserId,
+          recordingDurationRef.current,
+        );
 
         // Stop all audio tracks
         stream.getTracks().forEach((track) => track.stop());
 
         // Subir y confirmar automáticamente si hay conexión (P1-03, QA-05, T4.3)
-        const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+        const isOnline = typeof navigator === "undefined" || navigator.onLine;
         if (isOnline && runtime?.attemptToken) {
           void uploadAudioRecording(audioBlob);
         }
@@ -437,7 +524,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setRecordingSeconds(0);
       recordingDurationRef.current = 0;
 
-      const maxSec = getNumberProp(runtime?.activity?.config, 'maxDurationSeconds') ?? 120;
+      const maxSec =
+        getNumberProp(runtime?.activity?.config, "maxDurationSeconds") ?? 120;
       let elapsed = 0;
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -451,16 +539,21 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         }
       }, 1000);
     } catch {
-      setUploadError('Por favor habilita el permiso de micrófono en tu navegador para grabar.');
+      setUploadError(
+        "Por favor habilita el permiso de micrófono en tu navegador para grabar.",
+      );
     }
   };
 
-  const confirmMediaUpload = async (mediaIdToConfirm: string, token: string): Promise<boolean> => {
+  const confirmMediaUpload = async (
+    mediaIdToConfirm: string,
+    token: string,
+  ): Promise<boolean> => {
     try {
       await apiFetch(`/api/v1/media/${mediaIdToConfirm}/confirm`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'x-attempt-token': token,
+          "x-attempt-token": token,
         },
         schema: MediaConfirmResponseSchema,
       });
@@ -469,19 +562,21 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       if (err instanceof ApiError) {
         setUploadError(err.message);
       } else {
-        setUploadError('No pudimos validar la grabación en el servidor.');
+        setUploadError("No pudimos validar la grabación en el servidor.");
       }
       return false;
     }
   };
 
-  const uploadAudioRecording = async (blobOverride?: Blob): Promise<string | null> => {
+  const uploadAudioRecording = async (
+    blobOverride?: Blob,
+  ): Promise<string | null> => {
     const uploadUserId = currentUserId || getOfflineUserId();
     if (!uploadUserId || uploadUserId !== getOfflineUserId()) return null;
     const blobToUpload = blobOverride ?? recordedAudioBlob;
     if (!blobToUpload) return mediaId;
     const minSec =
-      getNumberProp(runtime?.activity?.config, 'minDurationSeconds') ?? 2;
+      getNumberProp(runtime?.activity?.config, "minDurationSeconds") ?? 2;
     if (recordingDurationRef.current < minSec) {
       setUploadError(`Graba al menos ${minSec} segundos`);
       return null;
@@ -489,13 +584,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
     const token = runtime?.attemptToken;
     if (!token) {
-      setUploadError('Token de intento no disponible para subir audio.');
+      setUploadError("Token de intento no disponible para subir audio.");
       return null;
     }
 
     setIsUploadingAudio(true);
     setUploadError(null);
-    setUploadProgress('Subiendo y confirmando grabación…');
+    setUploadProgress("Subiendo y confirmando grabación…");
     try {
       // URL firmada + PUT a R2; devuelve el mediaId del contrato (ENG-074)
       const uploadedMediaId = await uploadAudioBlob({
@@ -516,7 +611,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         return null;
       }
 
-      await saveLocalRecording(attemptId, blobToUpload, uploadUserId, recordingDurationRef.current, uploadedMediaId);
+      await saveLocalRecording(
+        attemptId,
+        blobToUpload,
+        uploadUserId,
+        recordingDurationRef.current,
+        uploadedMediaId,
+      );
       if (uploadUserId !== getOfflineUserId()) return null;
       setMediaId(uploadedMediaId);
       setUploadProgress(null);
@@ -524,7 +625,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       return uploadedMediaId;
     } catch {
       setUploadProgress(null);
-      setUploadError('No pudimos enviar tu grabación. Sigue guardada en este dispositivo.');
+      setUploadError(
+        "No pudimos enviar tu grabación. Sigue guardada en este dispositivo.",
+      );
       return null;
     } finally {
       setIsUploadingAudio(false);
@@ -540,13 +643,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       attemptToken: string;
     }) => {
       let res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'x-attempt-token': attemptToken,
+          "Content-Type": "application/json",
+          "x-attempt-token": attemptToken,
           Origin: window.location.origin,
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(completeBody),
       });
 
@@ -554,13 +657,13 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         const refreshed = await requestSharedRefresh().catch(() => false);
         if (refreshed) {
           res = await fetch(`${apiUrl}/api/v1/attempts/${attemptId}/complete`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'x-attempt-token': attemptToken,
+              "Content-Type": "application/json",
+              "x-attempt-token": attemptToken,
               Origin: window.location.origin,
             },
-            credentials: 'include',
+            credentials: "include",
             body: JSON.stringify(completeBody),
           });
         }
@@ -569,9 +672,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
         const msg =
-          isRecord(errData) && typeof errData.message === 'string'
+          isRecord(errData) && typeof errData.message === "string"
             ? errData.message
-            : 'Error al entregar la actividad';
+            : "Error al entregar la actividad";
         throw new Error(msg);
       }
 
@@ -579,31 +682,33 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       return compData;
     },
     onSuccess: async (compData) => {
+      focusResultRef.current = true;
+      setRevealStars(
+        runtime?.activity.type === ActivityType.game &&
+          !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      );
       setCompletion(compData);
       setActiveAttemptState(false);
 
-      // Trigger celebration confetti when student scores >= 3.0 (RF-9, ENG-086)
-      if (compData.attempt.score !== null && compData.attempt.score !== undefined && compData.attempt.score >= 3.0) {
-        fireCelebrationConfetti({ theme });
-      }
-
       // Clean local storage upon confirmed completion (RF-13, RF-28)
       await clearLocalRecording(attemptId);
-      queryClient.setQueryData<typeof attemptData>(['attempt', attemptId], (prev) =>
-        prev
-          ? {
-              ...prev,
-              data: {
-                ...prev.data,
-                attempt: compData.attempt,
-                correction: compData.correction,
-                answers,
-              },
-              savedRec: null,
-            }
-          : prev,
+      queryClient.setQueryData<typeof attemptData>(
+        ["attempt", attemptId],
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                data: {
+                  ...prev.data,
+                  attempt: compData.attempt,
+                  correction: compData.correction,
+                  answers,
+                },
+                savedRec: null,
+              }
+            : prev,
       );
-      void queryClient.invalidateQueries({ queryKey: ['student'] });
+      void queryClient.invalidateQueries({ queryKey: ["student"] });
     },
   });
 
@@ -611,7 +716,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     mutationFn: async (activityId: string) => {
       const url = `/api/v1/activities/${activityId}/attempts`;
       return apiFetch<RuntimeView>(url, {
-        method: 'POST',
+        method: "POST",
         schema: RuntimeViewSchema,
       });
     },
@@ -623,12 +728,17 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       }
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'No se pudo iniciar un nuevo intento del juego';
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "No se pudo iniciar un nuevo intento del juego";
       setRunnerAlert(msg);
     },
   });
 
-  const handleCompleteAttempt = async (overrideAnswers?: Record<string, unknown> | GameAnswers) => {
+  const handleCompleteAttempt = async (
+    overrideAnswers?: Record<string, unknown> | GameAnswers,
+  ) => {
     if (!runtime) return;
     if (isSubmitting || completeAttemptMutation.isPending) return;
 
@@ -660,27 +770,33 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       try {
         await triggerFlush(currentUserId);
       } catch (flushErr) {
-        console.warn('[OfflineQueue] Flush previo a entrega no fatal:', flushErr);
+        console.warn(
+          "[OfflineQueue] Flush previo a entrega no fatal:",
+          flushErr,
+        );
       }
 
       if (runtime.activity.type === ActivityType.speaking) {
         if (!recordedAudioBlob && !mediaId) {
-          setUploadError('Debes grabar un audio antes de entregar la actividad.');
+          setUploadError(
+            "Debes grabar un audio antes de entregar la actividad.",
+          );
           setIsSubmitting(false);
           return;
         }
         if (recordedAudioBlob && !mediaId) {
-          const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+          const isCurrentlyOffline =
+            typeof navigator !== "undefined" && !navigator.onLine;
           if (isCurrentlyOffline) {
-            throw new TypeError('Network request failed');
+            throw new TypeError("Network request failed");
           }
           finalMediaId = await uploadAudioRecording();
           if (!finalMediaId) {
             const isOfflineNow =
-              (typeof navigator !== 'undefined' && !navigator.onLine) ||
+              (typeof navigator !== "undefined" && !navigator.onLine) ||
               Boolean(uploadError);
             if (isOfflineNow) {
-              throw new TypeError('Network request failed');
+              throw new TypeError("Network request failed");
             }
             setIsSubmitting(false);
             return;
@@ -695,31 +811,43 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         completeBody.answers = effectiveAnswers;
       }
 
-      await completeAttemptMutation.mutateAsync({ completeBody, attemptToken: attemptToken || '' });
+      await completeAttemptMutation.mutateAsync({
+        completeBody,
+        attemptToken: attemptToken || "",
+      });
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : '';
+      const errMsg = err instanceof Error ? err.message : "";
       const isNetworkError =
-        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        (typeof navigator !== "undefined" && !navigator.onLine) ||
         err instanceof TypeError ||
-        Boolean(errMsg && /network|fetch|offline|failed to fetch/i.test(errMsg));
+        Boolean(
+          errMsg && /network|fetch|offline|failed to fetch/i.test(errMsg),
+        );
 
       if (isNetworkError) {
         // RF-12: Entrega sin conexión. Queda en la cola y muestra mensaje sin nota ficticia.
         const compEventId =
-          typeof crypto !== 'undefined' && crypto.randomUUID
+          typeof crypto !== "undefined" && crypto.randomUUID
             ? crypto.randomUUID()
             : `evt-comp-${Date.now()}`;
-        const effectiveUid = currentUserId || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
+        const effectiveUid =
+          currentUserId ||
+          (typeof window !== "undefined" ? getSharedSession()?.user?.id : "") ||
+          "";
         await enqueueEvent({
           userId: effectiveUid,
           attemptId,
           clientEventId: compEventId,
-          eventType: 'completed',
+          eventType: "completed",
           payload: {
-            ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}),
+            ...(finalMediaId
+              ? { mediaId: finalMediaId }
+              : mediaId
+                ? { mediaId }
+                : {}),
             answers: effectiveAnswers,
           },
-          attemptToken: attemptToken || '',
+          attemptToken: attemptToken || "",
         });
 
         if (recordedAudioBlob) {
@@ -731,17 +859,18 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             userId: effectiveUid,
             attemptId,
             blob: recordedAudioBlob,
-            mimeType: recordedAudioBlob.type || 'audio/webm',
+            mimeType: recordedAudioBlob.type || "audio/webm",
             durationMs: effectiveDurationMs,
             mediaId: finalMediaId || mediaId || null,
             attemptToken: attemptToken || undefined,
           });
         }
 
-        setIsOfflineSaved(true);
+        focusResultRef.current = true;
+        setIsQueued(true);
         setActiveAttemptState(false);
       } else {
-        setRunnerAlert(errMsg || 'No se pudo completar la entrega');
+        setRunnerAlert(errMsg || "No se pudo completar la entrega");
       }
     } finally {
       setIsSubmitting(false);
@@ -754,24 +883,25 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     playAgainMutation.mutate(activity.id);
   };
 
-  if (isLoading || (runtime?.activity.type === ActivityType.game && isFetching)) {
+  if (
+    isLoading ||
+    (runtime?.activity.type === ActivityType.game && isFetching)
+  ) {
     return (
-      <div className="py-20 text-center">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
-        <p className="mt-3 text-sm font-semibold opacity-70">Cargando actividad…</p>
-      </div>
+      <p role="status" className="origami-state">
+        Cargando actividad…
+      </p>
     );
   }
 
   if (!runtime) {
     return (
-      <div className="py-12 max-w-lg mx-auto text-center bg-white p-8 rounded-2xl border border-rose-200 shadow-sm">
-        <span className="text-4xl">⚠️</span>
-        <h2 className="text-lg font-bold text-rose-900 mt-3">No pudimos abrir la actividad</h2>
-        <p className="text-sm text-rose-700 mt-1">{error || 'Intento no disponible'}</p>
+      <div className="origami-state origami-state--error mx-auto max-w-lg space-y-3">
+        <h1 className="origami-page-title">No pudimos abrir la actividad</h1>
+        <p className="origami-reading">{error || "Intento no disponible"}</p>
         <Link
           href="/inicio"
-          className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600"
+          className="origami-button origami-button--secondary"
         >
           Volver al Inicio
         </Link>
@@ -782,168 +912,161 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const { activity, attempt } = runtime;
   const isFinished =
     completion !== null ||
-    isOfflineSaved ||
+    isQueued ||
     attempt.status === AttemptStatus.graded ||
     attempt.status === AttemptStatus.pending_review;
 
-  // Render Offline Delivery Receipt (RF-12, §7)
-  if (isOfflineSaved) {
-    const isKids = theme === 'kids';
+  if (isQueued) {
     return (
-      <div className="max-w-2xl mx-auto py-8">
-        <div className="rounded-3xl border border-amber-200 bg-white p-8 sm:p-10 text-center shadow-lg">
-          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
-            💾
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-amber-950 mb-3">
-            {isKids
-              ? '¡Listo! Tu trabajo quedó guardado y se enviará solo cuando vuelva el internet.'
-              : 'Guardado en este dispositivo. Se enviará cuando vuelva la conexión.'}
-          </h2>
-          <p className="text-sm text-zinc-600 max-w-md mx-auto mb-8">
-            {isKids
-              ? 'No te preocupes por tu progreso: tus respuestas están seguras en esta tablet.'
-              : 'Las respuestas se sincronizarán automáticamente con el servidor al restablecerse la red.'}
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-3">
-            <Link
-              href="/inicio"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ir a Mis Misiones
-            </Link>
-            <Link
-              href="/progreso"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ver Mi Progreso
-            </Link>
-          </div>
+      <section className="origami-state origami-state--warning mx-auto max-w-[45rem] space-y-4">
+        <h1 ref={resultHeadingRef} tabIndex={-1} className="origami-page-title">
+          Entrega pendiente de envío
+        </h1>
+        <p>
+          Tu entrega está en cola en este dispositivo. Se enviará al recuperar
+          la conexión. Todavía no se ha confirmado la entrega.
+        </p>
+        <div className={styles.actionBar}>
+          <Link href="/inicio" className="origami-button">
+            Ir a Mis Misiones
+          </Link>
+          <Link
+            href="/progreso"
+            className="origami-button origami-button--secondary"
+          >
+            Ver Mi Progreso
+          </Link>
         </div>
-      </div>
+      </section>
     );
   }
 
-  // Render Completion Modal/Card
   if (completion) {
     const isGame = activity.type === ActivityType.game;
     const score = completion.attempt.score;
     const starsCount = completion.attempt.stars ?? scoreToGameStars(score);
+    const heading = isGame
+      ? "¡Partida completada!"
+      : activity.type === ActivityType.open_question ||
+          activity.type === ActivityType.speaking
+        ? "¡Actividad entregada con éxito!"
+        : "¡Misión completada!";
 
     return (
-      <div className="max-w-2xl mx-auto py-8">
-        <div className="rounded-3xl border border-amber-200 bg-white p-8 sm:p-10 text-center shadow-lg">
-          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
-            {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
-              ? '📝'
-              : starsCount >= 2
-                ? '🏆'
-                : '⭐'}
-          </div>
+      <section className="origami-card origami-card--featured mx-auto max-w-[45rem] space-y-4 [overflow-wrap:anywhere]">
+        <h1 ref={resultHeadingRef} tabIndex={-1} className="origami-page-title">
+          {heading}
+        </h1>
 
-          <h2 className="text-2xl sm:text-3xl font-black text-amber-950">
-            {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
-              ? '¡Actividad entregada con éxito!'
-              : isGame
-                ? '¡Partida completada!'
-                : '¡Misión completada!'}
-          </h2>
-
-          {isGame ? (
-            <div className="mt-4">
-              <div className="flex justify-center gap-1.5 text-3xl my-2">
-                {[1, 2, 3].map((starIdx) => (
-                  <span
-                    key={starIdx}
-                    className={starIdx <= starsCount ? 'text-amber-400 drop-shadow-sm' : 'text-zinc-200'}
-                  >
-                    ★
-                  </span>
-                ))}
-              </div>
-              <p className="text-base sm:text-lg font-bold text-amber-900 mt-2 max-w-md mx-auto">
-                {completion.attempt.motivationMessage ||
-                  getGameMotivationMessage(score ?? 0, theme === 'teens' ? AgeSegment.teens : AgeSegment.kids)}
-              </p>
-            </div>
-          ) : score !== null && score !== undefined ? (
-            <div className="mt-4">
-              <div className="flex justify-center gap-1.5 text-3xl my-2">
-                {[1, 2, 3].map((starIdx) => (
-                  <span
-                    key={starIdx}
-                    className={starIdx <= starsCount ? 'text-amber-400 drop-shadow-sm' : 'text-zinc-200'}
-                  >
-                    ★
-                  </span>
-                ))}
-              </div>
-              <p className="text-2xl font-extrabold text-amber-900 mt-1">
-                Nota: {score.toFixed(1).replace('.', ',')} / 5,0
-              </p>
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-zinc-600 max-w-md mx-auto">
-              Tu respuesta ha quedado registrada. Tu profesora la revisará y calificará en los próximos días.
-            </p>
-          )}
-
-          {/* Retroalimentación de corrección en intentos evaluados (T4.2, P2-04) */}
-          {completion.correction && Object.keys(completion.correction).length > 0 && (
-            <div className="mt-4 p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-left max-w-md mx-auto">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2">
-                Retroalimentación de respuestas:
-              </h4>
-              <div className="space-y-1.5 text-xs">
-                <CorrectionFeedback correction={completion.correction} />
-              </div>
-            </div>
-          )}
-
-          {/* New Badges Awarded */}
-          {completion.newBadges && completion.newBadges.length > 0 && (
-            <div className="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-left">
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2">
-                ¡Nueva insignia desbloqueada! 🎉
-              </p>
-              {completion.newBadges.map((b) => (
-                <div key={b.id} className="flex items-center gap-3">
-                  <span className="text-3xl">{renderBadgeIcon(b.icon)}</span>
-                  <div>
-                    <h4 className="text-sm font-extrabold text-amber-950">{b.name}</h4>
-                    <p className="text-xs text-amber-800">{b.description}</p>
-                  </div>
-                </div>
+        {isGame ? (
+          <>
+            <div
+              className={styles.stars}
+              data-reveal={revealStars || undefined}
+              role="img"
+              aria-label={`Estrellas de práctica: ${starsCount} de 3`}
+              onAnimationEnd={(event) => {
+                if (
+                  !revealStars ||
+                  event.target !== event.currentTarget ||
+                  event.pseudoElement
+                )
+                  return;
+                setRevealStars(false);
+                if (score != null && score >= 3.0)
+                  fireCelebrationConfetti({ theme });
+              }}
+            >
+              {[1, 2, 3].map((star) => (
+                <Star
+                  key={star}
+                  aria-hidden="true"
+                  data-earned={star <= starsCount}
+                />
               ))}
             </div>
+            <p className="origami-reading">
+              {completion.attempt.motivationMessage ||
+                getGameMotivationMessage(
+                  score ?? 0,
+                  theme === "teens" ? AgeSegment.teens : AgeSegment.kids,
+                )}
+            </p>
+          </>
+        ) : score != null ? (
+          <p className="origami-section-title origami-tabular">
+            Nota: {score.toFixed(1).replace(".", ",")} / 5,0
+          </p>
+        ) : (
+          <p className="origami-reading">
+            Tu respuesta ha quedado registrada. Tu profesora la revisará y
+            calificará en los próximos días.
+          </p>
+        )}
+
+        {completion.correction &&
+          Object.keys(completion.correction).length > 0 && (
+            <section className="space-y-2">
+              <h2 className="origami-section-title">
+                Retroalimentación de respuestas:
+              </h2>
+              <CorrectionFeedback correction={completion.correction} />
+            </section>
           )}
 
-          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-            {activity.type === ActivityType.game && (
-              <button
-                type="button"
-                onClick={handlePlayAgain}
-                disabled={isSubmitting}
-                className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              >
-                🎮 {isSubmitting ? 'Iniciando…' : 'Jugar de nuevo'}
-              </button>
-            )}
-            <Link
-              href="/inicio"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+        {completion.newBadges && completion.newBadges.length > 0 && (
+          <section className="origami-state origami-state--success space-y-3">
+            <h2 className="origami-section-title">
+              ¡Nueva insignia desbloqueada!
+            </h2>
+            {completion.newBadges.map((badge) => (
+              <div key={badge.id} className="flex items-start gap-3">
+                <span aria-hidden="true" className="text-2xl">
+                  {renderBadgeIcon(badge.icon)}
+                </span>
+                <div>
+                  <h3 className="origami-card-title">{badge.name}</h3>
+                  <p>{badge.description}</p>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {runnerAlert && (
+          <p role="alert" className="origami-state origami-state--error">
+            {runnerAlert}
+          </p>
+        )}
+        <div className={styles.actionBar}>
+          {isGame && (
+            <button
+              type="button"
+              onClick={handlePlayAgain}
+              disabled={playAgainMutation.isPending}
+              className="origami-button"
             >
-              Ir a Mis Misiones
-            </Link>
-            <Link
-              href="/progreso"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ver Mi Progreso
-            </Link>
-          </div>
+              {playAgainMutation.isPending ? "Iniciando…" : "Jugar de nuevo"}
+            </button>
+          )}
+          <Link
+            href="/inicio"
+            className={
+              isGame
+                ? "origami-button origami-button--secondary"
+                : "origami-button"
+            }
+          >
+            Ir a Mis Misiones
+          </Link>
+          <Link
+            href="/progreso"
+            className="origami-button origami-button--secondary"
+          >
+            Ver Mi Progreso
+          </Link>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -960,20 +1083,22 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const speakingConfig = parsedSpeaking.success ? parsedSpeaking.data : null;
   const openQItems = getOpenQuestionItems(activity.config, activity.id);
   const parsedOpenQ = OpenQuestionConfigSchema.safeParse(activity.config);
-  const openQInstructions = parsedOpenQ.success ? parsedOpenQ.data.instructions : undefined;
+  const openQInstructions = parsedOpenQ.success
+    ? parsedOpenQ.data.instructions
+    : undefined;
 
   return (
-    <div className="max-w-3xl mx-auto py-6 space-y-6">
+    <div className={styles.practice}>
       {runnerAlert && (
         <div
           role="alert"
-          className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 flex items-center justify-between text-sm font-semibold shadow-xs"
+          className="origami-state origami-state--error flex flex-wrap items-center justify-between gap-2"
         >
-          <span>⚠️ {runnerAlert}</span>
+          <span role="alert">{runnerAlert}</span>
           <button
             type="button"
             onClick={() => setRunnerAlert(null)}
-            className="font-bold text-rose-600 hover:text-rose-800 ml-4 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-lg p-1"
+            className="origami-button origami-button--text"
             aria-label="Cerrar aviso"
           >
             ✕
@@ -982,45 +1107,51 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       )}
 
       {/* Activity Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-amber-200/80 shadow-xs">
+      <div className="origami-card flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800">
-              Nivel {activity.level}
-            </span>
-            <span className="text-xs font-semibold text-zinc-500">
+            <span className="origami-label">Nivel {activity.level}</span>
+            <span className="text-xs font-semibold text-[var(--origami-text-secondary)]">
               Intento #{attempt.attemptNumber}
             </span>
-            {attempt.status === 'in_progress' && attempt.completeUntil && (
-              <span className="text-xs font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <span>⏳</span>
+            {attempt.status === "in_progress" && attempt.completeUntil && (
+              <span className="origami-state origami-state--warning flex flex-wrap items-center gap-1">
+                <span aria-hidden="true">⏳</span>
                 <span>
-                  Termina antes de:{' '}
-                  {new Date(attempt.completeUntil).toLocaleDateString('es-CO', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: 'numeric',
-                    minute: '2-digit',
+                  Termina antes de:{" "}
+                  {new Date(attempt.completeUntil).toLocaleDateString("es-CO", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "numeric",
+                    minute: "2-digit",
                     hour12: true,
                   })}
                 </span>
               </span>
             )}
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-amber-950">{activity.title}</h1>
+          <h1 className="origami-page-title">{activity.title}</h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {activity.type === ActivityType.game && (
             <button
               type="button"
               onClick={() => setSoundEnabled((prev) => !prev)}
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
-              aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
+              className="origami-button origami-button--secondary"
+              title={
+                soundEnabled
+                  ? "Silenciar efectos de sonido"
+                  : "Activar efectos de sonido"
+              }
+              aria-label={
+                soundEnabled
+                  ? "Silenciar efectos de sonido"
+                  : "Activar efectos de sonido"
+              }
             >
-              <span>{soundEnabled ? '🔊' : '🔇'}</span>
-              <span>{soundEnabled ? 'Sonido sí' : 'Sonido no'}</span>
+              <span aria-hidden="true">{soundEnabled ? "🔊" : "🔇"}</span>
+              <span>{soundEnabled ? "Sonido sí" : "Sonido no"}</span>
             </button>
           )}
 
@@ -1028,11 +1159,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             <button
               type="button"
               onClick={() => speakText(activity.title)}
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+              className="origami-button origami-button--secondary"
               title="Escuchar título"
               aria-label="Escuchar título"
             >
-              <span>🗣️</span>
+              <span aria-hidden="true">🗣️</span>
               <span>Escuchar</span>
             </button>
           )}
@@ -1040,378 +1171,106 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       </div>
 
       {/* Runner Body by Activity Type */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-amber-200/80 shadow-sm space-y-6">
-        {/* Fill in the Blank Type */}
+      <div className="origami-card space-y-6">
         {activity.type === ActivityType.fill_blank && fbConfig?.items && (
-          <div className="space-y-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
-              Completa los espacios en blanco con la palabra correcta:
-            </p>
-            {fbConfig.items.map((item, itemIdx) => (
-              <div
-                key={item.id}
-                className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-amber-800">Pregunta {itemIdx + 1}</span>
-                  {hasTtsSupport && (
-                    <button
-                      type="button"
-                      onClick={() => speakText(formatBlankPromptForSpeech(item.prompt))}
-                      className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                      aria-label={`Escuchar pregunta ${itemIdx + 1}`}
-                    >
-                      <span aria-hidden="true">🔊</span> Escuchar
-                    </button>
-                  )}
-                </div>
-                <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
-                  {formatBlankPrompt(item.prompt, item.blanks)}
-                </p>
-
-                {/* Blank inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  {item.blanks.map((blank, blankIdx) => {
-                    const itemAnswers = getStringRecord(answers[item.id]);
-                    const rawBlankVal = itemAnswers[blank.id] || answers[blank.id];
-                    const currentVal = typeof rawBlankVal === 'string' ? rawBlankVal : '';
-                    const blankInputId = `blank-${item.id}-${blank.id || blankIdx}`;
-                    const blankLabel = `Espacio ${blankIdx + 1}`;
-                    return (
-                      <div key={blank.id || `blank-${blankIdx}`} className="space-y-1">
-                        <label htmlFor={blankInputId} className="text-xs font-bold text-zinc-600 block">
-                          Espacio {blankIdx + 1}:
-                        </label>
-                        {blank.options && blank.options.length > 0 ? (
-                          <select
-                            id={blankInputId}
-                            aria-label={blankLabel}
-                            disabled={isFinished}
-                            value={currentVal}
-                            onChange={(e) => {
-                              const updatedItem = { ...itemAnswers, [blank.id]: e.target.value };
-                              handleAnswerChange(item.id, updatedItem);
-                            }}
-                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
-                          >
-                            <option value="">-- Elige una opción --</option>
-                            {blank.options.map((opt) => (
-                              <option key={opt.id} value={opt.id}>
-                                {opt.text}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            id={blankInputId}
-                            aria-label={blankLabel}
-                            type="text"
-                            disabled={isFinished}
-                            value={currentVal}
-                            onChange={(e) => {
-                              const updatedItem = { ...itemAnswers, [blank.id]: e.target.value };
-                              handleAnswerChange(item.id, updatedItem);
-                            }}
-                            placeholder="Escribe tu respuesta…"
-                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Exam Type */}
-        {activity.type === ActivityType.exam && examConfig?.items && (
-          <div className="space-y-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
-              Examen — Responde cada una de las oraciones:
-            </p>
-            {examConfig.items.map((item, itemIdx) => {
-              const itemAnswers = getStringRecord(answers[item.id]);
-              return (
-                <div
-                  key={item.id}
-                  className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-amber-800">
-                      Ítem #{itemIdx + 1} (Peso: {item.weight})
-                    </span>
-                    {hasTtsSupport && (
-                      <button
-                        type="button"
-                        onClick={() => speakText(formatBlankPromptForSpeech(item.prompt))}
-                        className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                        aria-label={`Escuchar ítem ${itemIdx + 1}`}
-                      >
-                        <span aria-hidden="true">🔊</span> Escuchar
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
-                    {formatBlankPrompt(item.prompt, item.blanks)}
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                    {item.blanks.map((b, bIdx) => {
-                      const examInputId = `exam-blank-${item.id}-${b.id || bIdx}`;
-                      const examLabel = `Espacio ${bIdx + 1} del ítem ${itemIdx + 1}`;
-                      return (
-                        <div key={b.id || `blank-${bIdx}`} className="space-y-1">
-                          <label htmlFor={examInputId} className="text-xs font-bold text-zinc-600 block">
-                            Espacio {bIdx + 1}:
-                          </label>
-                          {b.options && b.options.length > 0 ? (
-                            <select
-                              id={examInputId}
-                              aria-label={examLabel}
-                              disabled={isFinished}
-                              value={itemAnswers[b.id] || ''}
-                              onChange={(e) => {
-                                const updatedItem = { ...itemAnswers, [b.id]: e.target.value };
-                                handleAnswerChange(item.id, updatedItem);
-                              }}
-                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
-                            >
-                              <option value="">-- Elige una opción --</option>
-                              {b.options.map((opt) => (
-                                <option key={opt.id} value={opt.id}>
-                                  {opt.text}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              id={examInputId}
-                              aria-label={examLabel}
-                              type="text"
-                              disabled={isFinished}
-                              value={itemAnswers[b.id] || ''}
-                              onChange={(e) => {
-                                const updatedItem = { ...itemAnswers, [b.id]: e.target.value };
-                                handleAnswerChange(item.id, updatedItem);
-                              }}
-                              placeholder="Tu respuesta…"
-                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Open Question Type (RFC-01: multi-pregunta y monoriguroso) */}
-        {activity.type === ActivityType.open_question && (
-          <div className="space-y-6">
-            {openQInstructions && (
-              <div className="p-4 rounded-2xl bg-amber-100/70 border border-amber-300 text-amber-950">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block mb-1">
-                  Instrucciones generales
-                </span>
-                <p className="text-sm font-medium">{openQInstructions}</p>
-              </div>
-            )}
-
-            {openQItems.map((item, idx) => {
-              const isSingleItem = openQItems.length === 1;
-              const rawItemAns = answers[item.id];
-              const rawTextAns = answers['text'];
-              const itemAnswer =
-                (typeof rawItemAns === 'string' ? rawItemAns : undefined) ??
-                (isSingleItem && typeof rawTextAns === 'string' ? rawTextAns : '') ??
-                '';
-              const maxLen = item.maxLength || 2000;
-
-              return (
-                <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white border border-amber-200 shadow-xs">
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-1">
-                        {!isSingleItem ? `Pregunta ${idx + 1}` : 'Pregunta abierta'}
-                      </h3>
-                      <p className="text-base font-semibold leading-relaxed">
-                        {item.prompt || 'Escribe tu respuesta a continuación en inglés:'}
-                      </p>
-                    </div>
-                    {hasTtsSupport && (
-                      <button
-                        type="button"
-                        onClick={() => speakText(item.prompt || 'Escribe tu respuesta a continuación en inglés:')}
-                        className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shrink-0 cursor-pointer"
-                        aria-label={`Escuchar consigna ${idx + 1}`}
-                      >
-                        <span aria-hidden="true">🔊</span> Escuchar
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <textarea
-                      id={`open-question-answer-${item.id}`}
-                      aria-label={`Tu respuesta en inglés para pregunta ${idx + 1}`}
-                      disabled={isFinished}
-                      rows={!isSingleItem ? 4 : 6}
-                      maxLength={maxLen}
-                      value={itemAnswer}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        handleAnswerChange(item.id, val);
-                        if (isSingleItem) {
-                          handleAnswerChange('text', val);
-                        }
-                      }}
-                      placeholder="Escribe aquí tu respuesta detallada…"
-                      className="w-full rounded-2xl border border-amber-300 p-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
-                    />
-                    <div className="flex justify-end text-[11px] font-semibold text-zinc-400">
-                      <span>{itemAnswer.length} / {maxLen} caracteres</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Speaking Type */}
-        {activity.type === ActivityType.speaking && (
-          <div className="space-y-6">
-            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                Instrucción de pronunciación / Speaking
-              </h3>
-              <p className="text-lg font-bold">
-                {speakingConfig?.prompt || 'Graba tu voz leyendo la oración en voz alta.'}
-              </p>
-              {hasTtsSupport && (
-                <button
-                  type="button"
-                  onClick={() => speakText(speakingConfig?.prompt || '')}
-                  className="mt-2 text-xs font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-xl inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                  aria-label="Escuchar modelo"
-                >
-                  <span aria-hidden="true">🔊</span> Escuchar modelo
-                </button>
-              )}
-            </div>
-
-            {/* Recorder Controls */}
-            {!isFinished && (
-              <div className="p-6 rounded-3xl border border-amber-200 bg-amber-50/40 text-center space-y-4">
-                <div className="flex justify-center items-center gap-3">
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full ${
-                      isRecording ? 'bg-rose-500 animate-pulse' : 'bg-zinc-300'
-                    }`}
-                  />
-                  <span className="text-xl font-mono font-bold text-amber-950">
-                    {Math.floor(recordingSeconds / 60)
-                      .toString()
-                      .padStart(2, '0')}
-                    :
-                    {(recordingSeconds % 60).toString().padStart(2, '0')}
-                  </span>
-                  <span className="text-xs text-zinc-500">(máx 2:00 min)</span>
-                </div>
-
-                <div className="flex justify-center gap-3">
-                  {!isRecording ? (
-                    <button
-                      type="button"
-                      onClick={startRecording}
-                      disabled={isUploadingAudio}
-                      className="rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer disabled:opacity-50"
-                    >
-                      <span>🎙️</span>
-                      <span>{recordedAudioBlob ? 'Volver a grabar' : 'Empezar a grabar'}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                    >
-                      <span>⏹️</span>
-                      <span>Detener grabación</span>
-                    </button>
-                  )}
-                </div>
-
-                {recordedAudioBlob && !isRecording && (
-                  <div className="pt-2 flex flex-col items-center gap-1">
-                    <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-900">
-                      <span>✅</span>
-                      <span>Grabación lista para enviar ({recordingDurationRef.current > 0 ? `${recordingDurationRef.current}s` : (recordingSeconds > 0 ? `${recordingSeconds}s` : 'guardada')})</span>
-                    </div>
-                  </div>
-                )}
-
-                {uploadError && (
-                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2 text-center max-w-sm mx-auto">
-                    <p className="font-bold">{uploadError}</p>
-                    <button
-                      type="button"
-                      onClick={() => void uploadAudioRecording()}
-                      disabled={isUploadingAudio}
-                      className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 min-h-[48px] min-w-[48px] shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                    >
-                      {isUploadingAudio ? 'Reintentando…' : 'Reintentar envío'}
-                    </button>
-                  </div>
-                )}
-
-                {uploadProgress && (
-                  <p className="text-xs font-semibold text-amber-700 animate-pulse">
-                    {uploadProgress}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Microgame Type (SPEC-06, ENG-080 to ENG-085) */}
-        {activity.type === ActivityType.game && isGamePublicConfig(activity.config) && (
-          <GameRenderer
-            config={activity.config}
-            initialState={isGameAnswers(runtime.answers) ? runtime.answers : {}}
-            onEvent={(event) => {
-              if ('itemId' in event && 'answer' in event) {
-                handleAnswerChange(event.itemId, event.answer);
-              }
-            }}
-            soundEnabled={soundEnabled}
-            theme={theme}
-            onComplete={(finalAnswers) => {
-              handleCompleteAttempt(finalAnswers);
-            }}
+          <SentenceRenderer
+            items={fbConfig.items}
+            answers={answers}
+            onAnswerChange={handleAnswerChange}
+            disabled={isFinished}
+            onSpeak={hasTtsSupport ? speakText : undefined}
           />
         )}
 
+        {activity.type === ActivityType.exam && examConfig?.items && (
+          <SentenceRenderer
+            exam
+            items={examConfig.items}
+            answers={answers}
+            onAnswerChange={handleAnswerChange}
+            disabled={isFinished}
+            onSpeak={hasTtsSupport ? speakText : undefined}
+          />
+        )}
+
+        {activity.type === ActivityType.open_question && (
+          <OpenQuestionRenderer
+            instructions={openQInstructions}
+            items={openQItems}
+            answers={answers}
+            onAnswerChange={handleAnswerChange}
+            disabled={isFinished}
+            onSpeak={hasTtsSupport ? speakText : undefined}
+          />
+        )}
+
+        {activity.type === ActivityType.speaking && (
+          <SpeakingRenderer
+            prompt={speakingConfig?.prompt}
+            onSpeak={hasTtsSupport ? speakText : undefined}
+            recorder={
+              isFinished
+                ? undefined
+                : {
+                    mode: "attempt",
+                    isRecording,
+                    recordingSeconds,
+                    savedDuration: !recordedAudioBlob
+                      ? null
+                      : recordingDurationRef.current > 0
+                        ? `${recordingDurationRef.current}s`
+                        : recordingSeconds > 0
+                          ? `${recordingSeconds}s`
+                          : "guardada",
+                    isUploading: isUploadingAudio,
+                    progress: uploadProgress,
+                    error: uploadError,
+                    onStart: startRecording,
+                    onStop: stopRecording,
+                    onRetry: () => void uploadAudioRecording(),
+                  }
+            }
+          />
+        )}
+
+        {/* Microgame Type (SPEC-06, ENG-080 to ENG-085) */}
+        {activity.type === ActivityType.game &&
+          isGamePublicConfig(activity.config) && (
+            <GameRenderer
+              config={activity.config}
+              initialState={
+                isGameAnswers(runtime.answers) ? runtime.answers : {}
+              }
+              onEvent={(event) => {
+                if ("itemId" in event && "answer" in event) {
+                  handleAnswerChange(event.itemId, event.answer);
+                }
+              }}
+              soundEnabled={soundEnabled}
+              theme={theme}
+              onComplete={(finalAnswers) => {
+                handleCompleteAttempt(finalAnswers);
+              }}
+            />
+          )}
+
         {/* Submit Button for standard activities (Microgames provide their own dedicated submit action) */}
         {!isFinished && activity.type !== ActivityType.game && (
-          <div className="pt-4 border-t border-amber-200/60 flex justify-end">
+          <div className={styles.actionBar}>
             <button
               type="button"
               disabled={
                 isSubmitting ||
                 isUploadingAudio ||
                 (activity.type === ActivityType.speaking &&
-                  (!recordedAudioBlob || (!mediaId && (typeof navigator === 'undefined' || navigator.onLine))))
+                  (!recordedAudioBlob ||
+                    (!mediaId &&
+                      (typeof navigator === "undefined" || navigator.onLine))))
               }
               onClick={() => handleCompleteAttempt()}
-              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-8 py-3.5 text-base shadow-md transition-all disabled:opacity-50 min-h-[48px] min-w-[48px] focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+              className="origami-button"
             >
-              {isSubmitting ? 'Entregando actividad…' : 'Entregar actividad ✨'}
+              {isSubmitting ? "Entregando actividad…" : "Entregar actividad ✨"}
             </button>
           </div>
         )}

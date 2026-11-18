@@ -1,113 +1,159 @@
-'use client';
+"use client";
 
-import React, { useTransition } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { logoutSharedDevice } from '../lib/auth-hygiene';
+import {
+  BookOpen,
+  ChartColumn,
+  ClipboardCheck,
+  ClipboardList,
+  House,
+  LibraryBig,
+  LogOut,
+  Menu,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import React, {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { logoutSharedDevice } from "../lib/auth-hygiene";
+import { AppearanceSelector } from "./appearance-selector";
+import { OrigamiBrand } from "./ui/origami-brand";
 
-interface TeacherNavProps {
-  teacherName?: string;
+const areas = [
+  { label: "Inicio", href: "/inicio", Icon: House },
+  { label: "Actividades", href: "/actividades", Icon: BookOpen },
+  { label: "Asignaciones", href: "/asignaciones", Icon: ClipboardList },
+  { label: "Revisión", href: "/revision", Icon: ClipboardCheck },
+  { label: "Estadísticas", href: "/estadisticas", Icon: ChartColumn },
+  { label: "Grupos", href: "/grupos", Icon: Users },
+  { label: "Alumnos", href: "/alumnos", Icon: UserRound },
+  { label: "Contenido extra", href: "/contenido-extra", Icon: LibraryBig },
+];
+
+function TeacherAreas({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  return (
+    <nav aria-label="Navegación principal" className="origami-teacher-areas">
+      {areas.map(({ href, label, Icon }) => {
+        const current = pathname === href || pathname.startsWith(href + "/");
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onNavigate}
+            aria-current={current ? "page" : undefined}
+            className={`origami-area-link${current ? " origami-selected" : ""}`}
+          >
+            <Icon size={24} aria-hidden="true" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
 
-export function TeacherNav({ teacherName }: TeacherNavProps) {
-  const pathname = usePathname();
+export function TeacherNav({ teacherName }: { teacherName?: string }) {
   const [isLoggingOut, startLogout] = useTransition();
+  const [open, setOpen] = useState(false);
+  const dialogId = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
 
-  const navItems = [
-    { label: 'Inicio', href: '/inicio' },
-    { label: 'Actividades', href: '/actividades' },
-    { label: 'Asignaciones', href: '/asignaciones' },
-    { label: 'Revisión', href: '/revision' },
-    { label: 'Estadísticas', href: '/estadisticas' },
-    { label: 'Grupos', href: '/grupos' },
-    { label: 'Alumnos', href: '/alumnos' },
-    { label: 'Contenido extra', href: '/contenido-extra' },
-  ];
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const onResize = () => {
+      if (desktop.matches) dialog.current?.close();
+    };
+    desktop.addEventListener("change", onResize);
+    return () => desktop.removeEventListener("change", onResize);
+  }, []);
 
   const handleLogout = () => {
     startLogout(async () => {
       await logoutSharedDevice();
-      window.location.href = '/login';
+      window.location.href = "/login";
     });
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-4">
-          <Link
-            href="/inicio"
-            className="flex items-center gap-2 text-xl font-bold tracking-tight text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-extrabold text-sm">
-              E
-            </span>
-            <span>Upward English</span>
+    <>
+      <header className="origami-role-header origami-shell">
+        <div className="origami-container origami-role-header__inner">
+          <Link className="origami-brand-link" href="/inicio">
+            <OrigamiBrand />
           </Link>
-
-          <nav className="hidden xl:flex items-center gap-1" aria-label="Navegación principal">
-            {navItems.map((item) => {
-              const isActive =
-                item.href === '/inicio'
-                  ? pathname === '/inicio'
-                  : pathname.startsWith(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                      : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
-                  }`}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
           {teacherName && (
-            <span className="hidden sm:inline-block max-w-40 truncate text-xs font-medium text-zinc-600">
+            <span className="hidden min-w-0 truncate text-sm lg:block">
               {teacherName}
             </span>
           )}
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="min-h-12 min-w-12 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50 transition-colors"
-          >
-            {isLoggingOut ? 'Cerrando…' : 'Cerrar sesión'}
-          </button>
-        </div>
-      </div>
-      {/* Mobile nav bar */}
-      <nav className="grid grid-cols-2 gap-1 border-t border-zinc-100 px-2 py-1 sm:grid-cols-4 xl:hidden" aria-label="Navegación móvil">
-        {navItems.map((item) => {
-          const isActive =
-            item.href === '/inicio'
-              ? pathname === '/inicio'
-              : pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-md px-2 py-1.5 text-center text-xs font-medium ${
-                isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-zinc-600'
-              }`}
-              aria-current={isActive ? 'page' : undefined}
+          <div className="origami-header-actions">
+            <AppearanceSelector authenticated />
+            <button
+              type="button"
+              className="origami-button origami-button--secondary origami-icon-action"
+              aria-label={isLoggingOut ? "Cerrando…" : "Cerrar sesión"}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
             >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </header>
+              <LogOut aria-hidden="true" />
+              <span className="origami-wide-action">
+                {isLoggingOut ? "Cerrando…" : "Cerrar sesión"}
+              </span>
+            </button>
+            <button
+              type="button"
+              ref={menuButton}
+              className="origami-button origami-button--secondary origami-icon-action origami-teacher-menu"
+              aria-label="Abrir menú principal"
+              aria-controls={dialogId}
+              aria-expanded={open}
+              onClick={() => {
+                dialog.current?.showModal();
+                setOpen(true);
+              }}
+            >
+              <Menu aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <dialog
+          id={dialogId}
+          ref={dialog}
+          className="origami-teacher-drawer"
+          aria-labelledby={`${dialogId}-label`}
+          onClose={() => {
+            setOpen(false);
+            menuButton.current?.focus();
+          }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h2 id={`${dialogId}-label`} className="origami-card-title">
+              Menú principal
+            </h2>
+            <button
+              type="button"
+              className="origami-button origami-button--text origami-icon-action"
+              aria-label="Cerrar menú principal"
+              onClick={() => dialog.current?.close()}
+            >
+              <X aria-hidden="true" />
+            </button>
+          </div>
+          <TeacherAreas onNavigate={() => dialog.current?.close()} />
+        </dialog>
+      </header>
+      <aside className="origami-teacher-sidebar origami-shell">
+        <TeacherAreas />
+      </aside>
+    </>
   );
 }

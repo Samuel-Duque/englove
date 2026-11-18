@@ -1,0 +1,406 @@
+.header :global(.origami-role-header__inner) {
+  flex-wrap: wrap;
+}
+
+.header :global(.origami-header-actions) {
+  flex-wrap: wrap;
+}
+
+.anchorMenu {
+  position: relative;
+}
+
+.anchorMenu .menuTrigger {
+  padding-inline: var(--origami-space-2);
+  list-style: none;
+}
+
+.menuTrigger::-webkit-details-marker {
+  display: none;
+}
+
+.anchorMenu .anchorLinks {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: calc(100% + var(--origami-space-2));
+  inset-inline-start: 0;
+  display: grid;
+  inline-size: max-content;
+  max-inline-size: min(15rem, calc(100vw - 2 * var(--origami-gutter)));
+  padding: var(--origami-space-2);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-card-radius);
+  background: var(--origami-surface-raised);
+  box-shadow: 0 4px 0 var(--origami-shadow);
+}
+
+.anchorMenu .anchorLinks a {
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.anchorMenu::details-content {
+  transform: translateY(-4px);
+  opacity: 0;
+  transition:
+    transform 120ms var(--origami-ease-in),
+    opacity 120ms var(--origami-ease-in),
+    content-visibility 120ms allow-discrete;
+}
+
+.anchorMenu[open]::details-content {
+  transform: none;
+  opacity: 1;
+  transition-duration: 180ms;
+}
+
+.anchorMenu:has(.anchorLinks :focus-visible)::details-content {
+  transition: none;
+}
+
+.inlineAnchors {
+  display: none;
+}
+
+.header .headerLogin {
+  padding-inline: var(--origami-space-2);
+}
+
+.landing {
+  --landing-space: var(--origami-space-10);
+  display: grid;
+  gap: var(--landing-space);
+  padding-block: var(--landing-space);
+}
+
+.hero {
+  display: grid;
+  align-items: center;
+  gap: var(--origami-column-gap);
+}
+
+.intro,
+.sectionHeading,
+.close {
+  display: grid;
+  gap: var(--origami-space-4);
+}
+
+.intro h1 {
+  max-inline-size: 16ch;
+  text-wrap: balance;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--origami-space-3);
+}
+
+.scene {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  aspect-ratio: 4 / 3;
+  min-inline-size: 0;
+  padding: var(--origami-card-padding);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-card-radius);
+  background: var(--origami-surface);
+  box-shadow: 0 4px 0 var(--origami-shadow);
+}
+
+.scene::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    -9deg,
+    transparent 0 1.4rem,
+    var(--origami-border-control) 1.4rem calc(1.4rem + 1px),
+    transparent calc(1.4rem + 1px) 2rem
+  );
+  opacity: var(--origami-wood-opacity);
+  pointer-events: none;
+  content: "";
+}
+
+.scene::after {
+  position: absolute;
+  inset: 0 0 auto auto;
+  border-start-end-radius: inherit;
+  inline-size: var(--origami-space-6);
+  block-size: var(--origami-space-6);
+  background: var(--origami-orange);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  pointer-events: none;
+  content: "";
+}
+
+.sceneCaption {
+  position: relative;
+  inline-size: fit-content;
+  padding: var(--origami-space-1) var(--origami-space-2);
+  background: var(--origami-surface);
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 2fr);
+  place-items: center;
+  align-self: center;
+}
+
+.flightPath {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  color: var(--origami-border-control);
+}
+
+.wordPaper {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  inline-size: 90%;
+  aspect-ratio: 4 / 5;
+  transform: rotate(-8deg);
+  border: 1px solid var(--origami-border-control);
+  background: var(--origami-surface-raised);
+  box-shadow: 0 4px 0 var(--origami-shadow);
+  font-size: clamp(1rem, 2.45vw, 2rem);
+  font-weight: 900;
+}
+
+.wordPaper::after {
+  inline-size: 55%;
+  block-size: 2px;
+  margin-block-start: var(--origami-space-1);
+  background: var(--origami-orange);
+  content: "";
+}
+
+.foldPaper {
+  inline-size: 72%;
+  aspect-ratio: 1;
+  transform: rotate(36deg);
+  border: 1px solid var(--origami-border-control);
+  background: linear-gradient(
+    135deg,
+    var(--origami-honey) 50%,
+    var(--origami-orange) 50%
+  );
+  box-shadow: 2px 3px 0 var(--origami-shadow);
+}
+
+.crane {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  filter: drop-shadow(0 4px 0 var(--origami-shadow));
+}
+
+.folds,
+.audiences {
+  display: grid;
+  gap: var(--origami-column-gap);
+}
+
+.folds {
+  border-inline-start: 1px dashed var(--origami-border-control);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: var(--origami-space-2) var(--origami-space-3);
+  margin-inline-start: var(--origami-space-3);
+}
+
+.step h3 {
+  align-self: center;
+}
+
+.step p {
+  grid-column: 2;
+}
+
+.stepIcon {
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  background: var(--origami-honey);
+  color: var(--origami-on-honey);
+  clip-path: polygon(0 0, 66.67% 0, 100% 33.33%, 100% 100%, 0 100%);
+}
+
+.stepIcon svg {
+  inline-size: var(--origami-icon);
+  block-size: var(--origami-icon);
+}
+
+.sample {
+  display: grid;
+  align-content: start;
+  gap: var(--origami-space-2);
+  padding: var(--origami-card-padding);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-card-radius);
+  background: var(--origami-surface);
+}
+
+.kids {
+  box-shadow: 0 4px 0 var(--origami-shadow);
+  border-block-start: 4px solid var(--origami-honey);
+}
+
+.wordPair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-3);
+  margin-block-start: var(--origami-space-1);
+  font-weight: 800;
+}
+
+.kids .wordPair {
+  padding: var(--origami-space-2) var(--origami-space-3);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-control-radius);
+  background: var(--origami-surface-soft);
+  font-size: 1.25rem;
+}
+
+.bird {
+  flex: none;
+  inline-size: 2.75rem;
+  block-size: auto;
+  color: var(--origami-text-primary);
+}
+
+.kids .bird {
+  inline-size: 4rem;
+}
+
+.review {
+  border-inline-start: 4px solid var(--origami-border-control);
+  border-radius: 0 var(--origami-card-radius) var(--origami-card-radius) 0;
+}
+
+.review blockquote {
+  max-inline-size: 62ch;
+  font: var(--origami-body);
+  font-weight: 700;
+}
+
+.close {
+  padding: var(--origami-card-padding);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-card-radius);
+  background: var(--origami-surface);
+}
+
+.closeTop {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--origami-space-3);
+}
+
+.registrationLink {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--origami-target);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+@media (max-width: 34rem) {
+  .header :global(.origami-header-actions) {
+    inline-size: 100%;
+  }
+
+  .header :global(.origami-role-header__inner .origami-brand__wordmark) {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .anchorMenu {
+    margin-inline-end: auto;
+  }
+}
+
+@media (min-width: 40rem) {
+  .audiences {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 60rem) {
+  .anchorMenu {
+    display: none;
+  }
+
+  .inlineAnchors {
+    display: block;
+  }
+
+  .inlineAnchors .anchorLinks {
+    display: flex;
+    gap: var(--origami-space-2);
+  }
+}
+
+@media (min-width: 64rem) {
+  .landing {
+    --landing-space: var(--origami-space-16);
+  }
+
+  .hero {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .intro {
+    grid-column: span 5;
+  }
+
+  .scene {
+    grid-column: span 7;
+  }
+
+  .folds {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-inline-start: none;
+    border-block-start: 1px dashed var(--origami-border-control);
+  }
+
+  .step {
+    margin-inline-start: 0;
+    padding-block-start: var(--origami-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anchorMenu::details-content {
+    transition: none;
+    transform: none;
+  }
+}

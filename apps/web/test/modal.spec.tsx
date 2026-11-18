@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import React from 'react';
-import { renderToString } from 'react-dom/server';
-import { AccessibleModal } from '../src/components/ui/modal';
+import { describe, it, expect, vi, afterEach } from "vitest";
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { AccessibleModal, ConfirmDialog } from "../src/components/ui/modal";
 
-describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)', () => {
+describe("AccessibleModal focus stabilization and accessibility (P0-06, RF-20)", () => {
   const originalDocument = globalThis.document;
 
   afterEach(() => {
@@ -15,16 +15,16 @@ describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)',
     vi.restoreAllMocks();
   });
 
-  it('returns null when isOpen is false', () => {
+  it("returns null when isOpen is false", () => {
     const html = renderToString(
       <AccessibleModal isOpen={false} onClose={() => {}} title="Test Modal">
         <p>Modal content</p>
       </AccessibleModal>,
     );
-    expect(html).toBe('');
+    expect(html).toBe("");
   });
 
-  it('renders modal dialog with accessible ARIA attributes when isOpen is true', () => {
+  it("renders modal dialog with accessible ARIA attributes when isOpen is true", () => {
     const html = renderToString(
       <AccessibleModal
         isOpen={true}
@@ -40,12 +40,13 @@ describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)',
     expect(html).toContain('aria-modal="true"');
     expect(html).toContain('aria-labelledby="modal-title"');
     expect(html).toContain('aria-describedby="modal-desc"');
-    expect(html).toContain('Título de Prueba');
-    expect(html).toContain('Descripción accesible');
-    expect(html).toContain('Escribe aquí');
+    expect(html).toContain("Título de Prueba");
+    expect(html).toContain("Descripción accesible");
+    expect(html).toContain("Escribe aquí");
+    expect(html).toMatch(/class="[^"]*origami-dialog\b/);
   });
 
-  it('omits aria-describedby when no description prop is provided', () => {
+  it("omits aria-describedby when no description prop is provided", () => {
     const html = renderToString(
       <AccessibleModal isOpen={true} onClose={() => {}} title="Sin Descripción">
         <p>Contenido simple</p>
@@ -53,10 +54,10 @@ describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)',
     );
 
     expect(html).toContain('aria-labelledby="modal-title"');
-    expect(html).not.toContain('aria-describedby=');
+    expect(html).not.toContain("aria-describedby=");
   });
 
-  it('applies custom maxWidthClass when passed', () => {
+  it("applies custom maxWidthClass when passed", () => {
     const html = renderToString(
       <AccessibleModal
         isOpen={true}
@@ -68,10 +69,30 @@ describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)',
       </AccessibleModal>,
     );
 
-    expect(html).toContain('max-w-3xl');
+    expect(html).toContain("max-w-3xl");
   });
 
-  it('stabilizes focus effect dependency strictly on [isOpen] without re-running on onClose reference changes (P0-06)', () => {
+  it("RF-8: renders explicit labeled actions in an Origami confirmation", () => {
+    const html = renderToString(
+      <ConfirmDialog
+        isOpen
+        title="Confirmar eliminación"
+        message="El cambio no se puede deshacer."
+        confirmText="Eliminar"
+        isDestructive
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(html).toMatch(
+      /<button[^>]*class="[^"]*origami-button--secondary[^"]*"[^>]*>Cancelar<\/button>/,
+    );
+    expect(html).toMatch(
+      /<button[^>]*class="[^"]*origami-button[^"]*"[^>]*>Eliminar<\/button>/,
+    );
+  });
+
+  it("stabilizes focus effect dependency strictly on [isOpen] without re-running on onClose reference changes (P0-06)", () => {
     // Verify that the hook design decouples onClose from the effect dependency array
     // by using a mutable ref pattern. When typing in an input re-renders the parent with
     // a new onClose closure, the focus initialization timer does NOT re-arm and steal focus.
@@ -102,7 +123,7 @@ describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)',
       if (!isOpen) return;
 
       effectRunCount++;
-      addEventListenerSpy('keydown', vi.fn());
+      addEventListenerSpy("keydown", vi.fn());
     };
 
     // 1. Initial open
@@ -123,19 +144,21 @@ describe('AccessibleModal focus stabilization and accessibility (P0-06, RF-20)',
     expect(onCloseRef.current).toBe(newOnClose);
   });
 
-  it('guarantees source implementation decouples focus timer from onClose dependency (P0-06)', async () => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const modalPath = path.resolve(__dirname, '../src/components/ui/modal.tsx');
-    const source = fs.readFileSync(modalPath, 'utf8');
+  it("guarantees source implementation decouples focus timer from onClose dependency (P0-06)", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const modalPath = path.resolve(__dirname, "../src/components/ui/modal.tsx");
+    const source = fs.readFileSync(modalPath, "utf8");
 
     // Must bind onClose to a ref
-    expect(source).toMatch(/const\s+onCloseRef\s*=\s*useRef\s*\(\s*onClose\s*\)/);
+    expect(source).toMatch(
+      /const\s+onCloseRef\s*=\s*useRef\s*\(\s*onClose\s*\)/,
+    );
     // Must update ref on render
     expect(source).toMatch(/onCloseRef\.current\s*=\s*onClose/);
     // Must strictly depend only on [isOpen] for the focus setup effect
-    expect(source).toContain('}, [isOpen]);');
+    expect(source).toContain("}, [isOpen]);");
     // Must NOT contain [isOpen, onClose]
-    expect(source).not.toContain('[isOpen, onClose]');
+    expect(source).not.toContain("[isOpen, onClose]");
   });
 });

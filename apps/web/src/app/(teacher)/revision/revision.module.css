@@ -1,0 +1,221 @@
+.page,
+.queueControls,
+.layout,
+.form {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--origami-column-gap);
+}
+
+.heading,
+.queueSummary,
+.fieldGroup,
+.filters > div,
+.submission,
+.retry {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--origami-space-2);
+}
+
+.heading {
+  padding-block-end: var(--origami-space-4);
+  border-block-end: 1px solid var(--origami-border-subtle);
+}
+
+.heading p,
+.placeholder {
+  color: var(--origami-text-secondary);
+}
+
+.tabs,
+.notice,
+.inlineActions,
+.mark {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--origami-space-2);
+}
+
+.notice,
+.inlineActions {
+  justify-content: space-between;
+}
+
+.flatButton {
+  --origami-button-shadow: none;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--origami-space-5);
+}
+
+.layout {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.queueSummary {
+  margin-block-end: var(--origami-space-3);
+}
+
+.rows {
+  display: grid;
+  gap: var(--origami-space-2);
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  inline-size: 100%;
+  min-block-size: var(--origami-target);
+  gap: var(--origami-space-1);
+  padding: var(--origami-space-3) var(--origami-space-4);
+  border: 2px solid var(--origami-border-control);
+  font: var(--origami-body);
+  text-align: start;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .row:not([aria-current]):hover {
+    background: var(--origami-surface-soft);
+  }
+}
+
+.rowMeta {
+  font: var(--origami-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--origami-text-secondary);
+}
+
+.row[aria-current] .rowMeta {
+  color: inherit;
+}
+
+.mark {
+  font: var(--origami-label);
+}
+
+.mark > svg {
+  inline-size: var(--origami-icon-meta);
+  block-size: var(--origami-icon-meta);
+  flex: none;
+}
+
+.detail {
+  min-inline-size: 0;
+}
+
+.back {
+  margin-block-end: var(--origami-space-5);
+}
+
+.detailHeader,
+.answerSheet {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--origami-space-2);
+  padding-block-end: var(--origami-space-4);
+  border-block-end: 1px solid var(--origami-border-subtle);
+}
+
+.placeholder {
+  min-block-size: 8rem;
+}
+
+.audio {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.answer {
+  margin-block-start: var(--origami-space-1);
+  padding: var(--origami-space-3);
+  border-inline-start: 2px solid var(--origami-border-control);
+  background: var(--origami-surface-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.score {
+  max-inline-size: 8rem;
+}
+
+.stickerField {
+  min-inline-size: 0;
+}
+
+.stickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--origami-space-2);
+  margin-block-start: var(--origami-space-2);
+}
+
+.stickers .sticker {
+  justify-content: start;
+  padding-inline: var(--origami-space-2);
+  text-align: start;
+}
+
+.sticker > .stickerCheck {
+  inline-size: var(--origami-icon-meta);
+  block-size: var(--origami-icon-meta);
+  margin-inline-start: auto;
+}
+
+.retry {
+  padding: var(--origami-space-4);
+  border: 1px solid var(--origami-border-subtle);
+  border-radius: var(--origami-control-radius);
+}
+
+.retryToggle {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--origami-target);
+  gap: var(--origami-space-2);
+  font: var(--origami-label);
+  cursor: pointer;
+}
+
+.retryToggle input {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  flex: none;
+  accent-color: var(--origami-primary);
+}
+
+.submit {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (width < 1024px) {
+  .page:not([data-detail-open]) .detail,
+  .page[data-detail-open] :is(.queueControls, .queue) {
+    display: none;
+  }
+}
+
+@media (width >= 1024px) {
+  .layout {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+
+  .detail .back {
+    display: none;
+  }
+
+  .rows {
+    max-block-size: 43.75rem;
+    overflow-y: auto;
+    /* El margen de la lista deja visible el anillo al enfocar cada fila. */
+    padding: 0.375rem;
+    margin: -0.375rem;
+  }
+}

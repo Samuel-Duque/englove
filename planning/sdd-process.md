@@ -92,7 +92,8 @@ specs/
 ├── SPEC-08-estadisticas.md
 ├── SPEC-09-pwa-offline-a11y.md
 ├── SPEC-10-contenido-extra.md
-└── SPEC-11-calidad-y-correcciones.md # Etapa 12: Calidad, correcciones y verificación (Verificada)
+├── SPEC-11-calidad-y-correcciones.md # Etapa 12: Calidad, correcciones y verificación
+└── SPEC-12-ui-origami.md            # Etapa 13: UI Origami en la rama UI
 ```
 
 - La numeración sigue las etapas de `pbp-development.md`. Si una etapa necesita más de una spec, se usa un sufijo: `SPEC-05a`, `SPEC-05b`.
@@ -225,6 +226,7 @@ Las specs se escriben **una etapa por delante** de la implementación, no todas 
 | SPEC-09 PWA, offline y accesibilidad | Etapa 8            | Etapa 9                      | —                                                                         |
 | SPEC-10 Contenido extra              | Cualquier hueco    | Etapa 10                     | —                                                                         |
 | SPEC-11 Calidad, correcciones y verificación | Etapa 10 y posteriores (con SPEC-01 a SPEC-10 ya verificadas) | Etapa 12 (se ejecuta antes de cerrar la Etapa 11) | Ninguno abierto: Q-01 a Q-08 de CONTEXT §15 están decididas (decisiones 130 a 137) y la spec está `Verificada` |
+| SPEC-12 UI Origami | Después de SPEC-11; planeación de la rama `UI` | Etapa 13, solo en la rama `UI` hasta decidir su adopción | Aprobación explícita de la spec. La aceptación del diseño, posterior a la implementación y la verificación completa, es una decisión distinta (decisión 147). |
 
 **La aprobación es la compuerta de inicio (Decidido, CONTEXT §14, decisión 65).** "Debe estar Aprobada antes de" es literal: la Etapa 1 empieza cuando SPEC-01 está Aprobada, y la Etapa 2 cuando SPEC-02 está Aprobada y las dependencias técnicas de la Etapa 1 están entregadas. La Etapa 0 no corre en paralelo con las Etapas 1 y 2 en lo que respecta a esas dependencias; solo la preparación que no las bloquea (cuentas, dominio, repositorio, tokens de diseño, observación con niños) puede solaparse. Lo mismo vale para el resto: redactar la spec de la etapa N+1 durante la etapa N no autoriza a empezar su código.
 

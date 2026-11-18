@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <g id="folded">
+      <rect y="7" width="80" height="86" rx="5" fill="#48230F" opacity=".25"/>
+      <rect width="80" height="86" rx="5" fill="#FFD343"/>
+      <path d="M1 3 40 51 79 3M1 82l30-43m48 43L49 39" fill="none"/>
+      <path d="m1 3 39 48 39-48z" fill="#FFF0BC"/>
+      <path d="m43 0-3 51L79 3l-3-3z" fill="#F88A17" opacity=".48" stroke="none"/>
+    </g>
+  </defs>
+  <ellipse cx="198" cy="249" rx="147" ry="25" fill="#48230F" opacity=".18"/>
+  <g stroke="#48230F" stroke-width="2.2" stroke-linejoin="round">
+    <use href="#folded" x="66" y="45" transform="rotate(-12 106 88)"/>
+    <use href="#folded" x="162" y="39" transform="rotate(7 202 82)"/>
+    <use href="#folded" x="254" y="54" transform="rotate(13 294 97)"/>
+    <use href="#folded" x="65" y="148" transform="rotate(-9 105 191)"/>
+    <use href="#folded" x="261" y="153" transform="rotate(13 301 196)"/>
+    <g transform="translate(162 144) rotate(-5 40 43)">
+      <rect y="7" width="80" height="86" rx="5" fill="#238EA8"/>
+      <rect width="80" height="86" rx="5" fill="#E4F4FB"/>
+      <path d="m14 45 12 4 10-24 13 15 17-12-10 24-27 10z" fill="#67C4DB"/>
+      <path d="m26 49 23-9 7 12-27 10z" fill="#238EA8"/>
+    </g>
+  </g>
+</svg>

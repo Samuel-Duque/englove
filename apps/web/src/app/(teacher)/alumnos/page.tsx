@@ -4,14 +4,15 @@ import { AlumnosClient } from './alumnos-client';
 
 export const metadata: Metadata = {
   title: 'Gestión de Alumnos',
-  description: 'Administración de alumnos, solicitudes de inscripción y cuentas bloqueadas.',
+  description:
+    'Administración de alumnos, solicitudes de inscripción y cuentas bloqueadas.',
 };
 
 export default function StudentsManagementPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-16 text-center text-zinc-500 text-sm">
+        <div role="status" className="origami-state text-center">
           Cargando gestión de alumnos…
         </div>
       }

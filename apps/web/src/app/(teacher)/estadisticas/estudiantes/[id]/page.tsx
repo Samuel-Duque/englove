@@ -16,7 +16,7 @@ export default async function StudentDetailPage({
   return (
     <Suspense
       fallback={
-        <div className="py-12 text-center text-zinc-500 text-sm">
+        <div className="py-12 text-center text-[var(--origami-text-secondary)] text-sm">
           Cargando ficha del estudiante…
         </div>
       }

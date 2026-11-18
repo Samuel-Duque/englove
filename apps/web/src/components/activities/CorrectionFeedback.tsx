@@ -32,7 +32,7 @@ export function CorrectionFeedback({
       return (
         <div key={itemId}>
           {value.correct ? "✅" : "❌"}{" "}
-          <span className="font-semibold text-zinc-800">
+          <span className="font-semibold">
             Respuesta {index + 1}: {value.correct ? "Correcto" : "Incorrecto"}
           </span>
         </div>
@@ -44,9 +44,9 @@ export function CorrectionFeedback({
           if (!isRecord(result) || typeof result.correct !== "boolean")
             return null;
           return (
-            <div key={blankId} className="flex items-center gap-2">
+            <div key={blankId} className="flex flex-wrap items-center gap-2">
               <span>{result.correct ? "✅" : "❌"}</span>
-              <span className="font-semibold text-zinc-800">
+              <span className="font-semibold">
                 Espacio {blankIndex + 1}:{" "}
                 {result.correct ? "Correcto" : "Incorrecto"}
               </span>

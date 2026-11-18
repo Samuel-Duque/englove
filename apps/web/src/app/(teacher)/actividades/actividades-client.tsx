@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ActivitySummary,
   ActivitySummarySchema,
@@ -12,22 +12,22 @@ import {
   ActivityType,
   ActivityStatus,
   Level,
-} from '@upward-english/shared';
-import { apiFetch, ApiError } from '../../../lib/api';
-import { ConfirmDialog } from '../../../components/ui/modal';
+} from "@upward-english/shared";
+import { apiFetch, ApiError } from "../../../lib/api";
+import { ConfirmDialog } from "../../../components/ui/modal";
 
-const typeLabels: Record<ActivityType, string> = {
-  [ActivityType.fill_blank]: 'Rellenar huecos',
-  [ActivityType.open_question]: 'Pregunta abierta',
-  [ActivityType.speaking]: 'Expresión oral (Speaking)',
-  [ActivityType.game]: 'Microjuego',
-  [ActivityType.exam]: 'Examen',
-};
+import { activityTypeLabels } from "./activity-labels";
 
 const statusLabels: Record<ActivityStatus, { label: string; color: string }> = {
-  [ActivityStatus.draft]: { label: 'Borrador', color: 'bg-zinc-100 text-zinc-800' },
-  [ActivityStatus.published]: { label: 'Publicada', color: 'bg-emerald-100 text-emerald-800' },
-  [ActivityStatus.archived]: { label: 'Archivada', color: 'bg-amber-100 text-amber-800' },
+  [ActivityStatus.draft]: { label: "Borrador", color: "origami-state" },
+  [ActivityStatus.published]: {
+    label: "Publicada",
+    color: "origami-state origami-state--success",
+  },
+  [ActivityStatus.archived]: {
+    label: "Archivada",
+    color: "origami-state origami-state--warning",
+  },
 };
 
 export function ActividadesClient() {
@@ -38,87 +38,108 @@ export function ActividadesClient() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'active' | 'archived' | 'all'>('active');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [levelFilter, setLevelFilter] = useState<string>('all');
-  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<
+    "active" | "archived" | "all"
+  >("active");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(
+    null,
+  );
 
   const activitiesQuery = useQuery({
-    queryKey: ['teacher', 'activities', statusFilter, typeFilter, levelFilter],
+    queryKey: ["teacher", "activities", statusFilter, typeFilter, levelFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (statusFilter === 'archived') {
-        params.set('status', ActivityStatus.archived);
+      if (statusFilter === "archived") {
+        params.set("status", ActivityStatus.archived);
       }
-      if (typeFilter !== 'all') {
-        params.set('type', typeFilter);
+      if (typeFilter !== "all") {
+        params.set("type", typeFilter);
       }
-      if (levelFilter !== 'all') {
-        params.set('level', levelFilter);
+      if (levelFilter !== "all") {
+        params.set("level", levelFilter);
       }
-      params.set('limit', '100');
-      return apiFetch<ActivityListResponse>(`/api/v1/activities?${params.toString()}`, {
-        schema: ActivityListResponseSchema,
-      });
+      params.set("limit", "100");
+      return apiFetch<ActivityListResponse>(
+        `/api/v1/activities?${params.toString()}`,
+        {
+          schema: ActivityListResponseSchema,
+        },
+      );
     },
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (id: string) =>
       apiFetch<ActivitySummary>(`/api/v1/activities/${id}/duplicate`, {
-        method: 'POST',
+        method: "POST",
         schema: ActivitySummarySchema,
       }),
     onSuccess: (duplicated) => {
-      setActionSuccess('Actividad duplicada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      setActionSuccess("Actividad duplicada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["teacher", "activities"] });
       router.push(`/actividades/${duplicated.id}`);
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo duplicar la actividad');
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo duplicar la actividad",
+      );
     },
   });
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch(`/api/v1/activities/${id}/archive`, { method: 'POST' }),
+      apiFetch(`/api/v1/activities/${id}/archive`, { method: "POST" }),
     onSuccess: () => {
-      setActionSuccess('Actividad archivada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      setActionSuccess("Actividad archivada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["teacher", "activities"] });
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo archivar la actividad');
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo archivar la actividad",
+      );
     },
   });
 
   const restoreMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch(`/api/v1/activities/${id}/restore`, { method: 'POST' }),
+      apiFetch(`/api/v1/activities/${id}/restore`, { method: "POST" }),
     onSuccess: () => {
-      setActionSuccess('Actividad restaurada al catálogo');
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      setActionSuccess("Actividad restaurada al catálogo");
+      queryClient.invalidateQueries({ queryKey: ["teacher", "activities"] });
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo restaurar la actividad');
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo restaurar la actividad",
+      );
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch(`/api/v1/activities/${id}`, { method: 'DELETE' }),
+      apiFetch(`/api/v1/activities/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      setActionSuccess('Borrador eliminado exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      setActionSuccess("Borrador eliminado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["teacher", "activities"] });
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
-        if (err.code === 'ACTIVITY_DELETE_NOT_ALLOWED') {
-          setActionError('No es posible eliminar la actividad: solo se pueden eliminar borradores sin asignaciones.');
+        if (err.code === "ACTIVITY_DELETE_NOT_ALLOWED") {
+          setActionError(
+            "No es posible eliminar la actividad: solo se pueden eliminar borradores sin asignaciones.",
+          );
         } else {
           setActionError(err.message);
         }
       } else {
-        setActionError('No se pudo eliminar la actividad');
+        setActionError("No se pudo eliminar la actividad");
       }
     },
   });
@@ -153,39 +174,39 @@ export function ActividadesClient() {
   const isLoading = activitiesQuery.isLoading;
   const activities: ActivitySummary[] = activitiesQuery.data?.items || [];
   const total = activitiesQuery.data?.total || 0;
-  const error = actionError || (activitiesQuery.error instanceof ApiError ? activitiesQuery.error.message : activitiesQuery.error instanceof Error ? activitiesQuery.error.message : null);
+  const loadError = activitiesQuery.isError
+    ? activitiesQuery.error instanceof ApiError
+      ? activitiesQuery.error.message
+      : "No pudimos cargar el catálogo de actividades."
+    : null;
 
   return (
-    <div className="space-y-6">
+    <div className="origami-shell space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            Catálogo de Actividades
-          </h1>
-          <p className="text-sm text-zinc-600">
+          <h1 className="origami-page-title">Catálogo de Actividades</h1>
+          <p className="origami-meta mt-1">
             Diseña y gestiona el contenido pedagógico para tus grupos.
           </p>
         </div>
-        <Link
-          href="/actividades/nueva"
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
-        >
-          + Crear actividad
+        <Link href="/actividades/nueva" className="origami-button self-start">
+          Crear actividad
         </Link>
       </div>
 
       {/* Alerts */}
-      {error && (
+      {actionError && (
         <div
           role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
+          className="origami-state origami-state--error flex items-center justify-between gap-2"
         >
-          <span>{error}</span>
+          <span>{actionError}</span>
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="text-rose-600 hover:text-rose-800 font-bold ml-4"
+            className="origami-button origami-button--text"
+            aria-label="Cerrar error"
           >
             ✕
           </button>
@@ -195,13 +216,14 @@ export function ActividadesClient() {
       {actionSuccess && (
         <div
           role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
+          className="origami-state origami-state--success flex items-center justify-between gap-2"
         >
           <span>{actionSuccess}</span>
           <button
             type="button"
             onClick={() => setActionSuccess(null)}
-            className="text-emerald-600 hover:text-emerald-800 font-bold ml-4"
+            className="origami-button origami-button--text"
+            aria-label="Cerrar aviso"
           >
             ✕
           </button>
@@ -209,47 +231,50 @@ export function ActividadesClient() {
       )}
 
       {/* Filters Bar */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-3 items-center">
+      <div className="origami-card grid gap-4">
+        <div className="flex flex-wrap items-end gap-4">
           {/* Status Tabs */}
-          <div className="inline-flex rounded-lg border border-zinc-200 p-1 bg-zinc-50 text-xs font-medium">
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Estado del catálogo"
+          >
             <button
               type="button"
-              onClick={() => setStatusFilter('active')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                statusFilter === 'active'
-                  ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                  : 'text-zinc-600 hover:text-zinc-900'
-              }`}
+              onClick={() => setStatusFilter("active")}
+              aria-pressed={statusFilter === "active"}
+              className={`origami-button origami-button--secondary ${statusFilter === "active" ? "origami-selected" : ""}`}
             >
               Catálogo activo
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter('archived')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                statusFilter === 'archived'
-                  ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                  : 'text-zinc-600 hover:text-zinc-900'
-              }`}
+              onClick={() => setStatusFilter("archived")}
+              aria-pressed={statusFilter === "archived"}
+              className={`origami-button origami-button--secondary ${statusFilter === "archived" ? "origami-selected" : ""}`}
             >
               Archivadas
             </button>
           </div>
 
           {/* Type Filter */}
-          <label htmlFor="filter-type" className="text-xs font-medium text-zinc-600 flex items-center gap-1.5">
-            Tipo:
+          <label
+            htmlFor="filter-type"
+            className="origami-label grid min-w-0 gap-1"
+          >
+            Tipo
             <select
               id="filter-type"
               name="filter-type"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="origami-field"
             >
               <option value="all">Todos los tipos</option>
               <option value={ActivityType.fill_blank}>Rellenar huecos</option>
-              <option value={ActivityType.open_question}>Pregunta abierta</option>
+              <option value={ActivityType.open_question}>
+                Pregunta abierta
+              </option>
               <option value={ActivityType.speaking}>Speaking</option>
               <option value={ActivityType.game}>Microjuego</option>
               <option value={ActivityType.exam}>Examen</option>
@@ -257,14 +282,17 @@ export function ActividadesClient() {
           </label>
 
           {/* Level Filter */}
-          <label htmlFor="filter-level" className="text-xs font-medium text-zinc-600 flex items-center gap-1.5">
-            Nivel:
+          <label
+            htmlFor="filter-level"
+            className="origami-label grid min-w-0 gap-1"
+          >
+            Nivel
             <select
               id="filter-level"
               name="filter-level"
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="origami-field"
             >
               <option value="all">Todos los niveles</option>
               <option value={Level.A1}>A1</option>
@@ -275,49 +303,64 @@ export function ActividadesClient() {
           </label>
         </div>
 
-        <span className="text-xs text-zinc-500">
-          {total} actividad{total !== 1 ? 'es' : ''}
-        </span>
+        {activitiesQuery.isSuccess && (
+          <p className="origami-meta" role="status">
+            {total} actividad{total !== 1 ? "es" : ""}
+          </p>
+        )}
       </div>
 
       {/* Activity List / Grid */}
       {isLoading ? (
-        <div className="py-12 text-center text-zinc-500 text-sm">
+        <p className="origami-state" role="status">
           Cargando catálogo…
+        </p>
+      ) : loadError ? (
+        <div
+          className="origami-state origami-state--error space-y-3"
+          role="alert"
+        >
+          <p>{loadError}</p>
+          <button
+            type="button"
+            className="origami-button origami-button--secondary"
+            onClick={() => void activitiesQuery.refetch()}
+          >
+            Reintentar
+          </button>
         </div>
       ) : activities.length === 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-          {statusFilter === 'active' && typeFilter === 'all' && levelFilter === 'all' ? (
+        <div className="origami-card text-center">
+          {statusFilter === "active" &&
+          typeFilter === "all" &&
+          levelFilter === "all" ? (
             <div>
-              <p className="text-base font-semibold text-zinc-800">
-                Aún no tienes actividades
+              <h2 className="origami-card-title">Aún no tienes actividades</h2>
+              <p className="origami-meta mt-1 mb-6">
+                Crea tu primera actividad para empezar a armar tus clases y
+                asignaciones.
               </p>
-              <p className="mt-1 text-sm text-zinc-500 mb-6">
-                Crea tu primera actividad para empezar a armar tus clases y asignaciones.
-              </p>
-              <Link
-                href="/actividades/nueva"
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              >
+              <Link href="/actividades/nueva" className="origami-button">
                 Crear mi primera actividad
               </Link>
             </div>
           ) : (
             <div>
-              <p className="text-base font-semibold text-zinc-800">
+              <h2 className="origami-card-title">
                 No encontramos actividades con estos filtros
-              </p>
-              <p className="mt-1 text-sm text-zinc-500 mb-4">
-                Prueba cambiando los criterios de búsqueda o revisa las archivadas.
+              </h2>
+              <p className="origami-meta mt-1 mb-4">
+                Prueba cambiando los criterios de búsqueda o revisa las
+                archivadas.
               </p>
               <button
                 type="button"
                 onClick={() => {
-                  setStatusFilter('active');
-                  setTypeFilter('all');
-                  setLevelFilter('all');
+                  setStatusFilter("active");
+                  setTypeFilter("all");
+                  setLevelFilter("all");
                 }}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="origami-button origami-button--secondary"
               >
                 Limpiar filtros
               </button>
@@ -330,79 +373,74 @@ export function ActividadesClient() {
             const statusConfig = statusLabels[act.status];
 
             return (
-              <div
+              <article
                 key={act.id}
-                className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm hover:border-zinc-300 transition-all flex flex-col justify-between"
+                aria-labelledby={`catalogue-activity-${act.id}`}
+                className="origami-card flex flex-col justify-between gap-3"
               >
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-zinc-100 text-zinc-700">
-                      Nivel {act.level}
-                    </span>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusConfig.color}`}
-                    >
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="origami-meta">Nivel {act.level}</span>
+                    <span className={`${statusConfig.color} text-sm font-bold`}>
                       {statusConfig.label}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-semibold text-zinc-900 line-clamp-2 mb-1">
+                  <h2
+                    id={`catalogue-activity-${act.id}`}
+                    className="origami-card-title mb-1"
+                  >
                     {act.title}
-                  </h3>
-                  <p className="text-xs text-zinc-500 mb-4">
-                    {typeLabels[act.type]} • Versión {act.version}
+                  </h2>
+                  <p className="origami-meta">
+                    {activityTypeLabels[act.type]} • Versión {act.version}
                   </p>
                 </div>
 
                 {/* Card Actions */}
-                <div className="border-t border-zinc-100 pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/actividades/${act.id}`}
-                      className="font-semibold text-blue-600 hover:text-blue-800 focus:outline-none focus:underline"
-                    >
-                      {act.status === ActivityStatus.archived ? 'Ver' : 'Editar'}
-                    </Link>
+                <div className="flex flex-wrap items-center gap-2 border-t border-(--origami-border-subtle) pt-3">
+                  <Link
+                    href={`/actividades/${act.id}`}
+                    className="origami-button origami-button--secondary"
+                  >
+                    {act.status === ActivityStatus.archived ? "Ver" : "Editar"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicate(act.id)}
+                    className="origami-button origami-button--text"
+                  >
+                    Duplicar
+                  </button>
+                  {act.status === ActivityStatus.archived ? (
                     <button
                       type="button"
-                      onClick={() => handleDuplicate(act.id)}
-                      className="text-zinc-600 hover:text-zinc-900 focus:outline-none focus:underline"
+                      onClick={() => handleRestore(act.id)}
+                      className="origami-button origami-button--text"
                     >
-                      Duplicar
+                      Restaurar al catálogo
                     </button>
-                  </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleArchive(act.id)}
+                      className="origami-button origami-button--text"
+                    >
+                      Archivar
+                    </button>
+                  )}
 
-                  <div className="flex items-center gap-2">
-                    {act.status === ActivityStatus.archived ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRestore(act.id)}
-                        className="font-medium text-emerald-600 hover:text-emerald-800 focus:outline-none focus:underline"
-                      >
-                        Restaurar al catálogo
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleArchive(act.id)}
-                        className="text-amber-700 hover:text-amber-900 focus:outline-none focus:underline"
-                      >
-                        Archivar
-                      </button>
-                    )}
-
-                    {act.status === ActivityStatus.draft && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(act.id)}
-                        className="text-rose-600 hover:text-rose-800 focus:outline-none focus:underline"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                  </div>
+                  {act.status === ActivityStatus.draft && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(act.id)}
+                      className="origami-button origami-button--text text-(--origami-error-text)"
+                    >
+                      Eliminar
+                    </button>
+                  )}
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>

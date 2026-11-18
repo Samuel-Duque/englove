@@ -12,6 +12,13 @@ import {
 import { syncUserSegment } from "./user-segment";
 import { checkAppMinVersion } from "./pwa-manager";
 import { getQueryClient } from "./query-client";
+import {
+  bindAppearanceSession,
+  resetAppearance,
+  resetAuthenticatedAppearance,
+  setAppearance,
+  type AppearancePreference,
+} from "./appearance";
 
 let inFlightPromise: Promise<SessionView | null> | null = null;
 let cachedSession: SessionView | null = null;
@@ -54,6 +61,15 @@ function formatEpochSnapshot(epoch: SessionEpoch | null): string {
 }
 
 function setBoundEpoch(next: SessionEpoch | null): void {
+  if (next?.state === "active") {
+    const previous = tabBoundEpoch ?? readPersistedSessionEpoch();
+    if (previous?.state === "active" && previous.uid !== next.uid) {
+      resetAuthenticatedAppearance();
+    }
+    bindAppearanceSession(next.gen);
+  } else {
+    resetAppearance();
+  }
   tabBoundEpoch = next;
   const formatted = formatEpochSnapshot(next);
   if (formatted !== currentEpochSnapshot) {
@@ -125,6 +141,15 @@ export function readPersistedSessionEpoch(): SessionEpoch | null {
   }
 }
 
+export function setSessionAppearance(preference: AppearancePreference): void {
+  if (isLogoutPending()) return;
+  // Una entrada directa a un portal puede tener una sesión coordinada sin
+  // haber vinculado todavía su generación en esta instancia.
+  const epoch = tabBoundEpoch ?? readPersistedSessionEpoch();
+  if (epoch?.state === "active") bindAppearanceSession(epoch.gen);
+  setAppearance(preference);
+}
+
 function broadcastEpochOverChannel(epoch: SessionEpoch): void {
   if (typeof BroadcastChannel !== "function") return;
   try {
@@ -173,7 +198,8 @@ export function syncBoundSessionEpoch(uid: string): {
   epoch: SessionEpoch;
   accountChanged: boolean;
 } {
-  const previousUid = tabBoundEpoch?.state === "active" ? tabBoundEpoch.uid : null;
+  const previousUid =
+    tabBoundEpoch?.state === "active" ? tabBoundEpoch.uid : null;
   const accountChanged = Boolean(previousUid && previousUid !== uid);
   const persisted = readPersistedSessionEpoch();
   if (persisted && persisted.state === "active" && persisted.uid === uid) {
@@ -337,6 +363,7 @@ export async function fetchSharedSession(
 export async function requestSharedRefresh(): Promise<boolean> {
   if (isLogoutPending()) return false;
   const generation = sessionGeneration;
+  const startSnapshot = currentEpochSnapshot;
   const startEpoch = readPersistedSessionEpoch();
   const performRefresh = async (): Promise<boolean> => {
     if (
@@ -365,6 +392,13 @@ export async function requestSharedRefresh(): Promise<boolean> {
       }
 
       if (res.status === 401) {
+        if (
+          generation === sessionGeneration &&
+          startSnapshot === currentEpochSnapshot &&
+          !hasEpochInvalidationSince(startEpoch)
+        ) {
+          resetAuthenticatedAppearance();
+        }
         cachedSession = null;
         return false;
       }
@@ -430,40 +464,43 @@ export async function requestSharedRefresh(): Promise<boolean> {
     typeof navigator.locks?.request === "function"
   ) {
     try {
-      return await navigator.locks.request("upward_english_auth_refresh", async () => {
-        if (
-          isLogoutPending() ||
-          generation !== sessionGeneration ||
-          hasEpochInvalidationSince(startEpoch)
-        ) {
-          return false;
-        }
-        // 1. Memoria local de esta pestaña
-        if (Date.now() - lastSuccessfulRefresh < 2000 && cachedSession) {
-          return true;
-        }
+      return await navigator.locks.request(
+        "upward_english_auth_refresh",
+        async () => {
+          if (
+            isLogoutPending() ||
+            generation !== sessionGeneration ||
+            hasEpochInvalidationSince(startEpoch)
+          ) {
+            return false;
+          }
+          // 1. Memoria local de esta pestaña
+          if (Date.now() - lastSuccessfulRefresh < 2000 && cachedSession) {
+            return true;
+          }
 
-        // 2. Coordinación inter-pestañas: si otra pestaña ya refrescó recientemente (dentro de 3 s),
-        // comprobamos pasivamente con fetchSharedSession(true) sobre la nueva cookie sin volver a rotar
-        try {
-          if (typeof window !== "undefined" && "localStorage" in window) {
-            const lastTabRefresh = Number(
-              window.localStorage.getItem(TAB_SYNC_KEY) || 0,
-            );
-            if (Date.now() - lastTabRefresh < 3000) {
-              const freshSession = await fetchSharedSession(true);
-              if (freshSession) {
-                lastSuccessfulRefresh = Date.now();
-                return true;
+          // 2. Coordinación inter-pestañas: si otra pestaña ya refrescó recientemente (dentro de 3 s),
+          // comprobamos pasivamente con fetchSharedSession(true) sobre la nueva cookie sin volver a rotar
+          try {
+            if (typeof window !== "undefined" && "localStorage" in window) {
+              const lastTabRefresh = Number(
+                window.localStorage.getItem(TAB_SYNC_KEY) || 0,
+              );
+              if (Date.now() - lastTabRefresh < 3000) {
+                const freshSession = await fetchSharedSession(true);
+                if (freshSession) {
+                  lastSuccessfulRefresh = Date.now();
+                  return true;
+                }
               }
             }
+          } catch {
+            // Ignorar si localStorage falla y continuar con refresco activo
           }
-        } catch {
-          // Ignorar si localStorage falla y continuar con refresco activo
-        }
 
-        return performRefresh();
-      });
+          return performRefresh();
+        },
+      );
     } catch {
       // Fallback a ejecución en memoria si navigator.locks falla
     }

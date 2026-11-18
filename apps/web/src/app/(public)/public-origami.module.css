@@ -1,0 +1,153 @@
+.layout {
+  display: flex;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  flex-direction: column;
+}
+
+.content {
+  display: grid;
+  flex: 1;
+  align-items: center;
+  padding-block: var(--origami-space-6) var(--origami-space-8);
+}
+
+.access,
+.field,
+.guardianGroup {
+  min-inline-size: 0;
+}
+
+.sheet,
+.form,
+.termsBody {
+  display: grid;
+  gap: var(--origami-space-5);
+}
+
+.intro,
+.field,
+.result {
+  display: grid;
+  gap: var(--origami-space-2);
+}
+
+.loading {
+  display: grid;
+  min-block-size: 9rem;
+  align-items: center;
+}
+
+.result > svg,
+.notice > svg {
+  inline-size: var(--origami-icon);
+  block-size: var(--origami-icon);
+  flex: none;
+  stroke-width: 2;
+}
+
+.related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--origami-space-2);
+}
+
+.textLink {
+  display: inline-flex;
+  inline-size: fit-content;
+  min-inline-size: var(--origami-target);
+  min-block-size: var(--origami-target);
+  align-items: center;
+  gap: var(--origami-space-2);
+  color: var(--origami-text-primary);
+  font: var(--origami-action);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.textLink > svg {
+  inline-size: var(--origami-icon);
+  block-size: var(--origami-icon);
+  flex: none;
+}
+
+.guardianGroup {
+  display: grid;
+  gap: var(--origami-space-5);
+  padding-block-start: var(--origami-space-4);
+  border-block-start: 1px solid var(--origami-border-subtle);
+}
+
+.guardianGroup > legend {
+  max-inline-size: 100%;
+  padding-inline-end: var(--origami-space-2);
+}
+
+.termsControl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--origami-space-2);
+  align-items: start;
+}
+
+.checkboxTarget {
+  display: grid;
+  min-inline-size: var(--origami-target);
+  min-block-size: var(--origami-target);
+  place-items: center;
+  border: 2px solid var(--origami-border-control);
+  border-radius: var(--origami-control-radius);
+  cursor: pointer;
+}
+
+.checkboxTarget:has(:focus-visible) {
+  outline: 3px solid var(--origami-focus);
+  outline-offset: 3px;
+}
+
+.checkboxTarget > input {
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  accent-color: var(--origami-primary);
+  cursor: pointer;
+}
+
+.termsLabel {
+  padding-block: var(--origami-space-2);
+}
+
+.termsLabel > label {
+  cursor: pointer;
+}
+
+.inlineLink {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.devCredentials,
+.legalFooter {
+  display: grid;
+  gap: var(--origami-space-2);
+  padding-block-start: var(--origami-space-4);
+  border-block-start: 1px solid var(--origami-border-subtle);
+}
+
+.devButton {
+  display: grid;
+  justify-items: start;
+  text-align: start;
+}
+
+.legalIntro {
+  padding-block-end: var(--origami-space-4);
+  border-block-end: 1px solid var(--origami-border-subtle);
+}
+
+.notice {
+  display: flex;
+  gap: var(--origami-space-3);
+  align-items: flex-start;
+}

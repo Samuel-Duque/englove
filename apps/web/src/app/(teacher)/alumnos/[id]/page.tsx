@@ -15,7 +15,13 @@ export default async function StudentDetailPage({
   const unwrappedParams = await params;
 
   return (
-    <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando ficha del alumno…</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-[var(--origami-text-secondary)] text-sm">
+          Cargando ficha del alumno…
+        </div>
+      }
+    >
       <AlumnoDetailClient id={unwrappedParams.id} />
     </Suspense>
   );

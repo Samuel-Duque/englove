@@ -117,12 +117,14 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     await page.fill('input[name="password"], input#password-input, input#password', 'short');
     await page.check('input[type="checkbox"]');
     await page.click('button[type="submit"]');
-    await expect(page.locator('div[role="alert"]:has-text("Usa entre 8 y 16 caracteres, sin espacios")')).toBeVisible();
+    const formAlert = page.getByRole('main').getByRole('alert');
+    await expect(formAlert).toHaveText('Usa entre 8 y 16 caracteres, sin espacios');
+    await expect(page.getByLabel('Contraseña', { exact: true })).toHaveAttribute('aria-invalid', 'true');
 
     // Contraseña con espacios rechazada
     await page.fill('input[name="password"], input#password-input, input#password', 'pass with space');
     await page.click('button[type="submit"]');
-    await expect(page.locator('div[role="alert"]:has-text("Usa entre 8 y 16 caracteres, sin espacios")')).toBeVisible();
+    await expect(formAlert).toHaveText('Usa entre 8 y 16 caracteres, sin espacios');
 
     // 2.2 Envío exitoso sin enumeración de correos
     await page.route('**/api/v1/auth/signup', async (route) => {
@@ -140,9 +142,14 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     await page.click('button[type="submit"]');
 
     // Mensaje uniforme de confirmación
-    await expect(page.locator('h1:has-text("Solicitud")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Solicitud de registro enviada' })).toBeFocused();
     await expect(page.locator('text=Recibimos tu solicitud. Revisa tu correo.')).toBeVisible();
-    await expect(page.locator('a:has-text("inicio de sesión"), a:has-text("iniciar sesión")')).toBeVisible();
+    const loginLink = page.getByRole('main').getByRole('link', {
+      name: 'Ir al inicio de sesión',
+      exact: true,
+    });
+    await expect(loginLink).toBeVisible();
+    await expect(loginLink).toHaveAttribute('href', '/login');
   });
 
   test('3. /recuperar-contrasena: Flujo de recuperación sin enumeración de correos', async ({ page }) => {
@@ -188,7 +195,10 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     await page.click('button[type="submit"]');
 
     await expect(page.locator('text=El enlace no es válido o ya venció. Solicita uno nuevo')).toBeVisible();
-    await expect(page.locator('a:has-text("Solicitar un nuevo enlace")')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Solicitar un nuevo enlace' })).toHaveAttribute(
+      'href',
+      '/recuperar-contrasena',
+    );
 
     // 4.2 Restablecimiento exitoso con token válido
     await page.route('**/api/v1/auth/reset-password', async (route) => {
@@ -207,7 +217,12 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
 
     await expect(page.locator('h1:has-text("Contraseña actualizada")')).toBeVisible();
     await expect(page.locator('text=Contraseña actualizada. Inicia sesión.')).toBeVisible();
-    await expect(page.locator('a:has-text("Iniciar sesión")')).toBeVisible();
+    const loginLink = page.getByRole('main').getByRole('link', {
+      name: 'Iniciar sesión',
+      exact: true,
+    });
+    await expect(loginLink).toBeVisible();
+    await expect(loginLink).toHaveAttribute('href', '/login');
   });
 
   test('5. /recuperar: Redirección transparente a /recuperar-contrasena', async ({ page }) => {

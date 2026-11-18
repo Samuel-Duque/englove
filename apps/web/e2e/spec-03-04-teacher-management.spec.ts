@@ -81,22 +81,30 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.goto('/inicio');
 
     // Header & Welcome
-    await expect(page.locator('h1:has-text("Panel Docente — Inicio")')).toBeVisible();
-    await expect(page.locator('text=Bienvenida/o, Profesora Clara Gómez')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Panel Docente — Inicio' })).toBeVisible();
+    await expect(page.getByRole('banner').getByText('Profesora Clara Gómez')).toBeVisible();
 
     // Reminder cards
-    await expect(page.locator('h2:has-text("Solicitudes de Registro")')).toBeVisible();
-    await expect(page.locator('text=Hay 3 alumnos esperando aprobación de cuenta.')).toBeVisible();
+    const reminders = page.getByRole('region', { name: 'Avisos prioritarios' });
+    await expect(reminders.getByRole('heading', { name: 'Solicitudes de Registro' })).toBeVisible();
+    await expect(reminders.getByText('Hay 3 alumnos esperando aprobación de cuenta.')).toBeVisible();
 
-    await expect(page.locator('h2:has-text("Entregas sin Calificar")')).toBeVisible();
-    await expect(page.locator('text=Hay 2 entregas pendientes de calificar hace más de 3 días.')).toBeVisible();
+    await expect(reminders.getByRole('heading', { name: 'Entregas sin Calificar' })).toBeVisible();
+    await expect(reminders.getByText('Hay 2 entregas pendientes de calificar hace más de 3 días.')).toBeVisible();
 
     // Quick links
-    await expect(page.locator('a[href="/asignaciones"] h3:has-text("Asignaciones")')).toBeVisible();
-    await expect(page.locator('a[href="/actividades"] h3:has-text("Catálogo de Actividades")')).toBeVisible();
-    await expect(page.locator('a[href="/grupos"] h3:has-text("Gestión de Grupos")')).toBeVisible();
-    await expect(page.locator('a[href="/alumnos"] h3:has-text("Gestión de Alumnos")')).toBeVisible();
-    await expect(page.locator('a[href="/revision"] h3:has-text("Revisión y Calificación")')).toBeVisible();
+    const management = page.getByRole('region', { name: 'Gestión del aula' });
+    for (const [name, href] of [
+      ['Asignaciones', '/asignaciones'],
+      ['Catálogo de Actividades', '/actividades'],
+      ['Gestión de Grupos', '/grupos'],
+      ['Gestión de Alumnos', '/alumnos'],
+      ['Revisión y Calificación', '/revision'],
+    ] as const) {
+      const link = management.getByRole('link', { name, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', href);
+    }
   });
 
   test('2. /contenidos y /contenidos/onboarding: Redirecciones declarativas hacia catálogo y creador', async ({
@@ -215,7 +223,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(
       dialog.locator('text=Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas.'),
     ).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.getByRole('button', { name: 'Cerrar modal' }).click();
     await expect(dialog).not.toBeVisible();
 
     // 4.2 Cambiar a open_question y previsualizar
@@ -223,14 +231,14 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(page.locator('textarea#oq-prompt-0, textarea#oq-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.getByRole('button', { name: 'Cerrar modal' }).click();
 
     // 4.3 Cambiar a speaking y previsualizar
     await page.selectOption('select#activity-type', 'speaking');
     await expect(page.locator('textarea#sp-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.getByRole('button', { name: 'Cerrar modal' }).click();
 
     // 4.4 Cambiar a game con mecánica match y previsualizar
     await page.selectOption('select#activity-type', 'game');
@@ -238,7 +246,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.selectOption('select#game-mechanic', 'match');
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.getByRole('button', { name: 'Cerrar modal' }).click();
 
     // 4.5 Cambiar a exam y verificar normalización de pesos a 100%
     await page.selectOption('select#activity-type', 'exam');

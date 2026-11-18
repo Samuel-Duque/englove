@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -8,14 +8,17 @@ import {
   MatchSettingsSchema,
   MatchSolutionSchema,
   deterministicShuffle,
-} from '@upward-english/shared';
-import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { soundManager } from '../../../lib/sound';
+} from "@upward-english/shared";
+import {
+  draggable,
+  dropTargetForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { soundManager } from "../../../lib/sound";
 
 export function MatchGame({
   config,
   initialState,
-  theme = 'kids',
+  theme = "kids",
   soundEnabled = true,
   previewMode = false,
   onEvent,
@@ -32,13 +35,20 @@ export function MatchGame({
   // Deterministic shuffle of right column (RF-2, §4 Rule 5)
   // Seed with left items' IDs + solution signature
   const seed = useMemo(() => {
-    return leftItems.map((l) => l.id).join('-') + (solution ? Object.values(solution.pairs || {}).join('-') : 'seed');
+    return (
+      leftItems.map((l) => l.id).join("-") +
+      (solution ? Object.values(solution.pairs || {}).join("-") : "seed")
+    );
   }, [leftItems, solution]);
 
   const shuffledRight = useMemo(() => {
     let shuffled = deterministicShuffle(rightOriginal, seed);
     // Guarantee non-parallel permutation to left items if possible (SPEC-06 RF-2)
-    if (solution?.pairs && shuffled.length >= 2 && leftItems.length === shuffled.length) {
+    if (
+      solution?.pairs &&
+      shuffled.length >= 2 &&
+      leftItems.length === shuffled.length
+    ) {
       const isParallel = leftItems.every(
         (left, idx) => solution.pairs[left.id] === shuffled[idx]?.id,
       );
@@ -57,7 +67,7 @@ export function MatchGame({
 
   // Selected left item for 2-step click/touch & keyboard
   const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null);
-  const [liveStatus, setLiveStatus] = useState<string>('');
+  const [liveStatus, setLiveStatus] = useState<string>("");
 
   // Inverted map for quick lookup: rightId -> leftId
   const rightToLeftMap = useMemo(() => {
@@ -83,45 +93,39 @@ export function MatchGame({
     setPairs(next);
     setSelectedLeftId(null);
 
-    const leftTxt = leftItems.find((l) => l.id === leftId)?.text ?? '';
-    const rightTxt = shuffledRight.find((r) => r.id === rightId)?.text ?? '';
+    const leftTxt = leftItems.find((l) => l.id === leftId)?.text ?? "";
+    const rightTxt = shuffledRight.find((r) => r.id === rightId)?.text ?? "";
     setLiveStatus(`Pareja unida: ${leftTxt} con ${rightTxt}`);
 
     // Sound & feedback
     if (solution?.pairs) {
       const isCorrect = solution.pairs[leftId] === rightId;
-      soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
+      soundManager.play(isCorrect ? "hit" : "miss", soundEnabled);
     }
 
-    onEvent?.({ itemId: 'pairs', answer: next });
+    onEvent?.({ itemId: "pairs", answer: next });
   };
 
   const handleUnlink = (leftId: string) => {
     const next = { ...pairs };
     delete next[leftId];
     setPairs(next);
-    const leftTxt = leftItems.find((l) => l.id === leftId)?.text ?? '';
+    const leftTxt = leftItems.find((l) => l.id === leftId)?.text ?? "";
     setLiveStatus(`Pareja desvinculada para ${leftTxt}`);
-    onEvent?.({ itemId: 'pairs', answer: next });
+    onEvent?.({ itemId: "pairs", answer: next });
   };
 
   const handleComplete = () => {
-    soundManager.play('complete', soundEnabled);
+    soundManager.play("complete", soundEnabled);
     onComplete?.({ pairs });
   };
 
-  const isKids = theme === 'kids';
+  const isKids = theme === "kids";
 
   return (
-    <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
-        isKids
-          ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
-      }`}
-    >
+    <div className="w-full min-w-0 space-y-4 [overflow-wrap:anywhere]">
       {previewMode && (
-        <div className="mb-4 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center">
+        <div className="origami-state text-center">
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
@@ -132,8 +136,8 @@ export function MatchGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
-          <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
+        <div className="origami-state">
+          <p className="text-sm sm:text-base font-semibold text-[var(--origami-text-primary)] leading-relaxed">
             {config.instructions}
           </p>
         </div>
@@ -144,7 +148,9 @@ export function MatchGame({
         <div className="space-y-3">
           <h4
             className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+              isKids
+                ? "text-[var(--origami-text-primary)]"
+                : "text-[var(--origami-text-secondary)]"
             }`}
           >
             Palabras ({leftItems.length})
@@ -184,7 +190,9 @@ export function MatchGame({
         <div className="space-y-3">
           <h4
             className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+              isKids
+                ? "text-[var(--origami-text-primary)]"
+                : "text-[var(--origami-text-secondary)]"
             }`}
           >
             Traducciones / Coincidencias ({shuffledRight.length})
@@ -202,7 +210,9 @@ export function MatchGame({
                   isPaired={Boolean(pairedLeftId)}
                   isKids={isKids}
                   isTargetActive={isTargetActive}
-                  onDropLink={(droppedLeftId) => handleLink(droppedLeftId, item.id)}
+                  onDropLink={(droppedLeftId) =>
+                    handleLink(droppedLeftId, item.id)
+                  }
                   onClickLink={() => {
                     if (selectedLeftId) {
                       handleLink(selectedLeftId, item.id);
@@ -216,19 +226,15 @@ export function MatchGame({
       </div>
 
       {/* Action Footer */}
-      <div className="mt-8 pt-4 border-t border-amber-200/60 flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500">
+      <div className="mt-8 pt-4 border-t border-[var(--origami-border-subtle)] flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium text-[var(--origami-text-secondary)]">
           {Object.keys(pairs).length} de {leftItems.length} parejas formadas
         </p>
 
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
-            isKids
-              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
-          }`}
+          className="origami-button"
         >
           Finalizar emparejamiento ✨
         </button>
@@ -272,46 +278,32 @@ function DraggableLeftItem({
   return (
     <div
       ref={elRef}
-      className={`min-h-12 p-2 sm:p-2.5 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation select-none ${
+      className={`min-h-[var(--origami-target)] p-2 sm:p-2.5 rounded-2xl border-2 flex flex-wrap items-center justify-between gap-2 transition-colors touch-manipulation select-none ${
         isSelected
-          ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-100/90 shadow-md'
+          ? "origami-selected"
           : isPaired
-            ? isKids
-              ? 'border-emerald-400 bg-emerald-50/70'
-              : 'border-emerald-600 bg-emerald-950/80'
+            ? "border-[var(--origami-success-text)] bg-[var(--origami-success-bg)]"
             : isKids
-              ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
-              : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
+              ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)]  hover:shadow-xs"
+              : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)]"
       }`}
     >
       <button
         type="button"
         onClick={onSelect}
         aria-pressed={isSelected}
-        className="flex-1 flex items-center justify-between text-left p-1.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="flex min-h-[var(--origami-target)] min-w-0 flex-1 flex-wrap items-center justify-between gap-2 p-1.5 text-left rounded-xl focus-visible:outline-[var(--origami-focus)]"
       >
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-bold ${
-            isSelected
-              ? 'text-zinc-900'
-              : isPaired
-                ? isKids
-                  ? 'text-emerald-950'
-                  : 'text-emerald-100'
-                : isKids
-                  ? 'text-zinc-900'
-                  : 'text-zinc-100'
-          }`}>
-            {text}
-          </span>
+          <span className="text-sm font-bold">{text}</span>
           {isPaired && pairedText && (
-            <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
+            <span className="text-xs font-semibold text-[var(--origami-success-text)] bg-[var(--origami-success-bg)] px-2 py-0.5 rounded-lg">
               🔗 {pairedText}
             </span>
           )}
         </div>
-        <span className={`text-xs font-bold mr-1 ${isSelected ? 'text-zinc-900' : 'text-zinc-400'}`} aria-hidden="true">
-          {isSelected ? '✓ Activo' : '👉'}
+        <span className="text-xs font-bold mr-1" aria-hidden="true">
+          {isSelected ? "✓ Activo" : "👉"}
         </span>
       </button>
 
@@ -319,7 +311,7 @@ function DraggableLeftItem({
         <button
           type="button"
           onClick={onUnlink}
-          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-bold text-rose-600 hover:text-rose-800 p-1 rounded-md ml-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-500"
+          className="origami-button origami-button--text !p-1"
           title="Desvincular"
           aria-label={`Desvincular ${text}`}
         >
@@ -362,7 +354,9 @@ function DropTargetRightItem({
       onDrop: ({ source }) => {
         setIsOver(false);
         const droppedLeftId =
-          typeof source.data?.leftId === 'string' ? source.data.leftId : undefined;
+          typeof source.data?.leftId === "string"
+            ? source.data.leftId
+            : undefined;
         if (droppedLeftId) {
           onDropLink(droppedLeftId);
         }
@@ -373,40 +367,41 @@ function DropTargetRightItem({
   return (
     <div
       ref={elRef}
-      className={`min-h-12 p-3 sm:p-4 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation cursor-pointer select-none ${
+      className={`min-h-[var(--origami-target)] p-3 sm:p-4 rounded-2xl border-2 flex flex-wrap items-center justify-between gap-2 transition-colors touch-manipulation cursor-pointer select-none ${
         isOver
-          ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg scale-102'
+          ? "border-[var(--origami-paper-blue)] ring-4 ring-[var(--origami-focus)] bg-[var(--origami-info-bg)] text-[var(--origami-info-text)]"
           : isTargetActive
-            ? 'border-dashed border-amber-400 bg-amber-50/60 animate-pulse'
+            ? "border-dashed border-[var(--origami-border-control)] bg-[var(--origami-surface-soft)]"
             : isPaired
-              ? isKids
-                ? 'border-emerald-300 bg-emerald-50/60'
-                : 'border-emerald-600 bg-emerald-950/80'
+              ? "border-[var(--origami-success-text)] bg-[var(--origami-success-bg)]"
               : isKids
-                ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
-                : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
+                ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)]  hover:shadow-xs"
+                : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)]"
       }`}
       role="button"
       tabIndex={0}
       onClick={onClickLink}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClickLink();
         }
       }}
     >
-      <span className={`text-sm font-bold ${
-        isPaired
-          ? isKids
-            ? 'text-emerald-950'
-            : 'text-emerald-100'
-          : isKids
-            ? 'text-zinc-900'
-            : 'text-zinc-100'
-      }`}>{text}</span>
-      <span className="text-xs text-zinc-400 font-bold" aria-hidden="true">
-        {isPaired ? '✅' : isTargetActive ? '👈 Tocar aquí' : '🎯'}
+      <span
+        className={`text-sm font-bold ${
+          isPaired
+            ? "text-[var(--origami-success-text)]"
+            : "text-[var(--origami-text-primary)]"
+        }`}
+      >
+        {text}
+      </span>
+      <span
+        className="text-xs text-[var(--origami-text-secondary)] font-bold"
+        aria-hidden="true"
+      >
+        {isPaired ? "✅" : isTargetActive ? "👈 Tocar aquí" : "🎯"}
       </span>
     </div>
   );

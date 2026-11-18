@@ -1,10 +1,21 @@
 "use client";
 
 import React, { useTransition, useState } from "react";
+import {
+  BookOpen,
+  ChartColumn,
+  Gamepad2,
+  House,
+  LogOut,
+  MessageSquare,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ConfirmDialog } from "./ui/modal";
 import { usePathname } from "next/navigation";
+import { AppearanceSelector } from "./appearance-selector";
+import { OrigamiBrand } from "./ui/origami-brand";
 import { logoutSharedDevice } from "../lib/auth-hygiene";
 import { fetchSharedFeatureFlags } from "../lib/feature-flags-client";
 import {
@@ -48,21 +59,12 @@ export function StudentNav({
     Boolean(featureFlagsQuery.data?.flags?.extra_content);
 
   const navItems = [
-    { label: "Inicio", href: "/inicio", icon: "🏠", ariaLabel: undefined },
-    ...(gamesOn
-      ? [{ label: "Juegos", href: "/juegos", icon: "🎮", ariaLabel: undefined }]
-      : []),
-    { label: "Progreso", href: "/progreso", icon: "⭐", ariaLabel: undefined },
-    { label: "Feedback", href: "/feedback", icon: "💬", ariaLabel: undefined },
+    { label: "Inicio", href: "/inicio", Icon: House },
+    ...(gamesOn ? [{ label: "Juegos", href: "/juegos", Icon: Gamepad2 }] : []),
+    { label: "Progreso", href: "/progreso", Icon: ChartColumn },
+    { label: "Feedback", href: "/feedback", Icon: MessageSquare },
     ...(extraContentOn
-      ? [
-          {
-            label: "Extra",
-            href: "/extra",
-            icon: "🔗",
-            ariaLabel: "Contenido extra",
-          },
-        ]
+      ? [{ label: "Extra", href: "/extra", Icon: BookOpen }]
       : []),
   ];
 
@@ -101,120 +103,75 @@ export function StudentNav({
   const isKids = ageSegment === "kids";
 
   return (
-    <header
-      className={`sticky top-0 z-40 w-full border-b backdrop-blur-sm ${
-        isKids
-          ? "border-amber-200 bg-amber-50/95 text-amber-950"
-          : "border-zinc-800 bg-zinc-900/95 text-zinc-100"
-      }`}
-    >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-6">
-          <Link
-            href="/inicio"
-            className="flex items-center gap-2 min-h-[48px] min-w-[48px] text-xl font-bold tracking-tight focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-md"
-          >
-            <span
-              className={`flex h-9 w-9 items-center justify-center rounded-xl font-black text-base shadow-sm ${
-                isKids ? "bg-amber-500 text-white" : "bg-indigo-600 text-white"
-              }`}
-            >
-              🌟
-            </span>
-            <span
-              className={
-                isKids
-                  ? "text-amber-950 font-black"
-                  : "text-zinc-100 font-black"
-              }
-            >
-              Upward English
-            </span>
+    <>
+      <header className="origami-role-header origami-shell">
+        <div className="origami-container origami-container--student origami-role-header__inner">
+          <Link className="origami-brand-link" href="/inicio">
+            <OrigamiBrand />
           </Link>
-
-          <nav
-            className="flex items-center gap-1 sm:gap-2"
-            aria-label="Navegación del estudiante"
-          >
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-label={item.ariaLabel}
-                  className={`flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 ${
-                    isActive
-                      ? isKids
-                        ? "bg-amber-200/80 text-amber-950 shadow-xs"
-                        : "bg-zinc-800 text-white shadow-xs"
-                      : isKids
-                        ? "text-amber-950 font-medium hover:bg-amber-100"
-                        : "text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100"
-                  }`}
-                >
-                  <span className="text-base" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-3">
           {level && (
-            <span
-              className={`hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                isKids
-                  ? "bg-amber-200 text-amber-900"
-                  : "bg-indigo-950 text-indigo-300 border border-indigo-800"
-              }`}
-            >
+            <span className="hidden text-sm font-bold lg:block">
               Nivel {level}
             </span>
           )}
-
-          <Link
-            href="/perfil"
-            className={`flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all focus:outline-none focus:ring-2 ${
-              pathname === "/perfil"
-                ? isKids
-                  ? "bg-amber-200 text-amber-950 ring-2 ring-amber-400"
-                  : "bg-zinc-800 text-white ring-2 ring-indigo-500"
-                : isKids
-                  ? "bg-amber-100/80 hover:bg-amber-200 text-amber-900"
-                  : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200"
-            }`}
-            aria-label={studentName ? `Perfil: ${studentName}` : "Perfil"}
-          >
-            <span className="text-sm" aria-hidden="true">
-              👤
-            </span>
-            <span className="hidden sm:inline-block max-w-[120px] truncate">
-              {studentName || "Perfil"}
-            </span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={handleLogoutClick}
-            disabled={isLoggingOut || isAttemptingFlush}
-            className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-xl px-4 py-2 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 cursor-pointer ${
-              isKids
-                ? "bg-amber-200/60 hover:bg-amber-200 text-amber-950"
-                : "bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
-            }`}
-          >
-            {isLoggingOut
-              ? "Saliendo…"
-              : isAttemptingFlush
-                ? "Guardando…"
-                : "Cerrar sesión"}
-          </button>
+          <div className="origami-header-actions">
+            <AppearanceSelector authenticated />
+            <Link
+              href="/perfil"
+              aria-label={studentName ? `Perfil: ${studentName}` : "Perfil"}
+              aria-current={pathname === "/perfil" ? "page" : undefined}
+              className={`origami-button origami-button--secondary origami-icon-action${pathname === "/perfil" ? " origami-selected" : ""}`}
+            >
+              <UserRound aria-hidden="true" />
+              <span className="origami-wide-action">Perfil</span>
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogoutClick}
+              disabled={isLoggingOut || isAttemptingFlush}
+              aria-label={
+                isLoggingOut
+                  ? "Saliendo…"
+                  : isAttemptingFlush
+                    ? "Guardando…"
+                    : "Cerrar sesión"
+              }
+              className="origami-button origami-button--secondary origami-icon-action"
+            >
+              <LogOut aria-hidden="true" />
+              <span className="origami-wide-action">
+                {isLoggingOut
+                  ? "Saliendo…"
+                  : isAttemptingFlush
+                    ? "Guardando…"
+                    : "Cerrar sesión"}
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
+      <nav
+        className="origami-student-nav origami-shell"
+        aria-label="Navegación del estudiante"
+      >
+        <div className="origami-container origami-container--student origami-student-nav__items">
+          {navItems.map(({ Icon, label, href }) => {
+            const current = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={href === "/extra" ? "Contenido extra" : undefined}
+                aria-current={current ? "page" : undefined}
+                className={`origami-area-link${current ? " origami-selected" : ""}`}
+              >
+                <Icon aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       <ConfirmDialog
         isOpen={showExitConfirm}
@@ -235,6 +192,6 @@ export function StudentNav({
         }}
         onCancel={() => setShowExitConfirm(false)}
       />
-    </header>
+    </>
   );
 }

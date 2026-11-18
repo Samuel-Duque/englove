@@ -1,28 +1,32 @@
-import type { Metadata, Viewport } from 'next';
-import './globals.css';
-import { Providers } from './providers';
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: {
-    default: 'Upward English — Aprende inglés jugando',
-    template: '%s | Upward English',
+    default: "Upward English — Aprende inglés jugando",
+    template: "%s | Upward English",
   },
-  description: 'Plataforma web gamificada para enseñar inglés a niños y adolescentes.',
-  manifest: '/manifest.webmanifest',
+  description:
+    "Plataforma web gamificada para enseñar inglés a niños y adolescentes.",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: '/favicon.ico',
+    icon: "/favicon.ico",
     apple: [
       {
-        url: '/icons/apple-touch-icon.png',
-        sizes: '180x180',
-        type: 'image/png',
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
       },
     ],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#4f46e5',
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fff1d6" },
+    { media: "(prefers-color-scheme: dark)", color: "#241b16" },
+  ],
 };
 
 export default function RootLayout({
@@ -31,17 +35,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className="antialiased min-h-screen bg-white text-zinc-900">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Sin async/defer: aplica la elección de la pestaña antes de pintar. */}
+        <script src="/origami-appearance.js" />
+      </head>
+      <body className="origami-shell antialiased min-h-screen">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-white text-sm font-semibold"
+          className="origami-skip-link sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50"
         >
           Saltar al contenido principal
         </a>
-        <Providers>
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

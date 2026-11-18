@@ -129,14 +129,16 @@ Reglas de dependencia:
 
 ```
 apps/web/src/app/
+├── page.tsx                    # portada pública
+├── inicio/                     # punto compartido; presenta el inicio correspondiente al rol
 ├── (public)/
 │   ├── login/                  # profesora y alumno: correo + contraseña (la API resuelve el rol)
 │   ├── registro/               # auto-registro del alumno: crea cuenta en pending_approval
 │   ├── recuperar-contrasena/   # solicitar enlace de recuperación
-│   └── restablecer/[token]/    # nueva contraseña con enlace de un solo uso
+│   ├── restablecer/[token]/    # nueva contraseña con enlace de un solo uso
+│   └── terminos/               # texto legal público
 ├── (teacher)/
 │   ├── layout.tsx              # tema neutro, navegación lateral
-│   ├── inicio/                 # dashboard: tarjetas de recordatorio (solicitudes pendientes, sin calificar > N días)
 │   ├── actividades/            # gestor de contenidos
 │   ├── asignaciones/
 │   ├── revision/               # calificación y feedback: cola manual + intentos autocalificados + habilitar nuevo intento + descarga de audio
@@ -146,7 +148,6 @@ apps/web/src/app/
 │   └── contenido-extra/
 └── (student)/
     ├── layout.tsx              # fija data-theme según age_segment
-    ├── inicio/                 # asignaciones abiertas
     ├── actividad/[attemptId]/  # renderizador
     ├── juegos/                 # lista → juego
     ├── progreso/               # resumen → insignias / rachas
@@ -179,11 +180,17 @@ Principios que mantienen la simpleza dentro del rango: la barra de navegación d
 
 ### 3.3 Sistema de diseño y temas — Decidido (CONTEXT §8 y decisión 20)
 
+**Base vigente hasta la adopción de Origami.**
+
 - Un solo conjunto de tokens con dos valores: `[data-theme="kids"]` y `[data-theme="teens"]` como CSS variables (`--color-*`, `--font-*`, `--space-*`, `--radius-*`, `--motion-*`, `--sound-*`). Tailwind los consume vía `theme.extend`.
 - Los componentes del alumno se construyen una sola vez y leen el conjunto activo. Solo hay variantes estructurales donde la diferencia lo exige: layout de la zona de juegos y densidad de la home.
 - El panel de la profesora usa shadcn/ui con un tema neutro y no participa del sistema Kids/Teens.
 - Framer Motion sin restricción (Decidido). Las variantes de animación viven en `motion/kids.ts` y `motion/teens.ts` y se cargan con `next/dynamic` según el tema activo: cada audiencia descarga solo su bundle.
 - Web Audio API nativa para efectos de sonido (activados por defecto en Kids, configurables en Teens; decisión 107) y canvas-confetti en celebraciones.
+
+**Diseño objetivo en la rama `UI` (decisión 147; requiere SPEC-12 Aprobada).** Aplicar tokens semánticos claros y oscuros en la raíz mediante `data-appearance`. Composición, densidad y refuerzo del alumno siguen leyendo `data-theme`. El panel y las vistas públicas comparten color, fuente y controles, no la tematización del alumno. El [plan Origami §§2–6](./plan-implementacion-ui-origami.md#2-sistema-visual-normativo) detalla tokens, componentes, rutas y movimiento.
+
+La apariencia se resuelve antes del primer pintado mediante el sistema o la elección temporal de la pestaña; debe tener respaldo CSS si no se puede leer almacenamiento. Reutilizar las señales existentes de transición de sesión para limpiar la elección sin cambiar credenciales, guards, renovación ni CSP. El layout compartido, el acceso y las vistas de recuperación no dependen de datos autenticados para pintar el tema. Para el movimiento propio de Origami se usa CSS y las utilidades existentes, sin eliminar contratos didácticos ya aprobados.
 
 ### 3.4 Renderizador de actividades
 
@@ -1223,6 +1230,10 @@ Detalles de implementación que este documento añade al formalizar Next.js 16 y
 | A95 | Se descartan, sin migrar, los `Attempt` de microjuegos ligados a un `Assignment` y las `Assignment` de microjuegos (datos de prueba): migración explícita y transaccional en ENG-150 antes de `assignment_id` nullable y de la unicidad por `activity_id` (decisión 136). **Decidido** | §6.4, §6.5 |
 | A96 | Ranking de juegos (privado de la profesora, por puntos de juego derivados de las estrellas) y sección «Práctica en juegos» (cuándo y cuánto tiempo, con tiempo recortado a `expected_duration_seconds × 3`); los microjuegos salen del promedio de notas, de las series de notas y del leaderboard de notas (precisa la decisión 113); sin tablas ni flags nuevos salvo que SPEC-11 lo justifique (decisión 137, ENG-162). **Decidido** | §9.4 |
 | A88 | Prueba de regresión por hallazgo, ejecución en entorno real y compuerta de cierre con guardrails ampliado para aserciones `as Type` (decisión 129). **Decidido** | §12 |
+
+### 14.9 Secuencia de validación de Origami en `UI` — Decidido, 2026-11-18
+
+El líder autorizó extender Origami al resto de las rutas antes de los recorridos en tablet. Las pruebas físicas de las referencias se ejecutarán con las de las demás rutas, sobre el candidato completo. No se eliminan pruebas ni se acredita aceptación, adopción, fusión o despliegue. Esta decisión concreta la ejecución de la decisión 147 de CONTEXT.
 
 ---
 

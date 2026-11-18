@@ -1,10 +1,10 @@
-import React, { Suspense } from 'react';
-import type { Metadata } from 'next';
-import { AsignacionDetailClient } from './asignacion-detail-client';
+import React, { Suspense } from "react";
+import type { Metadata } from "next";
+import { AsignacionDetailClient } from "./asignacion-detail-client";
 
 export const metadata: Metadata = {
-  title: 'Detalle de Asignación',
-  description: 'Detalle y seguimiento de la asignación.',
+  title: "Detalle de Asignación",
+  description: "Detalle y seguimiento de la asignación.",
 };
 
 export default async function AssignmentDetailPage({
@@ -16,7 +16,7 @@ export default async function AssignmentDetailPage({
   return (
     <Suspense
       fallback={
-        <div className="py-16 text-center text-zinc-500 text-sm">
+        <div className="origami-state" role="status">
           Cargando detalle de la asignación…
         </div>
       }

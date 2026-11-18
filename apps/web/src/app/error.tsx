@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { ErrorState } from '../components/error-state';
+import React from "react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
+import { SystemSheet } from "./origami-system-sheet";
 
 export default function ErrorBoundary({
   reset,
@@ -10,11 +11,17 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center p-6">
-      <ErrorState
-        variant="kids"
-        onRetry={() => reset()}
-      />
-    </div>
+    <SystemSheet
+      title="¡Ups!"
+      description="Algo no salió bien. Intenta otra vez"
+      icon={<TriangleAlert />}
+      variant="error"
+      segment
+    >
+      <button type="button" onClick={reset} className="origami-button">
+        <RotateCcw aria-hidden="true" />
+        Reintentar
+      </button>
+    </SystemSheet>
   );
 }

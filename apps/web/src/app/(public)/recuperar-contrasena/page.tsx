@@ -1,21 +1,17 @@
-import React, { Suspense } from 'react';
-import type { Metadata } from 'next';
-import { RecuperarContrasenaClient } from './recuperar-contrasena-client';
+import React, { Suspense } from "react";
+import type { Metadata } from "next";
+import { RecuperarContrasenaClient } from "./recuperar-contrasena-client";
+import { AccessLoading } from "../access-sheet";
 
 export const metadata: Metadata = {
-  title: 'Recuperar Contraseña',
-  description: 'Solicita un enlace para restablecer la contraseña de tu cuenta en Upward English.',
+  title: "Recuperar Contraseña",
+  description:
+    "Solicita un enlace para restablecer la contraseña de tu cuenta en Upward English.",
 };
 
 export default function RecuperarContrasenaPage() {
   return (
-    <Suspense
-      fallback={
-        <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center outline-none">
-          <p className="text-zinc-600 text-lg">Cargando…</p>
-        </main>
-      }
-    >
+    <Suspense fallback={<AccessLoading>Cargando…</AccessLoading>}>
       <RecuperarContrasenaClient />
     </Suspense>
   );

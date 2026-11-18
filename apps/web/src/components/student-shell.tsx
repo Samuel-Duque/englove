@@ -1,11 +1,13 @@
-'use client';
+"use client";
 
-import React, { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { StudentNav } from './student-nav';
-import { OfflineStatusBanner } from './offline-status-banner';
-import { fetchSharedProfile } from '../lib/auth-session';
-import { purgeOtherUsersEntries } from '../lib/offline-queue';
+import React, { type ComponentProps, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
+import { StudentNav } from "./student-nav";
+import { OfflineStatusBanner } from "./offline-status-banner";
+import { ContextFooter } from "./origami-footer";
+import { fetchSharedProfile } from "../lib/auth-session";
+import { purgeOtherUsersEntries } from "../lib/offline-queue";
 
 interface StudentShellProps {
   children: React.ReactNode;
@@ -13,7 +15,7 @@ interface StudentShellProps {
 
 export function StudentShell({ children }: StudentShellProps) {
   const { data: profile = null } = useQuery({
-    queryKey: ['student', 'profile', 'shell'],
+    queryKey: ["student", "profile", "shell"],
     queryFn: () => fetchSharedProfile(),
     retry: false,
   });
@@ -24,27 +26,38 @@ export function StudentShell({ children }: StudentShellProps) {
     }
   }, [profile?.user?.id]);
 
-  const ageSegment = profile?.student?.ageSegment ?? 'kids';
-  const isKids = ageSegment === 'kids';
+  return (
+    <StudentFrame
+      studentName={profile?.user.name}
+      ageSegment={profile?.student?.ageSegment}
+      level={profile?.student?.level}
+    >
+      {children}
+    </StudentFrame>
+  );
+}
 
+export function StudentFrame({
+  children,
+  ageSegment = "kids",
+  ...nav
+}: StudentShellProps & ComponentProps<typeof StudentNav>) {
+  const isActivity = usePathname().startsWith("/actividad/");
   return (
     <div
       data-theme={ageSegment}
-      className={`min-h-screen flex flex-col transition-colors duration-200 ${
-        isKids
-          ? 'bg-amber-50/40 text-amber-950 font-sans'
-          : 'bg-zinc-950 text-zinc-100 font-sans'
-      }`}
+      className="origami-shell origami-student-frame min-h-screen flex flex-col"
     >
-      <StudentNav
-        studentName={profile?.user.name}
-        ageSegment={ageSegment}
-        level={profile?.student?.level}
-      />
+      <StudentNav ageSegment={ageSegment} {...nav} />
       <OfflineStatusBanner />
-      <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 outline-none">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="origami-container origami-container--student min-w-0 flex-1 space-y-8 py-6 outline-none"
+      >
         {children}
       </main>
+      {!isActivity && <ContextFooter />}
     </div>
   );
 }

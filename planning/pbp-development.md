@@ -25,7 +25,7 @@
 1. Principios de ejecución
 2. Mapa de etapas e hitos
 3. Definición de Hecho
-4. Etapas del piloto (0 a 12)
+4. Etapas del piloto (0 a 12) e iniciativa de UI en rama aislada (13)
 5. Observaciones al orden decidido
 6. Después del piloto: Fase 2 y Fase 3
 7. Riesgos transversales
@@ -652,6 +652,18 @@ Cerrado antes de esta versión: hosting, UX de acceso del alumno, retención de 
 **Tamaño.** L, 3–4 semanas (Propuesto).
 
 **Tareas.** SPEC-11, ENG-143, ENG-150 a ENG-162, DOC-09.
+
+---
+
+### Etapa 13 — UI Origami (rama `UI`; CONTEXT §12, decisión 147)
+
+**Objetivo.** Implementar y verificar la propuesta visual completa antes de decidir si sustituye al diseño vigente. Esta etapa no sustituye ni cierra ninguna compuerta del Hito H4.
+
+**Dependencias y ejecución.** SPEC-12 Aprobada. En `UI`, establecer la base visual y probar localmente portada, Juegos Kids/Teens y Revisión como referencias; después extender a todas las rutas y sus estados. Las pruebas físicas se ejecutan en conjunto sobre el candidato completo, conforme a architecture §14.9. La matriz del [plan Origami](./plan-implementacion-ui-origami.md#5-aplicación-a-todas-las-páginas-existentes) es el inventario de entrega.
+
+**Cierre.** Resultados de regresión y accesibilidad, pruebas visuales por audiencia y apariencia, tablet y móvil reales, y observación con tres niños por segmento. Registrar pendientes al final del plan. Una vez obtenida evidencia completa en `UI`, el líder decide la adopción; implementar o verificar no autoriza fusionar ni desplegar.
+
+**Tareas.** SPEC-12 y ENG-163 a ENG-166.
 
 ---
 

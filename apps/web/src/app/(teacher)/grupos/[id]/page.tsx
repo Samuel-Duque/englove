@@ -15,7 +15,13 @@ export default async function GroupDetailPage({
   const unwrappedParams = await params;
 
   return (
-    <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando grupo…</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-[var(--origami-text-secondary)] text-sm">
+          Cargando grupo…
+        </div>
+      }
+    >
       <GrupoDetailClient id={unwrappedParams.id} />
     </Suspense>
   );

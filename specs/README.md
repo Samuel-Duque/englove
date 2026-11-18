@@ -23,10 +23,11 @@
 | [SPEC-09](./SPEC-09-pwa-offline-a11y.md) | PWA, offline y accesibilidad | Verificada | 9 — PWA, offline y accesibilidad | ENG-110 a ENG-113 |
 | [SPEC-10](./SPEC-10-contenido-extra.md) | Contenido extra | Verificada | 10 — Contenido extra | ENG-120, ENG-121 |
 | [SPEC-11](./SPEC-11-calidad-y-correcciones.md) | Calidad, correcciones y verificación | Verificada | 12 — Calidad y remediación | ENG-143, ENG-150 a ENG-162, DOC-09 |
+| [SPEC-12](./SPEC-12-ui-origami.md) | UI Origami | Aprobada | 13 — UI Origami (rama `UI`) | ENG-163 a ENG-166 |
 
 ## Especificaciones planificadas (sin redactar)
 
-*Ninguna especificación pendiente de redacción ni de implementación para el piloto (`SPEC-01` a `SPEC-11` en `Verificada`).*
+No hay especificaciones del piloto pendientes de redacción. SPEC-08 conserva su re-verificación pendiente; el estado de cada spec se indica en la tabla. SPEC-12 habilita la implementación en `UI`; no aprueba la adopción de Origami ni modifica las compuertas de lanzamiento del piloto.
 
 [SPEC-11](./SPEC-11-calidad-y-correcciones.md) es una spec de remediación (CONTEXT §14, decisiones 127 a 137) **Verificada** el 2026-11-08: corrige los hallazgos de `AUDITORIA.md` y de `testing-issues/` y no añade funcionalidades, salvo la excepción única de la decisión 137 (ranking de juegos y panel «Práctica en juegos»). Incorpora las decisiones 130 a 137 (microjuegos abiertos a todos sin `Assignment`, pérdida avisada del nuevo intento al cambiar de grupo, estrellas de práctica, WCAG 2.2 AA, MinIO y Mailpit locales, Serwist real, descarte de intentos de juego de prueba y ranking de juegos), define en su §4.5 los RF de `SPEC-08` que cambian por la decisión 137 y recoge en su §11 las propuestas técnicas y consideraciones de remediación. La totalidad de sus tareas `ENG` y `DOC` se encuentra implementada y verificada.
 

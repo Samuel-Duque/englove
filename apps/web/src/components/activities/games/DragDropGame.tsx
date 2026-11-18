@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ActivityRuntimeProps,
   GamePublicConfig,
@@ -8,14 +8,17 @@ import {
   DragDropSettingsSchema,
   DragDropSolutionSchema,
   deterministicShuffle,
-} from '@upward-english/shared';
-import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { soundManager } from '../../../lib/sound';
+} from "@upward-english/shared";
+import {
+  draggable,
+  dropTargetForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { soundManager } from "../../../lib/sound";
 
 export function DragDropGame({
   config,
   initialState,
-  theme = 'kids',
+  theme = "kids",
   soundEnabled = true,
   previewMode = false,
   onEvent,
@@ -23,7 +26,9 @@ export function DragDropGame({
 }: ActivityRuntimeProps<GamePublicConfig, GameAnswers>) {
   const parsedSettings = DragDropSettingsSchema.safeParse(config.settings);
   const settings = parsedSettings.success ? parsedSettings.data : null;
-  const parsedSol = DragDropSolutionSchema.safeParse(config.answerKey?.solution);
+  const parsedSol = DragDropSolutionSchema.safeParse(
+    config.answerKey?.solution,
+  );
   const solution = parsedSol.success ? parsedSol.data : undefined;
 
   const originalObjects = settings?.objects || [];
@@ -31,7 +36,9 @@ export function DragDropGame({
 
   // Deterministic shuffle of objects (RF-4, §4 Rule 5)
   const initialObjects = useMemo(() => {
-    const seed = originalObjects.map((o) => o.id).join('-') + (targets.map((t) => t.id).join('-'));
+    const seed =
+      originalObjects.map((o) => o.id).join("-") +
+      targets.map((t) => t.id).join("-");
     return deterministicShuffle(originalObjects, seed);
   }, [originalObjects, targets]);
 
@@ -40,7 +47,7 @@ export function DragDropGame({
   });
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const [liveStatus, setLiveStatus] = useState<string>('');
+  const [liveStatus, setLiveStatus] = useState<string>("");
 
   const objectMap = useMemo(() => {
     const map = new Map<string, { id: string; text: string }>();
@@ -74,15 +81,17 @@ export function DragDropGame({
     const next = { ...placements, [objectId]: targetId };
     setPlacements(next);
     setSelectedObjectId(null);
-    onEvent?.({ itemId: 'placements', answer: next });
+    onEvent?.({ itemId: "placements", answer: next });
 
     const obj = objectMap.get(objectId);
     const target = targets.find((t) => t.id === targetId);
-    setLiveStatus(`Ítem ${obj?.text ?? ''} colocado en categoría ${target?.text ?? 'categoría'}`);
+    setLiveStatus(
+      `Ítem ${obj?.text ?? ""} colocado en categoría ${target?.text ?? "categoría"}`,
+    );
 
     if (solution?.placements) {
       const isCorrect = solution.placements[objectId] === targetId;
-      soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
+      soundManager.play(isCorrect ? "hit" : "miss", soundEnabled);
     }
   };
 
@@ -92,27 +101,21 @@ export function DragDropGame({
     setPlacements(next);
     if (selectedObjectId === objectId) setSelectedObjectId(null);
     const obj = objectMap.get(objectId);
-    setLiveStatus(`Ítem ${obj?.text ?? ''} devuelto a la bandeja`);
-    onEvent?.({ itemId: 'placements', answer: next });
+    setLiveStatus(`Ítem ${obj?.text ?? ""} devuelto a la bandeja`);
+    onEvent?.({ itemId: "placements", answer: next });
   };
 
   const handleComplete = () => {
-    soundManager.play('complete', soundEnabled);
+    soundManager.play("complete", soundEnabled);
     onComplete?.({ placements });
   };
 
-  const isKids = theme === 'kids';
+  const isKids = theme === "kids";
 
   return (
-    <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
-        isKids
-          ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
-      }`}
-    >
+    <div className="w-full min-w-0 space-y-4 [overflow-wrap:anywhere]">
       {previewMode && (
-        <div className="mb-4 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold text-center">
+        <div className="origami-state text-center">
           👀 Vista previa: no se guardan respuestas
         </div>
       )}
@@ -123,8 +126,8 @@ export function DragDropGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
-          <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
+        <div className="origami-state">
+          <p className="text-sm sm:text-base font-semibold text-[var(--origami-text-primary)] leading-relaxed">
             {config.instructions}
           </p>
         </div>
@@ -142,13 +145,13 @@ export function DragDropGame({
               id={target.id}
               name={
                 target.text ||
-                (typeof Reflect.get(target, 'label') === 'string'
-                  ? String(Reflect.get(target, 'label'))
+                (typeof Reflect.get(target, "label") === "string"
+                  ? String(Reflect.get(target, "label"))
                   : undefined) ||
-                (typeof Reflect.get(target, 'name') === 'string'
-                  ? String(Reflect.get(target, 'name'))
+                (typeof Reflect.get(target, "name") === "string"
+                  ? String(Reflect.get(target, "name"))
                   : undefined) ||
-                'Categoría'
+                "Categoría"
               }
               placedObjects={placedInThis}
               isKids={isKids}
@@ -169,17 +172,20 @@ export function DragDropGame({
 
       {/* Objects Tray */}
       <div className="space-y-3 mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h4
             className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+              isKids
+                ? "text-[var(--origami-text-primary)]"
+                : "text-[var(--origami-text-secondary)]"
             }`}
           >
             Bandeja de objetos ({trayObjects.length} disponibles)
           </h4>
           {selectedObjectId && (
-            <span className="text-xs font-bold text-amber-700 animate-pulse">
-              Seleccionado: {objectMap.get(selectedObjectId)?.text} — Elige una categoría arriba
+            <span className="text-xs font-bold text-[var(--origami-text-secondary)]">
+              Seleccionado: {objectMap.get(selectedObjectId)?.text} — Elige una
+              categoría arriba
             </span>
           )}
         </div>
@@ -187,12 +193,12 @@ export function DragDropGame({
         <div
           className={`min-h-20 p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-2.5 items-center transition-colors ${
             selectedObjectId
-              ? 'border-amber-400 bg-amber-100/50'
-              : 'border-amber-200/90 bg-white/70'
+              ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-soft)]"
+              : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)]"
           }`}
         >
           {trayObjects.length === 0 ? (
-            <p className="text-xs font-medium text-zinc-400 italic">
+            <p className="text-xs font-medium text-[var(--origami-text-secondary)] italic">
               Todos los objetos están colocados en las categorías.
             </p>
           ) : (
@@ -217,19 +223,16 @@ export function DragDropGame({
       </div>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-amber-200/60 flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500">
-          {Object.keys(placements).length} de {originalObjects.length} clasificados
+      <div className="pt-4 border-t border-[var(--origami-border-subtle)] flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium text-[var(--origami-text-secondary)]">
+          {Object.keys(placements).length} de {originalObjects.length}{" "}
+          clasificados
         </p>
 
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
-            isKids
-              ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
-          }`}
+          className="origami-button"
         >
           Finalizar clasificación ✨
         </button>
@@ -271,19 +274,19 @@ function DraggableObjectToken({
       aria-pressed={isSelected}
       onClick={onSelect}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect();
-        } else if (e.key === 'Escape') {
+        } else if (e.key === "Escape") {
           if (isSelected) onSelect();
         }
       }}
-      className={`min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all touch-manipulation cursor-pointer flex items-center gap-1.5 ${
+      className={`min-h-[var(--origami-target)] min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-colors touch-manipulation cursor-pointer flex items-center gap-1.5 ${
         isSelected
-          ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-300 text-amber-950 scale-105'
+          ? "origami-selected"
           : isKids
-            ? 'border-amber-300 bg-white text-amber-950 hover:bg-amber-100 hover:border-amber-400'
-            : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+            ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)] hover:bg-[var(--origami-surface-soft)]"
+            : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] text-[var(--origami-text-primary)] hover:bg-[var(--origami-surface-raised)]"
       }`}
     >
       <span>📦</span>
@@ -329,7 +332,9 @@ function TargetCategoryContainer({
       onDrop: ({ source }) => {
         setIsOver(false);
         const objId =
-          typeof source.data?.objectId === 'string' ? source.data.objectId : undefined;
+          typeof source.data?.objectId === "string"
+            ? source.data.objectId
+            : undefined;
         if (objId) onDropObject(objId);
       },
     });
@@ -338,14 +343,14 @@ function TargetCategoryContainer({
   return (
     <div
       ref={elRef}
-      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all select-none ${
+      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-colors select-none ${
         isOver
-          ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg'
+          ? "border-[var(--origami-paper-blue)] ring-4 ring-[var(--origami-focus)] bg-[var(--origami-info-bg)] text-[var(--origami-info-text)]"
           : isTargetActive
-            ? 'border-dashed border-amber-400 bg-amber-100/50 animate-pulse'
+            ? "border-dashed border-[var(--origami-border-control)] bg-[var(--origami-surface-soft)]"
             : isKids
-              ? 'border-amber-300/80 bg-white shadow-xs'
-              : 'border-zinc-700 bg-zinc-800'
+              ? "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)] shadow-xs"
+              : "border-[var(--origami-border-control)] bg-[var(--origami-surface-raised)]"
       }`}
     >
       <div>
@@ -353,13 +358,19 @@ function TargetCategoryContainer({
           type="button"
           onClick={onClickCategory}
           aria-label={`Colocar ítem en categoría ${name}. Actualmente ${placedObjects.length} ítems`}
-          className={`w-full flex items-center justify-between pb-2 border-b text-left rounded-lg p-1 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors ${
-            isKids ? 'border-zinc-100 hover:bg-zinc-50' : 'border-zinc-700 hover:bg-zinc-750'
+          className={`w-full min-h-[var(--origami-target)] flex flex-wrap items-center justify-between gap-2 pb-2 border-b text-left rounded-lg p-1 focus-visible:outline-[var(--origami-focus)] transition-colors ${
+            isKids
+              ? "border-[var(--origami-border-subtle)] hover:bg-[var(--origami-surface-raised)]"
+              : "border-[var(--origami-border-control)] hover:bg-[var(--origami-surface-raised)]"
           }`}
         >
-          <span className={`text-sm font-black ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{name}</span>
-          <span className="text-xs font-bold text-zinc-400">
-            {isTargetActive ? '👈 Tocar para colocar' : `${placedObjects.length} ítems`}
+          <span className="text-sm font-black text-[var(--origami-text-primary)]">
+            {name}
+          </span>
+          <span className="text-xs font-bold">
+            {isTargetActive
+              ? "👈 Tocar para colocar"
+              : `${placedObjects.length} ítems`}
           </span>
         </button>
 
@@ -373,8 +384,8 @@ function TargetCategoryContainer({
               }}
               className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-extrabold shadow-2xs border ${
                 selectedObjectId === obj.id
-                  ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-200'
-                  : 'border-emerald-300 bg-emerald-50 text-emerald-950'
+                  ? "origami-selected"
+                  : "border-[var(--origami-success-text)] bg-[var(--origami-success-bg)] text-[var(--origami-success-text)]"
               }`}
             >
               <span>{obj.text}</span>
@@ -384,7 +395,7 @@ function TargetCategoryContainer({
                   e.stopPropagation();
                   onRemoveObject(obj.id);
                 }}
-                className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-black text-rose-600 hover:text-rose-800 ml-1 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className="origami-button origami-button--text !p-1"
                 title="Devolver a la bandeja"
                 aria-label={`Devolver ${obj.text} a la bandeja`}
               >
@@ -396,8 +407,8 @@ function TargetCategoryContainer({
       </div>
 
       <div className="pt-2 text-right">
-        <span className="text-2xs font-bold text-zinc-400">
-          {isTargetActive ? '👈 Tocar para colocar aquí' : '📥 Arrastra aquí'}
+        <span className="text-2xs font-bold text-[var(--origami-text-secondary)]">
+          {isTargetActive ? "👈 Tocar para colocar aquí" : "📥 Arrastra aquí"}
         </span>
       </div>
     </div>

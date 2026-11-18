@@ -11,7 +11,7 @@ export default function GroupsPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-16 text-center text-zinc-500 text-sm">
+        <div role="status" className="origami-state text-center">
           Cargando gestión de grupos…
         </div>
       }

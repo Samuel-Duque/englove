@@ -1,5 +1,7 @@
 'use client';
 
+import styles from '../../origami-management.module.css';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -64,7 +66,9 @@ export function GrupoDetailClient({ id }: { id: string }) {
       queryClient.setQueryData(['teacher', 'group', id], updated);
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['teacher', 'assignments'],
+      });
       setIsRenaming(false);
       setSuccess('Grupo renombrado exitosamente.');
     },
@@ -116,7 +120,9 @@ export function GrupoDetailClient({ id }: { id: string }) {
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
         if (err.code === 'GROUP_HAS_HISTORY') {
-          setActionError('No se puede borrar un grupo con historial. Archívalo en su lugar.');
+          setActionError(
+            'No se puede borrar un grupo con historial. Archívalo en su lugar.',
+          );
         } else {
           setActionError(err.message);
         }
@@ -141,7 +147,8 @@ export function GrupoDetailClient({ id }: { id: string }) {
   const isLoading = groupQuery.isLoading || membersQuery.isLoading;
 
   const handleArchive = () => {
-    const activeCount = group?.activeStudentCount ?? totalMembers ?? members.length;
+    const activeCount =
+      group?.activeStudentCount ?? totalMembers ?? members.length;
     if (activeCount > 0) {
       setActionError(
         `No es posible archivar el grupo: tiene ${activeCount} alumno(s) activo(s) (decisión 96). Traslada los alumnos antes de archivar.`,
@@ -167,7 +174,8 @@ export function GrupoDetailClient({ id }: { id: string }) {
     setConfirmDialog({
       isOpen: true,
       title: 'Eliminar grupo',
-      message: '¿Seguro que deseas eliminar este grupo? Solo es posible si no tiene historial.',
+      message:
+        '¿Seguro que deseas eliminar este grupo? Solo es posible si no tiene historial.',
       isDestructive: true,
       onConfirm: () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
@@ -179,17 +187,51 @@ export function GrupoDetailClient({ id }: { id: string }) {
 
   const error =
     actionError ||
-    (groupQuery.error instanceof ApiError ? groupQuery.error.message : groupQuery.error instanceof Error ? groupQuery.error.message : null) ||
-    (membersQuery.error instanceof ApiError ? membersQuery.error.message : membersQuery.error instanceof Error ? membersQuery.error.message : null);
+    (groupQuery.error instanceof ApiError
+      ? groupQuery.error.message
+      : groupQuery.error instanceof Error
+        ? groupQuery.error.message
+        : null) ||
+    (membersQuery.error instanceof ApiError
+      ? membersQuery.error.message
+      : membersQuery.error instanceof Error
+        ? membersQuery.error.message
+        : null);
 
   if (isLoading) {
-    return <div className="py-12 text-center text-zinc-500 text-sm">Cargando grupo…</div>;
+    return (
+      <div role="status" className="origami-state text-center">
+        Cargando grupo…
+      </div>
+    );
   }
 
   if (!group) {
+    const isMissing =
+      groupQuery.error instanceof ApiError &&
+      groupQuery.error.statusCode === 404;
     return (
-      <div role="alert" className="rounded-lg bg-rose-50 border border-rose-200 p-6 text-center text-rose-800">
-        {error || 'Grupo no encontrado'}
+      <div className="origami-state origami-state--error space-y-4">
+        <h1 className="origami-page-title">
+          {isMissing ? 'Grupo no encontrado' : 'No se pudo cargar el grupo'}
+        </h1>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/grupos"
+            className="origami-button origami-button--secondary"
+          >
+            Volver a grupos
+          </Link>
+          {!isMissing && (
+            <button
+              type="button"
+              className="origami-button origami-button--secondary"
+              onClick={() => void groupQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -199,44 +241,51 @@ export function GrupoDetailClient({ id }: { id: string }) {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/grupos" className="hover:text-zinc-900">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[var(--origami-text-secondary)]">
+        <Link
+          href="/grupos"
+          className="hover:text-[var(--origami-text-primary)] underline underline-offset-4"
+        >
           Grupos
         </Link>
         <span>/</span>
-        <span className="text-zinc-800 font-medium truncate">{group.name}</span>
+        <span className="text-[var(--origami-text-primary)] font-medium">
+          {group.name}
+        </span>
       </div>
 
       {/* Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
+      <div className="flex flex-wrap flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--origami-border-subtle)] pb-5">
         <div>
           {isRenaming ? (
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 mt-1">
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 maxLength={100}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-base font-semibold text-zinc-900"
+                className="origami-field"
               />
               <button
                 type="button"
                 onClick={handleSaveRename}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                className="origami-button"
               >
                 Guardar
               </button>
               <button
                 type="button"
                 onClick={() => setIsRenaming(false)}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
+                className="origami-button origami-button--secondary"
               >
                 Cancelar
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{group.name}</h1>
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <h1 className="origami-page-title text-[var(--origami-text-primary)]">
+                {group.name}
+              </h1>
               {!isArchived && (
                 <button
                   type="button"
@@ -244,7 +293,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
                     setNewName(group.name);
                     setIsRenaming(true);
                   }}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                  className="origami-button origami-button--text"
                 >
                   (Renombrar)
                 </button>
@@ -252,16 +301,19 @@ export function GrupoDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-3 mt-2">
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                isArchived ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                isArchived
+                  ? 'bg-[var(--origami-warning-bg)] text-[var(--origami-warning-text)]'
+                  : 'bg-[var(--origami-success-bg)] text-[var(--origami-success-text)]'
               }`}
             >
               {isArchived ? 'Grupo Archivado' : 'Grupo Activo'}
             </span>
-            <span className="text-xs text-zinc-500 font-medium">
-              {totalMembers} alumno{totalMembers !== 1 ? 's' : ''} activo{totalMembers !== 1 ? 's' : ''}
+            <span className="text-xs text-[var(--origami-text-secondary)] font-medium">
+              {totalMembers} alumno{totalMembers !== 1 ? 's' : ''} activo
+              {totalMembers !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -269,7 +321,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/asignaciones?groupId=${id}`}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+            className="rounded-lg border border-[var(--origami-border-control)] px-3 py-2 text-xs font-semibold text-[var(--origami-text-secondary)] hover:bg-[var(--origami-surface-soft)] underline underline-offset-4"
           >
             Ver asignaciones
           </Link>
@@ -277,7 +329,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={handleArchive}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+              className="origami-button origami-button--secondary text-[var(--origami-warning-text)]"
             >
               Archivar grupo
             </button>
@@ -286,7 +338,7 @@ export function GrupoDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={handleDelete}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+            className="origami-button origami-button--secondary text-[var(--origami-error-text)]"
           >
             Eliminar grupo
           </button>
@@ -297,10 +349,15 @@ export function GrupoDetailClient({ id }: { id: string }) {
       {error && (
         <div
           role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
+          className="origami-state origami-state--error flex justify-between items-center"
         >
           <span>{error}</span>
-          <button type="button" onClick={() => setActionError(null)} className="text-rose-600 font-bold ml-4">
+          <button
+            aria-label="Cerrar aviso"
+            type="button"
+            onClick={() => setActionError(null)}
+            className="origami-button origami-button--text ml-4 text-[var(--origami-error-text)]"
+          >
             ✕
           </button>
         </div>
@@ -309,77 +366,135 @@ export function GrupoDetailClient({ id }: { id: string }) {
       {success && (
         <div
           role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
+          className="origami-state origami-state--success flex justify-between items-center"
         >
           <span>{success}</span>
-          <button type="button" onClick={() => setSuccess(null)} className="text-emerald-600 font-bold ml-4">
+          <button
+            aria-label="Cerrar aviso"
+            type="button"
+            onClick={() => setSuccess(null)}
+            className="origami-button origami-button--text ml-4"
+          >
             ✕
           </button>
         </div>
       )}
 
       {/* Members List */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+      <div className="origami-card space-y-4">
+        <h2 className="origami-section-title text-[var(--origami-text-primary)] border-b border-[var(--origami-border-subtle)] pb-2">
           Alumnos miembros vigentes ({totalMembers})
         </h2>
 
-        {members.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">
+        {membersQuery.isError && !membersQuery.data ? (
+          <div className="origami-state origami-state--error flex flex-wrap items-center gap-2">
+            <p role="alert">No se pudieron cargar los integrantes del grupo.</p>
+            <button
+              type="button"
+              className="origami-button origami-button--secondary"
+              onClick={() => void membersQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : members.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--origami-text-secondary)]">
             Este grupo aún no tiene alumnos asignados.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Nombre
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Correo
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Nivel
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Segmento
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-600 uppercase">
-                    Acción
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200">
-                {members.map((member) => (
-                  <tr key={member.id} className="hover:bg-zinc-50">
-                    <td className="px-4 py-3 text-sm font-semibold text-zinc-900">
-                      <Link href={`/alumnos/${member.id}`} className="hover:text-blue-600">
-                        {member.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600">{member.email}</td>
-                    <td className="px-4 py-3 text-sm text-zinc-800">
-                      <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-zinc-100">
-                        {member.level ?? 'Sin nivel'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600 capitalize">
-                      {member.ageSegment}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right">
+          <table
+            role="table"
+            aria-label="Integrantes del grupo"
+            className={styles.operationalTable}
+          >
+            <thead role="rowgroup" className={styles.operationalHead}>
+              <tr role="row">
+                <th role="columnheader" scope="col">
+                  Nombre
+                </th>
+                <th role="columnheader" scope="col">
+                  Correo
+                </th>
+                <th role="columnheader" scope="col">
+                  Nivel
+                </th>
+                <th role="columnheader" scope="col">
+                  Segmento
+                </th>
+                <th role="columnheader" scope="col">
+                  Acción
+                </th>
+              </tr>
+            </thead>
+            <tbody role="rowgroup" className={styles.operationalBody}>
+              {members.map((member) => (
+                <tr
+                  role="row"
+                  key={member.id}
+                  className={
+                    styles.operationalRow +
+                    ' hover:bg-[var(--origami-surface-soft)]'
+                  }
+                >
+                  <td
+                    role="cell"
+                    className={styles.cardHeading + ' font-semibold'}
+                  >
+                    <h3 className="origami-card-title">
                       <Link
                         href={`/alumnos/${member.id}`}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                        className="hover:text-[var(--origami-info-text)] underline underline-offset-4"
                       >
-                        Ver ficha →
+                        {member.name}
                       </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </h3>
+                  </td>
+                  <td
+                    role="cell"
+                    className={
+                      styles.cardField + ' text-[var(--origami-text-secondary)]'
+                    }
+                  >
+                    <span className={styles.mobileLabel} aria-hidden="true">
+                      Correo
+                    </span>
+                    {member.email}
+                  </td>
+                  <td role="cell" className={styles.cardField}>
+                    <span className={styles.mobileLabel} aria-hidden="true">
+                      Nivel
+                    </span>
+                    <span className="flex flex-wrap px-2 py-0.5 rounded text-xs font-bold bg-[var(--origami-surface-raised)]">
+                      {member.level ?? 'Sin nivel'}
+                    </span>
+                  </td>
+                  <td
+                    role="cell"
+                    className={
+                      styles.cardField +
+                      ' text-[var(--origami-text-secondary)] capitalize'
+                    }
+                  >
+                    <span className={styles.mobileLabel} aria-hidden="true">
+                      Segmento
+                    </span>
+                    {member.ageSegment}
+                  </td>
+                  <td role="cell" className={styles.cardField}>
+                    <span className={styles.mobileLabel} aria-hidden="true">
+                      Acción
+                    </span>
+                    <Link
+                      href={`/alumnos/${member.id}`}
+                      className="text-xs font-semibold text-[var(--origami-info-text)] hover:text-[var(--origami-info-text)] underline underline-offset-4"
+                    >
+                      Ver ficha →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
       <ConfirmDialog
@@ -388,7 +503,9 @@ export function GrupoDetailClient({ id }: { id: string }) {
         message={confirmDialog.message}
         isDestructive={confirmDialog.isDestructive}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onCancel={() =>
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+        }
       />
     </div>
   );

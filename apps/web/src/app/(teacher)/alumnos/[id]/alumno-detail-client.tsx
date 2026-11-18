@@ -1,5 +1,7 @@
 'use client';
 
+import styles from '../../origami-management.module.css';
+
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,25 +18,32 @@ import {
   z,
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
-import { ConfirmDialog, AccessibleModal } from '../../../../components/ui/modal';
+import {
+  ConfirmDialog,
+  AccessibleModal,
+} from '../../../../components/ui/modal';
 
 const retryWarningSchema = z.object({
-  affectedActivities: z.array(
-    z.union([
-      z.string(),
-      z.object({
-        assignmentId: z.string(),
-        activityId: z.string(),
-        activityTitle: z.string(),
-        effectiveDueAt: z.string(),
-        attemptNumber: z.number(),
-      }),
-    ]),
-  ).optional(),
+  affectedActivities: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({
+          assignmentId: z.string(),
+          activityId: z.string(),
+          activityTitle: z.string(),
+          effectiveDueAt: z.string(),
+          attemptNumber: z.number(),
+        }),
+      ]),
+    )
+    .optional(),
 });
 
 function isLevel(val: string): val is Level {
-  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+  return (
+    val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2
+  );
 }
 
 export function AlumnoDetailClient({ id }: { id: string }) {
@@ -51,9 +60,12 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   const membershipsQuery = useQuery({
     queryKey: ['teacher', 'student', id, 'memberships'],
     queryFn: () =>
-      apiFetch<MembershipListResponse>(`/api/v1/students/${id}/memberships?limit=100`, {
-        schema: MembershipListResponseSchema,
-      }),
+      apiFetch<MembershipListResponse>(
+        `/api/v1/students/${id}/memberships?limit=100`,
+        {
+          schema: MembershipListResponseSchema,
+        },
+      ),
   });
 
   const groupsQuery = useQuery({
@@ -68,14 +80,18 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   const memberships = membershipsQuery.data?.items ?? [];
   const activeGroups = groupsQuery.data?.items ?? [];
 
-  const isLoading = studentQuery.isLoading || membershipsQuery.isLoading || groupsQuery.isLoading;
+  const isLoading =
+    studentQuery.isLoading ||
+    membershipsQuery.isLoading ||
+    groupsQuery.isLoading;
 
   // UI state
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Group transfer state
-  const [selectedDestinationGroup, setSelectedDestinationGroup] = useState<string>('');
+  const [selectedDestinationGroup, setSelectedDestinationGroup] =
+    useState<string>('');
   const syncedGroupIdRef = useRef<string | null>(null);
 
   // Profile edit state
@@ -144,7 +160,11 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       window.location.href = '/alumnos';
     },
     onError: (err: unknown) => {
-      setDeleteError(err instanceof ApiError ? err.message : 'No se pudo dar de baja al estudiante');
+      setDeleteError(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo dar de baja al estudiante',
+      );
     },
   });
   const isDeletingStudent = deleteStudentMutation.isPending;
@@ -156,7 +176,13 @@ export function AlumnoDetailClient({ id }: { id: string }) {
 
   // Group transfer handler (P0-09, QA-07, RF-9, Decision 131)
   const transferGroupMutation = useMutation({
-    mutationFn: ({ groupId, confirmLostRetries }: { groupId: string; confirmLostRetries: boolean }) =>
+    mutationFn: ({
+      groupId,
+      confirmLostRetries,
+    }: {
+      groupId: string;
+      confirmLostRetries: boolean;
+    }) =>
       apiFetch<StudentView>(`/api/v1/students/${id}/group`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -167,7 +193,9 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'student', id], updated);
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'student', id, 'memberships'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['teacher', 'student', id, 'memberships'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'group'] });
@@ -179,7 +207,10 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       if (err instanceof ApiError) {
         if (err.code === 'UNCONSUMED_RETRY_WARNING') {
           const parsed = retryWarningSchema.safeParse(err.details);
-          const acts = parsed.success && parsed.data.affectedActivities ? parsed.data.affectedActivities : [];
+          const acts =
+            parsed.success && parsed.data.affectedActivities
+              ? parsed.data.affectedActivities
+              : [];
           setAffectedActivities(acts);
           setRetryWarningModalOpen(true);
         } else if (err.code === 'GROUP_ARCHIVED') {
@@ -197,7 +228,11 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   const isTransferringGroup = transferGroupMutation.isPending;
 
   const handleGroupTransfer = (confirmLostRetries = false) => {
-    if (!selectedDestinationGroup || selectedDestinationGroup === student?.groupId) return;
+    if (
+      !selectedDestinationGroup ||
+      selectedDestinationGroup === student?.groupId
+    )
+      return;
 
     setError(null);
     setSuccess(null);
@@ -222,7 +257,11 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       setSuccess('Ficha del alumno actualizada.');
     },
     onError: (err: unknown) => {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar la información del alumno');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo guardar la información del alumno',
+      );
     },
   });
   const isSavingProfile = saveProfileMutation.isPending;
@@ -257,10 +296,16 @@ export function AlumnoDetailClient({ id }: { id: string }) {
         schema: MessageResponseSchema,
       }),
     onSuccess: (res) => {
-      setSuccess(res.message || 'Enlace de recuperación enviado al correo del alumno.');
+      setSuccess(
+        res.message || 'Enlace de recuperación enviado al correo del alumno.',
+      );
     },
     onError: (err: unknown) => {
-      setError(err instanceof ApiError ? err.message : 'No se pudo solicitar la recuperación de contraseña');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo solicitar la recuperación de contraseña',
+      );
     },
   });
 
@@ -284,7 +329,9 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       setIsChangeEmailOpen(false);
       setNewEmail('');
       setIdentityConfirmed(false);
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'student', id] });
+      void queryClient.invalidateQueries({
+        queryKey: ['teacher', 'student', id],
+      });
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
     },
     onError: (err: unknown) => {
@@ -304,7 +351,9 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   const handleChangeEmail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!identityConfirmed) {
-      setChangeEmailError('Debes confirmar que verificaste la identidad del alumno.');
+      setChangeEmailError(
+        'Debes confirmar que verificaste la identidad del alumno.',
+      );
       return;
     }
 
@@ -315,13 +364,41 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   };
 
   if (isLoading) {
-    return <div className="py-12 text-center text-zinc-500 text-sm">Cargando ficha del alumno…</div>;
+    return (
+      <div role="status" className="origami-state text-center">
+        Cargando ficha del alumno…
+      </div>
+    );
   }
 
   if (!student) {
+    const isMissing =
+      studentQuery.error instanceof ApiError &&
+      studentQuery.error.statusCode === 404;
     return (
-      <div role="alert" className="rounded-lg bg-rose-50 border border-rose-200 p-6 text-center text-rose-800">
-        Alumno no encontrado
+      <div className="origami-state origami-state--error space-y-4">
+        <h1 className="origami-page-title">
+          {isMissing
+            ? 'Alumno no encontrado'
+            : 'No se pudo cargar la ficha del alumno'}
+        </h1>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/alumnos"
+            className="origami-button origami-button--secondary"
+          >
+            Volver a alumnos
+          </Link>
+          {!isMissing && (
+            <button
+              type="button"
+              className="origami-button origami-button--secondary"
+              onClick={() => void studentQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -331,26 +408,35 @@ export function AlumnoDetailClient({ id }: { id: string }) {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/alumnos" className="hover:text-zinc-900">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[var(--origami-text-secondary)]">
+        <Link
+          href="/alumnos"
+          className="hover:text-[var(--origami-text-primary)] underline underline-offset-4"
+        >
           Alumnos
         </Link>
         <span>/</span>
-        <span className="text-zinc-800 font-medium truncate">{student.name}</span>
+        <span className="text-[var(--origami-text-primary)] font-medium">
+          {student.name}
+        </span>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
+      <div className="flex flex-wrap flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--origami-border-subtle)] pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{student.name}</h1>
-          <p className="text-sm text-zinc-600">{student.email}</p>
+          <h1 className="origami-page-title text-[var(--origami-text-primary)]">
+            {student.name}
+          </h1>
+          <p className="text-sm text-[var(--origami-text-secondary)]">
+            {student.email}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleSendPasswordReset}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 min-h-[44px]"
+            className="origami-button origami-button--secondary"
           >
             Enviar enlace de recuperación
           </button>
@@ -363,7 +449,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               setIdentityConfirmed(false);
               setNewEmail('');
             }}
-            className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800 min-h-[44px]"
+            className="origami-button"
           >
             Cambiar correo de acceso
           </button>
@@ -374,10 +460,15 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       {error && (
         <div
           role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
+          className="origami-state origami-state--error flex justify-between items-center"
         >
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} className="text-rose-600 font-bold ml-4">
+          <button
+            aria-label="Cerrar aviso"
+            type="button"
+            onClick={() => setError(null)}
+            className="origami-button origami-button--text ml-4 text-[var(--origami-error-text)]"
+          >
             ✕
           </button>
         </div>
@@ -386,24 +477,31 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       {success && (
         <div
           role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
+          className="origami-state origami-state--success flex justify-between items-center"
         >
           <span>{success}</span>
-          <button type="button" onClick={() => setSuccess(null)} className="text-emerald-600 font-bold ml-4">
+          <button
+            aria-label="Cerrar aviso"
+            type="button"
+            onClick={() => setSuccess(null)}
+            className="origami-button origami-button--text ml-4"
+          >
             ✕
           </button>
         </div>
       )}
 
       {/* Profile Details Card */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-          <h2 className="text-base font-bold text-zinc-900">Datos personales y pedagógicos</h2>
+      <div className="origami-card space-y-4">
+        <div className="flex items-center justify-between border-b border-[var(--origami-border-subtle)] pb-3">
+          <h2 className="origami-section-title text-[var(--origami-text-primary)]">
+            Datos personales y pedagógicos
+          </h2>
           {!isEditingProfile && (
             <button
               type="button"
               onClick={() => setIsEditingProfile(true)}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+              className="origami-button origami-button--text"
             >
               Editar datos
             </button>
@@ -414,7 +512,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="edit-name" className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label htmlFor="edit-name" className="origami-label block mb-1">
                   Nombre completo *
                 </label>
                 <input
@@ -424,12 +522,15 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                   maxLength={100}
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
 
               <div>
-                <label htmlFor="edit-bdate" className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label
+                  htmlFor="edit-bdate"
+                  className="origami-label block mb-1"
+                >
                   Fecha de nacimiento (YYYY-MM-DD)
                 </label>
                 <input
@@ -437,13 +538,16 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                   type="date"
                   value={editBirthDate}
                   onChange={(e) => setEditBirthDate(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
 
               <div>
-                <label htmlFor="edit-lvl" className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Nivel pedagógico {student?.approvalStatus === 'approved' ? '*' : '(no asignado aún)'}
+                <label htmlFor="edit-lvl" className="origami-label block mb-1">
+                  Nivel pedagógico{' '}
+                  {student?.approvalStatus === 'approved'
+                    ? '*'
+                    : '(no asignado aún)'}
                 </label>
                 {student?.approvalStatus === 'approved' ? (
                   <select
@@ -452,7 +556,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                     onChange={(e) => {
                       if (isLevel(e.target.value)) setEditLevel(e.target.value);
                     }}
-                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                    className="origami-field"
                   >
                     <option value={Level.A1}>A1</option>
                     <option value={Level.A2}>A2</option>
@@ -460,14 +564,18 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                     <option value={Level.B2}>B2</option>
                   </select>
                 ) : (
-                  <p className="text-xs text-zinc-500 py-2">
-                    El nivel pedagógico se asigna automáticamente al aprobar la solicitud del alumno.
+                  <p className="text-xs text-[var(--origami-text-secondary)] py-2">
+                    El nivel pedagógico se asigna automáticamente al aprobar la
+                    solicitud del alumno.
                   </p>
                 )}
               </div>
 
               <div>
-                <label htmlFor="edit-gname" className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label
+                  htmlFor="edit-gname"
+                  className="origami-label block mb-1"
+                >
                   Nombre del acudiente
                 </label>
                 <input
@@ -476,12 +584,15 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                   maxLength={200}
                   value={editGuardianName}
                   onChange={(e) => setEditGuardianName(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label htmlFor="edit-gcontact" className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label
+                  htmlFor="edit-gcontact"
+                  className="origami-label block mb-1"
+                >
                   Contacto del acudiente (teléfono / correo)
                 </label>
                 <input
@@ -490,7 +601,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                   maxLength={200}
                   value={editGuardianContact}
                   onChange={(e) => setEditGuardianContact(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
             </div>
@@ -499,14 +610,14 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => setIsEditingProfile(false)}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                className="origami-button origami-button--secondary"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSavingProfile}
-                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="origami-button"
               >
                 {isSavingProfile ? 'Guardando…' : 'Guardar'}
               </button>
@@ -515,20 +626,34 @@ export function AlumnoDetailClient({ id }: { id: string }) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="block text-xs font-medium text-zinc-500">Nivel actual</span>
-              <span className="font-bold text-zinc-900">{student.level ?? 'Sin nivel'}</span>
+              <span className="block text-xs font-medium text-[var(--origami-text-secondary)]">
+                Nivel actual
+              </span>
+              <span className="font-bold text-[var(--origami-text-primary)]">
+                {student.level ?? 'Sin nivel'}
+              </span>
             </div>
             <div>
-              <span className="block text-xs font-medium text-zinc-500">Segmento</span>
-              <span className="font-semibold text-zinc-900 capitalize">{student.ageSegment}</span>
+              <span className="block text-xs font-medium text-[var(--origami-text-secondary)]">
+                Segmento
+              </span>
+              <span className="font-semibold text-[var(--origami-text-primary)] capitalize">
+                {student.ageSegment}
+              </span>
             </div>
             <div>
-              <span className="block text-xs font-medium text-zinc-500">Nacimiento</span>
-              <span className="font-medium text-zinc-900">{student.birthDate}</span>
+              <span className="block text-xs font-medium text-[var(--origami-text-secondary)]">
+                Nacimiento
+              </span>
+              <span className="font-medium text-[var(--origami-text-primary)]">
+                {student.birthDate}
+              </span>
             </div>
             <div>
-              <span className="block text-xs font-medium text-zinc-500">Acudiente</span>
-              <span className="font-medium text-zinc-900">
+              <span className="block text-xs font-medium text-[var(--origami-text-secondary)]">
+                Acudiente
+              </span>
+              <span className="font-medium text-[var(--origami-text-primary)]">
                 {student.guardianName || 'No registrado'}
               </span>
             </div>
@@ -537,21 +662,26 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Group Transfer Card (Atomic, 1 active group per student, Decision 73 & 90) */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+      <div className="origami-card space-y-4">
+        <h2 className="origami-section-title text-[var(--origami-text-primary)] border-b border-[var(--origami-border-subtle)] pb-2">
           Grupo asignado
         </h2>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <span className="text-xs text-zinc-500">Grupo actual:</span>
-            <p className="text-base font-semibold text-zinc-900">
+            <span className="text-xs text-[var(--origami-text-secondary)]">
+              Grupo actual:
+            </span>
+            <p className="text-base font-semibold text-[var(--origami-text-primary)]">
               {activeMembership?.groupName || 'Sin grupo activo'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label htmlFor="destination-group-select" className="sr-only">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <label
+              htmlFor="destination-group-select"
+              className="origami-label sr-only"
+            >
               Seleccionar grupo de destino
             </label>
             <select
@@ -560,7 +690,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               aria-label="Seleccionar grupo de destino"
               value={selectedDestinationGroup}
               onChange={(e) => setSelectedDestinationGroup(e.target.value)}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+              className="origami-field"
             >
               {activeGroups.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -571,8 +701,11 @@ export function AlumnoDetailClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={() => void handleGroupTransfer(false)}
-              disabled={isTransferringGroup || selectedDestinationGroup === student.groupId}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 min-h-[40px]"
+              disabled={
+                isTransferringGroup ||
+                selectedDestinationGroup === student.groupId
+              }
+              className="origami-button"
             >
               {isTransferringGroup ? 'Trasladando…' : 'Cambiar de grupo'}
             </button>
@@ -581,75 +714,119 @@ export function AlumnoDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Membership History Table (RF-12) */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+      <div className="origami-card space-y-4">
+        <h2 className="origami-section-title text-[var(--origami-text-primary)] border-b border-[var(--origami-border-subtle)] pb-2">
           Historial de membresías
         </h2>
 
         {memberships.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-500">
+          <p className="py-4 text-center text-sm text-[var(--origami-text-secondary)]">
             No registra historial de grupos.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Grupo
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Fecha de ingreso
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Fecha de salida
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-600 uppercase">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200">
-                {memberships.map((m) => {
-                  const isCurrent = m.leftAt === null;
-                  return (
-                    <tr key={m.id} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3 text-sm font-semibold text-zinc-900">
-                        {m.groupName}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-zinc-600">
-                        {new Date(m.joinedAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-zinc-600">
-                        {m.leftAt ? new Date(m.leftAt).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
-                            isCurrent
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-zinc-100 text-zinc-600'
-                          }`}
-                        >
-                          {isCurrent ? 'Vigente' : 'Finalizada'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <table
+            role="table"
+            aria-label="Extensiones de plazo"
+            className={styles.operationalTable}
+          >
+            <thead role="rowgroup" className={styles.operationalHead}>
+              <tr role="row">
+                <th role="columnheader" scope="col">
+                  Grupo
+                </th>
+                <th role="columnheader" scope="col">
+                  Fecha de ingreso
+                </th>
+                <th role="columnheader" scope="col">
+                  Fecha de salida
+                </th>
+                <th role="columnheader" scope="col">
+                  Estado
+                </th>
+              </tr>
+            </thead>
+            <tbody role="rowgroup" className={styles.operationalBody}>
+              {memberships.map((m) => {
+                const isCurrent = m.leftAt === null;
+                return (
+                  <tr
+                    role="row"
+                    key={m.id}
+                    className={
+                      styles.operationalRow +
+                      ' hover:bg-[var(--origami-surface-soft)]'
+                    }
+                  >
+                    <td
+                      role="cell"
+                      className={styles.cardHeading + ' font-semibold'}
+                    >
+                      <h3 className="origami-card-title">{m.groupName}</h3>
+                    </td>
+                    <td
+                      role="cell"
+                      className={
+                        styles.cardField +
+                        ' text-[var(--origami-text-secondary)]'
+                      }
+                    >
+                      <span className={styles.mobileLabel} aria-hidden="true">
+                        Fecha de ingreso
+                      </span>
+                      {new Date(m.joinedAt).toLocaleDateString('es-CO', {
+                        timeZone: 'America/Bogota',
+                      })}
+                    </td>
+                    <td
+                      role="cell"
+                      className={
+                        styles.cardField +
+                        ' text-[var(--origami-text-secondary)]'
+                      }
+                    >
+                      <span className={styles.mobileLabel} aria-hidden="true">
+                        Fecha de salida
+                      </span>
+                      {m.leftAt
+                        ? new Date(m.leftAt).toLocaleDateString('es-CO', {
+                            timeZone: 'America/Bogota',
+                          })
+                        : '—'}
+                    </td>
+                    <td role="cell" className={styles.cardField}>
+                      <span className={styles.mobileLabel} aria-hidden="true">
+                        Estado
+                      </span>
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
+                          isCurrent
+                            ? 'bg-[var(--origami-success-bg)] text-[var(--origami-success-text)]'
+                            : 'bg-[var(--origami-surface-raised)] text-[var(--origami-text-secondary)]'
+                        }`}
+                      >
+                        {isCurrent ? 'Vigente' : 'Finalizada'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
       {/* Danger Zone: Delete Student (ENG-070, Decision 103) */}
-      <div className="rounded-2xl border border-rose-300 bg-rose-50/50 p-6 space-y-3">
+      <div className="rounded-2xl border border-[var(--origami-border-control)] bg-[var(--origami-error-bg)] p-6 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-bold text-rose-950">Zona de peligro — Dar de baja al estudiante</h2>
-            <p className="text-xs text-rose-800 mt-1 max-w-xl">
-              Esta acción congela los denominadores históricos en asignaciones anteriores, anonimiza registros de auditoría eliminando referencias de correo, borra los audios en almacenamiento y retira al estudiante de forma definitiva.
+            <h2 className="origami-section-title text-[var(--origami-error-text)]">
+              Zona de peligro — Dar de baja al estudiante
+            </h2>
+            <p className="text-xs text-[var(--origami-error-text)] mt-1 max-w-xl">
+              Esta acción congela los denominadores históricos en asignaciones
+              anteriores, anonimiza registros de auditoría eliminando
+              referencias de correo, borra los audios en almacenamiento y retira
+              al estudiante de forma definitiva.
             </p>
           </div>
           <button
@@ -659,7 +836,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               setDeleteError(null);
               setIsDeleteModalOpen(true);
             }}
-            className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 text-xs shadow-xs transition-colors"
+            className="origami-button"
           >
             Dar de baja al estudiante
           </button>
@@ -673,24 +850,26 @@ export function AlumnoDetailClient({ id }: { id: string }) {
         title="Cambiar correo de acceso"
       >
         {changeEmailError && (
-          <div
-            role="alert"
-            className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800"
-          >
+          <div role="alert" className="origami-state origami-state--error">
             {changeEmailError}
           </div>
         )}
 
         <form onSubmit={handleChangeEmail} className="space-y-4">
           <div>
-            <span className="block text-xs font-medium text-zinc-500 mb-1">Correo actual:</span>
-            <p className="text-sm font-semibold text-zinc-900 bg-zinc-50 p-2.5 rounded-lg border border-zinc-200">
+            <span className="block text-xs font-medium text-[var(--origami-text-secondary)] mb-1">
+              Correo actual:
+            </span>
+            <p className="text-sm font-semibold text-[var(--origami-text-primary)] bg-[var(--origami-surface-soft)] p-2.5 rounded-lg border border-[var(--origami-border-subtle)]">
               {student.email}
             </p>
           </div>
 
           <div>
-            <label htmlFor="change-new-email" className="block text-xs font-semibold text-zinc-700 mb-1">
+            <label
+              htmlFor="change-new-email"
+              className="origami-label block mb-1"
+            >
               Nuevo correo electrónico *
             </label>
             <input
@@ -701,35 +880,37 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
               placeholder="nuevo.correo@example.com"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="origami-field"
             />
           </div>
 
           {/* Mandatory unchecked verification checkbox (RF-18) */}
           <div className="pt-2">
-            <label className="flex items-start gap-2.5 text-xs text-zinc-700 font-medium cursor-pointer select-none">
+            <label className="origami-label flex items-start gap-2.5 font-medium cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={identityConfirmed}
                 onChange={(e) => setIdentityConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                className="h-6 w-6 shrink-0 accent-[var(--origami-primary)]"
               />
               <span>Confirmo que verifiqué la identidad del alumno.</span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
+          <div className="flex justify-end gap-3 pt-4 border-t border-[var(--origami-border-subtle)]">
             <button
               type="button"
               onClick={() => setIsChangeEmailOpen(false)}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+              className="origami-button origami-button--secondary"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isSubmittingEmail || !identityConfirmed || !newEmail.trim()}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+              disabled={
+                isSubmittingEmail || !identityConfirmed || !newEmail.trim()
+              }
+              className="origami-button"
             >
               {isSubmittingEmail ? 'Actualizando…' : 'Confirmar cambio'}
             </button>
@@ -744,26 +925,46 @@ export function AlumnoDetailClient({ id }: { id: string }) {
         title="⚠️ Confirmar baja definitiva"
         maxWidthClass="max-w-lg"
       >
-        <div className="text-xs text-zinc-700 space-y-2 leading-relaxed">
-          <p className="font-semibold text-zinc-900">
-            ¿Estás segura/o de dar de baja a <span className="font-bold text-rose-900">{student?.name}</span>?
+        <div className="text-xs text-[var(--origami-text-secondary)] space-y-2 leading-relaxed">
+          <p className="font-semibold text-[var(--origami-text-primary)]">
+            ¿Estás segura/o de dar de baja a{' '}
+            <span className="font-bold text-[var(--origami-error-text)]">
+              {student?.name}
+            </span>
+            ?
           </p>
-          <p className="font-bold text-rose-800 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-            Se eliminarán la cuenta, las respuestas y los audios. Esta acción no se puede deshacer.
+          <p className="font-bold text-[var(--origami-error-text)] bg-[var(--origami-error-bg)] p-2.5 rounded-xl border border-[var(--origami-border-subtle)]">
+            Se eliminarán la cuenta, las respuestas y los audios. Esta acción no
+            se puede deshacer.
           </p>
-          <ul className="list-disc pl-5 space-y-1 text-zinc-600">
-            <li>Congelación del denominador histórico en asignaciones abiertas y cerradas.</li>
-            <li>Anonimización y redacción de direcciones de correo en registros de auditoría.</li>
+          <ul className="list-disc pl-5 space-y-1 text-[var(--origami-text-secondary)]">
+            <li>
+              Congelación del denominador histórico en asignaciones abiertas y
+              cerradas.
+            </li>
+            <li>
+              Anonimización y redacción de direcciones de correo en registros de
+              auditoría.
+            </li>
             <li>Eliminación de archivos multimedia de voz en Cloudflare R2.</li>
-            <li>Eliminación en cascada limpia de membresías, intentos y usuario.</li>
+            <li>
+              Eliminación en cascada limpia de membresías, intentos y usuario.
+            </li>
           </ul>
-          <label htmlFor="delete-confirm-input" className="block pt-2 font-bold text-zinc-900">
-            Para confirmar, escribe <span className="text-rose-600 font-mono font-bold">ELIMINAR</span> a continuación:
+          <label
+            htmlFor="delete-confirm-input"
+            className="origami-label block pt-2 font-bold"
+          >
+            Para confirmar, escribe{' '}
+            <span className="text-[var(--origami-error-text)] font-mono font-bold">
+              ELIMINAR
+            </span>{' '}
+            a continuación:
           </label>
         </div>
 
         {deleteError && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800">
+          <div className="p-3 rounded-xl bg-[var(--origami-error-bg)] border border-[var(--origami-border-subtle)] text-xs font-bold text-[var(--origami-error-text)]">
             {deleteError}
           </div>
         )}
@@ -775,15 +976,15 @@ export function AlumnoDetailClient({ id }: { id: string }) {
           onChange={(e) => setDeleteConfirmText(e.target.value)}
           placeholder="ELIMINAR"
           aria-label="Escribe ELIMINAR para confirmar la baja"
-          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+          className="origami-field"
         />
 
-        <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+        <div className="flex justify-end gap-3 pt-3 border-t border-[var(--origami-border-subtle)]">
           <button
             type="button"
             disabled={isDeletingStudent}
             onClick={() => setIsDeleteModalOpen(false)}
-            className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50"
+            className="origami-button origami-button--secondary"
           >
             Cancelar
           </button>
@@ -791,7 +992,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
             type="button"
             disabled={isDeletingStudent || deleteConfirmText !== 'ELIMINAR'}
             onClick={handleDeleteStudent}
-            className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 text-xs shadow-xs disabled:opacity-50"
+            className="origami-button"
           >
             {isDeletingStudent ? 'Dando de baja…' : 'Confirmar baja definitiva'}
           </button>
@@ -810,17 +1011,25 @@ export function AlumnoDetailClient({ id }: { id: string }) {
         title="⚠️ Pérdida definitiva de reintentos"
         maxWidthClass="max-w-lg"
       >
-        <div className="text-xs text-zinc-700 space-y-3 leading-relaxed">
-          <p className="font-semibold text-zinc-900">
-            El alumno tiene reintentos concedidos pendientes en este grupo. Si confirmas el traslado,
-            <span className="text-rose-700 font-bold"> la pérdida de los reintentos concedidos será definitiva e irreversible</span>,
-            incluso si el alumno es trasladado de vuelta a este grupo en el futuro (QA-07).
+        <div className="text-xs text-[var(--origami-text-secondary)] space-y-3 leading-relaxed">
+          <p className="font-semibold text-[var(--origami-text-primary)]">
+            El alumno tiene reintentos concedidos pendientes en este grupo. Si
+            confirmas el traslado,
+            <span className="text-[var(--origami-error-text)] font-bold">
+              {' '}
+              la pérdida de los reintentos concedidos será definitiva e
+              irreversible
+            </span>
+            , incluso si el alumno es trasladado de vuelta a este grupo en el
+            futuro (QA-07).
           </p>
 
           {affectedActivities.length > 0 && (
-            <div className="border border-amber-200 bg-amber-50/70 rounded-xl p-3 space-y-1.5">
-              <p className="font-bold text-amber-950">Actividades con reintentos que se revocarán:</p>
-              <ul className="list-disc pl-4 space-y-1 text-zinc-800">
+            <div className="border border-[var(--origami-border-subtle)] bg-[var(--origami-warning-bg)] rounded-xl p-3 space-y-1.5">
+              <p className="font-bold text-[var(--origami-warning-text)]">
+                Actividades con reintentos que se revocarán:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[var(--origami-text-primary)]">
                 {affectedActivities.map((act, actIdx) => {
                   if (typeof act === 'string') {
                     return (
@@ -831,10 +1040,13 @@ export function AlumnoDetailClient({ id }: { id: string }) {
                   }
                   const key = act.assignmentId || String(actIdx);
                   const title = act.activityTitle || 'Actividad';
-                  const attemptNum = act.attemptNumber ? ` (Intento #${act.attemptNumber})` : '';
+                  const attemptNum = act.attemptNumber
+                    ? ` (Intento #${act.attemptNumber})`
+                    : '';
                   return (
                     <li key={key}>
-                      <span className="font-semibold">{title}</span>{attemptNum}
+                      <span className="font-semibold">{title}</span>
+                      {attemptNum}
                     </li>
                   );
                 })}
@@ -842,12 +1054,13 @@ export function AlumnoDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          <p className="text-zinc-600">
-            ¿Confirmas el traslado de grupo asumiendo la revocación permanente de estos reintentos?
+          <p className="text-[var(--origami-text-secondary)]">
+            ¿Confirmas el traslado de grupo asumiendo la revocación permanente
+            de estos reintentos?
           </p>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
+        <div className="flex justify-end gap-3 pt-4 border-t border-[var(--origami-border-subtle)]">
           <button
             type="button"
             disabled={isTransferringGroup}
@@ -855,7 +1068,7 @@ export function AlumnoDetailClient({ id }: { id: string }) {
               setRetryWarningModalOpen(false);
               setAffectedActivities([]);
             }}
-            className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            className="origami-button origami-button--secondary"
           >
             Cancelar
           </button>
@@ -863,9 +1076,11 @@ export function AlumnoDetailClient({ id }: { id: string }) {
             type="button"
             disabled={isTransferringGroup}
             onClick={() => handleGroupTransfer(true)}
-            className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 text-xs shadow-xs disabled:opacity-50"
+            className="origami-button"
           >
-            {isTransferringGroup ? 'Trasladando…' : 'Confirmar traslado definitivo'}
+            {isTransferringGroup
+              ? 'Trasladando…'
+              : 'Confirmar traslado definitivo'}
           </button>
         </div>
       </AccessibleModal>

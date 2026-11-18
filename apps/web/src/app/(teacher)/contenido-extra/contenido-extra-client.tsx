@@ -16,19 +16,25 @@ import { apiFetch, ApiError } from '../../../lib/api';
 import { AccessibleModal, ConfirmDialog } from '../../../components/ui/modal';
 
 function isLevel(val: string): val is Level {
-  return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
+  return (
+    val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2
+  );
 }
 
 export function ContenidoExtraClient() {
   const queryClient = useQueryClient();
 
   // Filters
-  const [levelFilter, setLevelFilter] = useState<'todos' | 'general' | 'A1' | 'A2' | 'B1' | 'B2'>('todos');
+  const [levelFilter, setLevelFilter] = useState<
+    'todos' | 'general' | 'A1' | 'A2' | 'B1' | 'B2'
+  >('todos');
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingResource, setEditingResource] = useState<ExternalResourceItem | null>(null);
-  const [deletingResource, setDeletingResource] = useState<ExternalResourceItem | null>(null);
+  const [editingResource, setEditingResource] =
+    useState<ExternalResourceItem | null>(null);
+  const [deletingResource, setDeletingResource] =
+    useState<ExternalResourceItem | null>(null);
 
   // Form fields
   const [formTitle, setFormTitle] = useState('');
@@ -80,7 +86,8 @@ export function ContenidoExtraClient() {
     },
     onError: (err) => {
       if (err instanceof ApiError) setServerError(err.message);
-      else setServerError('No se pudo actualizar la visibilidad de la sección.');
+      else
+        setServerError('No se pudo actualizar la visibilidad de la sección.');
     },
   });
 
@@ -232,7 +239,10 @@ export function ContenidoExtraClient() {
     setServerError(null);
 
     const trimmedUrl = formUrl.trim();
-    if (!trimmedUrl.toLowerCase().startsWith('https://') || !isValidHttpsResourceUrl(trimmedUrl)) {
+    if (
+      !trimmedUrl.toLowerCase().startsWith('https://') ||
+      !isValidHttpsResourceUrl(trimmedUrl)
+    ) {
       setFormUrlError('Ingresa un enlace válido que comience con https://');
       return;
     }
@@ -284,20 +294,22 @@ export function ContenidoExtraClient() {
   const isLoading = resourcesQuery.isLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {/* Banner when extra_content is disabled (RF-3, RF-4) */}
-      {!isExtraContentEnabled && !flagsQuery.isLoading && (
+      {!isExtraContentEnabled && flagsQuery.isSuccess && (
         <div
           role="status"
-          className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+          className="origami-state origami-state--warning flex flex-wrap items-center justify-between gap-4"
         >
-          <div className="flex items-center gap-3">
-            <span className="text-2xl" aria-hidden="true">🔒</span>
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <span className="text-2xl" aria-hidden="true">
+              🔒
+            </span>
             <div>
               <p className="text-sm font-bold">
                 Sección oculta para los estudiantes
               </p>
-              <p className="text-xs text-amber-800">
+              <p className="text-xs text-[var(--origami-warning-text)]">
                 Puedes preparar los enlaces y activarla cuando estés lista.
               </p>
             </div>
@@ -306,44 +318,48 @@ export function ContenidoExtraClient() {
             type="button"
             onClick={() => toggleFlagMutation.mutate(true)}
             disabled={toggleFlagMutation.isPending}
-            className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="origami-button"
           >
-            {toggleFlagMutation.isPending ? 'Activando…' : 'Habilitar sección para estudiantes'}
+            {toggleFlagMutation.isPending
+              ? 'Activando…'
+              : 'Habilitar sección para estudiantes'}
           </button>
         </div>
       )}
 
       {/* Main Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
+      <div className="flex flex-wrap flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[var(--origami-border-subtle)] pb-5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900">
+          <h1 className="origami-page-title text-[var(--origami-text-primary)]">
             Contenido extra
           </h1>
-          <p className="text-sm text-zinc-600 mt-1">
-            Enlaces externos verificados para práctica y profundización fuera del flujo evaluable.
+          <p className="text-sm text-[var(--origami-text-secondary)] mt-1">
+            Enlaces externos verificados para práctica y profundización fuera
+            del flujo evaluable.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           {/* Toggle button */}
           <button
             type="button"
             onClick={() => toggleFlagMutation.mutate(!isExtraContentEnabled)}
-            disabled={toggleFlagMutation.isPending || flagsQuery.isLoading}
+            disabled={toggleFlagMutation.isPending || !flagsQuery.isSuccess}
             aria-pressed={isExtraContentEnabled}
-            className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 disabled:opacity-50 ${
-              isExtraContentEnabled
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
-            }`}
+            className={
+              'origami-button origami-button--secondary' +
+              (isExtraContentEnabled ? ' origami-selected' : '')
+            }
           >
-            {isExtraContentEnabled ? '✓ Visible para estudiantes' : '○ Oculto para estudiantes'}
+            {isExtraContentEnabled
+              ? '✓ Visible para estudiantes'
+              : '○ Oculto para estudiantes'}
           </button>
 
           <button
             type="button"
             onClick={openCreateForm}
-            className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+            className="origami-button"
           >
             + Nuevo enlace
           </button>
@@ -351,32 +367,51 @@ export function ContenidoExtraClient() {
       </div>
 
       {serverError && (
-        <div
-          role="alert"
-          className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800"
-        >
+        <div role="alert" className="origami-state origami-state--error">
           {serverError}
         </div>
       )}
 
+      {flagsQuery.isError && (
+        <div className="origami-state origami-state--error flex flex-wrap items-center justify-between gap-2">
+          <p role="alert">No se pudo consultar la visibilidad de la sección.</p>
+          <button
+            type="button"
+            onClick={() => void flagsQuery.refetch()}
+            className="origami-button origami-button--secondary"
+          >
+            Reintentar visibilidad
+          </button>
+        </div>
+      )}
+
       {/* Level Filters */}
-      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Filtro por nivel MCER">
-        <span className="text-xs font-bold text-zinc-500 mr-1">Filtrar por nivel:</span>
+      <div
+        className="flex flex-wrap items-center gap-2"
+        role="toolbar"
+        aria-label="Filtro por nivel MCER"
+      >
+        <span className="text-xs font-bold text-[var(--origami-text-secondary)] mr-1">
+          Filtrar por nivel:
+        </span>
         {(['todos', 'general', 'A1', 'A2', 'B1', 'B2'] as const).map((lvl) => {
           const isActive = levelFilter === lvl;
           const label =
-            lvl === 'todos' ? 'Todos' : lvl === 'general' ? 'General' : `Nivel ${lvl}`;
+            lvl === 'todos'
+              ? 'Todos'
+              : lvl === 'general'
+                ? 'General'
+                : `Nivel ${lvl}`;
           return (
             <button
               key={lvl}
               type="button"
               onClick={() => setLevelFilter(lvl)}
               aria-pressed={isActive}
-              className={`inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-              }`}
+              className={
+                'origami-button origami-button--secondary' +
+                (isActive ? ' origami-selected' : '')
+              }
             >
               {label}
             </button>
@@ -385,74 +420,100 @@ export function ContenidoExtraClient() {
       </div>
 
       {levelFilter !== 'todos' && items.length > 1 && (
-        <p className="text-xs text-zinc-500 italic">
-          * Nota: El reordenamiento manual requiere seleccionar el filtro «Todos» para ordenar el catálogo completo.
+        <p className="text-xs text-[var(--origami-text-secondary)] italic">
+          * Nota: El reordenamiento manual requiere seleccionar el filtro
+          «Todos» para ordenar el catálogo completo.
         </p>
       )}
 
       {/* Content List */}
       {isLoading ? (
-        <div className="py-16 text-center text-sm font-medium text-zinc-500">
+        <div
+          role="status"
+          className="origami-state py-16 text-center text-sm font-medium text-[var(--origami-text-secondary)]"
+        >
           Cargando recursos externos…
         </div>
+      ) : resourcesQuery.isError && !resourcesQuery.data ? (
+        <div className="origami-state origami-state--error flex flex-wrap items-center justify-between gap-2">
+          <p role="alert">No se pudo cargar el catálogo de recursos.</p>
+          <button
+            type="button"
+            onClick={() => void resourcesQuery.refetch()}
+            className="origami-button origami-button--secondary"
+          >
+            Reintentar catálogo
+          </button>
+        </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50/50 p-12 text-center space-y-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 text-3xl">
+        <div className="rounded-2xl border border-dashed border-[var(--origami-border-control)] bg-[var(--origami-surface-soft)] p-12 text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--origami-surface-raised)] text-3xl">
             🔗
           </div>
           <div className="space-y-1">
-            <h2 className="text-base font-bold text-zinc-900">
+            <h2 className="origami-section-title text-[var(--origami-text-primary)]">
               Aún no has publicado enlaces de contenido extra.
             </h2>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              Agrega enlaces a Educaplay, videos educativos o diccionarios para que los alumnos practiquen libremente.
+            <p className="text-xs text-[var(--origami-text-secondary)] max-w-sm mx-auto">
+              Agrega enlaces a Educaplay, videos educativos o diccionarios para
+              que los alumnos practiquen libremente.
             </p>
           </div>
           <button
             type="button"
             onClick={openCreateForm}
-            className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+            className="origami-button"
           >
             Agregar primer enlace
           </button>
         </div>
       ) : (
-        <ul className="space-y-3" aria-label="Lista de recursos de contenido extra">
+        <ul
+          className="space-y-3"
+          aria-label="Lista de recursos de contenido extra"
+        >
           {items.map((item, index) => {
             const domain = getHostname(item.url);
-            const canMoveUp = levelFilter === 'todos' && index > 0 && !reorderMutation.isPending;
+            const canMoveUp =
+              levelFilter === 'todos' &&
+              index > 0 &&
+              !reorderMutation.isPending;
             const canMoveDown =
-              levelFilter === 'todos' && index < items.length - 1 && !reorderMutation.isPending;
+              levelFilter === 'todos' &&
+              index < items.length - 1 &&
+              !reorderMutation.isPending;
 
             return (
               <li
                 key={item.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:border-zinc-300 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-[var(--origami-border-subtle)] bg-[var(--origami-surface)] p-4 hover:border-[var(--origami-border-control)] transition-colors"
               >
                 <div className="flex items-start gap-3.5 min-w-0">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-xs font-bold text-zinc-500">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--origami-surface-raised)] text-xs font-bold text-[var(--origami-text-secondary)]">
                     {index + 1}
                   </span>
 
                   <div className="space-y-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-bold text-zinc-900 truncate">
+                      <h3 className="origami-card-title text-[var(--origami-text-primary)]">
                         {item.title}
                       </h3>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
                           item.level
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-emerald-100 text-emerald-800'
+                            ? 'bg-[var(--origami-info-bg)] text-[var(--origami-info-text)]'
+                            : 'bg-[var(--origami-success-bg)] text-[var(--origami-success-text)]'
                         }`}
                       >
                         {item.level ? `Nivel ${item.level}` : 'General'}
                       </span>
-                      <span className="text-xs text-zinc-500 truncate">({domain})</span>
+                      <span className="text-xs text-[var(--origami-text-secondary)]">
+                        ({domain})
+                      </span>
                     </div>
 
                     {item.description && (
-                      <p className="text-xs text-zinc-600 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-[var(--origami-text-secondary)] line-clamp-2 leading-relaxed">
                         {item.description}
                       </p>
                     )}
@@ -467,7 +528,7 @@ export function ContenidoExtraClient() {
                     disabled={!canMoveUp}
                     title="Subir posición"
                     aria-label={`Subir enlace ${item.title}`}
-                    className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-xl border border-zinc-200 text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                    className="origami-button origami-button--secondary"
                   >
                     ▲
                   </button>
@@ -477,7 +538,7 @@ export function ContenidoExtraClient() {
                     disabled={!canMoveDown}
                     title="Bajar posición"
                     aria-label={`Bajar enlace ${item.title}`}
-                    className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-xl border border-zinc-200 text-xs font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                    className="origami-button origami-button--secondary"
                   >
                     ▼
                   </button>
@@ -487,7 +548,7 @@ export function ContenidoExtraClient() {
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3 rounded-xl border border-zinc-200 text-xs font-bold text-zinc-700 hover:bg-zinc-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                    className="flex flex-wrap items-center justify-center min-h-[48px] min-w-[48px] px-3 rounded-xl border border-[var(--origami-border-subtle)] text-xs font-bold text-[var(--origami-text-secondary)] hover:bg-[var(--origami-surface-raised)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--origami-focus)] focus-visible:outline-[var(--origami-focus)]"
                   >
                     Abrir ↗
                   </a>
@@ -496,7 +557,7 @@ export function ContenidoExtraClient() {
                   <button
                     type="button"
                     onClick={() => openEditForm(item)}
-                    className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3 rounded-xl border border-zinc-200 text-xs font-bold text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                    className="origami-button origami-button--secondary"
                   >
                     Editar
                   </button>
@@ -505,7 +566,7 @@ export function ContenidoExtraClient() {
                   <button
                     type="button"
                     onClick={() => setDeletingResource(item)}
-                    className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-3 rounded-xl border border-rose-200 text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                    className="origami-button origami-button--secondary text-[var(--origami-error-text)]"
                   >
                     Eliminar
                   </button>
@@ -526,122 +587,136 @@ export function ContenidoExtraClient() {
         }}
         title={editingResource ? 'Editar enlace' : 'Nuevo enlace'}
       >
+        {serverError && (
+          <div role="alert" className="origami-state origami-state--error">
+            {serverError}
+          </div>
+        )}
 
-            {serverError && (
-              <div
+        <form onSubmit={handleFormSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="form-title"
+              className="origami-label block font-bold mb-1"
+            >
+              Título del recurso *
+            </label>
+            <input
+              id="form-title"
+              ref={firstInputRef}
+              type="text"
+              required
+              maxLength={160}
+              value={formTitle}
+              onChange={(e) => setFormTitle(e.target.value)}
+              placeholder="Ej: Animals & Colors Memory Game"
+              className="origami-field"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="form-url"
+              className="origami-label block font-bold mb-1"
+            >
+              Enlace externo (debe comenzar con https://) *
+            </label>
+            <input
+              aria-invalid={Boolean(formUrlError)}
+              aria-describedby={formUrlError ? 'resource-url-error' : undefined}
+              id="form-url"
+              type="url"
+              required
+              maxLength={2048}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={formUrl}
+              onChange={(e) => {
+                setFormUrl(e.target.value);
+                if (formUrlError) setFormUrlError(null);
+              }}
+              placeholder="https://es.educaplay.com/..."
+              className="origami-field"
+            />
+            {formUrlError && (
+              <p
+                id="resource-url-error"
+                className="text-xs font-bold text-[var(--origami-error-text)] mt-1"
                 role="alert"
-                className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800"
               >
-                {serverError}
-              </div>
+                {formUrlError}
+              </p>
             )}
+          </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="form-title" className="block text-xs font-bold text-zinc-700 mb-1">
-                  Título del recurso *
-                </label>
-                <input
-                  id="form-title"
-                  ref={firstInputRef}
-                  type="text"
-                  required
-                  maxLength={160}
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Ej: Animals & Colors Memory Game"
-                  className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+          <div>
+            <label
+              htmlFor="form-level"
+              className="origami-label block font-bold mb-1"
+            >
+              Nivel de visibilidad
+            </label>
+            <select
+              id="form-level"
+              value={formLevel}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFormLevel(isLevel(v) ? v : '');
+              }}
+              className="origami-field"
+            >
+              <option value="">General (todos los niveles)</option>
+              <option value="A1">Nivel A1</option>
+              <option value="A2">Nivel A2</option>
+              <option value="B1">Nivel B1</option>
+              <option value="B2">Nivel B2</option>
+            </select>
+          </div>
 
-              <div>
-                <label htmlFor="form-url" className="block text-xs font-bold text-zinc-700 mb-1">
-                  Enlace externo (debe comenzar con https://) *
-                </label>
-                <input
-                  id="form-url"
-                  type="url"
-                  required
-                  maxLength={2048}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={formUrl}
-                  onChange={(e) => {
-                    setFormUrl(e.target.value);
-                    if (formUrlError) setFormUrlError(null);
-                  }}
-                  placeholder="https://es.educaplay.com/..."
-                  className={`w-full rounded-xl border px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
-                    formUrlError
-                      ? 'border-rose-400 focus:ring-rose-500'
-                      : 'border-zinc-300 focus:ring-blue-500'
-                  }`}
-                />
-                {formUrlError && (
-                  <p className="text-xs font-bold text-rose-600 mt-1" role="alert">
-                    {formUrlError}
-                  </p>
-                )}
-              </div>
+          <div>
+            <label
+              htmlFor="form-description"
+              className="origami-label block font-bold mb-1"
+            >
+              Descripción u orientación (opcional)
+            </label>
+            <textarea
+              id="form-description"
+              rows={3}
+              maxLength={500}
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              placeholder="Instrucciones breves o consigna para el alumno…"
+              className="origami-field"
+            />
+          </div>
 
-              <div>
-                <label htmlFor="form-level" className="block text-xs font-bold text-zinc-700 mb-1">
-                  Nivel de visibilidad
-                </label>
-                <select
-                  id="form-level"
-                  value={formLevel}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setFormLevel(isLevel(v) ? v : '');
-                  }}
-                  className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">General (todos los niveles)</option>
-                  <option value="A1">Nivel A1</option>
-                  <option value="A2">Nivel A2</option>
-                  <option value="B1">Nivel B1</option>
-                  <option value="B2">Nivel B2</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="form-description" className="block text-xs font-bold text-zinc-700 mb-1">
-                  Descripción u orientación (opcional)
-                </label>
-                <textarea
-                  id="form-description"
-                  rows={3}
-                  maxLength={500}
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Instrucciones breves o consigna para el alumno…"
-                  className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-4 py-2 rounded-xl border border-zinc-300 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={createResourceMutation.isPending || updateResourceMutation.isPending}
-                  className="w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] min-w-[48px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 disabled:opacity-50"
-                >
-                  {createResourceMutation.isPending || updateResourceMutation.isPending
-                    ? 'Guardando…'
-                    : editingResource
-                      ? 'Guardar cambios'
-                      : 'Crear enlace'}
-                </button>
-              </div>
-            </form>
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={closeForm}
+              className="origami-button origami-button--secondary w-full sm:w-auto"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={
+                createResourceMutation.isPending ||
+                updateResourceMutation.isPending
+              }
+              className="origami-button w-full sm:w-auto"
+            >
+              {createResourceMutation.isPending ||
+              updateResourceMutation.isPending
+                ? 'Guardando…'
+                : editingResource
+                  ? 'Guardar cambios'
+                  : 'Crear enlace'}
+            </button>
+          </div>
+        </form>
       </AccessibleModal>
 
       {/* Modal: Delete Confirmation (RF-4) */}
@@ -649,7 +724,9 @@ export function ContenidoExtraClient() {
         isOpen={Boolean(deletingResource)}
         title="¿Eliminar enlace?"
         message={`¿Eliminar el enlace "${deletingResource?.title ?? ''}"? Dejará de aparecer en el portal inmediatamente.`}
-        confirmText={deleteResourceMutation.isPending ? 'Eliminando…' : 'Eliminar enlace'}
+        confirmText={
+          deleteResourceMutation.isPending ? 'Eliminando…' : 'Eliminar enlace'
+        }
         cancelText="Cancelar"
         isDestructive={true}
         onConfirm={() => {

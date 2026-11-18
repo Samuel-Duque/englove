@@ -193,6 +193,8 @@ test("RT-04: multi-tab logout clears second tab immediately and removes private 
 
   await expect(page1.getByText("AUDIT_PRIVATE_TEACHER_IDENTITY").first()).toBeVisible();
   await expect(page2.getByText("AUDIT_PRIVATE_TEACHER_IDENTITY").first()).toBeVisible();
+  await page2.getByLabel("Apariencia").selectOption("dark");
+  await expect(page2.locator("html")).toHaveAttribute("data-appearance", "dark");
 
   await page1.getByRole("button", { name: "Cerrar sesión", exact: true }).click();
   await expect(page1).toHaveURL(/\/login/);
@@ -200,6 +202,7 @@ test("RT-04: multi-tab logout clears second tab immediately and removes private 
   await page2.bringToFront();
   await expect(page2).toHaveURL(/\/login/);
   await expect(page2.getByText("AUDIT_PRIVATE_TEACHER_IDENTITY")).toHaveCount(0);
+  await expect(page2.getByLabel("Apariencia")).toHaveValue("system");
   expect(pageErrors).toEqual([]);
 });
 

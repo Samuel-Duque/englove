@@ -1,0 +1,120 @@
+/* La fila se conserva en el árbol accesible en ambos tamaños. Los rótulos
+   visuales de las fichas no se anuncian de nuevo junto a los encabezados. */
+.operationalTable,
+.comparativeTable {
+  inline-size: 100%;
+  border-collapse: collapse;
+  text-align: start;
+  font: var(--origami-meta);
+}
+
+.operationalTable th,
+.comparativeTable th {
+  block-size: var(--origami-target);
+  background: var(--origami-surface-soft);
+  font: var(--origami-label);
+}
+
+.operationalTable :is(td, th),
+.comparativeTable :is(td, th) {
+  padding: var(--origami-space-2) var(--origami-space-3);
+  overflow-wrap: anywhere;
+}
+
+.operationalTable td,
+.comparativeTable td {
+  block-size: 4rem;
+  border-block-start: 1px solid var(--origami-border-subtle);
+}
+
+.operationalBody {
+  background: var(--origami-surface);
+}
+
+.operationalTable a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--origami-space-1);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.mobileLabel {
+  display: none;
+}
+
+.comparativeTable {
+  min-inline-size: 32rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1023px) {
+  .operationalTable,
+  .operationalBody {
+    display: block;
+    min-inline-size: 0;
+  }
+
+  .operationalTable .operationalHead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .operationalBody {
+    display: grid;
+    gap: var(--origami-space-3);
+    background: transparent;
+  }
+
+  .operationalTable .operationalRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--origami-space-2);
+    padding: var(--origami-space-3);
+    border: 1px solid var(--origami-border-subtle);
+    border-radius: var(--origami-card-radius);
+    background: var(--origami-surface-raised);
+  }
+
+  .operationalTable :is(.cardHeading, .cardField, .cardActions) {
+    min-inline-size: 0;
+    block-size: auto;
+    padding: 0;
+    border: 0;
+    text-align: start;
+  }
+
+  .cardHeading {
+    display: block;
+  }
+
+  .cardField {
+    display: grid;
+    justify-items: start;
+    gap: var(--origami-space-1);
+  }
+
+  .cardActions {
+    display: grid;
+    gap: var(--origami-space-2);
+  }
+
+  .cardActions .rowActions {
+    justify-content: flex-start;
+  }
+
+  .mobileLabel {
+    display: block;
+    color: var(--origami-text-secondary);
+    font: var(--origami-meta);
+  }
+}

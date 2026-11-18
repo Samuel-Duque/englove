@@ -14,9 +14,15 @@ import {
   GameAnswerKey,
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
-import { formatBlankPrompt } from '../../../lib/blank-prompt';
+import { speak } from '../../../lib/speech';
+import {
+  OpenQuestionRenderer,
+  SentenceRenderer,
+  SpeakingRenderer,
+} from '../../../components/activities/DidacticRenderers';
 import { GameRenderer } from '../../../components/activities/GameRenderer';
 import { AccessibleModal } from '../../../components/ui/modal';
+import { activityTypeLabels } from './activity-labels';
 
 interface ActivityEditorProps {
   initialActivity?: ActivityEditor;
@@ -840,6 +846,23 @@ export function ActivityEditorComponent({
     initialActivity?.status ?? ActivityStatus.draft,
   );
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewAnswers, setPreviewAnswers] = useState<Record<string, unknown>>({});
+  const [previewRecordingNotice, setPreviewRecordingNotice] = useState(false);
+  const changePreviewAnswer = (itemId: string, answer: unknown) => {
+    setPreviewAnswers((previous) => ({ ...previous, [itemId]: answer }));
+  };
+  const openPreview = () => {
+    setPreviewAnswers({});
+    setPreviewRecordingNotice(false);
+    setIsPreviewOpen(true);
+  };
+  const speakPreview = isPreviewOpen &&
+    typeof window !== "undefined" &&
+    "speechSynthesis" in window &&
+    (window.speechSynthesis.getVoices().length > 0 ||
+      !("onvoiceschanged" in window.speechSynthesis))
+      ? speak
+      : undefined;
   const [previewTheme, setPreviewTheme] = useState<'kids' | 'teens'>('kids');
   const [gameMechanic, setGameMechanic] = useState<GameMechanicType>(
     initialActivity?.type === ActivityType.game ? initialMechanic : 'order_words',
@@ -1493,42 +1516,45 @@ export function ActivityEditorComponent({
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="origami-shell mx-auto max-w-4xl space-y-6">
       {/* Breadcrumb & Navigation */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/actividades" className="hover:text-zinc-900">
+      <div className="flex flex-wrap items-center gap-2 origami-meta">
+        <Link
+          href="/actividades"
+          className="origami-button origami-button--text"
+        >
           Catálogo de Actividades
         </Link>
         <span>/</span>
-        <span className="text-zinc-800 font-medium truncate">
-          {isEditing ? title || 'Sin título' : 'Nueva actividad'}
+        <span className="text-(--origami-text-primary) font-medium">
+          {isEditing ? title || "Sin título" : "Nueva actividad"}
         </span>
       </div>
 
       {/* Title & Actions Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-(--origami-border-subtle) pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            {isEditing ? 'Editor de actividad' : 'Nueva actividad'}
+          <h1 className="origami-page-title">
+            {isEditing ? "Editor de actividad" : "Nueva actividad"}
           </h1>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 flex-wrap mt-1">
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+              className={`origami-state text-sm font-extrabold ${
                 currentStatus === ActivityStatus.published
-                  ? 'bg-emerald-100 text-emerald-800'
+                  ? "origami-state--success"
                   : currentStatus === ActivityStatus.archived
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-zinc-100 text-zinc-700'
+                    ? "origami-state--warning"
+                    : ""
               }`}
             >
               {currentStatus === ActivityStatus.published
-                ? 'Publicada'
+                ? "Publicada"
                 : currentStatus === ActivityStatus.archived
-                  ? 'Archivada'
-                  : 'Borrador'}
+                  ? "Archivada"
+                  : "Borrador"}
             </span>
             {isEditing && (
-              <span className="text-xs text-zinc-500">
+              <span className="origami-meta">
                 Versión {initialActivity?.version}
               </span>
             )}
@@ -1538,11 +1564,10 @@ export function ActivityEditorComponent({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsPreviewOpen(true)}
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-500 min-h-[44px] flex items-center gap-1.5"
+            onClick={openPreview}
+            className="origami-button origami-button--secondary"
           >
-            <span>👁️</span>
-            <span>Previsualizar</span>
+            Previsualizar
           </button>
 
           {isEditing && currentStatus === ActivityStatus.draft && (
@@ -1550,7 +1575,7 @@ export function ActivityEditorComponent({
               type="button"
               onClick={handlePublish}
               disabled={isSaving}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 min-h-[44px]"
+              className="origami-button origami-button--secondary"
             >
               Publicar
             </button>
@@ -1561,9 +1586,13 @@ export function ActivityEditorComponent({
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 min-h-[44px]"
+              className="origami-button"
             >
-              {isSaving ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Crear borrador'}
+              {isSaving
+                ? "Guardando…"
+                : isEditing
+                  ? "Guardar cambios"
+                  : "Crear borrador"}
             </button>
           )}
         </div>
@@ -1571,42 +1600,33 @@ export function ActivityEditorComponent({
 
       {/* Alerts */}
       {error && (
-        <div
-          role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800"
-        >
+        <div role="alert" className="origami-state origami-state--error">
           {error}
         </div>
       )}
 
       {success && (
-        <div
-          role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800"
-        >
+        <div role="status" className="origami-state origami-state--success">
           {success}
         </div>
       )}
 
       {weightsAdjustedNotice && (
-        <div
-          role="status"
-          className="rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800"
-        >
-          Los pesos de las oraciones del examen fueron ajustados automáticamente en décimas para
-          sumar exactamente 100.0%.
+        <div role="status" className="origami-state">
+          Los pesos de las oraciones del examen fueron ajustados automáticamente
+          en décimas para sumar exactamente 100.0%.
         </div>
       )}
 
       {/* Metadata Form */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-5">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+      <section className="origami-card space-y-5">
+        <h2 className="origami-section-title border-b border-(--origami-border-subtle) pb-2">
           Información básica
         </h2>
 
         {/* Title */}
         <div>
-          <label htmlFor="activity-title" className="block text-sm font-semibold text-zinc-800 mb-1">
+          <label htmlFor="activity-title" className="origami-label mb-1 block">
             Título de la actividad *
           </label>
           <input
@@ -1616,15 +1636,18 @@ export function ActivityEditorComponent({
             onChange={(e) => setTitle(e.target.value)}
             maxLength={100}
             placeholder="Ej. Simple Present vs Continuous"
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="origami-field"
           />
-          <p className="mt-1 text-xs text-zinc-500">{title.length}/100 caracteres</p>
+          <p className="origami-meta mt-1">{title.length}/100 caracteres</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Level */}
           <div>
-            <label htmlFor="activity-level" className="block text-sm font-semibold text-zinc-800 mb-1">
+            <label
+              htmlFor="activity-level"
+              className="origami-label mb-1 block"
+            >
               Nivel pedagógico *
             </label>
             <select
@@ -1633,7 +1656,7 @@ export function ActivityEditorComponent({
               onChange={(e) => {
                 if (isLevel(e.target.value)) setLevel(e.target.value);
               }}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="origami-field"
             >
               <option value={Level.A1}>A1 — Principiante inicial</option>
               <option value={Level.A2}>A2 — Principiante elemental</option>
@@ -1644,7 +1667,7 @@ export function ActivityEditorComponent({
 
           {/* Type Selector (only before creation) */}
           <div>
-            <label htmlFor="activity-type" className="block text-sm font-semibold text-zinc-800 mb-1">
+            <label htmlFor="activity-type" className="origami-label mb-1 block">
               Tipo de actividad
             </label>
             <select
@@ -1654,11 +1677,17 @@ export function ActivityEditorComponent({
               onChange={(e) => {
                 if (isActivityType(e.target.value)) setType(e.target.value);
               }}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-100 disabled:cursor-not-allowed"
+              className="origami-field"
             >
-              <option value={ActivityType.fill_blank}>Rellenar huecos (Fill in the blanks)</option>
-              <option value={ActivityType.open_question}>Pregunta abierta (Open question)</option>
-              <option value={ActivityType.speaking}>Expresión oral (Speaking)</option>
+              <option value={ActivityType.fill_blank}>
+                Rellenar huecos (Fill in the blanks)
+              </option>
+              <option value={ActivityType.open_question}>
+                Pregunta abierta (Open question)
+              </option>
+              <option value={ActivityType.speaking}>
+                Expresión oral (Speaking)
+              </option>
               <option value={ActivityType.game}>Microjuego (Game)</option>
               <option value={ActivityType.exam}>Examen (Exam)</option>
             </select>
@@ -1668,7 +1697,7 @@ export function ActivityEditorComponent({
         {/* Durations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           <div>
-            <label htmlFor="exp-duration" className="block text-xs font-semibold text-zinc-700 mb-1">
+            <label htmlFor="exp-duration" className="origami-label mb-1 block">
               Duración esperada (segundos, opcional)
             </label>
             <input
@@ -1678,36 +1707,40 @@ export function ActivityEditorComponent({
               value={expectedDuration}
               onChange={(e) => setExpectedDuration(e.target.value)}
               placeholder="Default según tipo"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="origami-field"
             />
           </div>
 
           <div>
-            <label htmlFor="min-duration" className="block text-xs font-semibold text-zinc-700 mb-1">
+            <label htmlFor="min-duration" className="origami-label mb-1 block">
               Mínimo plausible (segundos)
             </label>
             <input
               id="min-duration"
               type="number"
               min="1"
-              value={type === ActivityType.speaking ? '2' : minPlausible}
+              value={type === ActivityType.speaking ? "2" : minPlausible}
               disabled={type === ActivityType.speaking}
               onChange={(e) => setMinPlausible(e.target.value)}
-              placeholder={type === ActivityType.speaking ? '2 (fijo)' : 'Default según tipo'}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-100"
+              placeholder={
+                type === ActivityType.speaking
+                  ? "2 (fijo)"
+                  : "Default según tipo"
+              }
+              className="origami-field"
             />
             {type === ActivityType.speaking && (
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="origami-meta mt-1">
                 La duración mínima para Speaking es fija de 2 segundos.
               </p>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Content Form by Type */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-5">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+      <section className="origami-card space-y-5">
+        <h2 className="origami-section-title border-b border-(--origami-border-subtle) pb-2">
           Contenido de la actividad
         </h2>
 
@@ -1715,7 +1748,10 @@ export function ActivityEditorComponent({
         {type === ActivityType.fill_blank && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="fb-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
+              <label
+                htmlFor="fb-instructions"
+                className="origami-label mb-1 block"
+              >
                 Instrucciones (opcional)
               </label>
               <input
@@ -1725,18 +1761,20 @@ export function ActivityEditorComponent({
                 onChange={(e) => setFbInstructions(e.target.value)}
                 maxLength={2000}
                 placeholder="Ej. Selecciona la opción correcta para completar la oración."
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="origami-field"
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <h3 className="text-sm font-bold text-zinc-800">
+            <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
+              <h3 className="text-base font-extrabold">
                 Oraciones con huecos ({fbItems.length})
               </h3>
               <button
                 type="button"
-                onClick={() => setFbItems([...fbItems, createDefaultSentence()])}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                onClick={() =>
+                  setFbItems([...fbItems, createDefaultSentence()])
+                }
+                className="origami-button origami-button--text"
               >
                 + Añadir oración
               </button>
@@ -1745,15 +1783,19 @@ export function ActivityEditorComponent({
             {fbItems.map((item, idx) => (
               <div
                 key={item.id || idx}
-                className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-4"
+                className="rounded-lg border border-(--origami-border-subtle) p-4 bg-(--origami-surface-soft) space-y-4"
               >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-zinc-800">Oración {idx + 1}</h4>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-base font-extrabold">
+                    Oración {idx + 1}
+                  </h4>
                   {fbItems.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => setFbItems(fbItems.filter((_, i) => i !== idx))}
-                      className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                      onClick={() =>
+                        setFbItems(fbItems.filter((_, i) => i !== idx))
+                      }
+                      className="origami-button origami-button--text text-(--origami-error-text)"
                       aria-label={`Eliminar oración ${idx + 1}`}
                     >
                       Eliminar oración
@@ -1764,29 +1806,32 @@ export function ActivityEditorComponent({
                 <div>
                   <label
                     htmlFor={`fb-prompt-${idx}`}
-                    className="block text-xs font-medium text-zinc-700 mb-1"
+                    className="origami-label mb-1 block"
                   >
-                    Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
+                    Texto de la oración (los huecos se marcan con{" "}
+                    <code>&#123;&#123;id&#125;&#125;</code>):
                   </label>
                   <textarea
                     id={`fb-prompt-${idx}`}
                     aria-label={`Texto con hueco oración ${idx + 1}`}
                     rows={2}
                     value={item.prompt}
-                    onChange={(e) => handlePromptChange(idx, e.target.value, false)}
-                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    onChange={(e) =>
+                      handlePromptChange(idx, e.target.value, false)
+                    }
+                    className="origami-field font-mono"
                   />
                 </div>
 
                 <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-700">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold text-(--origami-text-primary)">
                       Huecos de esta oración ({item.blanks.length})
                     </span>
                     <button
                       type="button"
                       onClick={() => handleAddBlank(idx, false)}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      className="origami-button origami-button--text"
                     >
                       + Añadir hueco
                     </button>
@@ -1795,14 +1840,14 @@ export function ActivityEditorComponent({
                   {item.blanks.map((blank, bIdx) => (
                     <div
                       key={blank.id || bIdx}
-                      className="rounded-md border border-zinc-200 bg-white p-3 space-y-2.5"
+                      className="rounded-md border border-(--origami-border-subtle) bg-(--origami-surface-raised) p-3 space-y-2.5"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-zinc-800">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-(--origami-text-primary)">
                             Espacio {bIdx + 1}
                           </span>
-                          <code className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-mono">
+                          <code className="text-[11px] bg-(--origami-surface-soft) text-(--origami-text-secondary) px-1.5 py-0.5 rounded font-mono">
                             &#123;&#123;{blank.id}&#125;&#125;
                           </code>
                         </div>
@@ -1810,7 +1855,7 @@ export function ActivityEditorComponent({
                           <button
                             type="button"
                             onClick={() => handleRemoveBlank(idx, bIdx, false)}
-                            className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                            className="origami-button origami-button--text text-(--origami-error-text)"
                             aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
                           >
                             Eliminar espacio
@@ -1819,15 +1864,15 @@ export function ActivityEditorComponent({
                       </div>
 
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-medium text-zinc-600">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-[11px] font-medium text-(--origami-text-secondary)">
                             Opciones ({blank.options.length}/6):
                           </span>
                           {blank.options.length < 6 && (
                             <button
                               type="button"
                               onClick={() => handleAddOption(idx, bIdx, false)}
-                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                              className="origami-button origami-button--text"
                             >
                               + Opción
                             </button>
@@ -1838,7 +1883,7 @@ export function ActivityEditorComponent({
                           {blank.options.map((opt, oIdx) => (
                             <div
                               key={opt.id || oIdx}
-                              className="flex items-center gap-2 bg-zinc-50 p-2 rounded border border-zinc-200"
+                              className="flex items-center gap-2 flex-wrap bg-(--origami-surface-soft) p-2 rounded border border-(--origami-border-subtle)"
                             >
                               <input
                                 type="text"
@@ -1846,18 +1891,30 @@ export function ActivityEditorComponent({
                                 placeholder={`Opción ${oIdx + 1}`}
                                 value={opt.text}
                                 onChange={(e) =>
-                                  handleOptionTextChange(idx, bIdx, oIdx, e.target.value, false)
+                                  handleOptionTextChange(
+                                    idx,
+                                    bIdx,
+                                    oIdx,
+                                    e.target.value,
+                                    false,
+                                  )
                                 }
-                                className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-900 bg-white"
+                                className="origami-field flex-1 min-w-24"
                               />
-                              <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer shrink-0">
+                              <label className="origami-label flex min-h-12 cursor-pointer items-center gap-2">
                                 <input
                                   type="radio"
+                                  className="size-5 shrink-0 accent-(--origami-primary)"
                                   name={`correct-fb-${item.id || idx}-${blank.id || bIdx}`}
                                   aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
                                   checked={blank.correctOptionId === opt.id}
                                   onChange={() =>
-                                    handleCorrectOptionChange(idx, bIdx, opt.id, false)
+                                    handleCorrectOptionChange(
+                                      idx,
+                                      bIdx,
+                                      opt.id,
+                                      false,
+                                    )
                                   }
                                 />
                                 Correcta
@@ -1865,8 +1922,10 @@ export function ActivityEditorComponent({
                               {blank.options.length > 2 && (
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveOption(idx, bIdx, oIdx, false)}
-                                  className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer px-1"
+                                  onClick={() =>
+                                    handleRemoveOption(idx, bIdx, oIdx, false)
+                                  }
+                                  className="origami-button origami-button--text text-(--origami-error-text)"
                                   aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
                                 >
                                   ✕
@@ -1888,7 +1947,10 @@ export function ActivityEditorComponent({
         {type === ActivityType.exam && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="exam-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
+              <label
+                htmlFor="exam-instructions"
+                className="origami-label mb-1 block"
+              >
                 Instrucciones del examen (opcional)
               </label>
               <input
@@ -1898,38 +1960,41 @@ export function ActivityEditorComponent({
                 onChange={(e) => setFbInstructions(e.target.value)}
                 maxLength={2000}
                 placeholder="Ej. Lee con atención cada oración y completa con la forma verbal correcta."
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="origami-field"
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
               <div>
-                <h3 className="text-sm font-bold text-zinc-800">
+                <h3 className="text-base font-extrabold">
                   Oraciones del examen ({examItems.length})
                 </h3>
-                <p className="text-xs text-zinc-500">
-                  Suma de pesos:{' '}
+                <p className="origami-meta">
+                  Suma de pesos:{" "}
                   {examItems
-                    .reduce((acc, it) => acc + (parseFloat(it.weight || '0') || 0), 0)
+                    .reduce(
+                      (acc, it) => acc + (parseFloat(it.weight || "0") || 0),
+                      0,
+                    )
                     .toFixed(1)}
                   % (Debe sumar 100% para publicar)
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setExamItems(balanceExamWeights(examItems))}
-                  className="text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1 rounded-md cursor-pointer"
+                  className="origami-button origami-button--secondary"
                 >
                   ⚖️ Balancear pesos
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    const newItems = [...examItems, createDefaultSentence('0')];
+                    const newItems = [...examItems, createDefaultSentence("0")];
                     setExamItems(balanceExamWeights(newItems));
                   }}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  className="origami-button origami-button--text"
                 >
                   + Añadir oración
                 </button>
@@ -1939,11 +2004,11 @@ export function ActivityEditorComponent({
             {examItems.map((item, idx) => (
               <div
                 key={item.id || idx}
-                className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-4"
+                className="rounded-lg border border-(--origami-border-subtle) p-4 bg-(--origami-surface-soft) space-y-4"
               >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-zinc-800">
-                    Oración {idx + 1} (Peso: {item.weight || '0'}%)
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-base font-extrabold">
+                    Oración {idx + 1} (Peso: {item.weight || "0"}%)
                   </h4>
                   {examItems.length > 1 && (
                     <button
@@ -1952,7 +2017,7 @@ export function ActivityEditorComponent({
                         const filtered = examItems.filter((_, i) => i !== idx);
                         setExamItems(balanceExamWeights(filtered));
                       }}
-                      className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                      className="origami-button origami-button--text text-(--origami-error-text)"
                       aria-label={`Eliminar oración ${idx + 1}`}
                     >
                       Eliminar oración
@@ -1963,7 +2028,7 @@ export function ActivityEditorComponent({
                 <div>
                   <label
                     htmlFor={`exam-w${idx + 1}`}
-                    className="block text-xs font-medium text-zinc-700 mb-1"
+                    className="origami-label mb-1 block"
                   >
                     Peso de la oración (0-100%):
                   </label>
@@ -1974,42 +2039,47 @@ export function ActivityEditorComponent({
                     min="0"
                     max="100"
                     step="0.1"
-                    value={item.weight ?? '0'}
+                    value={item.weight ?? "0"}
                     onChange={(e) =>
                       setExamItems(
-                        examItems.map((it, i) => (i === idx ? { ...it, weight: e.target.value } : it)),
+                        examItems.map((it, i) =>
+                          i === idx ? { ...it, weight: e.target.value } : it,
+                        ),
                       )
                     }
-                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
+                    className="origami-field max-w-32"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor={`exam-prompt-${idx}`}
-                    className="block text-xs font-medium text-zinc-700 mb-1"
+                    className="origami-label mb-1 block"
                   >
-                    Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
+                    Texto de la oración (los huecos se marcan con{" "}
+                    <code>&#123;&#123;id&#125;&#125;</code>):
                   </label>
                   <textarea
                     id={`exam-prompt-${idx}`}
                     aria-label={`Texto con hueco oración ${idx + 1}`}
                     rows={2}
                     value={item.prompt}
-                    onChange={(e) => handlePromptChange(idx, e.target.value, true)}
-                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    onChange={(e) =>
+                      handlePromptChange(idx, e.target.value, true)
+                    }
+                    className="origami-field font-mono"
                   />
                 </div>
 
                 <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-700">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold text-(--origami-text-primary)">
                       Huecos de esta oración ({item.blanks.length})
                     </span>
                     <button
                       type="button"
                       onClick={() => handleAddBlank(idx, true)}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      className="origami-button origami-button--text"
                     >
                       + Añadir hueco
                     </button>
@@ -2018,14 +2088,14 @@ export function ActivityEditorComponent({
                   {item.blanks.map((blank, bIdx) => (
                     <div
                       key={blank.id || bIdx}
-                      className="rounded-md border border-zinc-200 bg-white p-3 space-y-2.5"
+                      className="rounded-md border border-(--origami-border-subtle) bg-(--origami-surface-raised) p-3 space-y-2.5"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-zinc-800">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-(--origami-text-primary)">
                             Espacio {bIdx + 1}
                           </span>
-                          <code className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-mono">
+                          <code className="text-[11px] bg-(--origami-surface-soft) text-(--origami-text-secondary) px-1.5 py-0.5 rounded font-mono">
                             &#123;&#123;{blank.id}&#125;&#125;
                           </code>
                         </div>
@@ -2033,7 +2103,7 @@ export function ActivityEditorComponent({
                           <button
                             type="button"
                             onClick={() => handleRemoveBlank(idx, bIdx, true)}
-                            className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+                            className="origami-button origami-button--text text-(--origami-error-text)"
                             aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
                           >
                             Eliminar espacio
@@ -2042,15 +2112,15 @@ export function ActivityEditorComponent({
                       </div>
 
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-medium text-zinc-600">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-[11px] font-medium text-(--origami-text-secondary)">
                             Opciones ({blank.options.length}/6):
                           </span>
                           {blank.options.length < 6 && (
                             <button
                               type="button"
                               onClick={() => handleAddOption(idx, bIdx, true)}
-                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                              className="origami-button origami-button--text"
                             >
                               + Opción
                             </button>
@@ -2061,7 +2131,7 @@ export function ActivityEditorComponent({
                           {blank.options.map((opt, oIdx) => (
                             <div
                               key={opt.id || oIdx}
-                              className="flex items-center gap-2 bg-zinc-50 p-2 rounded border border-zinc-200"
+                              className="flex items-center gap-2 flex-wrap bg-(--origami-surface-soft) p-2 rounded border border-(--origami-border-subtle)"
                             >
                               <input
                                 type="text"
@@ -2069,18 +2139,30 @@ export function ActivityEditorComponent({
                                 placeholder={`Opción ${oIdx + 1}`}
                                 value={opt.text}
                                 onChange={(e) =>
-                                  handleOptionTextChange(idx, bIdx, oIdx, e.target.value, true)
+                                  handleOptionTextChange(
+                                    idx,
+                                    bIdx,
+                                    oIdx,
+                                    e.target.value,
+                                    true,
+                                  )
                                 }
-                                className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-900 bg-white"
+                                className="origami-field flex-1 min-w-24"
                               />
-                              <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer shrink-0">
+                              <label className="origami-label flex min-h-12 cursor-pointer items-center gap-2">
                                 <input
                                   type="radio"
+                                  className="size-5 shrink-0 accent-(--origami-primary)"
                                   name={`correct-exam-${item.id || idx}-${blank.id || bIdx}`}
                                   aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
                                   checked={blank.correctOptionId === opt.id}
                                   onChange={() =>
-                                    handleCorrectOptionChange(idx, bIdx, opt.id, true)
+                                    handleCorrectOptionChange(
+                                      idx,
+                                      bIdx,
+                                      opt.id,
+                                      true,
+                                    )
                                   }
                                 />
                                 Correcta
@@ -2088,8 +2170,10 @@ export function ActivityEditorComponent({
                               {blank.options.length > 2 && (
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveOption(idx, bIdx, oIdx, true)}
-                                  className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer px-1"
+                                  onClick={() =>
+                                    handleRemoveOption(idx, bIdx, oIdx, true)
+                                  }
+                                  className="origami-button origami-button--text text-(--origami-error-text)"
                                   aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
                                 >
                                   ✕
@@ -2111,7 +2195,10 @@ export function ActivityEditorComponent({
         {type === ActivityType.open_question && (
           <div className="space-y-6">
             <div>
-              <label htmlFor="oq-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
+              <label
+                htmlFor="oq-instructions"
+                className="origami-label mb-1 block"
+              >
                 Instrucciones generales de la actividad (opcional)
               </label>
               <input
@@ -2121,13 +2208,13 @@ export function ActivityEditorComponent({
                 value={oqInstructions}
                 onChange={(e) => setOqInstructions(e.target.value)}
                 maxLength={2000}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="origami-field"
               />
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-zinc-900">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm font-bold text-(--origami-text-primary)">
                   Preguntas abiertas ({oqQuestions.length})
                 </span>
                 <button
@@ -2137,13 +2224,13 @@ export function ActivityEditorComponent({
                       ...prev,
                       {
                         id: crypto.randomUUID(),
-                        prompt: '',
-                        rubric: '',
-                        maxLength: '2000',
+                        prompt: "",
+                        rubric: "",
+                        maxLength: "2000",
                       },
                     ])
                   }
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition-colors cursor-pointer"
+                  className="origami-button origami-button--secondary"
                 >
                   <span>+</span>
                   <span>Agregar otra pregunta</span>
@@ -2153,19 +2240,21 @@ export function ActivityEditorComponent({
               {oqQuestions.map((q, idx) => (
                 <div
                   key={q.id || idx}
-                  className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3 relative"
+                  className="p-4 rounded-xl border border-(--origami-border-subtle) bg-(--origami-surface-soft) space-y-3 relative"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black uppercase text-zinc-600 tracking-wide">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-black uppercase text-(--origami-text-secondary) tracking-wide">
                       Pregunta #{idx + 1}
                     </span>
                     {oqQuestions.length > 1 && (
                       <button
                         type="button"
                         onClick={() =>
-                          setOqQuestions((prev) => prev.filter((_, i) => i !== idx))
+                          setOqQuestions((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
                         }
-                        className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded transition-colors"
+                        className="origami-button origami-button--text text-(--origami-error-text)"
                         aria-label={`Eliminar pregunta ${idx + 1}`}
                       >
                         Eliminar pregunta
@@ -2176,7 +2265,7 @@ export function ActivityEditorComponent({
                   <div>
                     <label
                       htmlFor={`oq-prompt-${idx}`}
-                      className="block text-xs font-semibold text-zinc-700 mb-1"
+                      className="origami-label mb-1 block"
                     >
                       Consigna / Pregunta *
                     </label>
@@ -2187,13 +2276,15 @@ export function ActivityEditorComponent({
                       onChange={(e) =>
                         setOqQuestions((prev) =>
                           prev.map((item, i) =>
-                            i === idx ? { ...item, prompt: e.target.value } : item,
+                            i === idx
+                              ? { ...item, prompt: e.target.value }
+                              : item,
                           ),
                         )
                       }
                       maxLength={5000}
                       placeholder="Escribe la consigna en inglés..."
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="origami-field"
                     />
                   </div>
 
@@ -2201,7 +2292,7 @@ export function ActivityEditorComponent({
                     <div>
                       <label
                         htmlFor={`oq-rubric-${idx}`}
-                        className="block text-xs font-semibold text-zinc-700 mb-1"
+                        className="origami-label mb-1 block"
                       >
                         Rúbrica (opcional)
                       </label>
@@ -2212,20 +2303,22 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setOqQuestions((prev) =>
                             prev.map((item, i) =>
-                              i === idx ? { ...item, rubric: e.target.value } : item,
+                              i === idx
+                                ? { ...item, rubric: e.target.value }
+                                : item,
                             ),
                           )
                         }
                         maxLength={2000}
                         placeholder="Ej. Vocabulario y tiempos verbales"
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900"
+                        className="origami-field"
                       />
                     </div>
 
                     <div>
                       <label
                         htmlFor={`oq-max-len-${idx}`}
-                        className="block text-xs font-semibold text-zinc-700 mb-1"
+                        className="origami-label mb-1 block"
                       >
                         Límite de caracteres
                       </label>
@@ -2238,11 +2331,13 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setOqQuestions((prev) =>
                             prev.map((item, i) =>
-                              i === idx ? { ...item, maxLength: e.target.value } : item,
+                              i === idx
+                                ? { ...item, maxLength: e.target.value }
+                                : item,
                             ),
                           )
                         }
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900"
+                        className="origami-field"
                       />
                     </div>
                   </div>
@@ -2256,7 +2351,7 @@ export function ActivityEditorComponent({
         {type === ActivityType.speaking && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="sp-prompt" className="block text-sm font-semibold text-zinc-800 mb-1">
+              <label htmlFor="sp-prompt" className="origami-label mb-1 block">
                 Consigna de grabación *
               </label>
               <textarea
@@ -2265,12 +2360,12 @@ export function ActivityEditorComponent({
                 value={spPrompt}
                 onChange={(e) => setSpPrompt(e.target.value)}
                 maxLength={5000}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="origami-field"
               />
             </div>
 
             <div>
-              <label htmlFor="sp-url" className="block text-sm font-semibold text-zinc-800 mb-1">
+              <label htmlFor="sp-url" className="origami-label mb-1 block">
                 URL de audio de ejemplo (HTTPS, opcional)
               </label>
               <input
@@ -2279,13 +2374,16 @@ export function ActivityEditorComponent({
                 value={spExampleUrl}
                 onChange={(e) => setSpExampleUrl(e.target.value)}
                 placeholder="https://assets.upwardenglish.edu/samples/intro.mp3"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="origami-field"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="sp-min-dur" className="block text-sm font-semibold text-zinc-800 mb-1">
+                <label
+                  htmlFor="sp-min-dur"
+                  className="origami-label mb-1 block"
+                >
                   Duración mínima requerida
                 </label>
                 <input
@@ -2294,15 +2392,19 @@ export function ActivityEditorComponent({
                   value={2}
                   disabled
                   readOnly
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm text-zinc-500 cursor-not-allowed"
+                  className="origami-field"
                 />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Fijo en 2 segundos según las especificaciones pedagógicas (RF-5).
+                <p className="origami-meta mt-1">
+                  Fijo en 2 segundos según las especificaciones pedagógicas
+                  (RF-5).
                 </p>
               </div>
 
               <div>
-                <label htmlFor="sp-max-dur" className="block text-sm font-semibold text-zinc-800 mb-1">
+                <label
+                  htmlFor="sp-max-dur"
+                  className="origami-label mb-1 block"
+                >
                   Duración máxima de grabación (segundos, 2-300)
                 </label>
                 <input
@@ -2312,7 +2414,7 @@ export function ActivityEditorComponent({
                   max="300"
                   value={spMaxDuration}
                   onChange={(e) => setSpMaxDuration(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                  className="origami-field"
                 />
               </div>
             </div>
@@ -2323,35 +2425,50 @@ export function ActivityEditorComponent({
         {type === ActivityType.game && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="game-mechanic" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Mecánica del microjuego {isEditing && '(no modificable tras creación)'}
+              <label
+                htmlFor="game-mechanic"
+                className="origami-label mb-1 block"
+              >
+                Mecánica del microjuego{" "}
+                {isEditing && "(no modificable tras creación)"}
               </label>
               <select
                 id="game-mechanic"
                 value={gameMechanic}
                 disabled={isEditing}
                 onChange={(e) => {
-                  if (isGameMechanicType(e.target.value)) setGameMechanic(e.target.value);
+                  if (isGameMechanicType(e.target.value))
+                    setGameMechanic(e.target.value);
                 }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 disabled:bg-zinc-100 disabled:cursor-not-allowed"
+                className="origami-field"
               >
-                <option value="order_words">Ordenar palabras (Order words)</option>
+                <option value="order_words">
+                  Ordenar palabras (Order words)
+                </option>
                 <option value="match">Emparejar (Match)</option>
-                <option value="drag_drop">Arrastrar y soltar (Drag & drop)</option>
+                <option value="drag_drop">
+                  Arrastrar y soltar (Drag & drop)
+                </option>
                 <option value="memory">Memoria (Memory)</option>
-                <option value="timed_choice">Opción contra reloj (Timed choice)</option>
+                <option value="timed_choice">
+                  Opción contra reloj (Timed choice)
+                </option>
               </select>
               {isEditing && (
-                <p className="mt-1 text-xs text-zinc-500">
-                  La mecánica de un microjuego no se puede cambiar después de su creación.
+                <p className="origami-meta mt-1">
+                  La mecánica de un microjuego no se puede cambiar después de su
+                  creación.
                 </p>
               )}
             </div>
 
             {/* 1. ORDER WORDS */}
-            {gameMechanic === 'order_words' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-2">
-                <label htmlFor="order-words" className="block text-sm font-semibold text-zinc-800 mb-1">
+            {gameMechanic === "order_words" && (
+              <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-2">
+                <label
+                  htmlFor="order-words"
+                  className="origami-label mb-1 block"
+                >
                   Oración a ordenar (palabras separadas por espacios) *
                 </label>
                 <input
@@ -2360,33 +2477,44 @@ export function ActivityEditorComponent({
                   value={orderWordsText}
                   onChange={(e) => setOrderWordsText(e.target.value)}
                   placeholder="Ej. The dog plays in the garden"
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="origami-field"
                 />
-                <p className="text-xs text-zinc-500">
-                  El alumno recibirá las palabras desordenadas y deberá organizarlas en el orden exacto.
+                <p className="origami-meta">
+                  El alumno recibirá las palabras desordenadas y deberá
+                  organizarlas en el orden exacto.
                 </p>
               </div>
             )}
 
             {/* 2. MATCH */}
-            {gameMechanic === 'match' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
+            {gameMechanic === "match" && (
+              <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-800">Parejas a emparejar</h3>
-                    <p className="text-xs text-zinc-500">Mínimo 2 parejas.</p>
+                    <h3 className="text-base font-extrabold">
+                      Parejas a emparejar
+                    </h3>
+                    <p className="origami-meta">Mínimo 2 parejas.</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setMatchPairs([...matchPairs, { leftText: '', rightText: '' }])}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                    onClick={() =>
+                      setMatchPairs([
+                        ...matchPairs,
+                        { leftText: "", rightText: "" },
+                      ])
+                    }
+                    className="origami-button origami-button--text"
                   >
                     + Añadir pareja
                   </button>
                 </div>
                 <div className="space-y-2">
                   {matchPairs.map((pair, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 flex-wrap"
+                    >
                       <input
                         id={`match-pair-left-${idx}`}
                         aria-label={`Elemento izquierdo pareja ${idx + 1}`}
@@ -2396,13 +2524,17 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setMatchPairs(
                             matchPairs.map((p, i) =>
-                              i === idx ? { ...p, leftText: e.target.value } : p,
+                              i === idx
+                                ? { ...p, leftText: e.target.value }
+                                : p,
                             ),
                           )
                         }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                        className="origami-field flex-1 min-w-24"
                       />
-                      <span className="text-xs text-zinc-400">↔</span>
+                      <span className="text-xs text-(--origami-text-secondary)">
+                        ↔
+                      </span>
                       <input
                         id={`match-pair-right-${idx}`}
                         aria-label={`Elemento derecho pareja ${idx + 1}`}
@@ -2412,17 +2544,21 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setMatchPairs(
                             matchPairs.map((p, i) =>
-                              i === idx ? { ...p, rightText: e.target.value } : p,
+                              i === idx
+                                ? { ...p, rightText: e.target.value }
+                                : p,
                             ),
                           )
                         }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                        className="origami-field flex-1 min-w-24"
                       />
                       <button
                         type="button"
                         disabled={matchPairs.length <= 2}
-                        onClick={() => setMatchPairs(matchPairs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
+                        onClick={() =>
+                          setMatchPairs(matchPairs.filter((_, i) => i !== idx))
+                        }
+                        className="origami-button origami-button--text text-(--origami-error-text)"
                         title="Eliminar pareja"
                         aria-label={`Eliminar pareja ${idx + 1}`}
                       >
@@ -2435,27 +2571,36 @@ export function ActivityEditorComponent({
             )}
 
             {/* 3. DRAG AND DROP */}
-            {gameMechanic === 'drag_drop' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-4">
+            {gameMechanic === "drag_drop" && (
+              <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-4">
                 {/* Targets */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                      <h3 className="text-sm font-bold text-zinc-800">Categorías / Destinos</h3>
-                      <p className="text-xs text-zinc-500">Mínimo 2 destinos.</p>
+                      <h3 className="text-base font-extrabold">
+                        Categorías / Destinos
+                      </h3>
+                      <p className="origami-meta">Mínimo 2 destinos.</p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setDragTargets([...dragTargets, { name: '' }])}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      onClick={() =>
+                        setDragTargets([...dragTargets, { name: "" }])
+                      }
+                      className="origami-button origami-button--text"
                     >
                       + Añadir categoría
                     </button>
                   </div>
                   <div className="space-y-2">
                     {dragTargets.map((target, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-500 w-16">Cat. {idx + 1}:</span>
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 flex-wrap"
+                      >
+                        <span className="text-xs text-(--origami-text-secondary) w-16">
+                          Cat. {idx + 1}:
+                        </span>
                         <input
                           id={`drag-target-${idx}`}
                           aria-label={`Nombre de la categoría ${idx + 1}`}
@@ -2469,13 +2614,15 @@ export function ActivityEditorComponent({
                               ),
                             )
                           }
-                          className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                          className="origami-field flex-1 min-w-24"
                         />
                         <button
                           type="button"
                           disabled={dragTargets.length <= 2}
                           onClick={() => {
-                            setDragTargets(dragTargets.filter((_, i) => i !== idx));
+                            setDragTargets(
+                              dragTargets.filter((_, i) => i !== idx),
+                            );
                             setDragObjects(
                               dragObjects.map((o) => ({
                                 ...o,
@@ -2486,7 +2633,7 @@ export function ActivityEditorComponent({
                               })),
                             );
                           }}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
+                          className="origami-button origami-button--text text-(--origami-error-text)"
                           title="Eliminar categoría"
                           aria-label={`Eliminar categoría ${idx + 1}`}
                         >
@@ -2498,25 +2645,33 @@ export function ActivityEditorComponent({
                 </div>
 
                 {/* Objects */}
-                <div className="space-y-2 border-t border-zinc-200 pt-3">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-2 border-t border-(--origami-border-subtle) pt-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                      <h3 className="text-sm font-bold text-zinc-800">Elementos a clasificar</h3>
-                      <p className="text-xs text-zinc-500">Mínimo 2 elementos.</p>
+                      <h3 className="text-base font-extrabold">
+                        Elementos a clasificar
+                      </h3>
+                      <p className="origami-meta">Mínimo 2 elementos.</p>
                     </div>
                     <button
                       type="button"
                       onClick={() =>
-                        setDragObjects([...dragObjects, { text: '', targetIndex: 0 }])
+                        setDragObjects([
+                          ...dragObjects,
+                          { text: "", targetIndex: 0 },
+                        ])
                       }
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      className="origami-button origami-button--text"
                     >
                       + Añadir elemento
                     </button>
                   </div>
                   <div className="space-y-2">
                     {dragObjects.map((obj, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 flex-wrap"
+                      >
                         <input
                           id={`drag-object-${idx}`}
                           aria-label={`Texto del elemento a clasificar ${idx + 1}`}
@@ -2530,9 +2685,9 @@ export function ActivityEditorComponent({
                               ),
                             )
                           }
-                          className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                          className="origami-field flex-1 min-w-24"
                         />
-                        <span className="text-xs text-zinc-500">→</span>
+                        <span className="origami-meta">→</span>
                         <select
                           id={`drag-target-select-${idx}`}
                           aria-label={`Categoría asignada para el elemento ${idx + 1}`}
@@ -2541,12 +2696,16 @@ export function ActivityEditorComponent({
                             setDragObjects(
                               dragObjects.map((o, i) =>
                                 i === idx
-                                  ? { ...o, targetIndex: parseInt(e.target.value, 10) || 0 }
+                                  ? {
+                                      ...o,
+                                      targetIndex:
+                                        parseInt(e.target.value, 10) || 0,
+                                    }
                                   : o,
                               ),
                             )
                           }
-                          className="rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 max-w-[150px]"
+                          className="origami-field sm:max-w-48"
                         >
                           {dragTargets.map((t, tIdx) => (
                             <option key={tIdx} value={tIdx}>
@@ -2557,8 +2716,12 @@ export function ActivityEditorComponent({
                         <button
                           type="button"
                           disabled={dragObjects.length <= 2}
-                          onClick={() => setDragObjects(dragObjects.filter((_, i) => i !== idx))}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
+                          onClick={() =>
+                            setDragObjects(
+                              dragObjects.filter((_, i) => i !== idx),
+                            )
+                          }
+                          className="origami-button origami-button--text text-(--origami-error-text)"
                           title="Eliminar elemento"
                           aria-label={`Eliminar elemento a clasificar ${idx + 1}`}
                         >
@@ -2572,28 +2735,36 @@ export function ActivityEditorComponent({
             )}
 
             {/* 4. MEMORY */}
-            {gameMechanic === 'memory' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
+            {gameMechanic === "memory" && (
+              <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-800">Parejas de memoria</h3>
-                    <p className="text-xs text-zinc-500">
+                    <h3 className="text-base font-extrabold">
+                      Parejas de memoria
+                    </h3>
+                    <p className="origami-meta">
                       Mínimo 2 parejas (4 tarjetas en total).
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() =>
-                      setMemoryPairs([...memoryPairs, { card1Text: '', card2Text: '' }])
+                      setMemoryPairs([
+                        ...memoryPairs,
+                        { card1Text: "", card2Text: "" },
+                      ])
                     }
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                    className="origami-button origami-button--text"
                   >
                     + Añadir pareja
                   </button>
                 </div>
                 <div className="space-y-2">
                   {memoryPairs.map((pair, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 flex-wrap"
+                    >
                       <input
                         id={`memory-card-1-${idx}`}
                         aria-label={`Tarjeta 1 pareja ${idx + 1}`}
@@ -2603,13 +2774,17 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setMemoryPairs(
                             memoryPairs.map((p, i) =>
-                              i === idx ? { ...p, card1Text: e.target.value } : p,
+                              i === idx
+                                ? { ...p, card1Text: e.target.value }
+                                : p,
                             ),
                           )
                         }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                        className="origami-field flex-1 min-w-24"
                       />
-                      <span className="text-xs text-zinc-400">♥</span>
+                      <span className="text-xs text-(--origami-text-secondary)">
+                        ♥
+                      </span>
                       <input
                         id={`memory-card-2-${idx}`}
                         aria-label={`Tarjeta 2 pareja ${idx + 1}`}
@@ -2619,17 +2794,23 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setMemoryPairs(
                             memoryPairs.map((p, i) =>
-                              i === idx ? { ...p, card2Text: e.target.value } : p,
+                              i === idx
+                                ? { ...p, card2Text: e.target.value }
+                                : p,
                             ),
                           )
                         }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                        className="origami-field flex-1 min-w-24"
                       />
                       <button
                         type="button"
                         disabled={memoryPairs.length <= 2}
-                        onClick={() => setMemoryPairs(memoryPairs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
+                        onClick={() =>
+                          setMemoryPairs(
+                            memoryPairs.filter((_, i) => i !== idx),
+                          )
+                        }
+                        className="origami-button origami-button--text text-(--origami-error-text)"
                         title="Eliminar pareja"
                         aria-label={`Eliminar pareja de memoria ${idx + 1}`}
                       >
@@ -2642,10 +2823,13 @@ export function ActivityEditorComponent({
             )}
 
             {/* 5. TIMED CHOICE */}
-            {gameMechanic === 'timed_choice' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-4">
+            {gameMechanic === "timed_choice" && (
+              <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-4">
                 <div>
-                  <label htmlFor="timed-limit" className="block text-xs font-semibold text-zinc-700 mb-1">
+                  <label
+                    htmlFor="timed-limit"
+                    className="origami-label mb-1 block"
+                  >
                     Tiempo límite por pregunta (segundos, 5-120) *
                   </label>
                   <input
@@ -2655,39 +2839,50 @@ export function ActivityEditorComponent({
                     max="120"
                     value={timedChoiceLimit}
                     onChange={(e) => setTimedChoiceLimit(e.target.value)}
-                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
+                    className="origami-field max-w-32"
                   />
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                      <h3 className="text-sm font-bold text-zinc-800">Preguntas contra reloj</h3>
-                      <p className="text-xs text-zinc-500">Mínimo 1 pregunta.</p>
+                      <h3 className="text-base font-extrabold">
+                        Preguntas contra reloj
+                      </h3>
+                      <p className="origami-meta">Mínimo 1 pregunta.</p>
                     </div>
                     <button
                       type="button"
                       onClick={() =>
                         setTimedQuestions([
                           ...timedQuestions,
-                          { prompt: '', opt1: '', opt2: '', correct: 'opt1' },
+                          { prompt: "", opt1: "", opt2: "", correct: "opt1" },
                         ])
                       }
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      className="origami-button origami-button--text"
                     >
                       + Añadir pregunta
                     </button>
                   </div>
 
                   {timedQuestions.map((q, idx) => (
-                    <div key={idx} className="rounded border border-zinc-200 bg-white p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-zinc-700">Pregunta {idx + 1}</span>
+                    <div
+                      key={idx}
+                      className="rounded border border-(--origami-border-subtle) bg-(--origami-surface-raised) p-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs font-bold text-(--origami-text-primary)">
+                          Pregunta {idx + 1}
+                        </span>
                         <button
                           type="button"
                           disabled={timedQuestions.length <= 1}
-                          onClick={() => setTimedQuestions(timedQuestions.filter((_, i) => i !== idx))}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                          onClick={() =>
+                            setTimedQuestions(
+                              timedQuestions.filter((_, i) => i !== idx),
+                            )
+                          }
+                          className="origami-button origami-button--text text-(--origami-error-text)"
                           aria-label={`Eliminar pregunta contra reloj ${idx + 1}`}
                         >
                           Eliminar
@@ -2703,15 +2898,17 @@ export function ActivityEditorComponent({
                         onChange={(e) =>
                           setTimedQuestions(
                             timedQuestions.map((item, i) =>
-                              i === idx ? { ...item, prompt: e.target.value } : item,
+                              i === idx
+                                ? { ...item, prompt: e.target.value }
+                                : item,
                             ),
                           )
                         }
-                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
+                        className="origami-field"
                       />
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <input
                             id={`tc-opt1-${idx}`}
                             aria-label={`Opción 1 pregunta ${idx + 1}`}
@@ -2721,22 +2918,27 @@ export function ActivityEditorComponent({
                             onChange={(e) =>
                               setTimedQuestions(
                                 timedQuestions.map((item, i) =>
-                                  i === idx ? { ...item, opt1: e.target.value } : item,
+                                  i === idx
+                                    ? { ...item, opt1: e.target.value }
+                                    : item,
                                 ),
                               )
                             }
-                            className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs"
+                            className="origami-field flex-1 min-w-24"
                           />
-                          <label className="flex items-center gap-1 text-xs text-emerald-700 cursor-pointer">
+                          <label className="origami-label flex min-h-12 cursor-pointer items-center gap-2">
                             <input
                               type="radio"
+                              className="size-5 shrink-0 accent-(--origami-primary)"
                               name={`tc-correct-${idx}`}
                               aria-label={`Marcar opción 1 como correcta para pregunta ${idx + 1}`}
-                              checked={q.correct === 'opt1'}
+                              checked={q.correct === "opt1"}
                               onChange={() =>
                                 setTimedQuestions(
                                   timedQuestions.map((item, i) =>
-                                    i === idx ? { ...item, correct: 'opt1' } : item,
+                                    i === idx
+                                      ? { ...item, correct: "opt1" }
+                                      : item,
                                   ),
                                 )
                               }
@@ -2745,7 +2947,7 @@ export function ActivityEditorComponent({
                           </label>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <input
                             id={`tc-opt2-${idx}`}
                             aria-label={`Opción 2 pregunta ${idx + 1}`}
@@ -2755,22 +2957,27 @@ export function ActivityEditorComponent({
                             onChange={(e) =>
                               setTimedQuestions(
                                 timedQuestions.map((item, i) =>
-                                  i === idx ? { ...item, opt2: e.target.value } : item,
+                                  i === idx
+                                    ? { ...item, opt2: e.target.value }
+                                    : item,
                                 ),
                               )
                             }
-                            className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs"
+                            className="origami-field flex-1 min-w-24"
                           />
-                          <label className="flex items-center gap-1 text-xs text-emerald-700 cursor-pointer">
+                          <label className="origami-label flex min-h-12 cursor-pointer items-center gap-2">
                             <input
                               type="radio"
+                              className="size-5 shrink-0 accent-(--origami-primary)"
                               name={`tc-correct-${idx}`}
                               aria-label={`Marcar opción 2 como correcta para pregunta ${idx + 1}`}
-                              checked={q.correct === 'opt2'}
+                              checked={q.correct === "opt2"}
                               onChange={() =>
                                 setTimedQuestions(
                                   timedQuestions.map((item, i) =>
-                                    i === idx ? { ...item, correct: 'opt2' } : item,
+                                    i === idx
+                                      ? { ...item, correct: "opt2" }
+                                      : item,
                                   ),
                                 )
                               }
@@ -2786,7 +2993,7 @@ export function ActivityEditorComponent({
             )}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Activity Preview Modal (ENG-039, RF-16 SPEC-04, RF-12 SPEC-05) */}
       <AccessibleModal
@@ -2796,211 +3003,139 @@ export function ActivityEditorComponent({
         description="Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas."
         maxWidthClass="max-w-2xl"
       >
-        <div className="space-y-6">
-          <div className="flex items-center justify-end">
+        <div className="space-y-4">
+          <div className="flex flex-wrap">
             <div
-              className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200"
+              className="flex flex-wrap items-center gap-2"
               role="group"
               aria-label="Selector de tema para previsualización"
             >
               <button
                 type="button"
-                onClick={() => setPreviewTheme('kids')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  previewTheme === 'kids'
-                    ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
+                onClick={() => setPreviewTheme("kids")}
+                aria-pressed={previewTheme === "kids"}
+                className={`origami-button origami-button--secondary ${previewTheme === "kids" ? "origami-selected" : ""}`}
               >
-                🧒 Kids
+                Kids
               </button>
               <button
                 type="button"
-                onClick={() => setPreviewTheme('teens')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  previewTheme === 'teens'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
+                onClick={() => setPreviewTheme("teens")}
+                aria-pressed={previewTheme === "teens"}
+                className={`origami-button origami-button--secondary ${previewTheme === "teens" ? "origami-selected" : ""}`}
               >
-                🧑‍🎓 Teens
+                Teens
               </button>
             </div>
           </div>
 
-          <div
-            className={`p-6 rounded-2xl border space-y-4 max-h-[60vh] overflow-y-auto ${
-              previewTheme === 'kids'
-                ? 'border-amber-200 bg-amber-50/40 text-amber-950'
-                : 'border-zinc-700 bg-zinc-900 text-zinc-100'
-            }`}
-            data-theme={previewTheme}
-          >
-            <div className="flex items-center justify-between">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900">
-                Nivel {level}
-              </span>
-              <span className="text-xs font-semibold text-zinc-500 capitalize">{type}</span>
+          <div className="origami-card space-y-4" data-theme={previewTheme}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="origami-state">Nivel {level}</span>
+              <span className="origami-meta">{activityTypeLabels[type]}</span>
             </div>
-            <h3 className={`text-xl font-black ${previewTheme === 'kids' ? 'text-amber-950' : 'text-zinc-100'}`}>{title || 'Actividad sin título'}</h3>
+            <h3 className="origami-card-title">
+              {title || "Actividad sin título"}
+            </h3>
 
-            {type === ActivityType.fill_blank && (
-              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
-                <p className="text-xs font-bold text-zinc-500">
-                  Oraciones con huecos ({fbItems.length})
-                </p>
-                {fbItems.map((it, idx) => (
-                  <div
-                    key={it.id || idx}
-                    className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
-                  >
-                    <p className="text-base text-zinc-800">
-                      {idx + 1}. {formatBlankPrompt(it.prompt, it.blanks)}
-                    </p>
-                    {it.blanks.map((b, bIdx) => (
-                      <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
-                        <p className="text-xs font-semibold text-zinc-600">Espacio {bIdx + 1}:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {b.options.map((opt) => (
-                            <span
-                              key={opt.id}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                                opt.id === b.correctOptionId
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-amber-100 text-amber-900'
-                              }`}
-                            >
-                              {opt.text} {opt.id === b.correctOptionId ? '✓' : ''}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+            {isPreviewOpen && (type === ActivityType.fill_blank || type === ActivityType.exam) && (
+              <SentenceRenderer
+                exam={type === ActivityType.exam}
+                items={(type === ActivityType.exam ? examItems : fbItems).map((item) => ({
+                  id: item.id,
+                  prompt: buildSentencePromptWithMarkers(item.prompt, item.blanks),
+                  weight: Number(item.weight) || 0,
+                  blanks: item.blanks.map(({ id, options }) => ({ id, options })),
+                }))}
+                answers={previewAnswers}
+                onAnswerChange={changePreviewAnswer}
+                onSpeak={speakPreview}
+              />
             )}
 
-            {type === ActivityType.speaking && (
-              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200 text-center">
-                <p className="text-sm font-bold text-amber-900">{spPrompt || 'Pronuncia la frase en voz alta'}</p>
-                <div className="p-4 rounded-xl bg-amber-50 inline-block text-xs font-semibold text-zinc-600">
-                  🎙️ Grabadora de voz simulada (2 a 120 segundos)
-                </div>
-              </div>
+            {isPreviewOpen && type === ActivityType.open_question && (
+              <OpenQuestionRenderer
+                instructions={oqInstructions}
+                items={oqQuestions.map(({ id, prompt, maxLength }) => {
+                  const limit = Number(maxLength);
+                  return {
+                    id,
+                    prompt,
+                    maxLength: Number.isInteger(limit) && limit > 0 ? limit : 2000,
+                  };
+                })}
+                answers={previewAnswers}
+                onAnswerChange={changePreviewAnswer}
+                onSpeak={speakPreview}
+              />
             )}
 
-            {type === ActivityType.open_question && (
-              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
-                {oqInstructions && (
-                  <div className="p-2.5 bg-amber-50 rounded-lg text-xs text-amber-900 border border-amber-200 font-medium">
-                    <strong>Instrucciones:</strong> {oqInstructions}
-                  </div>
-                )}
-                {oqQuestions.map((q, idx) => (
-                  <div key={q.id || idx} className="space-y-1.5 p-3 rounded-lg border border-amber-100 bg-amber-50/30">
-                    <p className="text-xs font-bold text-amber-900">
-                      {oqQuestions.length > 1 ? `Pregunta ${idx + 1}:` : 'Consigna:'}
-                    </p>
-                    <p className="text-sm font-semibold text-zinc-800">{q.prompt || 'Sin consigna'}</p>
-                    {q.rubric && (
-                      <p className="text-[11px] text-zinc-500 italic">Rúbrica: {q.rubric}</p>
-                    )}
-                    <textarea
-                      disabled
-                      placeholder="Aquí el alumno escribirá su respuesta..."
-                      className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-400 bg-white"
-                      rows={2}
+            {isPreviewOpen && type === ActivityType.speaking && (
+              <SpeakingRenderer
+                prompt={spPrompt}
+                onSpeak={speakPreview}
+                recorder={{
+                  mode: "preview",
+                  onStart: () => setPreviewRecordingNotice(true),
+                  notice: previewRecordingNotice
+                    ? "El micrófono no se activa en la previsualización."
+                    : undefined,
+                }}
+              />
+            )}
+
+            {isPreviewOpen && type === ActivityType.game &&
+              (() => {
+                let previewConfig: GamePublicConfig | null;
+                try {
+                  const payload = buildPayload();
+                  if (
+                    !payload ||
+                    !isGamePublicConfig(payload.config) ||
+                    !isGameAnswerKey(payload.answerKey)
+                  ) {
+                    previewConfig = null;
+                  } else {
+                    previewConfig = {
+                      ...payload.config,
+                      answerKey: payload.answerKey,
+                    };
+                  }
+                } catch {
+                  previewConfig = null;
+                }
+
+                if (!previewConfig) {
+                  return (
+                    <div className="origami-state space-y-2">
+                      <p className="font-bold">
+                        Previsualización de {gameMechanic}
+                      </p>
+                      <p className="origami-meta">
+                        Completa los campos requeridos de la mecánica para
+                        interactuar con la previsualización.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="min-w-0">
+                    <GameRenderer
+                      config={previewConfig}
+                      previewMode={true}
+                      theme={previewTheme}
                     />
                   </div>
-                ))}
-              </div>
-            )}
-
-            {type === ActivityType.exam && (
-              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
-                <p className="text-xs font-bold text-zinc-500">
-                  Ítems ponderados del examen ({examItems.length})
-                </p>
-                {examItems.map((it, idx) => (
-                  <div
-                    key={it.id || idx}
-                    className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
-                  >
-                    <p className="text-sm font-medium text-zinc-800">
-                      {idx + 1}. {formatBlankPrompt(it.prompt, it.blanks)}{' '}
-                      <span className="text-xs text-zinc-500 font-normal">
-                        ({it.weight || '0'}%)
-                      </span>
-                    </p>
-                    {it.blanks.map((b, bIdx) => (
-                      <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
-                        <p className="text-xs font-semibold text-zinc-600">Espacio {bIdx + 1}:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {b.options.map((opt) => (
-                            <span
-                              key={opt.id}
-                              className={`px-2 py-0.5 rounded text-xs font-bold ${
-                                opt.id === b.correctOptionId
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-amber-50 text-amber-900 border border-amber-200'
-                              }`}
-                            >
-                              {opt.text} {opt.id === b.correctOptionId ? '✓' : ''}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {type === ActivityType.game && (() => {
-              let previewConfig: GamePublicConfig | null;
-              try {
-                const payload = buildPayload();
-                if (!payload || !isGamePublicConfig(payload.config) || !isGameAnswerKey(payload.answerKey)) {
-                  previewConfig = null;
-                } else {
-                  previewConfig = {
-                    ...payload.config,
-                    answerKey: payload.answerKey,
-                  };
-                }
-              } catch {
-                previewConfig = null;
-              }
-
-              if (!previewConfig) {
-                return (
-                  <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
-                    <p className="text-xs font-bold text-amber-800 uppercase">Previsualización de {gameMechanic}</p>
-                    <p className="text-xs text-zinc-600 mt-1">
-                      Completa los campos requeridos de la mecánica para interactuar con la previsualización.
-                    </p>
-                  </div>
                 );
-              }
-
-              return (
-                <div className="p-4 bg-white rounded-2xl border border-amber-200">
-                  <GameRenderer
-                    config={previewConfig}
-                    previewMode={true}
-                    theme={previewTheme}
-                  />
-                </div>
-              );
-            })()}
+              })()}
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-zinc-100">
+          <div className="flex justify-end border-t border-(--origami-border-subtle) pt-3">
             <button
               type="button"
               onClick={() => setIsPreviewOpen(false)}
-              className="rounded-xl bg-zinc-900 text-white font-bold px-5 py-2 text-xs hover:bg-zinc-800 cursor-pointer"
+              className="origami-button origami-button--secondary"
             >
               Cerrar previsualización
             </button>

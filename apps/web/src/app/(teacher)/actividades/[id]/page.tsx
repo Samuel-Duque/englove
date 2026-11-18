@@ -1,10 +1,10 @@
-import React, { Suspense } from 'react';
-import type { Metadata } from 'next';
-import { ActividadDetailClient } from './actividad-detail-client';
+import React, { Suspense } from "react";
+import type { Metadata } from "next";
+import { ActividadDetailClient } from "./actividad-detail-client";
 
 export const metadata: Metadata = {
-  title: 'Editar Actividad',
-  description: 'Editor docente para diseñar y configurar la actividad.',
+  title: "Editar Actividad",
+  description: "Editor docente para diseñar y configurar la actividad.",
 };
 
 export default async function EditarActividadPage({
@@ -17,7 +17,7 @@ export default async function EditarActividadPage({
   return (
     <Suspense
       fallback={
-        <div className="py-12 text-center text-zinc-500 text-sm">
+        <div className="origami-state" role="status">
           Cargando actividad…
         </div>
       }

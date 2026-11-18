@@ -350,12 +350,21 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 
 ## 8. Sistema de diseño — Decidido
 
+### Base vigente hasta la adopción de Origami
+
 - **Dos temas visuales**, uno por segmento de edad. Es una decisión de producto firme: las necesidades de un niño de 7 años y un adolescente de 14 son distintas en densidad de información, tono y refuerzo.
   - **Kids/Junior (7–10):** colorido, botones táctiles grandes, animaciones lúdicas, refuerzo sonoro, confeti en celebraciones.
   - **Teens (11–14+):** moderno y limpio, estilo Duolingo/Kahoot, motivador sin infantilizar.
 - **Implementación:** un solo sistema de tokens de diseño (color, tipografía, espaciado, radios, intensidad de movimiento, sonido) con dos conjuntos de valores. Los componentes se construyen una vez y leen el conjunto activo según `age_segment`. Solo se crean variantes estructurales de componente donde la diferencia lo exige (por ejemplo, el layout de la zona de juegos). Esto entrega dos temas sin mantener dos aplicaciones visuales.
 - Animaciones ligeras y transiciones mediante CSS y Tailwind, optimizadas para tablets y sin dependencias pesadas (Decisiones 105 y 107).
 - Antes de cerrar el diseño visual: sesiones de observación con 3 niños reales por segmento de edad usando un prototipo.
+
+### Origami — objetivo de la rama `UI` (decisión 147)
+
+- Una identidad para el espacio público, Kids, Teens y la profesora: grulla, papel plegado y una base común de tipografía y componentes. Kids conserva mayor tamaño táctil y relieve; Teens reduce ornamentos; el panel utiliza superficies de trabajo lisas.
+- El rol sigue determinando permisos y destinos. El segmento y el permiso vigente determinan el `data-theme` del alumno. Claro/oscuro es una preferencia de presentación independiente, temporal por pestaña y sin API ni persistencia en el perfil.
+- El [plan de Origami](../planning/plan-implementacion-ui-origami.md) es la referencia visual; [SPEC-12](../specs/SPEC-12-ui-origami.md) define el comportamiento y la evidencia. Este objetivo no cambia el diseño vigente fuera de `UI` ni habilita código hasta que la spec esté Aprobada.
+- La adopción requiere implementación completa y verificación en `UI`, con evidencia por ruta, audiencia, apariencia y dispositivo; se conserva la observación con tres niños reales por segmento. La aprobación de la spec habilita implementar, no adoptar ni publicar.
 
 ---
 
@@ -422,6 +431,8 @@ Toda actividad jugable o calificable implementa la misma interfaz, definida en e
 10. Sección "Contenido extra".
 11. Lanzamiento del piloto. Condiciones previas: contenido cargado por la profesora, estadísticas de rendimiento y constancia operativas, manual de uso de la profesora entregado y Etapa 12 verificada (`SPEC-11` en `Verificada`).
 12. **Calidad y remediación (Decidido, decisión 127):** corrección de los errores, incongruencias, brechas de seguridad, defectos de accesibilidad y código no limpio detectados en `AUDITORIA.md` y en `testing-issues/`, con pruebas de regresión que verifican cada corrección. No añade funcionalidades, con una única excepción acordada por el líder: el ranking de juegos y la sección «Práctica en juegos» del panel (decisión 137). Lleva el número 12 porque se planificó después de la Etapa 11 (para no renumerar), pero **se ejecuta y se cierra antes de cerrar la Etapa 11**.
+
+13. **UI Origami en la rama `UI` (decisión 147):** iniciativa transversal de presentación sobre las capacidades existentes. [SPEC-12](../specs/SPEC-12-ui-origami.md) rige el trabajo de esa rama; no renumera etapas previas ni modifica las condiciones operativas del Hito H4.
 
 Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 
@@ -677,6 +688,12 @@ Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 | # | Decisión | Estado |
 | --- | --- | --- |
 | 146 | **Nombre definitivo del producto: «Upward English»:** se adopta **Upward English** como nombre definitivo del producto y plataforma (en reemplazo del nombre provisional anterior) en contexto, especificaciones, documentación, manifiesto PWA, paquetes `@upward-english/*`, prefijos `upward_english_*` y dominios `upwardenglish.*`. Cierra el pendiente de CONTEXT §15, el riesgo de `planning/pbp-development.md` (Etapa 11), el pendiente de `planning/taskboard.md` y la pregunta Q-05 de SPEC-09. | Decidido por el líder del proyecto |
+
+### Ronda 20 — 2026-11-17 (Origami en la rama UI)
+
+| # | Decisión | Estado |
+| --- | --- | --- |
+| 147 | **Origami como candidato de rediseño en `UI`:** preparar un contrato transversal para portada, espacios autenticados y estados del sistema. Implementar el alcance completo y verificarlo en `UI` antes de decidir su adopción. Se preservan permisos, acceso por segmento, contratos de negocio y exclusiones del piloto. La aceptación definitiva exige evidencia y una decisión posterior; no equivale a la aprobación de SPEC-12 ni autoriza publicar. | Decidido para la rama `UI`; adopción pendiente |
 
 Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abrir una ronda nueva con fecha) y actualizar la sección afectada de este documento en el mismo cambio.
 

@@ -1,5 +1,7 @@
 # Upward English — Taskboard
 
+> Actualización 2026-11-18: [SPEC-12 UI Origami](../specs/SPEC-12-ui-origami.md) aprobada para la rama `UI`. ENG-163 a ENG-165 tienen implementación y evidencia local, sin cierre formal ni adopción. ENG-166 tiene la regresión local y espera la [validación física conjunta](./plan-implementacion-ui-origami.md#validación-física-del-candidato-completo) y las demás comprobaciones de aceptación. Resumen: 124 Hecho, 3 En curso, 5 Por hacer, 1 Bloqueado, 8 Backlog (Total 141).
+
 > Seguimiento vigente de auditoría (2026-11-12): [correcciones y evidencia](./remediacion-auditoria-2026-11-12.md). Los estados y conteos del cierre anterior se conservan como registro histórico. ENG-015 tiene implementación de promoción serializada y compuertas locales; su primera ejecución cloud depende del aprovisionamiento ENG-003/004. La enmienda NEG-01 de SPEC-08 requiere re-verificación en CI; no se cierran aquí tareas de lanzamiento ni aceptación operativa.
 
 > Actualización documental (2026-11-16): DOC-10 incorpora la skill `upward-english-kids-ux` (solicitada como `englove-kids-ux`), sus referencias, escenarios de evaluación, copias de agentes y registro local. No modifica código de producto ni cierra aceptación operativa. Resumen vigente: 123 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 8 Backlog (Total 136); los resúmenes siguientes son históricos.
@@ -39,12 +41,12 @@
 
 | Estado    | Tareas  |
 | --------- | ------- |
-| Hecho     | 123     |
-| En curso  | 0       |
+| Hecho     | 124     |
+| En curso  | 3       |
 | Por hacer | 5       |
-| Bloqueado | 0       |
+| Bloqueado | 1       |
 | Backlog   | 8       |
-| **Total** | **136** |
+| **Total** | **141** |
 
 Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (documentos legales), ENG-022 (CRUD `Guardian`), ENG-042 (`ConsentRecord`), ENG-136 (consentimientos recogidos). Creada el 2026-09-28 por la decisión 57: ENG-046. Creada y cerrada el 2026-10-08: DOC-07 (skill propia `upward-english-spec`). Creada el 2026-10-10 por las decisiones 81 y 82: ENG-140 (PoC go/no-go de plataforma). Creada y cerrada el 2026-10-19: DOC-08 (skill propia `upward-english-guardrails`). La decisión 67 (modelo de datos) no crea ni elimina tareas: reescribe el alcance de las existentes. Creadas el 2026-11-08 por las decisiones 127 a 129 (Etapa 12): SPEC-11, ENG-150 a ENG-162 y DOC-09 (15 tareas; ENG-143 cambia de etapa sin cambiar de estado).
 
@@ -52,7 +54,9 @@ Eliminadas el 2026-09-22 por la decisión 34 (no cuentan en el total): ENG-006 (
 
 ## Bloqueado — esperando decisión
 
-Ninguna tarea bloqueada. Las tres que lo estaban (ENG-103, ENG-133, ENG-134) se desbloquearon el 2026-09-21 con las decisiones 25, 27 y 28 de CONTEXT §14; ENG-133 y ENG-134 se renumeraron como ENG-095 y ENG-096 y pasaron a la Etapa 7.
+- ENG-166: la aceptación del candidato Origami espera pruebas físicas y manuales, más evidencia de CI.
+
+Las tareas ENG-103, ENG-133 y ENG-134 se desbloquearon el 2026-09-21 con las decisiones 25, 27 y 28 de CONTEXT §14; ENG-133 y ENG-134 se renumeraron como ENG-095 y ENG-096 y pasaron a la Etapa 7.
 
 ---
 
@@ -195,7 +199,9 @@ Evidencia DOC-10: entrada de 56 líneas/776 palabras; guardrails globales sin er
 
 Límite: 3.
 
-Ninguna tarea en curso.
+| ID | Tarea | Prioridad | Dependencias | Spec | Estado |
+| --- | --- | --- | --- | --- | --- |
+| SPEC-12 | Formalizar y aprobar UI Origami para la rama `UI`: sistema visual, apariencia, cobertura de rutas, regresión y aceptación. | P1 | Decisión 147, SPEC-11 | SPEC-12 | Hecho |
 
 
 
@@ -330,6 +336,15 @@ Compuerta cumplida: [SPEC-11](../specs/SPEC-11-calidad-y-correcciones.md) se enc
 ---
 
 ## Backlog
+
+### Etapa 13 — UI Origami (rama `UI`)
+
+| ID | Tarea | Prioridad | Dependencias | Spec | Estado |
+| --- | --- | --- | --- | --- | --- |
+| ENG-163 | Integrar recursos locales, tokens, apariencia de pestaña, controles y estructuras de navegación. | P1 | SPEC-12 | SPEC-12 | En curso |
+| ENG-164 | Implementar y verificar portada, Juegos Kids/Teens y Revisión como pantallas de referencia. | P1 | ENG-163 | SPEC-12 | En curso |
+| ENG-165 | Extender Origami al resto de rutas y estados; verificar integración y preservar redirecciones y contratos. | P1 | ENG-164 (evidencia local; prueba física en ENG-166) | SPEC-12 | En curso |
+| ENG-166 | Ejecutar y documentar la matriz completa de regresión, accesibilidad y dispositivos en `UI`; presentar evidencia para decisión de adopción. | P1 | ENG-165 | SPEC-12 | Bloqueado |
 
 ### Etapa 11 — Lanzamiento (Hito H4)
 

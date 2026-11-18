@@ -10,7 +10,7 @@ export default function EstadisticasPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-12 text-center text-zinc-500 text-sm">
+        <div role="status" className="origami-state text-center">
           Cargando panel de estadísticas…
         </div>
       }

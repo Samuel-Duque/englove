@@ -1,52 +1,21 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AssignmentView,
   AssignmentViewSchema,
   AssignmentAvailability,
-  ActivityType,
   formatBogotaDateTime,
   getExtendedDueAt,
-} from '@upward-english/shared';
-import { apiFetch, ApiError } from '../../../../lib/api';
-import { AccessibleModal } from '../../../../components/ui/modal';
+} from "@upward-english/shared";
+import { apiFetch, ApiError } from "../../../../lib/api";
+import { AccessibleModal } from "../../../../components/ui/modal";
 
-const typeLabels: Record<ActivityType, string> = {
-  [ActivityType.fill_blank]: 'Rellenar huecos',
-  [ActivityType.open_question]: 'Pregunta abierta',
-  [ActivityType.speaking]: 'Expresión oral (Speaking)',
-  [ActivityType.game]: 'Microjuego',
-  [ActivityType.exam]: 'Examen',
-};
+import { activityTypeLabels } from "../../actividades/activity-labels";
 
-const availabilityBadges: Record<
-  AssignmentAvailability,
-  { label: string; bg: string; text: string }
-> = {
-  [AssignmentAvailability.scheduled]: {
-    label: 'Programada',
-    bg: 'bg-blue-50 border-blue-200',
-    text: 'text-blue-700',
-  },
-  [AssignmentAvailability.open]: {
-    label: 'Abierta',
-    bg: 'bg-emerald-50 border-emerald-200',
-    text: 'text-emerald-700',
-  },
-  [AssignmentAvailability.closed]: {
-    label: 'Cerrada',
-    bg: 'bg-zinc-100 border-zinc-200',
-    text: 'text-zinc-600',
-  },
-  [AssignmentAvailability.cancelled]: {
-    label: 'Cancelada',
-    bg: 'bg-rose-50 border-rose-200',
-    text: 'text-rose-700',
-  },
-};
+import { availabilityBadges } from "../assignment-labels";
 
 export function AsignacionDetailClient({ id }: { id: string }) {
   const queryClient = useQueryClient();
@@ -57,10 +26,11 @@ export function AsignacionDetailClient({ id }: { id: string }) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
   const modalReturnBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const assignmentQuery = useQuery({
-    queryKey: ['teacher', 'assignment', id],
+    queryKey: ["teacher", "assignment", id],
     queryFn: () =>
       apiFetch<AssignmentView>(`/api/v1/assignments/${id}`, {
         schema: AssignmentViewSchema,
@@ -75,15 +45,15 @@ export function AsignacionDetailClient({ id }: { id: string }) {
     const err = assignmentQuery.error;
     if (err instanceof ApiError) {
       if (err.statusCode === 404) {
-        return 'No encontramos esta asignación o alguno de los recursos seleccionados';
+        return "No encontramos esta asignación o alguno de los recursos seleccionados";
       } else if (err.statusCode === 403) {
-        return 'No tienes acceso a esta sección';
+        return "No tienes acceso a esta sección";
       } else if (err.statusCode === 429) {
-        return 'Espera un momento antes de volver a intentarlo';
+        return "Espera un momento antes de volver a intentarlo";
       }
-      return err.message || 'No pudimos cargar la asignación';
+      return err.message || "No pudimos cargar la asignación";
     }
-    return 'No pudimos cargar la asignación';
+    return "No pudimos cargar la asignación";
   };
 
   const error = getErrorMessage();
@@ -91,27 +61,29 @@ export function AsignacionDetailClient({ id }: { id: string }) {
   const cancelMutation = useMutation({
     mutationFn: () =>
       apiFetch<AssignmentView>(`/api/v1/assignments/${id}/cancel`, {
-        method: 'POST',
+        method: "POST",
         schema: AssignmentViewSchema,
       }),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['teacher', 'assignment', id], updated);
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      queryClient.setQueryData(["teacher", "assignment", id], updated);
+      queryClient.invalidateQueries({ queryKey: ["teacher", "assignments"] });
       setShowCancelModal(false);
-      setSuccessNotice('Asignación cancelada');
+      setSuccessNotice("Asignación cancelada");
       setTimeout(() => {
-        cancelButtonRef.current?.focus();
+        titleRef.current?.focus();
       }, 50);
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
         if (err.statusCode === 409) {
-          setCancelError('Esta asignación no se puede cancelar porque ya está cerrada o cancelada');
+          setCancelError(
+            "Esta asignación no se puede cancelar porque ya está cerrada o cancelada",
+          );
         } else {
-          setCancelError(err.message || 'No se pudo cancelar la asignación');
+          setCancelError(err.message || "No se pudo cancelar la asignación");
         }
       } else {
-        setCancelError('No se pudo cancelar la asignación');
+        setCancelError("No se pudo cancelar la asignación");
       }
     },
   });
@@ -122,12 +94,12 @@ export function AsignacionDetailClient({ id }: { id: string }) {
   useEffect(() => {
     if (!showCancelModal) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         handleCloseCancelModal();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showCancelModal, isCancelling]);
 
   const handleOpenCancelModal = () => {
@@ -155,7 +127,7 @@ export function AsignacionDetailClient({ id }: { id: string }) {
 
   if (isLoading) {
     return (
-      <div className="py-16 text-center text-zinc-500 text-sm">
+      <div className="origami-state" role="status">
         Cargando asignación…
       </div>
     );
@@ -166,15 +138,28 @@ export function AsignacionDetailClient({ id }: { id: string }) {
       <div className="max-w-xl mx-auto mt-8">
         <div
           role="alert"
-          className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-800"
+          className="origami-state origami-state--error space-y-3"
         >
           <p className="font-medium">
-            {error || 'No encontramos esta asignación o alguno de los recursos seleccionados'}
+            {error ||
+              "No encontramos esta asignación o alguno de los recursos seleccionados"}
           </p>
-          <div className="mt-4">
+          <div className="flex flex-wrap gap-2">
+            {!(
+              assignmentQuery.error instanceof ApiError &&
+              [403, 404].includes(assignmentQuery.error.statusCode)
+            ) && (
+              <button
+                type="button"
+                className="origami-button origami-button--secondary"
+                onClick={() => void assignmentQuery.refetch()}
+              >
+                Reintentar
+              </button>
+            )}
             <Link
               href="/asignaciones"
-              className="inline-flex items-center rounded-lg bg-zinc-800 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-900"
+              className="origami-button origami-button--text"
             >
               Volver a asignaciones
             </Link>
@@ -191,14 +176,17 @@ export function AsignacionDetailClient({ id }: { id: string }) {
   const extendedDue = getExtendedDueAt(assignment.dueAt);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="origami-shell mx-auto max-w-3xl space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/asignaciones" className="hover:text-zinc-900">
+      <div className="origami-meta flex flex-wrap items-center gap-2">
+        <Link
+          href="/asignaciones"
+          className="origami-button origami-button--text"
+        >
           Asignaciones
         </Link>
         <span>/</span>
-        <span className="text-zinc-800 font-medium truncate max-w-sm">
+        <span className="text-(--origami-text-primary) font-medium">
           {assignment.activity.title}
         </span>
       </div>
@@ -207,13 +195,14 @@ export function AsignacionDetailClient({ id }: { id: string }) {
       {successNotice && (
         <div
           role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex justify-between items-center"
+          className="origami-state origami-state--success flex items-center justify-between gap-2"
         >
           <span className="font-medium">{successNotice}</span>
           <button
             type="button"
             onClick={() => setSuccessNotice(null)}
-            className="text-emerald-600 font-bold ml-4"
+            className="origami-button origami-button--text"
+            aria-label="Cerrar aviso"
           >
             ✕
           </button>
@@ -221,23 +210,21 @@ export function AsignacionDetailClient({ id }: { id: string }) {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-zinc-200 pb-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${badge.bg} ${badge.text}`}
-            >
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-(--origami-border-subtle) pb-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className={`origami-state text-sm font-bold ${badge.tone}`}>
               {badge.label}
             </span>
-            <span className="text-xs text-zinc-500 font-medium">
+            <span className="text-xs text-(--origami-text-secondary) font-medium">
               v{assignment.activity.version}
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 mt-2">
+          <h1 ref={titleRef} tabIndex={-1} className="origami-page-title mt-2">
             {assignment.activity.title}
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            {typeLabels[assignment.activity.type]} · Nivel{' '}
+          <p className="text-sm text-(--origami-text-secondary) mt-1">
+            {activityTypeLabels[assignment.activity.type]} · Nivel{" "}
             {assignment.activity.level}
           </p>
         </div>
@@ -248,12 +235,12 @@ export function AsignacionDetailClient({ id }: { id: string }) {
               ref={cancelButtonRef}
               type="button"
               onClick={handleOpenCancelModal}
-              className="rounded-lg border border-rose-300 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-colors"
+              className="origami-button origami-button--secondary text-(--origami-error-text)"
             >
               Cancelar asignación
             </button>
           ) : (
-            <span className="inline-flex items-center rounded-lg bg-zinc-100 px-3 py-1.5 text-xs text-zinc-600 font-medium">
+            <span className="inline-flex items-center rounded-lg bg-(--origami-surface-soft) px-3 py-1.5 text-xs text-(--origami-text-secondary) font-medium">
               Cancelada el {formatBogotaDateTime(assignment.cancelledAt!)}
             </span>
           )}
@@ -263,35 +250,39 @@ export function AsignacionDetailClient({ id }: { id: string }) {
       {/* Main Details Grid */}
       <div className="grid gap-6 sm:grid-cols-2">
         {/* Group Info Card */}
-        <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
-          <h2 className="text-sm font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+        <section className="origami-card space-y-3">
+          <h2 className="origami-card-title border-b border-(--origami-border-subtle) pb-2">
             Grupo destinatario
           </h2>
           <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 font-medium">Nombre:</span>
-              <span className="font-semibold text-zinc-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-(--origami-text-secondary) font-medium">
+                Nombre:
+              </span>
+              <span className="font-semibold text-(--origami-text-primary)">
                 {assignment.group.name}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 font-medium">Estado del grupo:</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-(--origami-text-secondary) font-medium">
+                Estado del grupo:
+              </span>
               <span>
                 {assignment.group.archivedAt ? (
-                  <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-semibold">
+                  <span className="origami-state origami-state--warning">
                     Archivado
                   </span>
                 ) : (
-                  <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-semibold">
+                  <span className="origami-state origami-state--success">
                     Activo
                   </span>
                 )}
               </span>
             </div>
-            <div className="pt-2 border-t border-zinc-100">
+            <div className="pt-2 border-t border-(--origami-border-subtle)">
               <Link
                 href={`/grupos/${assignment.group.id}`}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                className="origami-button origami-button--text"
               >
                 Ver ficha del grupo →
               </Link>
@@ -300,37 +291,43 @@ export function AsignacionDetailClient({ id }: { id: string }) {
         </section>
 
         {/* Activity Catalog Info Card */}
-        <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
-          <h2 className="text-sm font-bold text-zinc-900 border-b border-zinc-100 pb-2">
+        <section className="origami-card space-y-3">
+          <h2 className="origami-card-title border-b border-(--origami-border-subtle) pb-2">
             Actividad en catálogo
           </h2>
           <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 font-medium">Tipo:</span>
-              <span className="font-semibold text-zinc-900">
-                {typeLabels[assignment.activity.type]}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-(--origami-text-secondary) font-medium">
+                Tipo:
+              </span>
+              <span className="font-semibold text-(--origami-text-primary)">
+                {activityTypeLabels[assignment.activity.type]}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 font-medium">Nivel:</span>
-              <span className="font-semibold text-zinc-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-(--origami-text-secondary) font-medium">
+                Nivel:
+              </span>
+              <span className="font-semibold text-(--origami-text-primary)">
                 {assignment.activity.level}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-500 font-medium">Estado en catálogo:</span>
-              <span className="capitalize font-semibold text-zinc-800">
-                {assignment.activity.status === 'published'
-                  ? 'Publicada'
-                  : assignment.activity.status === 'archived'
-                    ? 'Archivada'
-                    : 'Borrador'}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-(--origami-text-secondary) font-medium">
+                Estado en catálogo:
+              </span>
+              <span className="capitalize font-semibold text-(--origami-text-primary)">
+                {assignment.activity.status === "published"
+                  ? "Publicada"
+                  : assignment.activity.status === "archived"
+                    ? "Archivada"
+                    : "Borrador"}
               </span>
             </div>
-            <div className="pt-2 border-t border-zinc-100">
+            <div className="pt-2 border-t border-(--origami-border-subtle)">
               <Link
                 href={`/actividades/${assignment.activity.id}`}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                className="origami-button origami-button--text"
               >
                 Ver editor de actividad →
               </Link>
@@ -340,53 +337,52 @@ export function AsignacionDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Dates & Policy Section */}
-      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-          <h2 className="text-base font-bold text-zinc-900">
-            Plazos y horarios
-          </h2>
-          <span className="text-xs font-semibold text-zinc-600 bg-zinc-100 px-2.5 py-1 rounded-md">
+      <section className="origami-card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-(--origami-border-subtle) pb-3">
+          <h2 className="origami-card-title">Plazos y horarios</h2>
+          <span className="text-xs font-semibold text-(--origami-text-secondary) bg-(--origami-surface-soft) px-2.5 py-1 rounded-md">
             Hora de Colombia (America/Bogota)
           </span>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 text-xs">
-          <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-1">
-            <span className="font-semibold text-zinc-500 block uppercase tracking-wider text-[10px]">
+          <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-1">
+            <span className="font-semibold text-(--origami-text-secondary) block uppercase tracking-wider text-[10px]">
               Apertura
             </span>
-            <p className="text-base font-bold text-zinc-900">
+            <p className="origami-card-title">
               {formatBogotaDateTime(assignment.opensAt)}
             </p>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-(--origami-text-secondary)">
               Instante en que se habilita para los alumnos.
             </p>
           </div>
 
-          <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-1">
-            <span className="font-semibold text-zinc-500 block uppercase tracking-wider text-[10px]">
+          <div className="rounded-lg bg-(--origami-surface-soft) border border-(--origami-border-subtle) p-4 space-y-1">
+            <span className="font-semibold text-(--origami-text-secondary) block uppercase tracking-wider text-[10px]">
               Cierre para empezar
             </span>
-            <p className="text-base font-bold text-zinc-900">
+            <p className="origami-card-title">
               {formatBogotaDateTime(assignment.dueAt)}
             </p>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-(--origami-text-secondary)">
               Límite para iniciar el primer intento.
             </p>
           </div>
         </div>
 
         {/* Mandatory Policy Explanation (SPEC-04 RF-7, §7) */}
-        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-xs text-amber-900 space-y-2">
-          <p className="font-semibold">
-            Regla de entrega y tolerancia:
-          </p>
+        <div className="origami-state origami-state--warning space-y-2">
+          <p className="font-semibold">Regla de entrega y tolerancia:</p>
           <p className="leading-relaxed">
-            los alumnos pueden empezar hasta esta hora; quien haya empezado tendrá hasta 24 horas más para terminar.
+            los alumnos pueden empezar hasta esta hora; quien haya empezado
+            tendrá hasta 24 horas más para terminar.
           </p>
-          <div className="pt-2 border-t border-amber-200 font-medium">
-            Última hora para terminar si empezó a tiempo:{' '}
-            <span className="font-bold">{formatBogotaDateTime(extendedDue)}</span>
+          <div className="pt-2 border-t border-(--origami-border-subtle) font-medium">
+            Última hora para terminar si empezó a tiempo:{" "}
+            <span className="font-bold">
+              {formatBogotaDateTime(extendedDue)}
+            </span>
           </div>
         </div>
       </section>
@@ -397,26 +393,25 @@ export function AsignacionDetailClient({ id }: { id: string }) {
         onClose={handleCloseCancelModal}
         title="¿Cancelar esta asignación?"
       >
-        <p className="text-xs text-zinc-600 leading-relaxed">
-          No se podrán empezar nuevos intentos. Quienes ya empezaron podrán terminar dentro de su plazo. Se conservarán los trabajos y las calificaciones.
+        <p className="text-xs text-(--origami-text-secondary) leading-relaxed">
+          No se podrán empezar nuevos intentos. Quienes ya empezaron podrán
+          terminar dentro de su plazo. Se conservarán los trabajos y las
+          calificaciones.
         </p>
 
         {cancelError && (
-          <div
-            role="alert"
-            className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800"
-          >
+          <div role="alert" className="origami-state origami-state--error">
             {cancelError}
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-100">
+        <div className="flex items-center flex-wrap justify-end gap-3 pt-3 border-t border-(--origami-border-subtle)">
           <button
             ref={modalReturnBtnRef}
             type="button"
             onClick={handleCloseCancelModal}
             disabled={isCancelling}
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="origami-button origami-button--secondary"
           >
             Volver
           </button>
@@ -424,9 +419,9 @@ export function AsignacionDetailClient({ id }: { id: string }) {
             type="button"
             onClick={handleConfirmCancel}
             disabled={isCancelling}
-            className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50"
+            className="origami-button"
           >
-            {isCancelling ? 'Cancelando…' : 'Cancelar asignación'}
+            {isCancelling ? "Cancelando…" : "Cancelar asignación"}
           </button>
         </div>
       </AccessibleModal>

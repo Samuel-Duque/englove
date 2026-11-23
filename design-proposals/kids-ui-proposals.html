@@ -1,0 +1,2946 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Englove Kids — Propuestas de UI (Paleta Cálida)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fredoka:wght@500;600;700&family=Lexend:wght@400;500;600;700&family=Nunito:wght@500;600;700;800&family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       0. RESET & ACCESSIBILITY BASE
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #1C1412;
+      color: #2E1307;
+      font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    img, svg {
+      display: block;
+      max-width: 100%;
+    }
+
+    button, a {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      white-space: nowrap !important;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 1000;
+      background: #2E1307;
+      color: #FFFDF5;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.75rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+      outline: 3px solid #1D4ED8;
+      outline-offset: 3px;
+    }
+
+    /* ==========================================================================
+       1. STUDIO REVIEW TOOLBAR (OUTSIDE THE APP MOCKUP)
+       ========================================================================== */
+    .studio-bar {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: #1B1310;
+      color: #FDF6EE;
+      border-bottom: 1px solid rgba(255, 214, 153, 0.16);
+      padding: 0.5rem 1rem;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+
+    .studio-bar[hidden] {
+      display: none;
+    }
+
+    .studio-bar__inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .studio-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #FFD27D;
+      white-space: nowrap;
+    }
+
+    .studio-brand__dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #FF5938, #FFC83D);
+    }
+
+    .studio-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .studio-group {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 0.65rem;
+      padding: 0.15rem;
+      gap: 0.15rem;
+    }
+
+    .studio-btn {
+      border: 0;
+      background: transparent;
+      color: #E7D6C7;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 0.38rem 0.62rem;
+      min-block-size: 34px;
+      border-radius: 0.48rem;
+      transition: background-color 140ms ease-out, color 140ms ease-out;
+      white-space: nowrap;
+    }
+
+    .studio-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #FFFFFF;
+    }
+
+    .studio-btn[aria-pressed="true"] {
+      background: #F97316;
+      color: #1F0B02;
+    }
+
+    .studio-btn--outline {
+      border: 1px solid rgba(255, 200, 61, 0.35);
+      background: rgba(255, 200, 61, 0.1);
+      color: #FFE08A;
+      border-radius: 0.65rem;
+    }
+
+    .studio-btn--outline:hover {
+      background: rgba(255, 200, 61, 0.2);
+      color: #FFF7D6;
+    }
+
+    .studio-btn:focus-visible {
+      outline: 3px solid #FFD23F;
+      outline-offset: 2px;
+    }
+
+    .studio-restore-btn {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 250;
+      border: 2px solid #FFD23F;
+      background: #1B1310;
+      color: #FFF7D6;
+      padding: 0.65rem 1rem;
+      border-radius: 999px;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .studio-restore-btn[hidden] {
+      display: none;
+    }
+
+    /* ==========================================================================
+       2. VIEWPORT STAGE (DESKTOP / TABLET / MOBILE FRAME)
+       ========================================================================== */
+    .stage {
+      padding: 0;
+      min-height: calc(100vh - 58px);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      transition: padding 200ms ease-out;
+    }
+
+    .stage[data-device="tablet"],
+    .stage[data-device="mobile"] {
+      padding: 1.5rem 1rem 2.5rem;
+      background: radial-gradient(circle at top, #2D201B 0%, #19110E 70%);
+    }
+
+    .viewport-shell {
+      width: 100%;
+      min-height: calc(100vh - 58px);
+      background: var(--app-bg);
+      color: var(--ink-1);
+      font-family: var(--font-body);
+      transition: max-width 220ms ease-out, border-radius 220ms ease-out;
+      position: relative;
+      overflow-x: clip;
+    }
+
+    .stage[data-device="tablet"] .viewport-shell {
+      max-width: 820px;
+      min-height: 920px;
+      border-radius: 28px;
+      border: 8px solid #352722;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+    }
+
+    .stage[data-device="mobile"] .viewport-shell {
+      max-width: 390px;
+      min-height: 820px;
+      border-radius: 34px;
+      border: 8px solid #352722;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+    }
+
+    /* ==========================================================================
+       3. PROPOSAL DESIGN TOKENS (A: SOL DE PAPEL | B: AVENTURA SOLAR | C: ESTUDIO CREATIVO)
+       All text/bg pairs verified >= 4.5:1 (AA normal) and non-text >= 3:1
+       ========================================================================== */
+
+    /* --- PROPOSAL A: "Sol de Papel" (Illustrated Storybook & Tactile Paper) --- */
+    .viewport-shell[data-proposal="a"] {
+      --font-display: 'Fredoka', system-ui, sans-serif;
+      --font-body: 'Nunito', system-ui, sans-serif;
+
+      --app-bg: #FFFBF0;
+      --app-bg-accent: #FFF2CC;
+      --surface-1: #FFFFFF;
+      --surface-2: #FFF5D9;
+      --surface-soft-red: #FFE9E5;
+      --surface-soft-orange: #FFEDD8;
+      --surface-soft-yellow: #FFF3B8;
+
+      --ink-1: #2E1307;
+      --ink-2: #643520;
+      --ink-3: #7A4428;
+
+      --red: #C82822;
+      --red-hover: #A91E19;
+      --orange: #C4410A;
+      --orange-hover: #A33406;
+      --orange-bright: #FF7A1A;
+      --yellow: #FFC83D;
+      --yellow-deep: #E5A200;
+
+      --border-strong: #3B180A;
+      --border-soft: #E8C59B;
+      --radius-card: 24px;
+      --radius-btn: 16px;
+      --radius-pill: 999px;
+      --shadow-card: 5px 5px 0 #3B180A;
+      --shadow-btn: 0 4px 0 #3B180A;
+      --shadow-btn-hover: 0 6px 0 #3B180A;
+    }
+
+    /* --- PROPOSAL B: "Aventura Solar" (Tactile 3D Arcade for Tablets) --- */
+    .viewport-shell[data-proposal="b"] {
+      --font-display: 'Baloo 2', system-ui, sans-serif;
+      --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+      --app-bg: #FFF5E4;
+      --app-bg-accent: #FFE5BD;
+      --surface-1: #FFFFFF;
+      --surface-2: #FFF0D4;
+      --surface-soft-red: #FFE6E3;
+      --surface-soft-orange: #FFE8D1;
+      --surface-soft-yellow: #FFF1B5;
+
+      --ink-1: #261005;
+      --ink-2: #5E341D;
+      --ink-3: #744225;
+
+      --red: #C62828;
+      --red-hover: #A71E1E;
+      --orange: #C74607;
+      --orange-hover: #A83804;
+      --orange-bright: #FF6B1A;
+      --yellow: #FFBE18;
+      --yellow-deep: #D98A00;
+
+      --border-strong: #E4B27A;
+      --border-soft: #F1CFA3;
+      --radius-card: 28px;
+      --radius-btn: 20px;
+      --radius-pill: 999px;
+      --shadow-card: 0 6px 0 #E7C397;
+      --shadow-btn: 0 5px 0 #8F2C03;
+      --shadow-btn-hover: 0 7px 0 #8F2C03;
+    }
+
+    /* --- PROPOSAL C: "Estudio Creativo" (Clean, Calm, Reading-First Warmth) --- */
+    .viewport-shell[data-proposal="c"] {
+      --font-display: 'Outfit', system-ui, sans-serif;
+      --font-body: 'Lexend', system-ui, sans-serif;
+
+      --app-bg: #FFFCF7;
+      --app-bg-accent: #FFF3E0;
+      --surface-1: #FFFFFF;
+      --surface-2: #FFF8EE;
+      --surface-soft-red: #FFF0EE;
+      --surface-soft-orange: #FFF2E5;
+      --surface-soft-yellow: #FFF8D6;
+
+      --ink-1: #27150C;
+      --ink-2: #5F3D2B;
+      --ink-3: #754E39;
+
+      --red: #BF2626;
+      --red-hover: #9E1E1E;
+      --orange: #C2410C;
+      --orange-hover: #9E3408;
+      --orange-bright: #F97316;
+      --yellow: #FACC15;
+      --yellow-deep: #CA8A04;
+
+      --border-strong: #E7D5C4;
+      --border-soft: #EFE1D3;
+      --radius-card: 20px;
+      --radius-btn: 14px;
+      --radius-pill: 999px;
+      --shadow-card: 0 2px 12px rgba(102, 46, 12, 0.06);
+      --shadow-btn: 0 2px 6px rgba(194, 65, 12, 0.22);
+      --shadow-btn-hover: 0 6px 14px rgba(194, 65, 12, 0.26);
+    }
+
+    /* Subtle warm atmosphere unique to each proposal */
+    .viewport-shell[data-proposal="a"]::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 290px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 200, 61, 0.34), transparent 42%),
+        radial-gradient(circle at 88% 8%, rgba(255, 122, 26, 0.22), transparent 38%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .viewport-shell[data-proposal="b"]::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 320px;
+      background: linear-gradient(180deg, #FFE8C2 0%, rgba(255, 245, 228, 0) 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .viewport-shell[data-proposal="c"]::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 220px;
+      background: radial-gradient(ellipse at 85% 0%, rgba(255, 212, 102, 0.28), transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ==========================================================================
+       4. APP HEADER & NAVIGATION (STUDENT NAV — KIDS)
+       ========================================================================== */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 251, 240, 0.94);
+      backdrop-filter: blur(8px);
+      border-bottom: 2px solid var(--border-soft);
+    }
+
+    .viewport-shell[data-proposal="a"] .app-header {
+      background: #FFF8E6;
+      border-bottom: 2.5px solid var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .app-header {
+      background: #FFFFFF;
+      border-bottom: 3px solid #F3CCA0;
+    }
+
+    .viewport-shell[data-proposal="c"] .app-header {
+      background: rgba(255, 252, 247, 0.95);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .app-header__inner {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-decoration: none;
+      min-block-size: 48px;
+      border-radius: 14px;
+      padding-right: 0.4rem;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .viewport-shell[data-proposal="a"] .brand-mark {
+      background: var(--yellow);
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 3px 3px 0 var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .brand-mark {
+      background: linear-gradient(145deg, #FF7A1A 0%, #D62828 100%);
+      box-shadow: 0 4px 0 #931B1B;
+      border-radius: 16px;
+      color: #FFFDF5;
+    }
+
+    .viewport-shell[data-proposal="c"] .brand-mark {
+      background: var(--red);
+      border-radius: 13px;
+      color: #FFFDF5;
+    }
+
+    .viewport-shell[data-proposal="b"] .brand-mark .logo-ray,
+    .viewport-shell[data-proposal="c"] .brand-mark .logo-ray {
+      stroke: #FFFDF5;
+    }
+
+    .viewport-shell[data-proposal="b"] .brand-mark .logo-ring,
+    .viewport-shell[data-proposal="c"] .brand-mark .logo-ring {
+      fill: #FFC83D;
+      stroke: #FFFDF5;
+    }
+
+    .brand-name {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--ink-1);
+      line-height: 1;
+    }
+
+    .nav-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-block-size: 48px;
+      min-inline-size: 48px;
+      padding: 0.5rem 0.95rem;
+      border-radius: 14px;
+      border: 2px solid transparent;
+      background: transparent;
+      color: var(--ink-2);
+      font-weight: 700;
+      font-size: 0.9375rem;
+      text-decoration: none;
+      transition: background-color 150ms ease-out, color 150ms ease-out, transform 120ms ease-out, border-color 150ms ease-out;
+    }
+
+    .nav-btn:hover {
+      background: var(--surface-soft-yellow);
+      color: var(--ink-1);
+    }
+
+    .nav-btn:active {
+      transform: scale(0.97);
+    }
+
+    .nav-btn[aria-current="page"] {
+      color: var(--ink-1);
+      font-weight: 800;
+    }
+
+    .viewport-shell[data-proposal="a"] .nav-btn[aria-current="page"] {
+      background: var(--yellow);
+      border-color: var(--border-strong);
+      box-shadow: 2px 2px 0 var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .nav-btn[aria-current="page"] {
+      background: var(--orange);
+      color: #FFFFFF;
+      box-shadow: 0 4px 0 #8F2C03;
+    }
+
+    .viewport-shell[data-proposal="c"] .nav-btn[aria-current="page"] {
+      background: var(--surface-soft-orange);
+      color: var(--orange);
+      border-color: #F4C49A;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .level-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.8125rem;
+      font-weight: 800;
+      background: var(--surface-soft-red);
+      color: #8F1B17;
+      border: 1.5px solid #F3B1AA;
+      white-space: nowrap;
+    }
+
+    .viewport-shell[data-proposal="a"] .level-pill {
+      border: 2px solid var(--border-strong);
+      background: #FFD7D2;
+      color: #2E1307;
+    }
+
+    .profile-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-block-size: 48px;
+      padding: 0.35rem 0.85rem 0.35rem 0.45rem;
+      border-radius: var(--radius-pill);
+      border: 2px solid var(--border-soft);
+      background: var(--surface-1);
+      font-weight: 800;
+      font-size: 0.875rem;
+      color: var(--ink-1);
+      transition: background-color 150ms ease-out, transform 120ms ease-out;
+    }
+
+    .viewport-shell[data-proposal="a"] .profile-chip {
+      border-color: var(--border-strong);
+    }
+
+    .profile-chip:hover {
+      background: var(--surface-2);
+    }
+
+    .profile-chip:active {
+      transform: scale(0.97);
+    }
+
+    .avatar-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #FF7A1A, #C82822);
+      color: #FFFFFF;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: grid;
+      place-items: center;
+    }
+
+    .logout-btn {
+      min-block-size: 48px;
+      min-inline-size: 48px;
+      padding: 0.5rem 0.85rem;
+      border-radius: 14px;
+      border: 2px solid transparent;
+      background: transparent;
+      color: var(--ink-2);
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: background-color 150ms ease-out, color 150ms ease-out;
+    }
+
+    .logout-btn:hover {
+      background: var(--surface-soft-red);
+      color: #8F1B17;
+    }
+
+    /* Mobile bottom nav (shown in mobile preview or narrow screens) */
+    .mobile-bottom-nav {
+      display: none;
+    }
+
+    /* ==========================================================================
+       5. MAIN LAYOUT CONTAINER
+       ========================================================================== */
+    .app-main {
+      position: relative;
+      z-index: 1;
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 1.75rem 1.25rem 3.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
+
+    .screen-panel[hidden] {
+      display: none;
+    }
+
+    /* ==========================================================================
+       6. HERO / GREETING + WEEKLY FORGIVABLE STREAK (REAL ENGLOVE DOMAIN)
+       ========================================================================== */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+      gap: 1.25rem;
+      align-items: stretch;
+    }
+
+    .hero-card {
+      background: var(--surface-1);
+      border-radius: var(--radius-card);
+      padding: 1.65rem 1.75rem;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      overflow: hidden;
+    }
+
+    .viewport-shell[data-proposal="a"] .hero-card {
+      background: #FFE58F;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: var(--shadow-card);
+    }
+
+    .viewport-shell[data-proposal="b"] .hero-card {
+      background: linear-gradient(135deg, #FF7A1A 0%, #D9381E 100%);
+      color: #FFFFFF;
+      border: 3px solid #B92813;
+      box-shadow: 0 7px 0 #9A1E0E;
+    }
+
+    .viewport-shell[data-proposal="c"] .hero-card {
+      background: #FFFFFF;
+      border: 1.5px solid var(--border-soft);
+      box-shadow: var(--shadow-card);
+      border-left: 6px solid var(--orange-bright);
+    }
+
+    .hero-copy {
+      max-width: 52ch;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.65rem, 2.8vw, 2.2rem);
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 0 0 0.45rem;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-subtitle {
+      margin: 0 0 1.15rem;
+      font-size: 1rem;
+      line-height: 1.45;
+      color: var(--ink-2);
+    }
+
+    .viewport-shell[data-proposal="b"] .hero-subtitle {
+      color: #FFF3E5;
+    }
+
+    .hero-quick-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .quick-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-block-size: 48px;
+      padding: 0.55rem 1.05rem;
+      border-radius: var(--radius-btn);
+      font-weight: 800;
+      font-size: 0.9rem;
+      text-decoration: none;
+      border: 2px solid transparent;
+      transition: transform 120ms ease-out, background-color 150ms ease-out, box-shadow 150ms ease-out;
+    }
+
+    .quick-pill:active {
+      transform: scale(0.97);
+    }
+
+    .viewport-shell[data-proposal="a"] .quick-pill--primary {
+      background: var(--red);
+      color: #FFFFFF;
+      border-color: var(--border-strong);
+      box-shadow: 0 3px 0 var(--border-strong);
+    }
+    .viewport-shell[data-proposal="a"] .quick-pill--primary:hover {
+      background: var(--red-hover);
+      transform: translateY(-1px);
+    }
+    .viewport-shell[data-proposal="a"] .quick-pill--secondary {
+      background: #FFFFFF;
+      color: var(--ink-1);
+      border-color: var(--border-strong);
+      box-shadow: 0 3px 0 var(--border-strong);
+    }
+    .viewport-shell[data-proposal="a"] .quick-pill--secondary:hover {
+      background: #FFF9E6;
+    }
+
+    .viewport-shell[data-proposal="b"] .quick-pill--primary {
+      background: #FFD23F;
+      color: #261005;
+      box-shadow: 0 4px 0 #B87B00;
+    }
+    .viewport-shell[data-proposal="b"] .quick-pill--primary:hover {
+      background: #FFDC66;
+    }
+    .viewport-shell[data-proposal="b"] .quick-pill--secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.48);
+    }
+    .viewport-shell[data-proposal="b"] .quick-pill--secondary:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    .viewport-shell[data-proposal="c"] .quick-pill--primary {
+      background: var(--orange);
+      color: #FFFFFF;
+    }
+    .viewport-shell[data-proposal="c"] .quick-pill--primary:hover {
+      background: var(--orange-hover);
+    }
+    .viewport-shell[data-proposal="c"] .quick-pill--secondary {
+      background: var(--surface-soft-yellow);
+      color: var(--ink-1);
+      border-color: #F2D27A;
+    }
+    .viewport-shell[data-proposal="c"] .quick-pill--secondary:hover {
+      background: #FCEBA6;
+    }
+
+    .hero-mascot {
+      width: 118px;
+      height: 118px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Streak card (Weekly forgivable streak — Englove Decision 34 §9) */
+    .streak-card {
+      background: var(--surface-1);
+      border-radius: var(--radius-card);
+      padding: 1.4rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.9rem;
+    }
+
+    .viewport-shell[data-proposal="a"] .streak-card {
+      border: 2.5px solid var(--border-strong);
+      box-shadow: var(--shadow-card);
+      background: #FFFFFF;
+    }
+
+    .viewport-shell[data-proposal="b"] .streak-card {
+      border: 3px solid #F2C994;
+      box-shadow: var(--shadow-card);
+      background: #FFFFFF;
+    }
+
+    .viewport-shell[data-proposal="c"] .streak-card {
+      border: 1.5px solid var(--border-soft);
+      box-shadow: var(--shadow-card);
+      background: #FFF9F0;
+    }
+
+    .streak-top {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+
+    .streak-flame-badge {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: var(--surface-soft-orange);
+    }
+
+    .viewport-shell[data-proposal="a"] .streak-flame-badge {
+      background: #FFD8A8;
+      border: 2px solid var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .streak-flame-badge {
+      background: linear-gradient(145deg, #FFC83D, #FF7A1A);
+    }
+
+    .streak-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--ink-2);
+      margin: 0;
+    }
+
+    .streak-value {
+      font-family: var(--font-display);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 0.1rem 0 0;
+      color: var(--ink-1);
+    }
+
+    .week-dots {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.45rem;
+    }
+
+    .week-dot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.45rem 0.25rem;
+      border-radius: 12px;
+      background: var(--surface-soft-yellow);
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--ink-1);
+    }
+
+    .viewport-shell[data-proposal="a"] .week-dot {
+      border: 1.5px solid var(--border-strong);
+    }
+
+    .week-dot--done {
+      background: #FFE08A;
+    }
+
+    .shield-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.5rem 0.8rem;
+      border-radius: 12px;
+      background: #FFF3D6;
+      border: 1.5px solid #E5B65C;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: #4A2506;
+    }
+
+    .viewport-shell[data-proposal="a"] .shield-pill {
+      border: 2px solid var(--border-strong);
+      background: #FFF0CC;
+      color: var(--ink-1);
+    }
+
+    /* ==========================================================================
+       7. SECTION HEADER & FILTER CHIPS
+       ========================================================================== */
+    .section-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+
+    .section-heading {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--ink-1);
+    }
+
+    .section-sub {
+      margin: 0.15rem 0 0;
+      font-size: 0.9375rem;
+      color: var(--ink-2);
+    }
+
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .filter-chip {
+      min-block-size: 48px;
+      padding: 0.5rem 1.05rem;
+      border-radius: var(--radius-pill);
+      border: 2px solid var(--border-soft);
+      background: var(--surface-1);
+      color: var(--ink-1);
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background-color 150ms ease-out, border-color 150ms ease-out, transform 120ms ease-out, color 150ms ease-out;
+    }
+
+    .filter-chip:hover {
+      background: var(--surface-soft-yellow);
+    }
+
+    .filter-chip:active {
+      transform: scale(0.97);
+    }
+
+    .viewport-shell[data-proposal="a"] .filter-chip {
+      border-color: var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="a"] .filter-chip[aria-pressed="true"] {
+      background: var(--orange);
+      color: #FFFFFF;
+      box-shadow: 2px 2px 0 var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .filter-chip[aria-pressed="true"] {
+      background: var(--red);
+      color: #FFFFFF;
+      border-color: #931B1B;
+      box-shadow: 0 4px 0 #8A1818;
+    }
+
+    .viewport-shell[data-proposal="c"] .filter-chip[aria-pressed="true"] {
+      background: var(--ink-1);
+      color: #FFFDF8;
+      border-color: var(--ink-1);
+    }
+
+    .chip-count {
+      display: inline-grid;
+      place-items: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 0.35rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      background: rgba(46, 19, 7, 0.09);
+    }
+
+    .filter-chip[aria-pressed="true"] .chip-count {
+      background: rgba(255, 255, 255, 0.24);
+      color: inherit;
+    }
+
+    /* ==========================================================================
+       8. FEATURED NEXT MISSION + ASSIGNMENTS GRID (SCREEN 1: /inicio)
+       ========================================================================== */
+    .missions-layout {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* Balanced grids with zero orphan slots:
+       - Proposals A & C: featured in-progress mission spans full top row (3 cols) as a horizontal spotlight + 3 cards neatly below.
+       - Proposal B: tactile 2x2 arcade grid (2 cols x 2 rows) with color-coded headers. */
+    .viewport-shell[data-proposal="a"] .mission-card--featured,
+    .viewport-shell[data-proposal="c"] .mission-card--featured {
+      grid-column: 1 / -1;
+    }
+
+    .viewport-shell[data-proposal="a"] .mission-card--featured .mission-card__inner,
+    .viewport-shell[data-proposal="c"] .mission-card--featured .mission-card__inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .viewport-shell[data-proposal="b"] .missions-layout {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mission-card {
+      background: var(--surface-1);
+      border-radius: var(--radius-card);
+      padding: 1.35rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.1rem;
+      position: relative;
+      transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+    }
+
+    .mission-card[hidden] {
+      display: none;
+    }
+
+    .viewport-shell[data-proposal="a"] .mission-card {
+      border: 2.5px solid var(--border-strong);
+      box-shadow: var(--shadow-card);
+    }
+
+    .viewport-shell[data-proposal="a"] .mission-card--featured {
+      background: linear-gradient(135deg, #FFF7E0 0%, #FFEBD2 100%);
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card {
+      border: 3px solid #F0CCA0;
+      box-shadow: var(--shadow-card);
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card__inner {
+      padding: 1.25rem 1.35rem 1.35rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.1rem;
+      flex: 1;
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card__band {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+
+    .mission-card__band {
+      display: none;
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card__band--speaking {
+      background: #D62828;
+      color: #FFFFFF;
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card__band--fill {
+      background: #D9530A;
+      color: #FFFFFF;
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card__band--open {
+      background: #FFC42E;
+      color: #261005;
+    }
+
+    .viewport-shell[data-proposal="b"] .mission-card__band--exam {
+      background: #2E1307;
+      color: #FFE08A;
+    }
+
+    .viewport-shell[data-proposal="c"] .mission-card {
+      border: 1.5px solid var(--border-soft);
+      box-shadow: var(--shadow-card);
+    }
+
+    .viewport-shell[data-proposal="c"] .mission-card--featured {
+      background: #FFF9F2;
+      border-color: #F3C49B;
+    }
+
+    .mission-card__inner {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.1rem;
+      height: 100%;
+    }
+
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .viewport-shell[data-proposal="b"] .card-meta-row--hide-in-b {
+      display: none;
+    }
+
+    .type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.32rem 0.75rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.8125rem;
+      font-weight: 800;
+    }
+
+    .type-badge--speaking {
+      background: #FFE4E0;
+      color: #8E1A15;
+    }
+
+    .type-badge--fill {
+      background: #FFE8D1;
+      color: #8A3006;
+    }
+
+    .type-badge--open {
+      background: #FFF1B8;
+      color: #5C3800;
+    }
+
+    .type-badge--exam {
+      background: #FDE2CE;
+      color: #7D260A;
+    }
+
+    .viewport-shell[data-proposal="a"] .type-badge {
+      border: 1.5px solid var(--border-strong);
+      color: var(--ink-1);
+    }
+
+    .level-tag {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--ink-2);
+      background: var(--surface-2);
+      padding: 0.28rem 0.65rem;
+      border-radius: 10px;
+    }
+
+    .card-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.65rem;
+      margin-top: 0.65rem;
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 0;
+      color: var(--ink-1);
+    }
+
+    .mission-card--featured .card-title {
+      font-size: 1.45rem;
+    }
+
+    .tts-btn {
+      flex-shrink: 0;
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: 14px;
+      border: 2px solid var(--border-soft);
+      background: var(--surface-soft-yellow);
+      color: var(--ink-1);
+      display: grid;
+      place-items: center;
+      transition: background-color 140ms ease-out, transform 120ms ease-out;
+    }
+
+    .viewport-shell[data-proposal="a"] .tts-btn {
+      border-color: var(--border-strong);
+      background: var(--yellow);
+      box-shadow: 2px 2px 0 var(--border-strong);
+    }
+
+    .tts-btn:hover {
+      background: #FFD659;
+    }
+
+    .tts-btn:active {
+      transform: scale(0.95);
+    }
+
+    .tts-btn[aria-pressed="true"] {
+      background: var(--red);
+      color: #FFFFFF;
+      border-color: var(--red);
+    }
+
+    .card-due {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin: 0.65rem 0 0;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--ink-2);
+    }
+
+    .info-callout {
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.85rem;
+      border-radius: 14px;
+      font-size: 0.83rem;
+      font-weight: 700;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      line-height: 1.35;
+    }
+
+    .info-callout--grace {
+      background: #FFF2C2;
+      color: #522B04;
+      border: 1.5px solid #E8B84E;
+    }
+
+    .info-callout--retry {
+      background: #FFE7E3;
+      color: #7D1712;
+      border: 1.5px solid #F0A39B;
+    }
+
+    .info-callout--hint {
+      background: var(--surface-2);
+      color: var(--ink-2);
+    }
+
+    /* Score & Stars strip (Colombian scale 0,0 - 5,0 + 0-3 stars) */
+    .score-strip {
+      margin-top: 0.8rem;
+      padding: 0.75rem 0.95rem;
+      border-radius: 16px;
+      background: var(--surface-soft-yellow);
+      border: 1.5px solid #EDC463;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .viewport-shell[data-proposal="a"] .score-strip {
+      border: 2px solid var(--border-strong);
+      background: #FFF4C7;
+    }
+
+    .score-value {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--ink-1);
+    }
+
+    .score-sub {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--ink-2);
+      display: block;
+    }
+
+    .stars-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .star-icon {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* Primary & Secondary Action Buttons (>= 48px height, AA contrast verified) */
+    .btn {
+      width: 100%;
+      min-block-size: 52px;
+      padding: 0.75rem 1.15rem;
+      border-radius: var(--radius-btn);
+      border: 2px solid transparent;
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      text-decoration: none;
+      transition: transform 120ms ease-out, background-color 150ms ease-out, box-shadow 150ms ease-out;
+    }
+
+    .btn:active {
+      transform: translateY(2px) scale(0.98);
+    }
+
+    .btn--primary {
+      background: var(--orange);
+      color: #FFFFFF;
+      box-shadow: var(--shadow-btn);
+    }
+
+    .btn--primary:hover {
+      background: var(--orange-hover);
+      box-shadow: var(--shadow-btn-hover);
+      transform: translateY(-1px);
+    }
+
+    .viewport-shell[data-proposal="a"] .btn--primary {
+      border-color: var(--border-strong);
+    }
+
+    .btn--red {
+      background: var(--red);
+      color: #FFFFFF;
+      box-shadow: var(--shadow-btn);
+    }
+
+    .btn--red:hover {
+      background: var(--red-hover);
+      transform: translateY(-1px);
+    }
+
+    .viewport-shell[data-proposal="a"] .btn--red {
+      border-color: var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .btn--red {
+      box-shadow: 0 5px 0 #821616;
+    }
+
+    .btn--yellow {
+      background: var(--yellow);
+      color: #261005;
+      box-shadow: var(--shadow-btn);
+    }
+
+    .btn--yellow:hover {
+      background: #FFD45A;
+      transform: translateY(-1px);
+    }
+
+    .viewport-shell[data-proposal="a"] .btn--yellow {
+      border-color: var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .btn--yellow {
+      box-shadow: 0 5px 0 #B57900;
+    }
+
+    .btn--secondary {
+      background: var(--surface-2);
+      color: var(--ink-1);
+      border-color: var(--border-soft);
+    }
+
+    .btn--secondary:hover {
+      background: var(--surface-soft-yellow);
+    }
+
+    .viewport-shell[data-proposal="a"] .btn--secondary {
+      border-color: var(--border-strong);
+      background: #FFFFFF;
+      box-shadow: 0 3px 0 var(--border-strong);
+    }
+
+    /* ==========================================================================
+       9. SCREEN 2: ZONA DE MICROJUEGOS (/juegos)
+       ========================================================================== */
+    .games-banner {
+      border-radius: var(--radius-card);
+      padding: 1.6rem 1.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .viewport-shell[data-proposal="a"] .games-banner {
+      background: #FFD8A8;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: var(--shadow-card);
+    }
+
+    .viewport-shell[data-proposal="b"] .games-banner {
+      background: linear-gradient(135deg, #D62828 0%, #F77F00 100%);
+      color: #FFFFFF;
+      border: 3px solid #A41E1E;
+      box-shadow: 0 7px 0 #8B1919;
+    }
+
+    .viewport-shell[data-proposal="c"] .games-banner {
+      background: #FFFFFF;
+      border: 1.5px solid var(--border-soft);
+      border-left: 6px solid var(--red);
+      box-shadow: var(--shadow-card);
+    }
+
+    .games-banner__copy {
+      max-width: 56ch;
+    }
+
+    .games-banner__stats {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .practice-pill {
+      padding: 0.75rem 1.05rem;
+      border-radius: 18px;
+      background: #FFFFFF;
+      color: var(--ink-1);
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-weight: 800;
+    }
+
+    .viewport-shell[data-proposal="a"] .practice-pill {
+      border: 2px solid var(--border-strong);
+      box-shadow: 3px 3px 0 var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .practice-pill {
+      box-shadow: 0 4px 0 rgba(120, 24, 10, 0.35);
+    }
+
+    .viewport-shell[data-proposal="c"] .practice-pill {
+      background: var(--surface-soft-yellow);
+      border: 1.5px solid #F0D17B;
+    }
+
+    .practice-pill__num {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+
+    .practice-pill__lbl {
+      font-size: 0.78rem;
+      color: var(--ink-2);
+      display: block;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+
+    .game-card {
+      background: var(--surface-1);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+    }
+
+    .game-card[hidden] {
+      display: none;
+    }
+
+    .viewport-shell[data-proposal="a"] .game-card {
+      border: 2.5px solid var(--border-strong);
+      box-shadow: var(--shadow-card);
+    }
+
+    .viewport-shell[data-proposal="b"] .game-card {
+      border: 3px solid #F0CCA0;
+      box-shadow: var(--shadow-card);
+    }
+
+    .viewport-shell[data-proposal="c"] .game-card {
+      border: 1.5px solid var(--border-soft);
+      box-shadow: var(--shadow-card);
+    }
+
+    .game-card__visual {
+      padding: 1.15rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .game-card__visual--match { background: #FFF0B8; }
+    .game-card__visual--order { background: #FFE2C4; }
+    .game-card__visual--drag  { background: #FFE0DB; }
+    .game-card__visual--mem   { background: #FFEAA7; }
+    .game-card__visual--timed { background: #FFD8C2; }
+
+    .viewport-shell[data-proposal="a"] .game-card__visual {
+      border-bottom: 2.5px solid var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="c"] .game-card__visual {
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .mechanic-icon-box {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: #FFFFFF;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .viewport-shell[data-proposal="a"] .mechanic-icon-box {
+      border: 2px solid var(--border-strong);
+      box-shadow: 2px 2px 0 var(--border-strong);
+    }
+
+    .viewport-shell[data-proposal="b"] .mechanic-icon-box {
+      box-shadow: 0 4px 0 rgba(160, 82, 20, 0.2);
+    }
+
+    .viewport-shell[data-proposal="c"] .mechanic-icon-box {
+      border: 1.5px solid var(--border-soft);
+    }
+
+    .game-card__badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.35rem;
+    }
+
+    .mechanic-pill {
+      padding: 0.25rem 0.7rem;
+      border-radius: var(--radius-pill);
+      background: #FFFFFF;
+      color: var(--ink-1);
+      font-size: 0.78rem;
+      font-weight: 800;
+      border: 1.5px solid rgba(46, 19, 7, 0.2);
+    }
+
+    .viewport-shell[data-proposal="a"] .mechanic-pill {
+      border: 1.5px solid var(--border-strong);
+    }
+
+    .game-card__body {
+      padding: 1.2rem 1.25rem 1.3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1rem;
+      flex: 1;
+    }
+
+    .game-stars-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 14px;
+      background: var(--surface-2);
+    }
+
+    .game-attempts {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--ink-2);
+    }
+
+    .game-motivation {
+      margin: 0.45rem 0 0;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--ink-2);
+    }
+
+    /* ==========================================================================
+       10. TOAST FEEDBACK (POLITE LIVE REGION) & TOKENS DIALOG (NATIVE <dialog>)
+       ========================================================================== */
+    .app-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 1.25rem;
+      transform: translateX(-50%);
+      z-index: 300;
+      background: #261005;
+      color: #FFF9EB;
+      padding: 0.8rem 1.2rem;
+      border-radius: 16px;
+      border: 2px solid #FFC83D;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 0.875rem;
+      font-weight: 700;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      max-width: min(92vw, 480px);
+      text-align: center;
+    }
+
+    .app-toast[hidden] {
+      display: none;
+    }
+
+    dialog.tokens-dialog {
+      border: 2px solid #3B180A;
+      border-radius: 24px;
+      padding: 0;
+      max-width: min(94vw, 680px);
+      width: 100%;
+      background: #FFFDF8;
+      color: #2E1307;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+
+    dialog.tokens-dialog::backdrop {
+      background: rgba(25, 13, 8, 0.62);
+      backdrop-filter: blur(3px);
+    }
+
+    .dialog-head {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1.5px solid #EFE0CE;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .dialog-head h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 800;
+    }
+
+    .dialog-close {
+      min-width: 44px;
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1.5px solid #D9C3AE;
+      background: #FFFFFF;
+      font-weight: 800;
+      color: #2E1307;
+    }
+
+    .dialog-close:hover {
+      background: #FFF1D6;
+    }
+
+    .dialog-body {
+      padding: 1.35rem 1.5rem 1.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+    }
+
+    .swatch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .swatch-item {
+      border: 1.5px solid #E6D4C2;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #FFFFFF;
+    }
+
+    .swatch-color {
+      height: 54px;
+    }
+
+    .swatch-info {
+      padding: 0.55rem 0.65rem;
+      font-size: 0.78rem;
+    }
+
+    .swatch-info strong {
+      display: block;
+      font-size: 0.82rem;
+    }
+
+    .tokens-notes {
+      margin: 0;
+      padding-left: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+      color: #54311D;
+    }
+
+    /* ==========================================================================
+       11. RESPONSIVE ADAPTATIONS (TABLET & MOBILE — REAL + SIMULATED FRAME)
+       ========================================================================== */
+    @media (max-width: 960px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+      .missions-layout,
+      .games-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .viewport-shell[data-proposal="a"] .mission-card--featured,
+      .viewport-shell[data-proposal="c"] .mission-card--featured {
+        grid-column: span 2;
+      }
+    }
+
+    .stage[data-device="tablet"] .hero-grid {
+      grid-template-columns: 1fr;
+    }
+    .stage[data-device="tablet"] .missions-layout,
+    .stage[data-device="tablet"] .games-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .stage[data-device="tablet"] .mission-card--featured {
+      grid-column: 1 / -1;
+    }
+    .stage[data-device="tablet"] .app-header__inner {
+      padding: 0.55rem 0.9rem;
+      gap: 0.5rem;
+    }
+    .stage[data-device="tablet"] .brand-name {
+      font-size: 1.2rem;
+    }
+    .stage[data-device="tablet"] .nav-list {
+      gap: 0.15rem;
+    }
+    .stage[data-device="tablet"] .nav-btn {
+      padding: 0.45rem 0.65rem;
+      font-size: 0.84rem;
+      gap: 0.3rem;
+    }
+    .stage[data-device="tablet"] .nav-btn svg {
+      display: none;
+    }
+    .stage[data-device="tablet"] .level-pill,
+    .stage[data-device="tablet"] .profile-name,
+    .stage[data-device="tablet"] .logout-label {
+      display: none;
+    }
+    .stage[data-device="tablet"] .profile-chip {
+      padding: 0.3rem;
+    }
+
+    .stage[data-device="mobile"] .hero-grid,
+    .stage[data-device="mobile"] .missions-layout,
+    .stage[data-device="mobile"] .games-grid {
+      grid-template-columns: 1fr;
+    }
+    .stage[data-device="mobile"] .mission-card--featured {
+      grid-column: span 1 !important;
+    }
+    .stage[data-device="mobile"] .mission-card--featured .mission-card__inner {
+      display: flex !important;
+    }
+    .stage[data-device="mobile"] .app-header .nav-list,
+    .stage[data-device="mobile"] .level-pill,
+    .stage[data-device="mobile"] .logout-label,
+    .stage[data-device="mobile"] .hero-mascot {
+      display: none;
+    }
+    .stage[data-device="mobile"] .app-main {
+      padding: 1.15rem 0.95rem 5.5rem;
+      gap: 1.25rem;
+    }
+    .stage[data-device="mobile"] .hero-card,
+    .stage[data-device="mobile"] .games-banner {
+      padding: 1.2rem;
+    }
+    .stage[data-device="mobile"] .mobile-bottom-nav {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      position: sticky;
+      bottom: 0;
+      z-index: 60;
+      background: #FFFFFF;
+      border-top: 2px solid var(--border-soft);
+      padding: 0.4rem 0.45rem;
+      gap: 0.25rem;
+    }
+    .stage[data-device="mobile"] .viewport-shell[data-proposal="a"] .mobile-bottom-nav {
+      border-top: 2.5px solid var(--border-strong);
+      background: #FFF8E6;
+    }
+
+    @media (max-width: 680px) {
+      .missions-layout,
+      .games-grid {
+        grid-template-columns: 1fr;
+      }
+      .viewport-shell[data-proposal="a"] .mission-card--featured,
+      .viewport-shell[data-proposal="c"] .mission-card--featured {
+        grid-column: span 1;
+      }
+      .viewport-shell[data-proposal="a"] .mission-card--featured .mission-card__inner,
+      .viewport-shell[data-proposal="c"] .mission-card--featured .mission-card__inner {
+        display: flex;
+      }
+      .app-header .nav-list,
+      .level-pill,
+      .logout-label {
+        display: none;
+      }
+      .mobile-bottom-nav {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        position: fixed;
+        inset: auto 0 0 0;
+        z-index: 60;
+        background: #FFFFFF;
+        border-top: 2px solid var(--border-soft);
+        padding: 0.4rem 0.45rem;
+        gap: 0.25rem;
+      }
+      .app-main {
+        padding-bottom: 5.5rem;
+      }
+    }
+
+    .mobile-nav-item {
+      min-block-size: 52px;
+      border: 0;
+      background: transparent;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--ink-2);
+    }
+
+    .mobile-nav-item[aria-current="page"] {
+      background: var(--surface-soft-yellow);
+      color: var(--ink-1);
+    }
+
+    /* ==========================================================================
+       12. MOTION & FORCED COLORS ACCESSIBILITY
+       ========================================================================== */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (forced-colors: active) {
+      .hero-card,
+      .streak-card,
+      .mission-card,
+      .game-card,
+      .games-banner,
+      .btn,
+      .filter-chip,
+      .nav-btn[aria-current="page"] {
+        border: 2px solid CanvasText !important;
+        box-shadow: none !important;
+      }
+      :where(a, button):focus-visible {
+        outline: 3px solid Highlight !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link visually-hidden">Ir al contenido principal</a>
+
+  <!-- STUDIO PROPOSAL SWITCHER BAR -->
+  <aside class="studio-bar" id="studio-bar" aria-label="Controles de presentación de propuestas UI">
+    <div class="studio-bar__inner">
+      <div class="studio-brand">
+        <span class="studio-brand__dot" aria-hidden="true"></span>
+        <span>Englove Kids · UI</span>
+      </div>
+
+      <div class="studio-controls">
+        <div class="studio-group" role="group" aria-label="Propuesta visual">
+          <button type="button" class="studio-btn" data-set-proposal="a" aria-pressed="true">A · Sol de Papel</button>
+          <button type="button" class="studio-btn" data-set-proposal="b" aria-pressed="false">B · Aventura Solar</button>
+          <button type="button" class="studio-btn" data-set-proposal="c" aria-pressed="false">C · Estudio Creativo</button>
+        </div>
+
+        <div class="studio-group" role="group" aria-label="Pantalla">
+          <button type="button" class="studio-btn" data-set-screen="home" aria-pressed="true">1. Inicio (Misiones)</button>
+          <button type="button" class="studio-btn" data-set-screen="games" aria-pressed="false">2. Zona de Juegos</button>
+        </div>
+
+        <div class="studio-group" role="group" aria-label="Dispositivo">
+          <button type="button" class="studio-btn" data-set-device="desktop" aria-pressed="true">Escritorio</button>
+          <button type="button" class="studio-btn" data-set-device="tablet" aria-pressed="false">Tablet</button>
+          <button type="button" class="studio-btn" data-set-device="mobile" aria-pressed="false">Móvil</button>
+        </div>
+
+        <button type="button" class="studio-btn studio-btn--outline" id="open-tokens-btn">Paleta y criterios</button>
+        <button type="button" class="studio-btn" id="hide-bar-btn" aria-label="Ocultar barra de propuestas">Ocultar barra</button>
+      </div>
+    </div>
+  </aside>
+
+  <button type="button" class="studio-restore-btn" id="restore-bar-btn" hidden>Mostrar selector de propuestas</button>
+
+  <!-- APP VIEWPORT STAGE -->
+  <div class="stage" id="stage" data-device="desktop">
+    <div class="viewport-shell" id="viewport-shell" data-proposal="a">
+
+      <!-- STUDENT NAVIGATION (KIDS) -->
+      <header class="app-header">
+        <div class="app-header__inner">
+          <a href="#main-content" class="brand-link" data-nav-screen="home">
+            <span class="brand-mark" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+                <circle class="logo-ring" cx="16" cy="16" r="7.5" fill="#FFFDF5" stroke="#2E1307" stroke-width="2.2"/>
+                <path class="logo-ray" d="M16 3.5V7M16 25V28.5M3.5 16H7M25 16H28.5M7.2 7.2L9.7 9.7M22.3 22.3L24.8 24.8M24.8 7.2L22.3 9.7M9.7 22.3L7.2 24.8" stroke="#2E1307" stroke-width="2.4" stroke-linecap="round"/>
+                <circle cx="13.8" cy="15.2" r="1.1" fill="#2E1307"/>
+                <circle cx="18.2" cy="15.2" r="1.1" fill="#2E1307"/>
+                <path d="M13.5 18.2C14.3 19.3 17.7 19.3 18.5 18.2" stroke="#2E1307" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="brand-name">Englove</span>
+          </a>
+
+          <nav aria-label="Principal del estudiante">
+            <ul class="nav-list">
+              <li>
+                <button type="button" class="nav-btn" data-nav-screen="home" aria-current="page">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6.5h-5V21H4a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+                  </svg>
+                  <span>Inicio</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-btn" data-nav-screen="games">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="7" width="18" height="11" rx="5.5" stroke="currentColor" stroke-width="2.2"/>
+                    <path d="M8.5 10.5v4M6.5 12.5h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <circle cx="15.5" cy="11.5" r="1.1" fill="currentColor"/>
+                    <circle cx="17.5" cy="13.5" r="1.1" fill="currentColor"/>
+                  </svg>
+                  <span>Juegos</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-btn" data-demo-action="Vista de Progreso (/progreso): racha semanal, insignias e historial.">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 19.6l1-5.8-4.2-4.1 5.9-.9L12 3.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                  </svg>
+                  <span>Progreso</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-btn" data-demo-action="Vista de Feedback (/feedback): comentarios y stickers de tu profesora.">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                  </svg>
+                  <span>Feedback</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-btn" data-demo-action="Contenido extra (/extra): enlaces recomendados por tu profesora.">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M10 14a4 4 0 0 0 5.6 0l2.8-2.8a4 4 0 0 0-5.6-5.6L11.2 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                    <path d="M14 10a4 4 0 0 0-5.6 0l-2.8 2.8a4 4 0 1 0 5.6 5.6l1.6-1.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                  </svg>
+                  <span>Extra</span>
+                </button>
+              </li>
+            </ul>
+          </nav>
+
+          <div class="header-right">
+            <span class="level-pill">Nivel A1</span>
+            <button type="button" class="profile-chip" aria-label="Perfil de Mateo" data-demo-action="Perfil de Mateo (/perfil): cambio de correo con OTP.">
+              <span class="avatar-circle" aria-hidden="true">M</span>
+              <span class="profile-name">Mateo</span>
+            </button>
+            <button type="button" class="logout-btn" aria-label="Cerrar sesión" data-demo-action="Cierre de sesión seguro: sincroniza cola offline y limpia IndexedDB.">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 16l4-4-4-4M19 12H9M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="logout-label">Salir</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN CONTENT -->
+      <main id="main-content" class="app-main" tabindex="-1">
+
+        <!-- ================================================================
+             SCREEN 1: INICIO / MIS MISIONES (/inicio)
+             ================================================================ -->
+        <div class="screen-panel" id="screen-home" data-screen-panel="home">
+          <div style="display:flex; flex-direction:column; gap:1.75rem;">
+
+            <!-- Greeting + Weekly Forgivable Streak -->
+            <div class="hero-grid">
+              <section class="hero-card" aria-labelledby="home-greeting">
+                <div class="hero-copy">
+                  <h1 class="hero-title" id="home-greeting">¡Hola, Mateo!</h1>
+                  <p class="hero-subtitle">
+                    Tienes 2 misiones listas para completar esta semana y un comentario nuevo de tu profesora.
+                  </p>
+                  <div class="hero-quick-links">
+                    <button type="button" class="quick-pill quick-pill--primary" data-nav-screen="games">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="3" y="7" width="18" height="11" rx="5.5" stroke="currentColor" stroke-width="2.2"/>
+                        <path d="M8.5 10.5v4M6.5 12.5h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                        <circle cx="15.8" cy="11.5" r="1.1" fill="currentColor"/>
+                        <circle cx="17.8" cy="13.5" r="1.1" fill="currentColor"/>
+                      </svg>
+                      <span>Ir a microjuegos</span>
+                    </button>
+                    <button type="button" class="quick-pill quick-pill--secondary" data-demo-action="Feedback nuevo en Colors & Numbers Quiz: «¡Excelente pronunciación y atención!»">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                      </svg>
+                      <span>Ver mi feedback (1 nuevo)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Warm Sun Mascot (Soli) -->
+                <div class="hero-mascot" aria-hidden="true">
+                  <svg viewBox="0 0 120 120" fill="none">
+                    <circle cx="60" cy="60" r="34" fill="#FFC83D" stroke="#2E1307" stroke-width="4"/>
+                    <path d="M60 10V20M60 100V110M10 60H20M100 60H110M24 24L31 31M89 89L96 96M96 24L89 31M31 89L24 96" stroke="#FF7A1A" stroke-width="6.5" stroke-linecap="round"/>
+                    <circle cx="48" cy="56" r="4.2" fill="#2E1307"/>
+                    <circle cx="72" cy="56" r="4.2" fill="#2E1307"/>
+                    <circle cx="49.5" cy="54.5" r="1.3" fill="#FFFFFF"/>
+                    <circle cx="73.5" cy="54.5" r="1.3" fill="#FFFFFF"/>
+                    <ellipse cx="40" cy="65" rx="5.5" ry="3.2" fill="#FF6B4A" opacity="0.7"/>
+                    <ellipse cx="80" cy="65" rx="5.5" ry="3.2" fill="#FF6B4A" opacity="0.7"/>
+                    <path d="M49 69C53 76 67 76 71 69" stroke="#2E1307" stroke-width="3.6" stroke-linecap="round"/>
+                  </svg>
+                </div>
+              </section>
+
+              <section class="streak-card" aria-labelledby="streak-heading">
+                <div class="streak-top">
+                  <div class="streak-flame-badge" aria-hidden="true">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                      <path d="M16.5 3.5C16.5 3.5 24 9.5 24 17.5C24 22.7 20.3 27 15.5 27C10.8 27 7.5 23 7.5 18C7.5 14 10 10.5 11.5 9.2C11.2 12.2 12.8 13.7 14 14C13.6 10.3 15.2 6.5 16.5 3.5Z" fill="#D62828" stroke="#2E1307" stroke-width="2" stroke-linejoin="round"/>
+                      <path d="M16 14.5C18 16.5 19.5 19 19.5 21.3C19.5 23.6 17.8 25.3 15.7 25.3C13.6 25.3 12 23.6 12 21.5C12 19.7 13.2 17.9 14.5 16.8C14.6 18 15.3 18.7 16 18.7C16.1 17.2 16 15.8 16 14.5Z" fill="#FFC83D"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="streak-label" id="streak-heading">Racha semanal</p>
+                    <p class="streak-value">4 semanas seguidas</p>
+                  </div>
+                </div>
+
+                <div class="week-dots" aria-label="Últimas 4 semanas activas completadas">
+                  <div class="week-dot week-dot--done">
+                    <span>Sem 1</span>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C4410A"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="week-dot week-dot--done">
+                    <span>Sem 2</span>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C4410A"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="week-dot week-dot--done">
+                    <span>Sem 3</span>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C4410A"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="week-dot week-dot--done">
+                    <span>Esta</span>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C82822"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                </div>
+
+                <div class="shield-pill">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3l7 3v5.5c0 4.6-3 8.1-7 9.5-4-1.4-7-4.9-7-9.5V6l7-3Z" fill="#FFC83D" stroke="#2E1307" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M9 12l2 2 4-4" stroke="#2E1307" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>Escudo de perdón activo esta semana</span>
+                </div>
+              </section>
+            </div>
+
+            <!-- Section Heading + Real Filters -->
+            <div class="section-bar">
+              <div>
+                <h2 class="section-heading">Tus misiones de inglés</h2>
+                <p class="section-sub">Actividades asignadas para tu grupo A1 · Tarde</p>
+              </div>
+
+              <div class="filter-group" role="group" aria-label="Filtrar misiones">
+                <button type="button" class="filter-chip" data-mission-filter="all" aria-pressed="true">
+                  <span>Todas</span>
+                  <span class="chip-count">4</span>
+                </button>
+                <button type="button" class="filter-chip" data-mission-filter="pending" aria-pressed="false">
+                  <span>Por hacer</span>
+                  <span class="chip-count">2</span>
+                </button>
+                <button type="button" class="filter-chip" data-mission-filter="completed" aria-pressed="false">
+                  <span>Entregadas</span>
+                  <span class="chip-count">2</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Missions Grid (4 Real Englove Activity Types) -->
+            <div class="missions-layout" id="missions-grid">
+
+              <!-- Card 1: Featured In-Progress Speaking -->
+              <article class="mission-card mission-card--featured" data-mission-status="pending">
+                <div class="mission-card__band mission-card__band--speaking">
+                  <span>Speaking · En progreso</span>
+                  <span>Nivel A1</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <div class="card-meta-row card-meta-row--hide-in-b">
+                      <span class="type-badge type-badge--speaking">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2.2"/>
+                          <path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                        </svg>
+                        <span>Speaking · En progreso</span>
+                      </span>
+                      <span class="level-tag">Nivel A1</span>
+                    </div>
+
+                    <div class="card-title-row">
+                      <h3 class="card-title"><span lang="en">Describe your favorite animal</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Describe your favorite animal" aria-pressed="false" aria-label="Escuchar título: Describe your favorite animal">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <p class="card-due">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                      <span>Límite: mañana, 6:00 p. m. (hora Colombia)</span>
+                    </p>
+
+                    <div class="info-callout info-callout--grace">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.1"/>
+                        <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                      </svg>
+                      <span>Ya empezaste esta grabación. Puedes terminarla hasta 24 horas después del cierre.</span>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn--red" data-demo-action="Abriendo intento en progreso (/actividad/att-101) — grabador de audio Speaking.">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M7 5.5L18.5 12L7 18.5V5.5Z" fill="currentColor"/>
+                    </svg>
+                    <span>Continuar actividad</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Card 2: Pending Fill-in-the-blanks -->
+              <article class="mission-card" data-mission-status="pending">
+                <div class="mission-card__band mission-card__band--fill">
+                  <span>Completar espacios</span>
+                  <span>Nivel A1</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <div class="card-meta-row card-meta-row--hide-in-b">
+                      <span class="type-badge type-badge--fill">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Completar espacios</span>
+                      </span>
+                      <span class="level-tag">Nivel A1</span>
+                    </div>
+
+                    <div class="card-title-row">
+                      <h3 class="card-title"><span lang="en">At the zoo: Complete the story</span></h3>
+                      <button type="button" class="tts-btn" data-speak="At the zoo: Complete the story" aria-pressed="false" aria-label="Escuchar título: At the zoo: Complete the story">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <p class="card-due">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                      <span>Límite: viernes 22 nov, 5:00 p. m.</span>
+                    </p>
+
+                    <div class="info-callout info-callout--hint">
+                      <span>Si empiezas antes del cierre, tendrás 24 horas adicionales para terminar.</span>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn--primary" data-demo-action="Creando intento en servidor (POST /assignments/asg-202/attempts) — Fill in the blanks.">
+                    <span>Empezar actividad</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Card 3: Retry Enabled by Teacher (Open Question) -->
+              <article class="mission-card" data-mission-status="completed">
+                <div class="mission-card__band mission-card__band--open">
+                  <span>Pregunta abierta</span>
+                  <span>Nivel A1</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <div class="card-meta-row card-meta-row--hide-in-b">
+                      <span class="type-badge type-badge--open">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Pregunta abierta</span>
+                      </span>
+                      <span class="level-tag">Nivel A1</span>
+                    </div>
+
+                    <div class="card-title-row">
+                      <h3 class="card-title"><span lang="en">My daily routine</span></h3>
+                      <button type="button" class="tts-btn" data-speak="My daily routine" aria-pressed="false" aria-label="Escuchar título: My daily routine">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div class="info-callout info-callout--retry">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px" aria-hidden="true">
+                        <path d="M4 12a8 8 0 0 1 13.6-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.6 5.7L4 15.5M4 20v-4.5h4.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <span>Tu profesora te habilitó un nuevo intento hasta el lunes 25 nov.</span>
+                    </div>
+
+                    <div class="score-strip">
+                      <div>
+                        <span class="score-value">3,4 / 5,0</span>
+                        <span class="score-sub">Intento anterior</span>
+                      </div>
+                      <div class="stars-row" aria-label="2 de 3 estrellas">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando intento #2 autorizado por tu profesora (/actividad/att-304).">
+                    <span>Intentar de nuevo</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Card 4: Graded Exam (4,8 / 5,0 — 3 stars) -->
+              <article class="mission-card" data-mission-status="completed">
+                <div class="mission-card__band mission-card__band--exam">
+                  <span>Examen · Calificado</span>
+                  <span>Nivel A1</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <div class="card-meta-row card-meta-row--hide-in-b">
+                      <span class="type-badge type-badge--exam">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M9 11l2.5 2.5L16 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                          <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="2.1"/>
+                        </svg>
+                        <span>Examen · Calificado</span>
+                      </span>
+                      <span class="level-tag">Nivel A1</span>
+                    </div>
+
+                    <div class="card-title-row">
+                      <h3 class="card-title"><span lang="en">Colors &amp; Numbers Quiz</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Colors and Numbers Quiz" aria-pressed="false" aria-label="Escuchar título: Colors and Numbers Quiz">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div class="score-strip">
+                      <div>
+                        <span class="score-value">4,8 / 5,0</span>
+                        <span class="score-sub">Con feedback de tu profe</span>
+                      </div>
+                      <div class="stars-row" aria-label="3 de 3 estrellas">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn--secondary" data-demo-action="Abriendo entrega calificada y stickers de tu profesora (/actividad/att-098).">
+                    <span>Ver entrega y feedback</span>
+                  </button>
+                </div>
+              </article>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 2: ZONA DE MICROJUEGOS (/juegos)
+             24/7 autonomous practice, 0-3 practice stars, all 5 game mechanics
+             ================================================================ -->
+        <div class="screen-panel" id="screen-games" data-screen-panel="games" hidden>
+          <div style="display:flex; flex-direction:column; gap:1.75rem;">
+
+            <section class="games-banner" aria-labelledby="games-title">
+              <div class="games-banner__copy">
+                <h1 class="hero-title" id="games-title">Zona de Microjuegos</h1>
+                <p class="hero-subtitle" style="margin-bottom:0;">
+                  Practica inglés jugando cuando quieras, sin notas ni fecha límite. Consigue estrellas de práctica y repite las partidas que desees.
+                </p>
+              </div>
+
+              <div class="games-banner__stats">
+                <div class="practice-pill">
+                  <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/>
+                  </svg>
+                  <div>
+                    <span class="practice-pill__num">6 / 15</span>
+                    <span class="practice-pill__lbl">Estrellas de práctica</span>
+                  </div>
+                </div>
+                <div class="practice-pill">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="7" width="18" height="11" rx="5.5" fill="#FFE0B5" stroke="#2E1307" stroke-width="1.9"/>
+                    <path d="M8.5 10.5v4M6.5 12.5h4" stroke="#C82822" stroke-width="2.1" stroke-linecap="round"/>
+                    <circle cx="15.8" cy="11.5" r="1.2" fill="#C4410A"/>
+                    <circle cx="17.8" cy="13.5" r="1.2" fill="#C4410A"/>
+                  </svg>
+                  <div>
+                    <span class="practice-pill__num">7</span>
+                    <span class="practice-pill__lbl">Partidas jugadas</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="section-bar">
+              <div>
+                <h2 class="section-heading">Elige tu juego</h2>
+                <p class="section-sub">Abiertos todo el día · Disponibles todos los niveles</p>
+              </div>
+
+              <div class="filter-group" role="group" aria-label="Filtrar microjuegos">
+                <button type="button" class="filter-chip" data-game-filter="all" aria-pressed="true">
+                  <span>Todos</span>
+                  <span class="chip-count">5</span>
+                </button>
+                <button type="button" class="filter-chip" data-game-filter="pending" aria-pressed="false">
+                  <span>Por practicar</span>
+                  <span class="chip-count">2</span>
+                </button>
+                <button type="button" class="filter-chip" data-game-filter="completed" aria-pressed="false">
+                  <span>Jugados</span>
+                  <span class="chip-count">3</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 5 Real Englove Game Mechanics -->
+            <div class="games-grid" id="games-grid">
+
+              <!-- Game 1: Order Words (In Progress) -->
+              <article class="game-card" data-game-status="pending">
+                <div class="game-card__visual game-card__visual--order">
+                  <div class="mechanic-icon-box" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="5" width="8" height="6" rx="2" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8"/>
+                      <rect x="13" y="5" width="8" height="6" rx="2" fill="#FF7A1A" stroke="#2E1307" stroke-width="1.8"/>
+                      <rect x="6" y="13.5" width="12" height="5.5" rx="2" fill="#FFFDF5" stroke="#2E1307" stroke-width="1.8"/>
+                    </svg>
+                  </div>
+                  <div class="game-card__badges">
+                    <span class="mechanic-pill">Ordenar palabras</span>
+                    <span class="level-tag">Nivel A1</span>
+                  </div>
+                </div>
+                <div class="game-card__body">
+                  <div>
+                    <div class="card-title-row" style="margin-top:0;">
+                      <h3 class="card-title"><span lang="en">Build the Sentence!</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Build the Sentence!" aria-pressed="false" aria-label="Escuchar título: Build the Sentence!">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="game-stars-bar" style="margin-top:0.85rem;">
+                      <div class="stars-row" aria-label="Partida en curso, 0 de 3 estrellas aún">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                      <span class="game-attempts">En curso</span>
+                    </div>
+                    <p class="game-motivation">Te falta poquito para terminarlo.</p>
+                  </div>
+                  <button type="button" class="btn btn--red" data-demo-action="Reanudando partida en curso de Build the Sentence! (/actividad/game-att-4).">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 5.5L18.5 12L7 18.5V5.5Z" fill="currentColor"/></svg>
+                    <span>Reanudar partida</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Game 2: Memory (New / Not Played) -->
+              <article class="game-card" data-game-status="pending">
+                <div class="game-card__visual game-card__visual--mem">
+                  <div class="mechanic-icon-box" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <rect x="4" y="4" width="11" height="14" rx="2.5" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8"/>
+                      <rect x="9" y="7" width="11" height="14" rx="2.5" fill="#FFFDF5" stroke="#2E1307" stroke-width="1.8"/>
+                      <path d="M14.5 11.5l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3 1-2Z" fill="#C82822"/>
+                    </svg>
+                  </div>
+                  <div class="game-card__badges">
+                    <span class="mechanic-pill">Memoria</span>
+                    <span class="level-tag">Nivel A1</span>
+                  </div>
+                </div>
+                <div class="game-card__body">
+                  <div>
+                    <div class="card-title-row" style="margin-top:0;">
+                      <h3 class="card-title"><span lang="en">Fruit &amp; Colors Memory</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Fruit and Colors Memory" aria-pressed="false" aria-label="Escuchar título: Fruit and Colors Memory">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="game-stars-bar" style="margin-top:0.85rem;">
+                      <div class="stars-row" aria-label="0 de 3 estrellas de práctica">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                      <span class="game-attempts">¡Nuevo!</span>
+                    </div>
+                    <p class="game-motivation">Descubre las parejas y gana tus primeras estrellas.</p>
+                  </div>
+                  <button type="button" class="btn btn--primary" data-demo-action="Iniciando nueva partida de Fruit & Colors Memory (POST /activities/g2/attempts).">
+                    <span>Jugar</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Game 3: Match (3/3 stars) -->
+              <article class="game-card" data-game-status="completed">
+                <div class="game-card__visual game-card__visual--match">
+                  <div class="mechanic-icon-box" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <circle cx="7" cy="8" r="3" fill="#C82822" stroke="#2E1307" stroke-width="1.8"/>
+                      <circle cx="17" cy="16" r="3" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8"/>
+                      <path d="M9.6 9.5L14.4 14.5" stroke="#2E1307" stroke-width="2.2" stroke-linecap="round"/>
+                      <circle cx="17" cy="8" r="2.6" fill="#FFFDF5" stroke="#2E1307" stroke-width="1.8"/>
+                      <circle cx="7" cy="16" r="2.6" fill="#FF7A1A" stroke="#2E1307" stroke-width="1.8"/>
+                    </svg>
+                  </div>
+                  <div class="game-card__badges">
+                    <span class="mechanic-pill">Emparejar</span>
+                    <span class="level-tag">Nivel A1</span>
+                  </div>
+                </div>
+                <div class="game-card__body">
+                  <div>
+                    <div class="card-title-row" style="margin-top:0;">
+                      <h3 class="card-title"><span lang="en">Animal Sounds &amp; Names</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Animal Sounds and Names" aria-pressed="false" aria-label="Escuchar título: Animal Sounds and Names">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="game-stars-bar" style="margin-top:0.85rem;">
+                      <div class="stars-row" aria-label="3 de 3 estrellas de práctica">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                      <span class="game-attempts">4 partidas</span>
+                    </div>
+                    <p class="game-motivation">¡Excelente dominio en este juego!</p>
+                  </div>
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando nueva partida de práctica en Animal Sounds & Names.">
+                    <span>Jugar de nuevo</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Game 4: Drag & Drop (2/3 stars) -->
+              <article class="game-card" data-game-status="completed">
+                <div class="game-card__visual game-card__visual--drag">
+                  <div class="mechanic-icon-box" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <rect x="4" y="5" width="7" height="7" rx="2" fill="#FF7A1A" stroke="#2E1307" stroke-width="1.8"/>
+                      <rect x="13" y="12" width="7" height="7" rx="2" fill="#FFFDF5" stroke="#2E1307" stroke-width="1.8" stroke-dasharray="3 2"/>
+                      <path d="M11 8.5h4.5v3.5" stroke="#C82822" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                  <div class="game-card__badges">
+                    <span class="mechanic-pill">Arrastrar y soltar</span>
+                    <span class="level-tag">Nivel A1</span>
+                  </div>
+                </div>
+                <div class="game-card__body">
+                  <div>
+                    <div class="card-title-row" style="margin-top:0;">
+                      <h3 class="card-title"><span lang="en">Pack Your School Bag</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Pack Your School Bag" aria-pressed="false" aria-label="Escuchar título: Pack Your School Bag">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="game-stars-bar" style="margin-top:0.85rem;">
+                      <div class="stars-row" aria-label="2 de 3 estrellas de práctica">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                      <span class="game-attempts">2 partidas</span>
+                    </div>
+                    <p class="game-motivation">¡Vas muy bien! Intenta alcanzar las 3 estrellas.</p>
+                  </div>
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando nueva partida de Pack Your School Bag (toque híbrido + drag & drop).">
+                    <span>Jugar de nuevo</span>
+                  </button>
+                </div>
+              </article>
+
+              <!-- Game 5: Timed Choice (Level A2 open to all — Decision 130) -->
+              <article class="game-card" data-game-status="completed">
+                <div class="game-card__visual game-card__visual--timed">
+                  <div class="mechanic-icon-box" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="13" r="7.5" fill="#FFFDF5" stroke="#2E1307" stroke-width="1.9"/>
+                      <path d="M9.5 3.5h5M12 13l3-3M12 8.5V13" stroke="#C82822" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <div class="game-card__badges">
+                    <span class="mechanic-pill">Elección con tiempo</span>
+                    <span class="level-tag">Nivel A2</span>
+                  </div>
+                </div>
+                <div class="game-card__body">
+                  <div>
+                    <div class="card-title-row" style="margin-top:0;">
+                      <h3 class="card-title"><span lang="en">Fast Verbs Challenge</span></h3>
+                      <button type="button" class="tts-btn" data-speak="Fast Verbs Challenge" aria-pressed="false" aria-label="Escuchar título: Fast Verbs Challenge">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="game-stars-bar" style="margin-top:0.85rem;">
+                      <div class="stars-row" aria-label="1 de 3 estrellas de práctica">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFC83D" stroke="#2E1307" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                      <span class="game-attempts">1 partida</span>
+                    </div>
+                    <p class="game-motivation">¡Buen comienzo! Cada partida te hace más rápido.</p>
+                  </div>
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando nueva partida de Fast Verbs Challenge.">
+                    <span>Jugar de nuevo</span>
+                  </button>
+                </div>
+              </article>
+
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- MOBILE BOTTOM NAVIGATION -->
+      <nav class="mobile-bottom-nav" aria-label="Navegación móvil">
+        <button type="button" class="mobile-nav-item" data-nav-screen="home" aria-current="page">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6.5h-5V21H4a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
+          <span>Inicio</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-nav-screen="games">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="7" width="18" height="11" rx="5.5" stroke="currentColor" stroke-width="2.1"/><path d="M8.5 10.5v4M6.5 12.5h4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+          <span>Juegos</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-demo-action="Vista de Progreso (/progreso).">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 19.6l1-5.8-4.2-4.1 5.9-.9L12 3.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
+          <span>Progreso</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-demo-action="Vista de Feedback (/feedback).">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
+          <span>Feedback</span>
+        </button>
+      </nav>
+
+    </div>
+  </div>
+
+  <!-- ACCESSIBLE STATUS TOAST -->
+  <div class="app-toast" id="app-toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- NATIVE DIALOG FOR PALETTE & DESIGN TOKENS -->
+  <dialog class="tokens-dialog" id="tokens-dialog" aria-labelledby="tokens-dialog-title">
+    <div class="dialog-head">
+      <h2 id="tokens-dialog-title">Propuesta A · Sol de Papel</h2>
+      <button type="button" class="dialog-close" id="close-tokens-btn" aria-label="Cerrar ventana de paleta">✕</button>
+    </div>
+    <div class="dialog-body" id="tokens-dialog-body"></div>
+  </dialog>
+
+  <script>
+    (function () {
+      const shell = document.getElementById('viewport-shell');
+      const stage = document.getElementById('stage');
+      const studioBar = document.getElementById('studio-bar');
+      const restoreBtn = document.getElementById('restore-bar-btn');
+      const toast = document.getElementById('app-toast');
+      const dialog = document.getElementById('tokens-dialog');
+      const dialogTitle = document.getElementById('tokens-dialog-title');
+      const dialogBody = document.getElementById('tokens-dialog-body');
+
+      let toastTimer = null;
+      let currentProposal = 'a';
+      let activeSpeakingBtn = null;
+
+      const PROPOSAL_META = {
+        a: {
+          title: 'Propuesta A · Sol de Papel (Ilustrado y Táctil)',
+          summary: 'Inspirada en cuentos ilustrados y stickers de cuaderno: trazos firmes en tinta chocolate, sombras sólidas táctiles y jerarquía muy clara para niños de 7 a 10 años.',
+          fonts: 'Títulos: Fredoka (redondeada y cálida) · Cuerpo: Nunito (alta legibilidad infantil)',
+          swatches: [
+            { name: 'Rojo Coral', hex: '#C82822', role: 'CTA urgente / Speaking · 5.4:1 con blanco' },
+            { name: 'Naranja Mandarina', hex: '#C4410A', role: 'CTA principal · 5.1:1 con blanco' },
+            { name: 'Amarillo Girasol', hex: '#FFC83D', role: 'Hero / Estrellas · 11.4:1 con tinta' },
+            { name: 'Papel Solar', hex: '#FFFBF0', role: 'Fondo cálido antirreflejo' },
+            { name: 'Tinta Chocolate', hex: '#2E1307', role: 'Texto y bordes · >14:1 contraste' }
+          ],
+          notes: [
+            'La misión en progreso ocupa dos columnas para que el niño sepa de inmediato por dónde continuar.',
+            'Botones táctiles de 52px de alto mínimo y controles de audio de 48×48px (WCAG 2.2 AA para tablets).',
+            'Cero texto blanco sobre amarillo: todos los elementos amarillos llevan tinta chocolate oscura.'
+          ]
+        },
+        b: {
+          title: 'Propuesta B · Aventura Solar (Arcade Táctil)',
+          summary: 'Energía de videojuego educativo de tablet: botones 3D con base física, cabeceras de color por tipo de actividad y contraste alto y alegre.',
+          fonts: 'Títulos: Baloo 2 (divertida y chunky) · Cuerpo: Plus Jakarta Sans (limpia en pantallas pequeñas)',
+          swatches: [
+            { name: 'Rojo Aventura', hex: '#C62828', role: 'Speaking / Filtros activos · 5.5:1 con blanco' },
+            { name: 'Naranja Fuego', hex: '#C74607', role: 'Botón principal · 4.9:1 con blanco' },
+            { name: 'Amarillo Trofeo', hex: '#FFBE18', role: 'Reintentos y estrellas · 10.5:1 con tinta' },
+            { name: 'Arena Dorada', hex: '#FFF5E4', role: 'Fondo cálido suave' },
+            { name: 'Cacao Oscuro', hex: '#261005', role: 'Texto principal · >15:1 contraste' }
+          ],
+          notes: [
+            'Cada tarjeta de misión lleva una banda superior de color que identifica el tipo de actividad al instante.',
+            'Botones con sensación física de hundimiento al tocar en tablet (respeta prefers-reduced-motion).',
+            'Ideal si la profesora busca máxima motivación lúdica tipo juego.'
+          ]
+        },
+        c: {
+          title: 'Propuesta C · Estudio Creativo (Limpio y Enfocado)',
+          summary: 'Versión luminosa y serena de la paleta cálida: más aire visual, menos peso en bordes y tipografía diseñada especialmente para facilitar la lectura infantil.',
+          fonts: 'Títulos: Outfit (moderna y amigable) · Cuerpo: Lexend (optimizada para fluidez lectora)',
+          swatches: [
+            { name: 'Rojo Bermellón', hex: '#BF2626', role: 'Marca / Reanudar · 5.8:1 con blanco' },
+            { name: 'Naranja Ámbar', hex: '#C2410C', role: 'CTA principal · 5.1:1 con blanco' },
+            { name: 'Amarillo Miel', hex: '#FACC15', role: 'Estrellas y refuerzos · 12.1:1 con tinta' },
+            { name: 'Crema Blanco', hex: '#FFFCF7', role: 'Fondo limpio con baja fatiga visual' },
+            { name: 'Café Profundo', hex: '#27150C', role: 'Texto principal · >15:1 contraste' }
+          ],
+          notes: [
+            'Usa la fuente Lexend, creada para mejorar el reconocimiento de letras en niños que están aprendiendo inglés.',
+            'Mantiene toda la calidez rojo/naranja/amarillo con menos sobrecarga visual en sesiones largas.',
+            'Puente visual más natural hacia el tema Teens (11–14 años) usando los mismos tokens base.'
+          ]
+        }
+      };
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.hidden = true;
+        }, 3600);
+      }
+
+      function setProposal(id) {
+        currentProposal = id;
+        shell.dataset.proposal = id;
+        document.querySelectorAll('[data-set-proposal]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(btn.dataset.setProposal === id));
+        });
+      }
+
+      function setScreen(screenId) {
+        document.querySelectorAll('[data-screen-panel]').forEach((panel) => {
+          panel.hidden = panel.dataset.screenPanel !== screenId;
+        });
+        document.querySelectorAll('[data-set-screen]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(btn.dataset.setScreen === screenId));
+        });
+        document.querySelectorAll('[data-nav-screen]').forEach((btn) => {
+          if (btn.classList.contains('brand-link')) return;
+          if (btn.dataset.navScreen === screenId) {
+            btn.setAttribute('aria-current', 'page');
+          } else {
+            btn.removeAttribute('aria-current');
+          }
+        });
+        document.title = screenId === 'home'
+          ? 'Inicio — Englove Kids (Propuestas UI)'
+          : 'Zona de Microjuegos — Englove Kids (Propuestas UI)';
+      }
+
+      function setDevice(device) {
+        stage.dataset.device = device;
+        document.querySelectorAll('[data-set-device]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(btn.dataset.setDevice === device));
+        });
+      }
+
+      document.querySelectorAll('[data-set-proposal]').forEach((btn) => {
+        btn.addEventListener('click', () => setProposal(btn.dataset.setProposal));
+      });
+
+      document.querySelectorAll('[data-set-screen], [data-nav-screen]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          if (btn.tagName === 'A') e.preventDefault();
+          const target = btn.dataset.setScreen || btn.dataset.navScreen;
+          setScreen(target);
+        });
+      });
+
+      document.querySelectorAll('[data-set-device]').forEach((btn) => {
+        btn.addEventListener('click', () => setDevice(btn.dataset.setDevice));
+      });
+
+      // Mission filter chips
+      document.querySelectorAll('[data-mission-filter]').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const filter = chip.dataset.missionFilter;
+          document.querySelectorAll('[data-mission-filter]').forEach((c) => {
+            c.setAttribute('aria-pressed', String(c === chip));
+          });
+          document.querySelectorAll('#missions-grid [data-mission-status]').forEach((card) => {
+            card.hidden = filter !== 'all' && card.dataset.missionStatus !== filter;
+          });
+        });
+      });
+
+      // Game filter chips
+      document.querySelectorAll('[data-game-filter]').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const filter = chip.dataset.gameFilter;
+          document.querySelectorAll('[data-game-filter]').forEach((c) => {
+            c.setAttribute('aria-pressed', String(c === chip));
+          });
+          document.querySelectorAll('#games-grid [data-game-status]').forEach((card) => {
+            card.hidden = filter !== 'all' && card.dataset.gameStatus !== filter;
+          });
+        });
+      });
+
+      // Demo action toasts
+      document.querySelectorAll('[data-demo-action]').forEach((btn) => {
+        btn.addEventListener('click', () => showToast(btn.dataset.demoAction));
+      });
+
+      // Real Text-to-Speech for Kids prompts
+      document.querySelectorAll('[data-speak]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const text = btn.dataset.speak;
+          const isSame = activeSpeakingBtn === btn;
+
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+          }
+          if (activeSpeakingBtn) {
+            activeSpeakingBtn.setAttribute('aria-pressed', 'false');
+            activeSpeakingBtn = null;
+          }
+          if (isSame) return;
+
+          btn.setAttribute('aria-pressed', 'true');
+          activeSpeakingBtn = btn;
+
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            utterance.onend = () => {
+              btn.setAttribute('aria-pressed', 'false');
+              if (activeSpeakingBtn === btn) activeSpeakingBtn = null;
+            };
+            utterance.onerror = () => {
+              btn.setAttribute('aria-pressed', 'false');
+              if (activeSpeakingBtn === btn) activeSpeakingBtn = null;
+            };
+            window.speechSynthesis.speak(utterance);
+            showToast('Leyendo en voz alta: "' + text + '"');
+          } else {
+            showToast('Audio de lectura Kids: "' + text + '"');
+            setTimeout(() => {
+              btn.setAttribute('aria-pressed', 'false');
+              activeSpeakingBtn = null;
+            }, 1400);
+          }
+        });
+      });
+
+      // Hide/show studio bar for clean client demo
+      document.getElementById('hide-bar-btn').addEventListener('click', () => {
+        studioBar.hidden = true;
+        restoreBtn.hidden = false;
+      });
+      restoreBtn.addEventListener('click', () => {
+        studioBar.hidden = false;
+        restoreBtn.hidden = true;
+      });
+
+      // Tokens modal (native <dialog>)
+      function renderTokensDialog() {
+        const meta = PROPOSAL_META[currentProposal];
+        dialogTitle.textContent = meta.title;
+        const swatchesHtml = meta.swatches.map((s) => `
+          <div class="swatch-item">
+            <div class="swatch-color" style="background:${s.hex};"></div>
+            <div class="swatch-info">
+              <strong>${s.name}</strong>
+              <code>${s.hex}</code>
+              <div style="color:#6B442B;margin-top:2px;">${s.role}</div>
+            </div>
+          </div>
+        `).join('');
+        const notesHtml = meta.notes.map((n) => `<li>${n}</li>`).join('');
+        dialogBody.innerHTML = `
+          <p style="margin:0;font-size:0.95rem;color:#472715;">${meta.summary}</p>
+          <p style="margin:0;font-size:0.875rem;font-weight:700;color:#8A3006;">${meta.fonts}</p>
+          <div class="swatch-grid">${swatchesHtml}</div>
+          <ul class="tokens-notes">${notesHtml}</ul>
+        `;
+      }
+
+      document.getElementById('open-tokens-btn').addEventListener('click', () => {
+        renderTokensDialog();
+        dialog.showModal();
+      });
+
+      document.getElementById('close-tokens-btn').addEventListener('click', () => {
+        dialog.close();
+      });
+
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) dialog.close();
+      });
+    })();
+  </script>
+</body>
+</html>

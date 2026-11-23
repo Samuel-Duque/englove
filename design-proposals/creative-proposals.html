@@ -1,0 +1,1825 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Propuestas Creativas Libres — Estudiante + Profesora</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       0. RESET & ACCESSIBILITY BASE
+       ========================================================================== */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0E1017;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    button, a, input, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      white-space: nowrap !important;
+    }
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 1000;
+      background: #111827;
+      color: #FFFFFF;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.75rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+      outline: 3px solid var(--focus-ring, #2563EB);
+      outline-offset: 3px;
+    }
+
+    /* ==========================================================================
+       1. STUDIO SWITCHER BAR
+       ========================================================================== */
+    .studio-bar {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: #0F121B;
+      color: #F3F4F6;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 0.5rem 1rem;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+    .studio-bar[hidden] { display: none; }
+    .studio-bar__inner {
+      max-width: 1380px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .studio-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #E2E8F0;
+      white-space: nowrap;
+    }
+    .studio-brand__dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #2DD4BF, #F472B6, #FACC15);
+    }
+    .studio-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .studio-group {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 0.65rem;
+      padding: 0.15rem;
+      gap: 0.15rem;
+    }
+    .studio-btn {
+      border: 0;
+      background: transparent;
+      color: #CBD5E1;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.36rem 0.62rem;
+      min-block-size: 34px;
+      border-radius: 0.48rem;
+      white-space: nowrap;
+      transition: background-color 140ms ease-out, color 140ms ease-out;
+    }
+    .studio-btn:hover { background: rgba(255, 255, 255, 0.12); color: #FFFFFF; }
+    .studio-btn[aria-pressed="true"] { background: #38BDF8; color: #081226; }
+    .studio-btn--outline {
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.12);
+      color: #BAE6FD;
+      border-radius: 0.65rem;
+    }
+    .studio-btn:focus-visible { outline: 3px solid #38BDF8; outline-offset: 2px; }
+    .studio-restore-btn {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 250;
+      border: 2px solid #38BDF8;
+      background: #0F121B;
+      color: #F8FAFC;
+      padding: 0.65rem 1rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .studio-restore-btn[hidden] { display: none; }
+
+    /* ==========================================================================
+       2. STAGE & VIEWPORT SHELL
+       ========================================================================== */
+    .stage {
+      min-height: calc(100vh - 52px);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      transition: padding 200ms ease-out;
+    }
+    .stage[data-device="tablet"] {
+      padding: 1.5rem 1rem 2.5rem;
+      background: radial-gradient(circle at top, #1E2438 0%, #0C0E16 70%);
+    }
+    .viewport-shell {
+      width: 100%;
+      min-height: calc(100vh - 52px);
+      background: var(--app-bg);
+      color: var(--ink-1);
+      font-family: var(--font-body);
+      position: relative;
+      overflow-x: clip;
+      transition: max-width 220ms ease-out, border-radius 220ms ease-out;
+    }
+    .stage[data-device="tablet"] .viewport-shell {
+      max-width: 860px;
+      min-height: 960px;
+      border-radius: 28px;
+      border: 8px solid #2A3147;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+    }
+
+    /* ==========================================================================
+       3. THREE FREE CREATIVE DIRECTIONS
+       1: "LingoTree" (Botanical Sage, Forest Emerald & Berry Plum)
+       2: "Chirp!"    (Neo-Pop Cobalt Blue, Raspberry Pink & Electric Lime)
+       3: "Lumina"    (Storybook Night Indigo, Aurora Teal & Moon Yellow)
+       ========================================================================== */
+
+    /* --- THEME 1: LingoTree (Botanical Storybook) --- */
+    .viewport-shell[data-theme="botanical"] {
+      color-scheme: light;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+      --app-bg: #F3F8F4;
+      --header-bg: rgba(243, 248, 244, 0.95);
+      --surface-1: #FFFFFF;
+      --surface-2: #E8F4EC;
+      --surface-3: #F8FBF9;
+      --hero-bg: linear-gradient(135deg, #DCFCE7 0%, #D1FAE5 55%, #FEF3C7 100%);
+      --hero-ink: #102A22;
+      --hero-sub: #295244;
+
+      --ink-1: #102A22;
+      --ink-2: #385E50;
+      --ink-muted: #4A6D60;
+
+      --accent-1: #14533C;
+      --accent-1-hover: #0F3F2D;
+      --accent-1-ink: #FFFFFF;
+
+      --accent-2: #7C2D6D;
+      --accent-2-hover: #612054;
+      --accent-2-ink: #FFFFFF;
+
+      --accent-3: #F4C430;
+      --accent-3-hover: #E2B320;
+      --accent-3-ink: #102A22;
+
+      --pill-1-bg: #E2F5E9; --pill-1-ink: #14533C;
+      --pill-2-bg: #F6E4F2; --pill-2-ink: #6D215E;
+      --pill-3-bg: #FEF3C7; --pill-3-ink: #5A3B00;
+
+      --border-1: #C4DFCE;
+      --border-strong: #14533C;
+      --radius-card: 24px;
+      --radius-btn: 14px;
+      --shadow-card: 0 4px 20px rgba(20, 83, 60, 0.07);
+      --focus-ring: #7C2D6D;
+    }
+
+    /* --- THEME 2: Chirp! (Neo-Pop Studio: Cobalt, Raspberry & Lime) --- */
+    .viewport-shell[data-theme="neopop"] {
+      color-scheme: light;
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+
+      --app-bg: #F5F7FF;
+      --header-bg: rgba(255, 255, 255, 0.96);
+      --surface-1: #FFFFFF;
+      --surface-2: #EDF1FF;
+      --surface-3: #F8FAFF;
+      --hero-bg: linear-gradient(135deg, #1D4ED8 0%, #3B38D6 62%, #6D28D9 100%);
+      --hero-ink: #FFFFFF;
+      --hero-sub: #E0E7FF;
+
+      --ink-1: #111827;
+      --ink-2: #3F4B66;
+      --ink-muted: #52607D;
+
+      --accent-1: #1D4ED8;
+      --accent-1-hover: #1E40AF;
+      --accent-1-ink: #FFFFFF;
+
+      --accent-2: #BE185D;
+      --accent-2-hover: #9D174D;
+      --accent-2-ink: #FFFFFF;
+
+      --accent-3: #BEF264;
+      --accent-3-hover: #A3E635;
+      --accent-3-ink: #111827;
+
+      --pill-1-bg: #DBEAFE; --pill-1-ink: #1E3A8A;
+      --pill-2-bg: #FCE7F3; --pill-2-ink: #9D174D;
+      --pill-3-bg: #ECFCCB; --pill-3-ink: #365314;
+
+      --border-1: #CBD5F1;
+      --border-strong: #111827;
+      --radius-card: 22px;
+      --radius-btn: 14px;
+      --shadow-card: 4px 4px 0 #111827;
+      --focus-ring: #BE185D;
+    }
+
+    /* --- THEME 3: Lumina (Storybook Night: Deep Indigo, Aurora Teal & Coral) --- */
+    .viewport-shell[data-theme="lumina"] {
+      color-scheme: dark;
+      --font-display: 'Fredoka', system-ui, sans-serif;
+      --font-body: 'Nunito', system-ui, sans-serif;
+
+      --app-bg: #12172E;
+      --header-bg: rgba(20, 25, 51, 0.95);
+      --surface-1: #1C2342;
+      --surface-2: #252E54;
+      --surface-3: #171D38;
+      --hero-bg: linear-gradient(135deg, #232D5A 0%, #2D2A63 58%, #3A2557 100%);
+      --hero-ink: #F8FAFC;
+      --hero-sub: #CBD5E1;
+
+      --ink-1: #F8FAFC;
+      --ink-2: #CBD5E1;
+      --ink-muted: #A5B4CF;
+
+      --accent-1: #2DD4BF;
+      --accent-1-hover: #5EEAD4;
+      --accent-1-ink: #081C24;
+
+      --accent-2: #FF6B81;
+      --accent-2-hover: #FF8598;
+      --accent-2-ink: #24060C;
+
+      --accent-3: #FDE047;
+      --accent-3-hover: #FEF08A;
+      --accent-3-ink: #1A1403;
+
+      --pill-1-bg: rgba(45, 212, 191, 0.16); --pill-1-ink: #5EEAD4;
+      --pill-2-bg: rgba(255, 107, 129, 0.18); --pill-2-ink: #FDA4AF;
+      --pill-3-bg: rgba(253, 224, 71, 0.16); --pill-3-ink: #FDE047;
+
+      --border-1: #344070;
+      --border-strong: #495994;
+      --radius-card: 26px;
+      --radius-btn: 16px;
+      --shadow-card: 0 10px 30px rgba(5, 8, 22, 0.42);
+      --focus-ring: #FDE047;
+    }
+
+    /* Theme-conditional brand elements */
+    .viewport-shell[data-theme="botanical"] .only-pop,
+    .viewport-shell[data-theme="botanical"] .only-lumina,
+    .viewport-shell[data-theme="neopop"] .only-bot,
+    .viewport-shell[data-theme="neopop"] .only-lumina,
+    .viewport-shell[data-theme="lumina"] .only-bot,
+    .viewport-shell[data-theme="lumina"] .only-pop {
+      display: none !important;
+    }
+
+    /* Subtle thematic background atmosphere */
+    .viewport-shell[data-theme="botanical"]::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 300px;
+      background: radial-gradient(circle at 85% 10%, rgba(167, 243, 208, 0.5), transparent 45%);
+      pointer-events: none;
+    }
+    .viewport-shell[data-theme="neopop"]::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(29, 78, 216, 0.08) 1.2px, transparent 1.2px);
+      background-size: 26px 26px;
+      pointer-events: none;
+    }
+    .viewport-shell[data-theme="lumina"]::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 360px;
+      background:
+        radial-gradient(circle at 18% 15%, rgba(45, 212, 191, 0.14), transparent 42%),
+        radial-gradient(circle at 82% 8%, rgba(255, 107, 129, 0.14), transparent 38%);
+      pointer-events: none;
+    }
+
+    /* ==========================================================================
+       4. SHARED HEADER (ADAPTS TO ROLE: STUDENT vs TEACHER)
+       ========================================================================== */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--header-bg);
+      backdrop-filter: blur(10px);
+      border-bottom: 1.5px solid var(--border-1);
+    }
+    .viewport-shell[data-theme="neopop"] .app-header {
+      border-bottom: 2.5px solid #111827;
+    }
+    .app-header__inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.9rem;
+    }
+    .brand-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-decoration: none;
+      min-block-size: 48px;
+    }
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: var(--accent-1);
+      color: var(--accent-1-ink);
+    }
+    .viewport-shell[data-theme="neopop"] .brand-mark {
+      border: 2px solid #111827;
+      box-shadow: 2px 2px 0 #111827;
+      background: #BEF264;
+      color: #111827;
+    }
+    .viewport-shell[data-theme="lumina"] .brand-mark {
+      background: linear-gradient(135deg, #2DD4BF, #38BDF8);
+      color: #081C24;
+    }
+    .brand-name {
+      font-family: var(--font-display);
+      font-size: 1.38rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      display: block;
+    }
+    .brand-slogan {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--ink-2);
+      display: block;
+    }
+
+    .nav-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .nav-btn {
+      min-block-size: 46px;
+      padding: 0.45rem 0.76rem;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      background: transparent;
+      color: var(--ink-2);
+      font-weight: 700;
+      font-size: 0.86rem;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background-color 140ms ease-out, color 140ms ease-out, transform 120ms ease-out;
+    }
+    .nav-btn:hover { background: var(--surface-2); color: var(--ink-1); }
+    .nav-btn:active { transform: scale(0.97); }
+    .nav-btn[aria-current="page"] {
+      background: var(--accent-1);
+      color: var(--accent-1-ink);
+      font-weight: 800;
+    }
+    .viewport-shell[data-theme="neopop"] .nav-btn[aria-current="page"] {
+      border-color: #111827;
+      box-shadow: 2px 2px 0 #111827;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 0.5rem; }
+    .role-badge {
+      padding: 0.3rem 0.72rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      background: var(--pill-2-bg);
+      color: var(--pill-2-ink);
+      white-space: nowrap;
+    }
+    .profile-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-block-size: 46px;
+      padding: 0.28rem 0.8rem 0.28rem 0.36rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-1);
+      font-weight: 800;
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+    .viewport-shell[data-theme="neopop"] .profile-chip { border: 2px solid #111827; }
+    .avatar-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--accent-2);
+      color: var(--accent-2-ink);
+      font-family: var(--font-display);
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+    }
+
+    /* ==========================================================================
+       5. MAIN LAYOUT & GENERIC CARDS / BUTTONS
+       ========================================================================== */
+    .app-main {
+      position: relative;
+      z-index: 1;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 1.75rem 1.25rem 3.5rem;
+    }
+    .screen-panel[hidden] { display: none; }
+    .stack { display: flex; flex-direction: column; gap: 1.6rem; }
+
+    .surface-card {
+      background: var(--surface-1);
+      border-radius: var(--radius-card);
+      border: 1.5px solid var(--border-1);
+      box-shadow: var(--shadow-card);
+    }
+    .viewport-shell[data-theme="neopop"] .surface-card {
+      border: 2.5px solid #111827;
+    }
+
+    .btn {
+      min-block-size: 48px;
+      padding: 0.68rem 1.1rem;
+      border-radius: var(--radius-btn);
+      border: 2px solid transparent;
+      font-family: var(--font-display);
+      font-size: 0.96rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      transition: transform 120ms ease-out, background-color 140ms ease-out;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn--full { width: 100%; }
+    .btn--a1 { background: var(--accent-1); color: var(--accent-1-ink); }
+    .btn--a1:hover { background: var(--accent-1-hover); }
+    .btn--a2 { background: var(--accent-2); color: var(--accent-2-ink); }
+    .btn--a2:hover { background: var(--accent-2-hover); }
+    .btn--a3 { background: var(--accent-3); color: var(--accent-3-ink); }
+    .btn--a3:hover { background: var(--accent-3-hover); }
+    .btn--ghost {
+      background: var(--surface-2);
+      color: var(--ink-1);
+      border-color: var(--border-1);
+    }
+    .btn--ghost:hover { filter: brightness(0.96); }
+    .viewport-shell[data-theme="neopop"] .btn {
+      border-color: #111827;
+      box-shadow: 0 3px 0 #111827;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.28rem 0.72rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+    .pill--1 { background: var(--pill-1-bg); color: var(--pill-1-ink); }
+    .pill--2 { background: var(--pill-2-bg); color: var(--pill-2-ink); }
+    .pill--3 { background: var(--pill-3-bg); color: var(--pill-3-ink); }
+    .viewport-shell[data-theme="neopop"] .pill { border: 1.5px solid #111827; }
+
+    /* ==========================================================================
+       6. STUDENT SCREENS (HOME & MICROGAMES)
+       ========================================================================== */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(290px, 1fr);
+      gap: 1.25rem;
+    }
+    .hero-banner {
+      background: var(--hero-bg);
+      color: var(--hero-ink);
+      border-radius: var(--radius-card);
+      border: 1.5px solid var(--border-1);
+      box-shadow: var(--shadow-card);
+      padding: 1.7rem 1.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+    }
+    .viewport-shell[data-theme="neopop"] .hero-banner { border: 2.5px solid #111827; }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.7rem, 2.8vw, 2.25rem);
+      font-weight: 800;
+      line-height: 1.12;
+      margin: 0.55rem 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .hero-lema {
+      margin: 0 0 0.45rem;
+      font-family: var(--font-display);
+      font-size: 1.02rem;
+      font-weight: 700;
+      opacity: 0.95;
+    }
+    .hero-sub {
+      margin: 0 0 1.15rem;
+      font-size: 0.95rem;
+      color: var(--hero-sub);
+      max-width: 50ch;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+    .mascot-box { width: 128px; height: 128px; flex-shrink: 0; }
+
+    .streak-card {
+      padding: 1.4rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.9rem;
+    }
+    .streak-head { display: flex; align-items: center; gap: 0.85rem; }
+    .streak-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: var(--pill-3-bg);
+      color: var(--pill-3-ink);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .streak-num { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; margin: 0.1rem 0 0; line-height: 1.1; }
+    .week-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.45rem; }
+    .week-box {
+      padding: 0.45rem 0.25rem;
+      border-radius: 12px;
+      background: var(--surface-2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.74rem;
+      font-weight: 800;
+    }
+    .shield-bar {
+      padding: 0.52rem 0.8rem;
+      border-radius: 12px;
+      background: var(--pill-1-bg);
+      color: var(--pill-1-ink);
+      font-size: 0.8rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .section-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+    .section-h { font-family: var(--font-display); font-size: 1.45rem; font-weight: 800; margin: 0; }
+    .section-p { margin: 0.12rem 0 0; font-size: 0.9rem; color: var(--ink-2); }
+
+    .filter-group { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .filter-chip {
+      min-block-size: 46px;
+      padding: 0.45rem 0.95rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-1);
+      color: var(--ink-1);
+      font-weight: 800;
+      font-size: 0.86rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .viewport-shell[data-theme="neopop"] .filter-chip { border: 2px solid #111827; }
+    .filter-chip[aria-pressed="true"] {
+      background: var(--accent-1);
+      color: var(--accent-1-ink);
+      border-color: var(--accent-1);
+    }
+
+    .missions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+    .mission-featured {
+      grid-column: 1 / -1;
+      padding: 1.4rem 1.55rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 240px;
+      align-items: center;
+      gap: 1.5rem;
+      background: var(--surface-3);
+    }
+    .mission-card {
+      padding: 1.35rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1.05rem;
+    }
+    .mission-card[hidden], .mission-featured[hidden] { display: none; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .card-h-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-top: 0.6rem; }
+    .card-h { font-family: var(--font-display); font-size: 1.22rem; font-weight: 800; line-height: 1.22; margin: 0; }
+    .tts-btn {
+      flex-shrink: 0;
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: 13px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-2);
+      color: var(--ink-1);
+      display: grid;
+      place-items: center;
+    }
+    .tts-btn[aria-pressed="true"] { background: var(--accent-2); color: var(--accent-2-ink); border-color: var(--accent-2); }
+    .card-note {
+      margin-top: 0.65rem;
+      padding: 0.55rem 0.8rem;
+      border-radius: 12px;
+      background: var(--surface-2);
+      color: var(--ink-2);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .score-box {
+      margin-top: 0.7rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 14px;
+      background: var(--pill-3-bg);
+      color: var(--pill-3-ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 800;
+    }
+    .stars { display: inline-flex; gap: 0.18rem; }
+
+    /* Games Grid */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+    .game-card {
+      padding: 1.3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .game-card[hidden] { display: none; }
+    .game-stars {
+      margin-top: 0.7rem;
+      padding: 0.58rem 0.8rem;
+      border-radius: 12px;
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    /* ==========================================================================
+       7. SCREEN 3: TEACHER DASHBOARD & LIVE REVIEW QUEUE (REAL ENGLOVE TEACHER)
+       ========================================================================== */
+    .teacher-top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .teacher-alerts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .alert-card {
+      padding: 1.2rem 1.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border-left: 6px solid var(--accent-2);
+    }
+    .alert-card--alt { border-left-color: var(--accent-1); }
+    .alert-num {
+      font-family: var(--font-display);
+      font-size: 1.85rem;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--accent-2);
+    }
+    .alert-card--alt .alert-num { color: var(--accent-1); }
+
+    /* Teacher Workspace: Split Review Queue + Group Pulse */
+    .teacher-workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    .review-panel {
+      padding: 1.45rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+    }
+    .queue-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding-bottom: 0.9rem;
+      border-bottom: 1.5px solid var(--border-1);
+    }
+    .queue-tab {
+      min-block-size: 46px;
+      padding: 0.45rem 0.9rem;
+      border-radius: 13px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-2);
+      color: var(--ink-1);
+      font-size: 0.83rem;
+      font-weight: 800;
+      text-align: left;
+    }
+    .queue-tab[aria-selected="true"] {
+      background: var(--accent-1);
+      color: var(--accent-1-ink);
+      border-color: var(--accent-1);
+    }
+
+    /* Audio Waveform Mock Player for Speaking */
+    .audio-box {
+      padding: 1rem 1.15rem;
+      border-radius: 16px;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border-1);
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+    .play-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 999px;
+      border: 0;
+      background: var(--accent-2);
+      color: var(--accent-2-ink);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .wave-bars {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 36px;
+    }
+    .wave-bar {
+      flex: 1;
+      border-radius: 999px;
+      background: var(--border-strong);
+      opacity: 0.42;
+      transition: opacity 160ms ease-out, background-color 160ms ease-out;
+    }
+    .wave-bar.is-lit {
+      background: var(--accent-2);
+      opacity: 1;
+    }
+
+    .open-answer-box {
+      padding: 1rem 1.15rem;
+      border-radius: 16px;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border-1);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .grade-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.95rem;
+    }
+    .grade-row {
+      display: grid;
+      grid-template-columns: 165px minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+    .field-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--ink-2);
+      margin-bottom: 0.35rem;
+    }
+    .field-input, .field-textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-3);
+      color: var(--ink-1);
+      padding: 0.65rem 0.85rem;
+      font-weight: 700;
+    }
+    .field-textarea { min-height: 76px; resize: vertical; font-weight: 600; }
+
+    .sticker-row { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .sticker-btn {
+      min-block-size: 40px;
+      padding: 0.35rem 0.78rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-2);
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+    .sticker-btn[aria-pressed="true"] {
+      background: var(--accent-3);
+      color: var(--accent-3-ink);
+      border-color: var(--border-strong);
+    }
+
+    .retry-check {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--ink-2);
+      padding: 0.55rem 0.8rem;
+      border-radius: 12px;
+      background: var(--surface-2);
+    }
+    .retry-check input { width: 18px; height: 18px; accent-color: var(--accent-1); }
+
+    /* Teacher Right Column: Groups Pulse & Quick Tools */
+    .side-col { display: flex; flex-direction: column; gap: 1.25rem; }
+    .groups-card { padding: 1.35rem; display: flex; flex-direction: column; gap: 0.9rem; }
+    .group-item {
+      padding: 0.85rem 1rem;
+      border-radius: 14px;
+      background: var(--surface-2);
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .group-top { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 0.9rem; }
+    .bar-track { height: 8px; border-radius: 999px; background: var(--border-1); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--accent-1); }
+    .group-meta { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--ink-2); font-weight: 700; }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+    .quick-tile {
+      padding: 0.95rem;
+      border-radius: 16px;
+      border: 1.5px solid var(--border-1);
+      background: var(--surface-1);
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: transform 120ms ease-out;
+    }
+    .quick-tile:hover { transform: translateY(-2px); }
+    .quick-tile strong { font-family: var(--font-display); font-size: 0.96rem; }
+    .quick-tile span { font-size: 0.76rem; color: var(--ink-2); }
+
+    /* ==========================================================================
+       8. TOAST & NATIVE DIALOG
+       ========================================================================== */
+    .app-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 1.25rem;
+      transform: translateX(-50%);
+      z-index: 300;
+      background: #111827;
+      color: #F8FAFC;
+      padding: 0.8rem 1.2rem;
+      border-radius: 14px;
+      border: 2px solid #38BDF8;
+      font-size: 0.85rem;
+      font-weight: 700;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      max-width: min(92vw, 500px);
+      text-align: center;
+    }
+    .app-toast[hidden] { display: none; }
+
+    dialog.concept-dialog {
+      border: 2px solid #334155;
+      border-radius: 22px;
+      padding: 0;
+      max-width: min(94vw, 680px);
+      width: 100%;
+      background: #FFFFFF;
+      color: #111827;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+    dialog.concept-dialog::backdrop { background: rgba(10, 14, 24, 0.65); backdrop-filter: blur(3px); }
+    .dialog-head { padding: 1.15rem 1.4rem; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
+    .dialog-head h2 { margin: 0; font-size: 1.2rem; font-weight: 800; }
+    .dialog-close { min-width: 44px; min-height: 44px; border-radius: 12px; border: 1.5px solid #CBD5E1; background: #FFF; font-weight: 800; }
+    .dialog-body { padding: 1.25rem 1.4rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+    .swatch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 0.7rem; }
+    .swatch-item { border: 1.5px solid #E2E8F0; border-radius: 13px; overflow: hidden; }
+    .swatch-color { height: 48px; }
+    .swatch-info { padding: 0.5rem 0.6rem; font-size: 0.76rem; }
+
+    /* ==========================================================================
+       9. RESPONSIVE (TABLET FRAME & NARROW VIEWPORTS)
+       ========================================================================== */
+    .stage[data-device="tablet"] .hero-grid,
+    .stage[data-device="tablet"] .teacher-workspace,
+    .stage[data-device="tablet"] .teacher-alerts { grid-template-columns: 1fr; }
+    .stage[data-device="tablet"] .missions-grid,
+    .stage[data-device="tablet"] .games-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stage[data-device="tablet"] .mission-featured { grid-template-columns: 1fr; }
+    .stage[data-device="tablet"] .brand-slogan,
+    .stage[data-device="tablet"] .role-badge { display: none; }
+    .stage[data-device="tablet"] .nav-btn { padding: 0.42rem 0.6rem; font-size: 0.82rem; }
+
+    @media (max-width: 960px) {
+      .hero-grid, .teacher-workspace, .teacher-alerts { grid-template-columns: 1fr; }
+      .missions-grid, .games-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .mission-featured { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .missions-grid, .games-grid, .grade-row { grid-template-columns: 1fr; }
+      .nav-list, .role-badge { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+    @media (forced-colors: active) {
+      .surface-card, .hero-banner, .btn, .filter-chip { border: 2px solid CanvasText !important; box-shadow: none !important; }
+      :where(a, button):focus-visible { outline: 3px solid Highlight !important; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link visually-hidden">Ir al contenido principal</a>
+
+  <!-- STUDIO BAR -->
+  <aside class="studio-bar" id="studio-bar" aria-label="Selector de propuestas creativas libres">
+    <div class="studio-bar__inner">
+      <div class="studio-brand">
+        <span class="studio-brand__dot" aria-hidden="true"></span>
+        <span>3 Direcciones Creativas Libres · Alumno + Profesora</span>
+      </div>
+
+      <div class="studio-controls">
+        <div class="studio-group" role="group" aria-label="Diseño creativo">
+          <button type="button" class="studio-btn" data-set-theme="botanical" aria-pressed="true">1 · LingoTree (Botánico)</button>
+          <button type="button" class="studio-btn" data-set-theme="neopop" aria-pressed="false">2 · Chirp! (Neo-Pop)</button>
+          <button type="button" class="studio-btn" data-set-theme="lumina" aria-pressed="false">3 · Lumina (Nocturno)</button>
+        </div>
+
+        <div class="studio-group" role="group" aria-label="Vista">
+          <button type="button" class="studio-btn" data-set-screen="student-home" aria-pressed="true">Niño · Inicio</button>
+          <button type="button" class="studio-btn" data-set-screen="student-games" aria-pressed="false">Niño · Juegos</button>
+          <button type="button" class="studio-btn" data-set-screen="teacher" aria-pressed="false">Profesora · Aula y Revisión</button>
+        </div>
+
+        <div class="studio-group" role="group" aria-label="Dispositivo">
+          <button type="button" class="studio-btn" data-set-device="desktop" aria-pressed="true">Escritorio</button>
+          <button type="button" class="studio-btn" data-set-device="tablet" aria-pressed="false">Tablet</button>
+        </div>
+
+        <button type="button" class="studio-btn studio-btn--outline" id="open-concept-btn">Concepto y paleta</button>
+        <button type="button" class="studio-btn" id="hide-bar-btn">Ocultar barra</button>
+      </div>
+    </div>
+  </aside>
+
+  <button type="button" class="studio-restore-btn" id="restore-bar-btn" hidden>Mostrar selector</button>
+
+  <div class="stage" id="stage" data-device="desktop">
+    <div class="viewport-shell" id="shell" data-theme="botanical">
+
+      <!-- DYNAMIC HEADER (ADAPTS TO STUDENT OR TEACHER VIEW) -->
+      <header class="app-header">
+        <div class="app-header__inner">
+          <a href="#main-content" class="brand-link" id="brand-home-link">
+            <span class="brand-mark" aria-hidden="true">
+              <!-- Leaf Owl (LingoTree) -->
+              <svg class="only-bot" width="26" height="26" viewBox="0 0 32 32" fill="none">
+                <path d="M16 4C23 4 27 9.5 27 17C27 23.5 22 28 16 28C10 28 5 23.5 5 17C5 9.5 9 4 16 4Z" fill="#A7F3D0"/>
+                <circle cx="12" cy="15" r="3.4" fill="#FFFFFF"/><circle cx="20" cy="15" r="3.4" fill="#FFFFFF"/>
+                <circle cx="12.5" cy="15" r="1.6" fill="#102A22"/><circle cx="20.5" cy="15" r="1.6" fill="#102A22"/>
+                <path d="M16 17L18 19.5H14L16 17Z" fill="#F4C430"/>
+              </svg>
+              <!-- Geometric Bird (Chirp!) -->
+              <svg class="only-pop" width="26" height="26" viewBox="0 0 32 32" fill="none">
+                <circle cx="14" cy="16" r="9.5" fill="#1D4ED8" stroke="#111827" stroke-width="2"/>
+                <path d="M22.5 13L29 16L22.5 19V13Z" fill="#FDE047" stroke="#111827" stroke-width="2" stroke-linejoin="round"/>
+                <circle cx="15" cy="14" r="2.2" fill="#FFFFFF"/>
+                <circle cx="15.6" cy="14" r="1.1" fill="#111827"/>
+                <circle cx="11.5" cy="18.5" r="2.4" fill="#F472B6"/>
+              </svg>
+              <!-- Firefly Star (Lumina) -->
+              <svg class="only-lumina" width="26" height="26" viewBox="0 0 32 32" fill="none">
+                <path d="M16 4L19.2 12.2L28 13.4L21.5 19.2L23.2 28L16 23.6L8.8 28L10.5 19.2L4 13.4L12.8 12.2L16 4Z" fill="#FDE047" stroke="#081C24" stroke-width="1.8" stroke-linejoin="round"/>
+                <circle cx="13.5" cy="16.2" r="1.2" fill="#081C24"/><circle cx="18.5" cy="16.2" r="1.2" fill="#081C24"/>
+              </svg>
+            </span>
+            <span>
+              <span class="brand-name only-bot">LingoTree</span>
+              <span class="brand-slogan only-bot">Cada palabra hace crecer tu mundo</span>
+              <span class="brand-name only-pop">Chirp!</span>
+              <span class="brand-slogan only-pop">Habla fuerte, juega en inglés</span>
+              <span class="brand-name only-lumina">Lumina</span>
+              <span class="brand-slogan only-lumina">Ilumina tu inglés cada semana</span>
+            </span>
+          </a>
+
+          <!-- Student Nav -->
+          <nav id="nav-student" aria-label="Navegación del estudiante">
+            <ul class="nav-list">
+              <li><button type="button" class="nav-btn" data-set-screen="student-home" aria-current="page">Inicio</button></li>
+              <li><button type="button" class="nav-btn" data-set-screen="student-games">Juegos</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Progreso (/progreso): racha semanal e insignias.">Progreso</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Feedback (/feedback): comentarios de tu profesora.">Feedback</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Contenido extra (/extra): recursos de apoyo.">Extra</button></li>
+            </ul>
+          </nav>
+
+          <!-- Teacher Nav (Real Englove Teacher Routes) -->
+          <nav id="nav-teacher" aria-label="Navegación docente" hidden>
+            <ul class="nav-list">
+              <li><button type="button" class="nav-btn" aria-current="page">Aula y Revisión</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Catálogo (/actividades): crear los 5 tipos de actividad.">Actividades</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Asignaciones (/asignaciones): programar entregas por grupo.">Asignaciones</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Alumnos (/alumnos): solicitudes, fichas y desbloqueo.">Alumnos</button></li>
+              <li><button type="button" class="nav-btn" data-toast="Estadísticas (/estadisticas): rendimiento, constancia y rankings privados.">Estadísticas</button></li>
+            </ul>
+          </nav>
+
+          <div class="header-right">
+            <span class="role-badge" id="role-badge">Estudiante · Nivel A1</span>
+            <button type="button" class="profile-chip" id="profile-chip" data-toast="Perfil activo.">
+              <span class="avatar-circle" id="avatar-letter" aria-hidden="true">M</span>
+              <span id="profile-name">Mateo</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="main-content" class="app-main" tabindex="-1">
+
+        <!-- ================================================================
+             SCREEN 1: STUDENT HOME (/inicio)
+             ================================================================ -->
+        <div class="screen-panel" data-screen-panel="student-home">
+          <div class="stack">
+
+            <div class="hero-grid">
+              <section class="hero-banner" aria-labelledby="s-home-h1">
+                <div>
+                  <span class="pill pill--3 only-bot">Bosque A1 · Nivel inicial</span>
+                  <span class="pill pill--3 only-pop">Estudio A1 · En el aire</span>
+                  <span class="pill pill--3 only-lumina">Constelación A1 · Semana 4</span>
+
+                  <h1 class="hero-title" id="s-home-h1">¡Hola, Mateo!</h1>
+                  <p class="hero-lema only-bot">«Cada palabra hace crecer tu mundo»</p>
+                  <p class="hero-lema only-pop">«Habla fuerte, juega en inglés»</p>
+                  <p class="hero-lema only-lumina">«Ilumina tu inglés cada semana»</p>
+                  <p class="hero-sub">Tienes 2 misiones abiertas esta semana y una revisión nueva con sticker de tu profesora.</p>
+
+                  <div class="hero-actions">
+                    <button type="button" class="btn btn--a3" data-set-screen="student-games">Ir a microjuegos</button>
+                    <button type="button" class="btn btn--a2" data-toast="Feedback nuevo en Colors & Numbers Quiz: «¡Excelente pronunciación!»">Ver mi feedback (1)</button>
+                  </div>
+                </div>
+
+                <div class="mascot-box" aria-hidden="true">
+                  <!-- Mascot 1: Botanical Owl -->
+                  <svg class="only-bot" viewBox="0 0 130 130" fill="none">
+                    <circle cx="65" cy="65" r="56" fill="#FFFFFF" stroke="#14533C" stroke-width="3"/>
+                    <path d="M65 20C88 20 100 38 100 66C100 92 84 106 65 106C46 106 30 92 30 66C30 38 42 20 65 20Z" fill="#14533C"/>
+                    <path d="M40 34L52 44L38 50L40 34Z" fill="#14533C"/><path d="M90 34L78 44L92 50L90 34Z" fill="#14533C"/>
+                    <ellipse cx="65" cy="84" rx="22" ry="18" fill="#A7F3D0"/>
+                    <circle cx="51" cy="58" r="12" fill="#FFFFFF"/><circle cx="79" cy="58" r="12" fill="#FFFFFF"/>
+                    <circle cx="52.5" cy="58" r="5.5" fill="#102A22"/><circle cx="80.5" cy="58" r="5.5" fill="#102A22"/>
+                    <circle cx="54.5" cy="56" r="2" fill="#FFFFFF"/><circle cx="82.5" cy="56" r="2" fill="#FFFFFF"/>
+                    <path d="M65 64L71 72H59L65 64Z" fill="#F4C430"/>
+                    <path d="M65 20C68 11 78 9 84 12C80 19 72 22 65 20Z" fill="#22C55E"/>
+                  </svg>
+                  <!-- Mascot 2: Neo-Pop Chirp Bird -->
+                  <svg class="only-pop" viewBox="0 0 130 130" fill="none">
+                    <circle cx="62" cy="68" r="44" fill="#BEF264" stroke="#111827" stroke-width="4"/>
+                    <path d="M98 52L122 64L98 76V52Z" fill="#FDE047" stroke="#111827" stroke-width="4" stroke-linejoin="round"/>
+                    <path d="M46 26C52 14 68 14 72 28" stroke="#F472B6" stroke-width="7" stroke-linecap="round"/>
+                    <circle cx="66" cy="58" r="11" fill="#FFFFFF" stroke="#111827" stroke-width="3.5"/>
+                    <circle cx="68.5" cy="58" r="4.8" fill="#111827"/>
+                    <circle cx="50" cy="76" r="8" fill="#F472B6"/>
+                    <path d="M26 70C38 66 48 76 44 90C34 90 25 82 26 70Z" fill="#1D4ED8" stroke="#111827" stroke-width="3.5"/>
+                  </svg>
+                  <!-- Mascot 3: Lumina Star Firefly -->
+                  <svg class="only-lumina" viewBox="0 0 130 130" fill="none">
+                    <circle cx="65" cy="65" r="54" fill="#2DD4BF" opacity="0.14"/>
+                    <circle cx="65" cy="65" r="38" fill="#FDE047" opacity="0.18"/>
+                    <path d="M65 18L76 46L106 50L84 70L90 100L65 85L40 100L46 70L24 50L54 46L65 18Z" fill="#FDE047" stroke="#12172E" stroke-width="3.5" stroke-linejoin="round"/>
+                    <circle cx="56" cy="60" r="3.8" fill="#12172E"/><circle cx="74" cy="60" r="3.8" fill="#12172E"/>
+                    <circle cx="57.2" cy="58.8" r="1.2" fill="#FFFFFF"/><circle cx="75.2" cy="58.8" r="1.2" fill="#FFFFFF"/>
+                    <ellipse cx="48" cy="67" rx="4.5" ry="2.6" fill="#FF6B81"/><ellipse cx="82" cy="67" rx="4.5" ry="2.6" fill="#FF6B81"/>
+                    <path d="M58 70C61.5 74.5 68.5 74.5 72 70" stroke="#12172E" stroke-width="3" stroke-linecap="round"/>
+                  </svg>
+                </div>
+              </section>
+
+              <section class="surface-card streak-card" aria-labelledby="streak-h">
+                <div class="streak-head">
+                  <div class="streak-icon" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="currentColor"/></svg>
+                  </div>
+                  <div>
+                    <span id="streak-h" style="font-size:0.82rem;font-weight:700;color:var(--ink-2);">Racha semanal</span>
+                    <p class="streak-num">4 semanas seguidas</p>
+                  </div>
+                </div>
+
+                <div class="week-row">
+                  <div class="week-box"><span>Sem 1</span><span>✓</span></div>
+                  <div class="week-box"><span>Sem 2</span><span>✓</span></div>
+                  <div class="week-box"><span>Sem 3</span><span>✓</span></div>
+                  <div class="week-box"><span>Esta</span><span>★</span></div>
+                </div>
+
+                <div class="shield-bar">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.6-3 8.1-7 9.5-4-1.4-7-4.9-7-9.5V6l7-3Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+                  <span>Escudo de perdón activo esta semana</span>
+                </div>
+              </section>
+            </div>
+
+            <div class="section-bar">
+              <div>
+                <h2 class="section-h">Tus misiones de inglés</h2>
+                <p class="section-p">Grupo A1 · Tarde — Escala de calificación 0,0 a 5,0</p>
+              </div>
+              <div class="filter-group" role="group" aria-label="Filtrar misiones">
+                <button type="button" class="filter-chip" data-m-filter="all" aria-pressed="true">Todas (4)</button>
+                <button type="button" class="filter-chip" data-m-filter="pending" aria-pressed="false">Por hacer (2)</button>
+                <button type="button" class="filter-chip" data-m-filter="completed" aria-pressed="false">Entregadas (2)</button>
+              </div>
+            </div>
+
+            <div class="missions-grid" id="missions-grid">
+              <article class="surface-card mission-featured" data-m-status="pending">
+                <div>
+                  <div class="card-top">
+                    <span class="pill pill--2">Speaking · En progreso</span>
+                    <span class="pill pill--1">Nivel A1</span>
+                  </div>
+                  <div class="card-h-row">
+                    <h3 class="card-h"><span lang="en">Describe your favorite animal</span></h3>
+                    <button type="button" class="tts-btn" data-speak="Describe your favorite animal" aria-pressed="false" aria-label="Escuchar título"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                  </div>
+                  <p class="card-note">Límite: mañana, 6:00 p. m. (Colombia) · Como ya empezaste, tienes 24 horas extra para terminar.</p>
+                </div>
+                <button type="button" class="btn btn--a2 btn--full" data-toast="Abriendo grabador Speaking (/actividad/att-101).">Continuar actividad</button>
+              </article>
+
+              <article class="surface-card mission-card" data-m-status="pending">
+                <div>
+                  <div class="card-top"><span class="pill pill--1">Completar espacios</span><span style="font-size:0.78rem;font-weight:800;color:var(--ink-2);">A1</span></div>
+                  <div class="card-h-row">
+                    <h3 class="card-h"><span lang="en">At the zoo: Complete the story</span></h3>
+                    <button type="button" class="tts-btn" data-speak="At the zoo: Complete the story" aria-pressed="false" aria-label="Escuchar título"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                  </div>
+                  <p class="card-note">Límite: viernes 22 nov, 5:00 p. m.</p>
+                </div>
+                <button type="button" class="btn btn--a1 btn--full" data-toast="Iniciando Fill in the blanks.">Empezar actividad</button>
+              </article>
+
+              <article class="surface-card mission-card" data-m-status="completed">
+                <div>
+                  <div class="card-top"><span class="pill pill--3">Pregunta abierta</span><span style="font-size:0.78rem;font-weight:800;color:var(--ink-2);">A1</span></div>
+                  <div class="card-h-row">
+                    <h3 class="card-h"><span lang="en">My daily routine</span></h3>
+                    <button type="button" class="tts-btn" data-speak="My daily routine" aria-pressed="false" aria-label="Escuchar título"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                  </div>
+                  <p class="card-note">Tu profesora te habilitó un nuevo intento hasta el 25 nov.</p>
+                  <div class="score-box"><span>3,4 / 5,0</span><span aria-label="2 de 3 estrellas">★★☆</span></div>
+                </div>
+                <button type="button" class="btn btn--a3 btn--full" data-toast="Iniciando intento #2 habilitado por la profesora.">Intentar de nuevo</button>
+              </article>
+
+              <article class="surface-card mission-card" data-m-status="completed">
+                <div>
+                  <div class="card-top"><span class="pill pill--1">Examen · Calificado</span><span style="font-size:0.78rem;font-weight:800;color:var(--ink-2);">A1</span></div>
+                  <div class="card-h-row">
+                    <h3 class="card-h"><span lang="en">Colors &amp; Numbers Quiz</span></h3>
+                    <button type="button" class="tts-btn" data-speak="Colors and Numbers Quiz" aria-pressed="false" aria-label="Escuchar título"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                  </div>
+                  <div class="score-box"><span>4,8 / 5,0</span><span aria-label="3 de 3 estrellas">★★★</span></div>
+                </div>
+                <button type="button" class="btn btn--ghost btn--full" data-toast="Abriendo feedback y sticker de tu profesora.">Ver entrega y feedback</button>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 2: STUDENT MICROGAMES (/juegos)
+             ================================================================ -->
+        <div class="screen-panel" data-screen-panel="student-games" hidden>
+          <div class="stack">
+            <section class="hero-banner" aria-labelledby="g-h1">
+              <div>
+                <span class="pill pill--3">Práctica autónoma 24/7 · Sin notas</span>
+                <h1 class="hero-title" id="g-h1">Zona de Microjuegos</h1>
+                <p class="hero-sub" style="margin-bottom:0;">Practica inglés jugando cuando quieras, gana estrellas de práctica y repite tus juegos favoritos.</p>
+              </div>
+              <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                <div class="surface-card" style="padding:0.85rem 1.15rem;color:var(--ink-1);">
+                  <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;line-height:1;">6 / 15</div>
+                  <div style="font-size:0.76rem;color:var(--ink-2);font-weight:700;">Estrellas de práctica</div>
+                </div>
+                <div class="surface-card" style="padding:0.85rem 1.15rem;color:var(--ink-1);">
+                  <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;line-height:1;">7</div>
+                  <div style="font-size:0.76rem;color:var(--ink-2);font-weight:700;">Partidas jugadas</div>
+                </div>
+              </div>
+            </section>
+
+            <div class="games-grid">
+              <article class="surface-card game-card">
+                <div>
+                  <div class="card-top"><span class="pill pill--2">Ordenar palabras</span><span class="pill pill--1">A1</span></div>
+                  <h3 class="card-h" style="margin-top:0.75rem;"><span lang="en">Build the Sentence!</span></h3>
+                  <div class="game-stars"><span>☆☆☆</span><span>En curso</span></div>
+                  <p style="margin:0.5rem 0 0;font-size:0.85rem;color:var(--ink-2);font-weight:600;">Te falta poquito para terminarlo.</p>
+                </div>
+                <button type="button" class="btn btn--a2 btn--full" data-toast="Reanudando Build the Sentence!">Reanudar partida</button>
+              </article>
+
+              <article class="surface-card game-card">
+                <div>
+                  <div class="card-top"><span class="pill pill--3">Memoria</span><span class="pill pill--1">A1</span></div>
+                  <h3 class="card-h" style="margin-top:0.75rem;"><span lang="en">Fruit &amp; Colors Memory</span></h3>
+                  <div class="game-stars"><span>☆☆☆</span><span>¡Nuevo!</span></div>
+                  <p style="margin:0.5rem 0 0;font-size:0.85rem;color:var(--ink-2);font-weight:600;">Encuentra las parejas y gana tus primeras estrellas.</p>
+                </div>
+                <button type="button" class="btn btn--a1 btn--full" data-toast="Iniciando Fruit & Colors Memory.">Jugar</button>
+              </article>
+
+              <article class="surface-card game-card">
+                <div>
+                  <div class="card-top"><span class="pill pill--1">Emparejar</span><span class="pill pill--1">A1</span></div>
+                  <h3 class="card-h" style="margin-top:0.75rem;"><span lang="en">Animal Sounds &amp; Names</span></h3>
+                  <div class="game-stars"><span>★★★</span><span>4 partidas</span></div>
+                  <p style="margin:0.5rem 0 0;font-size:0.85rem;color:var(--ink-2);font-weight:600;">¡Excelente dominio en este juego!</p>
+                </div>
+                <button type="button" class="btn btn--a3 btn--full" data-toast="Iniciando nueva práctica de Animal Sounds & Names.">Jugar de nuevo</button>
+              </article>
+
+              <article class="surface-card game-card">
+                <div>
+                  <div class="card-top"><span class="pill pill--2">Arrastrar y soltar</span><span class="pill pill--1">A1</span></div>
+                  <h3 class="card-h" style="margin-top:0.75rem;"><span lang="en">Pack Your School Bag</span></h3>
+                  <div class="game-stars"><span>★★☆</span><span>2 partidas</span></div>
+                  <p style="margin:0.5rem 0 0;font-size:0.85rem;color:var(--ink-2);font-weight:600;">¡Vas muy bien! Intenta alcanzar las 3 estrellas.</p>
+                </div>
+                <button type="button" class="btn btn--a3 btn--full" data-toast="Iniciando Pack Your School Bag.">Jugar de nuevo</button>
+              </article>
+
+              <article class="surface-card game-card">
+                <div>
+                  <div class="card-top"><span class="pill pill--3">Elección con tiempo</span><span class="pill pill--1">A2</span></div>
+                  <h3 class="card-h" style="margin-top:0.75rem;"><span lang="en">Fast Verbs Challenge</span></h3>
+                  <div class="game-stars"><span>★☆☆</span><span>1 partida</span></div>
+                  <p style="margin:0.5rem 0 0;font-size:0.85rem;color:var(--ink-2);font-weight:600;">¡Buen comienzo! Cada partida te hace más rápido.</p>
+                </div>
+                <button type="button" class="btn btn--a3 btn--full" data-toast="Iniciando Fast Verbs Challenge.">Jugar de nuevo</button>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 3: TEACHER DASHBOARD + INTERACTIVE REVIEW QUEUE
+             (Real Englove Teacher Experience: Reminders, Speaking/Open Review, Groups)
+             ================================================================ -->
+        <div class="screen-panel" data-screen-panel="teacher" hidden>
+          <div class="stack">
+
+            <div class="teacher-top-bar">
+              <div>
+                <span class="pill pill--1">Panel Docente · Actualización cada 30 s</span>
+                <h1 class="hero-title" style="margin-bottom:0.2rem;">Hola, Profe Camila</h1>
+                <p class="section-p">Resumen de tu aula, pendientes prioritarios y cola rápida de calificación.</p>
+              </div>
+              <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn--a1" data-toast="Abriendo editor de actividad (/actividades/nueva): 5 tipos disponibles.">+ Nueva actividad</button>
+                <button type="button" class="btn btn--ghost" data-toast="Abriendo programación de asignación (/asignaciones/nueva).">Asignar a grupo</button>
+              </div>
+            </div>
+
+            <!-- Real Priority Reminder Cards (CONTEXT §5.1) -->
+            <div class="teacher-alerts">
+              <div class="surface-card alert-card">
+                <div>
+                  <span class="pill pill--2">Acción requerida</span>
+                  <h2 style="margin:0.45rem 0 0.15rem;font-family:var(--font-display);font-size:1.15rem;">Solicitudes de registro pendientes</h2>
+                  <p style="margin:0;font-size:0.85rem;color:var(--ink-2);">2 estudiantes se registraron y esperan aprobación y asignación de grupo.</p>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <div class="alert-num">2</div>
+                  <button type="button" class="btn btn--a2" style="min-block-size:40px;margin-top:0.4rem;font-size:0.84rem;" data-toast="Bandeja de solicitudes (/alumnos/solicitudes): aprobar nivel MCER y grupo único.">Revisar</button>
+                </div>
+              </div>
+
+              <div class="surface-card alert-card alert-card--alt">
+                <div>
+                  <span class="pill pill--1">Cola de revisión</span>
+                  <h2 style="margin:0.45rem 0 0.15rem;font-family:var(--font-display);font-size:1.15rem;">Entregas sin calificar (&gt; 3 días)</h2>
+                  <p style="margin:0;font-size:0.85rem;color:var(--ink-2);">3 entregas de Speaking y Pregunta abierta listas para nota y feedback.</p>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <div class="alert-num">3</div>
+                  <button type="button" class="btn btn--a1" style="min-block-size:40px;margin-top:0.4rem;font-size:0.84rem;" data-toast="Cola completa de revisión (/revision).">Abrir cola</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main Teacher Workspace: Interactive Review Workbench + Group Pulse -->
+            <div class="teacher-workspace">
+
+              <!-- Left: Live Interactive Grading & Feedback Workbench -->
+              <section class="surface-card review-panel" aria-labelledby="rev-title">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                  <div>
+                    <h2 class="section-h" id="rev-title" style="font-size:1.3rem;">Revisión rápida y feedback</h2>
+                    <p class="section-p">Califica en escala 0,0–5,0, añade stickers y notifica al alumno por correo (sin exponer la nota).</p>
+                  </div>
+                  <span class="pill pill--3" id="review-status-pill">Pendiente de calificar</span>
+                </div>
+
+                <!-- Queue switcher -->
+                <div class="queue-tabs" role="tablist" aria-label="Entregas pendientes">
+                  <button type="button" class="queue-tab" role="tab" data-review-item="speaking" aria-selected="true">
+                    Mateo Rojas · Speaking (A1 · Tarde)
+                  </button>
+                  <button type="button" class="queue-tab" role="tab" data-review-item="open" aria-selected="false">
+                    Sofía Gómez · Pregunta abierta (A2 · Mañana)
+                  </button>
+                </div>
+
+                <!-- Item 1: Speaking Audio Review -->
+                <div id="review-speaking">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.65rem;">
+                    <div>
+                      <strong style="font-family:var(--font-display);font-size:1.12rem;"><span lang="en">Describe your favorite animal</span></strong>
+                      <div style="font-size:0.8rem;color:var(--ink-2);font-weight:700;">Audio transcodificado MP4/AAC · 0:38 s · Retención en R2: 30 días tras calificar</div>
+                    </div>
+                    <button type="button" class="btn btn--ghost" style="min-block-size:40px;font-size:0.8rem;" data-toast="Descargando audio MP4 desde URL firmada de Cloudflare R2.">Descargar audio</button>
+                  </div>
+
+                  <div class="audio-box">
+                    <button type="button" class="play-btn" id="play-audio-btn" aria-label="Reproducir audio de Mateo" aria-pressed="false">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 5.5L19 12L8 18.5V5.5Z" fill="currentColor"/></svg>
+                    </button>
+                    <div class="wave-bars" id="wave-bars" aria-hidden="true"></div>
+                    <span id="audio-time" style="font-size:0.82rem;font-weight:800;min-width:46px;text-align:right;">0:00</span>
+                  </div>
+                </div>
+
+                <!-- Item 2: Open Question Review -->
+                <div id="review-open" hidden>
+                  <div style="margin-bottom:0.65rem;">
+                    <strong style="font-family:var(--font-display);font-size:1.12rem;"><span lang="en">My weekend with my family</span></strong>
+                    <div style="font-size:0.8rem;color:var(--ink-2);font-weight:700;">Pregunta abierta · Entregada ayer 4:15 p. m. · Intento #1</div>
+                  </div>
+                  <div class="open-answer-box" lang="en">
+                    "Last Saturday I went to the park with my mom and my little brother. We ate ice cream and played soccer. On Sunday I studied English and watched a movie."
+                  </div>
+                </div>
+
+                <!-- Grading Form (Real Englove rules: 0,0-5,0 + mandatory comment + stickers + retry option) -->
+                <form class="grade-form" id="grade-form">
+                  <div class="grade-row">
+                    <div>
+                      <label for="score-input" class="field-label">Nota (0,0 a 5,0)</label>
+                      <input id="score-input" class="field-input" type="text" value="4,6" aria-describedby="score-hint">
+                      <span id="score-hint" style="font-size:0.74rem;color:var(--ink-2);font-weight:700;">Aprueba desde 3,0 · 3 estrellas</span>
+                    </div>
+                    <div>
+                      <label for="comment-input" class="field-label">Comentario personal (obligatorio)</label>
+                      <textarea id="comment-input" class="field-textarea">¡Muy buena pronunciación de los adjetivos! Sigue practicando la entonación al final de las frases.</textarea>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span class="field-label">Stickers de refuerzo</span>
+                    <div class="sticker-row" role="group" aria-label="Elegir stickers">
+                      <button type="button" class="sticker-btn" aria-pressed="true">⭐ ¡Excelente trabajo!</button>
+                      <button type="button" class="sticker-btn" aria-pressed="true">🎤 Gran pronunciación</button>
+                      <button type="button" class="sticker-btn" aria-pressed="false">💪 ¡Sigue así!</button>
+                      <button type="button" class="sticker-btn" aria-pressed="false">🚀 Superaste el reto</button>
+                    </div>
+                  </div>
+
+                  <label class="retry-check">
+                    <input type="checkbox" id="retry-toggle">
+                    <span>Habilitar un intento adicional para este estudiante (opcional, con fecha límite propia)</span>
+                  </label>
+
+                  <div style="display:flex;justify-content:flex-end;gap:0.65rem;flex-wrap:wrap;">
+                    <button type="submit" class="btn btn--a1">Guardar calificación y notificar</button>
+                  </div>
+                </form>
+              </section>
+
+              <!-- Right: Groups Performance & Constancy + Quick Access -->
+              <aside class="side-col" aria-label="Resumen de grupos y accesos rápidos">
+                <div class="surface-card groups-card">
+                  <div>
+                    <h2 class="section-h" style="font-size:1.18rem;">Rendimiento y constancia</h2>
+                    <p class="section-p" style="font-size:0.82rem;">Vista privada de la profesora (incluye ranking de juegos aparte).</p>
+                  </div>
+
+                  <div class="group-item">
+                    <div class="group-top"><span>A1 · Tarde (12 alumnos)</span><span class="pill pill--1">4,4 / 5,0</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width:86%;"></div></div>
+                    <div class="group-meta"><span>86 % entregas al día</span><span>Racha prom.: 3,5 sem</span></div>
+                  </div>
+
+                  <div class="group-item">
+                    <div class="group-top"><span>A2 · Mañana (10 alumnos)</span><span class="pill pill--3">4,1 / 5,0</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width:78%;"></div></div>
+                    <div class="group-meta"><span>78 % entregas al día</span><span>Racha prom.: 4,0 sem</span></div>
+                  </div>
+
+                  <div class="group-item">
+                    <div class="group-top"><span>B1 · Sabatino (8 alumnos)</span><span class="pill pill--2">3,8 / 5,0</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width:70%;"></div></div>
+                    <div class="group-meta"><span>70 % entregas al día</span><span>2 alumnos por revisar</span></div>
+                  </div>
+                </div>
+
+                <div class="quick-grid">
+                  <button type="button" class="quick-tile" data-toast="Práctica en juegos y ranking privado (/estadisticas).">
+                    <strong>Práctica en juegos</strong>
+                    <span>Ranking privado de práctica</span>
+                  </button>
+                  <button type="button" class="quick-tile" data-toast="Cuentas bloqueadas (/alumnos/bloqueados): 0 bloqueadas hoy.">
+                    <strong>Bloqueados (0)</strong>
+                    <span>Desbloqueo en 1 clic</span>
+                  </button>
+                  <button type="button" class="quick-tile" data-toast="Contenido extra (/contenido-extra): enlaces por nivel MCER.">
+                    <strong>Contenido extra</strong>
+                    <span>Enlaces Educaplay y guías</span>
+                  </button>
+                  <button type="button" class="quick-tile" data-toast="Gestión de grupos (/grupos): miembros e historial.">
+                    <strong>Grupos (3)</strong>
+                    <span>Niveles A1, A2 y B1</span>
+                  </button>
+                </div>
+              </aside>
+
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div class="app-toast" id="app-toast" role="status" aria-live="polite" hidden></div>
+
+  <dialog class="concept-dialog" id="concept-dialog" aria-labelledby="concept-title">
+    <div class="dialog-head">
+      <h2 id="concept-title">Concepto creativo y paleta</h2>
+      <button type="button" class="dialog-close" id="close-concept-btn" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="dialog-body" id="concept-body"></div>
+  </dialog>
+
+  <script>
+    (function () {
+      const shell = document.getElementById('shell');
+      const stage = document.getElementById('stage');
+      const bar = document.getElementById('studio-bar');
+      const restoreBtn = document.getElementById('restore-bar-btn');
+      const toast = document.getElementById('app-toast');
+      const dialog = document.getElementById('concept-dialog');
+      const dialogTitle = document.getElementById('concept-title');
+      const dialogBody = document.getElementById('concept-body');
+
+      const navStudent = document.getElementById('nav-student');
+      const navTeacher = document.getElementById('nav-teacher');
+      const roleBadge = document.getElementById('role-badge');
+      const avatarLetter = document.getElementById('avatar-letter');
+      const profileName = document.getElementById('profile-name');
+
+      let currentTheme = 'botanical';
+      let toastTimer = null;
+      let audioTimer = null;
+      let audioSec = 0;
+
+      const CONCEPTS = {
+        botanical: {
+          title: '1 · LingoTree — Bosque Botánico & Cuento Sereno',
+          lema: 'Lema: «Cada palabra hace crecer tu mundo»',
+          desc: 'Combina frescura botánica (verde bosque y papel salvia) con acentos ciruela y mostaza. Reduce la fatiga visual tanto en el niño como en la profesora cuando califica varias entregas seguidas.',
+          fonts: 'Títulos: Fraunces (serif orgánica y amable) · Cuerpo: Plus Jakarta Sans',
+          swatches: [
+            { name: 'Verde Bosque', hex: '#14533C', role: 'Marca y CTA principal · 8.9:1 con blanco' },
+            { name: 'Ciruela Mora', hex: '#7C2D6D', role: 'Speaking y alertas · 8.1:1 con blanco' },
+            { name: 'Mostaza Polen', hex: '#F4C430', role: 'Estrellas y refuerzo · 11.8:1 con tinta' },
+            { name: 'Papel Salvia', hex: '#F3F8F4', role: 'Fondo calmado antirreflejo' }
+          ]
+        },
+        neopop: {
+          title: '2 · Chirp! — Estudio Neo-Pop Geométrico',
+          lema: 'Lema: «Habla fuerte, juega en inglés»',
+          desc: 'Identidad vibrante inspirada en estudios de animación infantil: azul cobalto, frambuesa y lima eléctrica con sombras sólidas nítidas. Súper memorable y fácil de escalar a Teens y a futuras academias.',
+          fonts: 'Títulos: Space Grotesk · Cuerpo: DM Sans',
+          swatches: [
+            { name: 'Azul Cobalto', hex: '#1D4ED8', role: 'Marca, hero y CTA · 6.7:1 con blanco' },
+            { name: 'Fucsia Frambuesa', hex: '#BE185D', role: 'Speaking y acciones clave · 6.2:1 con blanco' },
+            { name: 'Lima Cítrica', hex: '#BEF264', role: 'Microjuegos y acentos · 13.5:1 con tinta' },
+            { name: 'Tiza Cielo', hex: '#F5F7FF', role: 'Fondo limpio con trama sutil' }
+          ]
+        },
+        lumina: {
+          title: '3 · Lumina — Cielo Nocturno de Cuento (Dark Amable)',
+          lema: 'Lema: «Ilumina tu inglés cada semana»',
+          desc: 'Demuestra cómo un modo oscuro pensado para niños y profesora puede ser cálido y mágico (índigo nocturno + turquesa aurora + coral + luna amarilla) en lugar de frío o técnico.',
+          fonts: 'Títulos: Fredoka · Cuerpo: Nunito',
+          swatches: [
+            { name: 'Cielo Índigo', hex: '#12172E', role: 'Fondo nocturno suave' },
+            { name: 'Turquesa Aurora', hex: '#2DD4BF', role: 'CTA principal · 10.8:1 con tinta oscura' },
+            { name: 'Coral Estrella', hex: '#FF6B81', role: 'Speaking y alertas · 6.8:1 con tinta oscura' },
+            { name: 'Amarillo Luna', hex: '#FDE047', role: 'Estrellas y stickers · 13.5:1 con tinta' }
+          ]
+        }
+      };
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toast.hidden = true; }, 3400);
+      }
+
+      function setTheme(id) {
+        currentTheme = id;
+        shell.dataset.theme = id;
+        document.querySelectorAll('[data-set-theme]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b.dataset.setTheme === id));
+        });
+      }
+
+      function setScreen(screenId) {
+        const isTeacher = screenId === 'teacher';
+        document.querySelectorAll('[data-screen-panel]').forEach((p) => {
+          p.hidden = p.dataset.screenPanel !== screenId;
+        });
+        document.querySelectorAll('.studio-bar [data-set-screen]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b.dataset.setScreen === screenId));
+        });
+
+        navStudent.hidden = isTeacher;
+        navTeacher.hidden = !isTeacher;
+        roleBadge.textContent = isTeacher ? 'Docente · Administradora' : 'Estudiante · Nivel A1';
+        avatarLetter.textContent = isTeacher ? 'C' : 'M';
+        profileName.textContent = isTeacher ? 'Profe Camila' : 'Mateo';
+
+        if (!isTeacher) {
+          navStudent.querySelectorAll('[data-set-screen]').forEach((b) => {
+            if (b.dataset.setScreen === screenId) b.setAttribute('aria-current', 'page');
+            else b.removeAttribute('aria-current');
+          });
+        }
+      }
+
+      document.querySelectorAll('[data-set-theme]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.setTheme)));
+      document.querySelectorAll('[data-set-screen]').forEach((b) => b.addEventListener('click', () => setScreen(b.dataset.setScreen)));
+      document.querySelectorAll('[data-set-device]').forEach((b) => {
+        b.addEventListener('click', () => {
+          stage.dataset.device = b.dataset.setDevice;
+          document.querySelectorAll('[data-set-device]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        });
+      });
+
+      document.getElementById('brand-home-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        setScreen('student-home');
+      });
+
+      document.querySelectorAll('[data-toast]').forEach((b) => b.addEventListener('click', () => showToast(b.dataset.toast)));
+
+      // Student mission filters
+      document.querySelectorAll('[data-m-filter]').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const f = chip.dataset.mFilter;
+          document.querySelectorAll('[data-m-filter]').forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+          document.querySelectorAll('#missions-grid [data-m-status]').forEach((card) => {
+            card.hidden = f !== 'all' && card.dataset.mStatus !== f;
+          });
+        });
+      });
+
+      // TTS for Kids
+      document.querySelectorAll('[data-speak]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const txt = btn.dataset.speak;
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(txt);
+            u.lang = 'en-US';
+            u.rate = 0.9;
+            window.speechSynthesis.speak(u);
+          }
+          showToast('Leyendo en voz alta: "' + txt + '"');
+        });
+      });
+
+      // Teacher Review Queue Tabs
+      document.querySelectorAll('[data-review-item]').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          const item = tab.dataset.reviewItem;
+          document.querySelectorAll('[data-review-item]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+          document.getElementById('review-speaking').hidden = item !== 'speaking';
+          document.getElementById('review-open').hidden = item !== 'open';
+          document.getElementById('score-input').value = item === 'speaking' ? '4,6' : '4,3';
+          document.getElementById('comment-input').value = item === 'speaking'
+            ? '¡Muy buena pronunciación de los adjetivos! Sigue practicando la entonación al final de las frases.'
+            : 'Excelente uso del pasado simple (went, ate, played). Revisa la puntuación al separar ideas.';
+          document.getElementById('review-status-pill').textContent = 'Pendiente de calificar';
+        });
+      });
+
+      // Teacher Stickers Toggle
+      document.querySelectorAll('.sticker-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const pressed = btn.getAttribute('aria-pressed') === 'true';
+          btn.setAttribute('aria-pressed', String(!pressed));
+        });
+      });
+
+      // Teacher Waveform Bars + Simulated Audio Playback
+      const waveContainer = document.getElementById('wave-bars');
+      const heights = [28, 52, 74, 42, 88, 65, 95, 48, 72, 60, 84, 38, 92, 70, 56, 80, 44, 68, 90, 50, 62, 78, 40, 54];
+      heights.forEach((h) => {
+        const b = document.createElement('div');
+        b.className = 'wave-bar';
+        b.style.height = h + '%';
+        waveContainer.appendChild(b);
+      });
+
+      const playBtn = document.getElementById('play-audio-btn');
+      const audioTime = document.getElementById('audio-time');
+      playBtn.addEventListener('click', () => {
+        const playing = playBtn.getAttribute('aria-pressed') === 'true';
+        if (playing) {
+          clearInterval(audioTimer);
+          playBtn.setAttribute('aria-pressed', 'false');
+          playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 5.5L19 12L8 18.5V5.5Z" fill="currentColor"/></svg>';
+          return;
+        }
+        playBtn.setAttribute('aria-pressed', 'true');
+        playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="6" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" rx="1" fill="currentColor"/></svg>';
+        audioSec = 0;
+        const bars = waveContainer.querySelectorAll('.wave-bar');
+        bars.forEach((b) => b.classList.remove('is-lit'));
+        audioTimer = setInterval(() => {
+          audioSec++;
+          const litCount = Math.min(bars.length, Math.ceil((audioSec / 12) * bars.length));
+          bars.forEach((b, i) => b.classList.toggle('is-lit', i < litCount));
+          audioTime.textContent = '0:' + String(audioSec * 3).padStart(2, '0');
+          if (audioSec >= 12) {
+            clearInterval(audioTimer);
+            playBtn.setAttribute('aria-pressed', 'false');
+            playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 5.5L19 12L8 18.5V5.5Z" fill="currentColor"/></svg>';
+          }
+        }, 350);
+      });
+
+      // Teacher Grade Submit
+      document.getElementById('grade-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const score = document.getElementById('score-input').value.trim() || '4,5';
+        const retry = document.getElementById('retry-toggle').checked;
+        document.getElementById('review-status-pill').textContent = 'Calificada (' + score + ' / 5,0)';
+        showToast('Calificación guardada (' + score + '/5,0)' + (retry ? ' + nuevo intento habilitado' : '') + '. Correo enviado al estudiante sin revelar la nota.');
+      });
+
+      // Studio bar toggle & Concept Dialog
+      document.getElementById('hide-bar-btn').addEventListener('click', () => { bar.hidden = true; restoreBtn.hidden = false; });
+      restoreBtn.addEventListener('click', () => { bar.hidden = false; restoreBtn.hidden = true; });
+      document.getElementById('open-concept-btn').addEventListener('click', () => {
+        const c = CONCEPTS[currentTheme];
+        dialogTitle.textContent = c.title;
+        dialogBody.innerHTML = `
+          <p style="margin:0;font-weight:800;color:#1D4ED8;">${c.lema}</p>
+          <p style="margin:0;font-size:0.93rem;color:#334155;">${c.desc}</p>
+          <p style="margin:0;font-size:0.84rem;font-weight:700;color:#0F172A;">${c.fonts}</p>
+          <div class="swatch-grid">${c.swatches.map((s) => `
+            <div class="swatch-item">
+              <div class="swatch-color" style="background:${s.hex};"></div>
+              <div class="swatch-info"><strong>${s.name}</strong><div><code>${s.hex}</code></div><div style="color:#475569;margin-top:2px;">${s.role}</div></div>
+            </div>`).join('')}</div>
+        `;
+        dialog.showModal();
+      });
+      document.getElementById('close-concept-btn').addEventListener('click', () => dialog.close());
+      dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+    })();
+  </script>
+</body>
+</html>

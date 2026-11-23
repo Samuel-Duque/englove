@@ -815,5 +815,92 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
         service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
       ).rejects.toThrow(ConflictException);
     }, 15000);
+
+    it('reconfirmación de speaking acepta asset ready ya transcodificado a converted_key tras borrado del raw', async () => {
+      const confirmedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_confirmed_0123456789abcdef.webm`;
+      const convertedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_converted.mp4`;
+
+      mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.ready,
+        key: confirmedKey,
+        converted_key: convertedKey,
+        size_bytes: BigInt(250000),
+        duration_seconds: 15,
+      });
+
+      const sendSpy = vi.spyOn(service['s3Client'], 'send').mockResolvedValueOnce({
+        ContentLength: 120000,
+      } as never);
+
+      const res = await service.confirmUpload(orgId, studentId, attemptId, mediaId, 60);
+      expect(res.id).toBe(mediaId);
+      expect(res.converted_key).toBe(convertedKey);
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('reconfirmación de speaking recupera carrera cuando transcode borra asset.key entre lectura y HeadObject', async () => {
+      const confirmedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_confirmed_0123456789abcdef.webm`;
+      const convertedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_converted.mp4`;
+
+      mockPrisma.mediaAsset.findFirst
+        .mockResolvedValueOnce({
+          id: mediaId,
+          organization_id: orgId,
+          student_id: studentId,
+          attempt_id: attemptId,
+          status: MediaAssetStatus.ready,
+          key: confirmedKey,
+          converted_key: null,
+          size_bytes: BigInt(250000),
+          duration_seconds: 15,
+        })
+        .mockResolvedValueOnce({
+          id: mediaId,
+          organization_id: orgId,
+          student_id: studentId,
+          attempt_id: attemptId,
+          status: MediaAssetStatus.ready,
+          key: confirmedKey,
+          converted_key: convertedKey,
+          size_bytes: BigInt(250000),
+          duration_seconds: 15,
+        });
+
+      const notFoundErr = Object.assign(new Error('NotFound'), { name: 'NotFound' });
+      vi.spyOn(service['s3Client'], 'send')
+        .mockRejectedValueOnce(notFoundErr)
+        .mockResolvedValueOnce({ ContentLength: 120000 } as never);
+
+      const res = await service.confirmUpload(orgId, studentId, attemptId, mediaId, 60);
+      expect(res.converted_key).toBe(convertedKey);
+    });
+
+    it('reconfirmación de speaking rechaza con 409 si converted_key no existe en R2', async () => {
+      const confirmedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_confirmed_0123456789abcdef.webm`;
+      const convertedKey = `${orgId}/${studentId}/${attemptId}/${mediaId}_converted.mp4`;
+
+      mockPrisma.mediaAsset.findFirst.mockResolvedValueOnce({
+        id: mediaId,
+        organization_id: orgId,
+        student_id: studentId,
+        attempt_id: attemptId,
+        status: MediaAssetStatus.ready,
+        key: confirmedKey,
+        converted_key: convertedKey,
+        size_bytes: BigInt(250000),
+        duration_seconds: 15,
+      });
+
+      const notFoundErr = Object.assign(new Error('NotFound'), { name: 'NotFound' });
+      vi.spyOn(service['s3Client'], 'send').mockRejectedValueOnce(notFoundErr);
+
+      await expect(
+        service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 });

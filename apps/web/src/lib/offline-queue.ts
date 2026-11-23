@@ -288,13 +288,14 @@ export async function getPendingCount(userId: string): Promise<number> {
     }
     return new Promise((resolve) => {
       const tx = db.transaction(existingStores, "readonly");
-      let count = 0;
+      let userEvents: PendingEventRecord[] = [];
+      let userUploads: PendingUploadRecord[] = [];
 
       if (existingStores.includes(EVENTS_STORE)) {
         const eventsReq = tx.objectStore(EVENTS_STORE).getAll();
         eventsReq.onsuccess = () => {
           const events: PendingEventRecord[] = eventsReq.result || [];
-          count += events.filter((e) => e.userId === userId).length;
+          userEvents = events.filter((e) => e.userId === userId);
         };
       }
 
@@ -302,12 +303,21 @@ export async function getPendingCount(userId: string): Promise<number> {
         const uploadsReq = tx.objectStore(UPLOADS_STORE).getAll();
         uploadsReq.onsuccess = () => {
           const uploads: PendingUploadRecord[] = uploadsReq.result || [];
-          count += uploads.filter((u) => u.userId === userId).length;
+          userUploads = uploads.filter((u) => u.userId === userId);
         };
       }
 
       tx.oncomplete = () => {
         db.close();
+        const completedAttemptIds = new Set(
+          userEvents
+            .filter((e) => e.eventType === "completed")
+            .map((e) => e.attemptId),
+        );
+        const syncableUploads = userUploads.filter(
+          (u) => !u.isDraft || completedAttemptIds.has(u.attemptId),
+        );
+        const count = userEvents.length + syncableUploads.length;
         resolve(
           generation === identityGeneration && hasActiveIdentity(userId)
             ? count

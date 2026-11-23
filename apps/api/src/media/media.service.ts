@@ -485,37 +485,57 @@ export class MediaService implements OnModuleInit {
           message: 'La grabación supera el tiempo permitido',
         });
       }
-      if (
-        forcedDurationSeconds === undefined &&
-        typeof asset.key === 'string' &&
-        this.extractConfirmedHashPrefix(asset.key) !== null
-      ) {
-        try {
-          const headRes = await this.s3Client.send(
-            new HeadObjectCommand({
-              Bucket: this.bucketName,
-              Key: asset.key,
-            }),
-          );
-          if (Number(headRes?.ContentLength ?? -1) !== Number(asset.size_bytes)) {
-            throw new ConflictException({
-              statusCode: 409,
-              code: 'MEDIA_NOT_AVAILABLE',
-              message: 'El archivo de audio confirmado no está disponible',
-            });
-          }
-        } catch (err: unknown) {
-          if (err instanceof ConflictException) {
+      if (forcedDurationSeconds === undefined) {
+        if (typeof asset.converted_key === 'string' && asset.converted_key.length > 0) {
+          await this.assertConvertedObjectAvailable(asset.converted_key);
+        } else if (
+          typeof asset.key === 'string' &&
+          this.extractConfirmedHashPrefix(asset.key) !== null
+        ) {
+          try {
+            const headRes = await this.s3Client.send(
+              new HeadObjectCommand({
+                Bucket: this.bucketName,
+                Key: asset.key,
+              }),
+            );
+            if (Number(headRes?.ContentLength ?? -1) !== Number(asset.size_bytes)) {
+              throw new ConflictException({
+                statusCode: 409,
+                code: 'MEDIA_NOT_AVAILABLE',
+                message: 'El archivo de audio confirmado no está disponible',
+              });
+            }
+          } catch (err: unknown) {
+            if (err instanceof ConflictException) {
+              throw err;
+            }
+            if (this.isS3NotFoundError(err)) {
+              // La transcodificación pudo completarse y borrar el raw mientras verificábamos asset.key (Decisión 64, SPEC-05 RF-14)
+              const refreshed = await this.prisma.mediaAsset.findFirst({
+                where: {
+                  id: asset.id,
+                  organization_id: organizationId,
+                  student_id: studentId,
+                },
+              });
+              if (
+                refreshed &&
+                refreshed.status === MediaAssetStatus.ready &&
+                typeof refreshed.converted_key === 'string' &&
+                refreshed.converted_key.length > 0
+              ) {
+                await this.assertConvertedObjectAvailable(refreshed.converted_key);
+                return refreshed;
+              }
+              throw new ConflictException({
+                statusCode: 409,
+                code: 'MEDIA_NOT_AVAILABLE',
+                message: 'El archivo de audio confirmado no está disponible',
+              });
+            }
             throw err;
           }
-          if (this.isS3NotFoundError(err)) {
-            throw new ConflictException({
-              statusCode: 409,
-              code: 'MEDIA_NOT_AVAILABLE',
-              message: 'El archivo de audio confirmado no está disponible',
-            });
-          }
-          throw err;
         }
       }
       return asset;
@@ -749,6 +769,36 @@ export class MediaService implements OnModuleInit {
       format,
       compatibilityWarning,
     };
+  }
+
+  private async assertConvertedObjectAvailable(convertedKey: string): Promise<void> {
+    try {
+      const headRes = await this.s3Client.send(
+        new HeadObjectCommand({
+          Bucket: this.bucketName,
+          Key: convertedKey,
+        }),
+      );
+      if (Number(headRes?.ContentLength ?? 0) <= 0) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'MEDIA_NOT_AVAILABLE',
+          message: 'El archivo de audio confirmado no está disponible',
+        });
+      }
+    } catch (err: unknown) {
+      if (err instanceof ConflictException) {
+        throw err;
+      }
+      if (this.isS3NotFoundError(err)) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'MEDIA_NOT_AVAILABLE',
+          message: 'El archivo de audio confirmado no está disponible',
+        });
+      }
+      throw err;
+    }
   }
 
   private isS3NotFoundError(err: unknown): boolean {

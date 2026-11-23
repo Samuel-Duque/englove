@@ -11,7 +11,7 @@ import {
   AssignmentAvailability,
   Level,
   Role,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AssignmentsService } from '../src/assignments/assignments.service';
 import { AssignmentsController } from '../src/assignments/assignments.controller';
 import { PrismaService } from '../src/prisma/prisma.service';

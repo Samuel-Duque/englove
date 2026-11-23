@@ -12,7 +12,7 @@ import {
   ActivityEditorSchema,
   GamePublicConfig,
   GameAnswerKey,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { formatBlankPrompt } from '../../../lib/blank-prompt';
 import { GameRenderer } from '../../../components/activities/GameRenderer';
@@ -2278,7 +2278,7 @@ export function ActivityEditorComponent({
                 type="url"
                 value={spExampleUrl}
                 onChange={(e) => setSpExampleUrl(e.target.value)}
-                placeholder="https://assets.englove.edu/samples/intro.mp3"
+                placeholder="https://assets.upwardenglish.edu/samples/intro.mp3"
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

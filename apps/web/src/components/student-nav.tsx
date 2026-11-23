@@ -128,7 +128,7 @@ export function StudentNav({
                   : "text-zinc-100 font-black"
               }
             >
-              Englove
+              Upward English
             </span>
           </Link>
 

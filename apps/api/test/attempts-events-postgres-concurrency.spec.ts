@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ActivityType, Level, Role, AgeSegment, parseFillBlankSimpleSyntax } from '@englove/shared';
+import { ActivityType, Level, Role, AgeSegment, parseFillBlankSimpleSyntax } from '@upward-english/shared';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AssignmentsService } from '../src/assignments/assignments.service';

@@ -51,7 +51,7 @@ export class PreAuthRateLimiterGuard implements CanActivate {
     private readonly rateLimiterService: RateLimiterService,
     @Optional() private readonly configService?: ConfigService,
   ) {
-    this.cookiePrefix = this.configService?.get<string>('COOKIE_PREFIX', 'englove_') ?? 'englove_';
+    this.cookiePrefix = this.configService?.get<string>('COOKIE_PREFIX', 'upward_english_') ?? 'upward_english_';
   }
 
   canActivate(context: ExecutionContext): boolean {

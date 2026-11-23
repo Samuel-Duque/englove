@@ -21,7 +21,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/auth.dto';
-import { SessionView, MessageResponse } from '@englove/shared';
+import { SessionView, MessageResponse } from '@upward-english/shared';
 
 import { extractClientIp } from '../common/utils/identity.utils';
 
@@ -34,7 +34,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {
-    this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'englove_');
+    this.cookiePrefix = this.configService.get<string>('COOKIE_PREFIX', 'upward_english_');
   }
 
   private extractIp(req: Request): string {

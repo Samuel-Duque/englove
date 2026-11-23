@@ -16,7 +16,7 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Englove Service Worker (SPEC-09 ENG-110, SPEC-11 RF-7, Decisión 135)
+// Upward English Service Worker (SPEC-09 ENG-110, SPEC-11 RF-7, Decisión 135)
 // Real Serwist Service Worker with build-hash precaching.
 // NEVER caches authenticated API responses (/api/v1/*), R2 signed URLs, HTML documents, or RSC payloads in Cache Storage.
 

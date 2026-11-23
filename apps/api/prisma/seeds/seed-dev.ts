@@ -86,7 +86,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000001',
       name: 'Lucas Diaz',
-      email: 'lucas.kids@englove.org',
+      email: 'lucas.kids@upwardenglish.org',
       birth: new Date('2017-05-15'),
       segment: AgeSegment.kids,
       level: Level.A1,
@@ -96,7 +96,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000002',
       name: 'Sofia Gomez',
-      email: 'sofia.kids@englove.org',
+      email: 'sofia.kids@upwardenglish.org',
       birth: new Date('2018-03-20'),
       segment: AgeSegment.kids,
       level: Level.A1,
@@ -107,7 +107,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000003',
       name: 'Mateo Ruiz',
-      email: 'mateo.kids@englove.org',
+      email: 'mateo.kids@upwardenglish.org',
       birth: new Date('2016-11-10'),
       segment: AgeSegment.kids,
       level: Level.A2,
@@ -118,7 +118,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000004',
       name: 'Camila Torres',
-      email: 'camila.teens@englove.org',
+      email: 'camila.teens@upwardenglish.org',
       birth: new Date('2013-08-12'),
       segment: AgeSegment.teens,
       level: Level.B1,
@@ -128,7 +128,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000005',
       name: 'Daniel Vargas',
-      email: 'daniel.teens@englove.org',
+      email: 'daniel.teens@upwardenglish.org',
       birth: new Date('2014-01-25'),
       segment: AgeSegment.teens,
       level: Level.B1,
@@ -139,7 +139,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000006',
       name: 'Valentina Rios',
-      email: 'valentina.teens@englove.org',
+      email: 'valentina.teens@upwardenglish.org',
       birth: new Date('2012-07-04'),
       segment: AgeSegment.teens,
       level: Level.B2,
@@ -149,7 +149,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000007',
       name: 'Santiago Morales',
-      email: 'santiago.teens@englove.org',
+      email: 'santiago.teens@upwardenglish.org',
       birth: new Date('2013-12-30'),
       segment: AgeSegment.teens,
       level: Level.B2,
@@ -160,7 +160,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000008',
       name: 'Isabella Castro',
-      email: 'isabella.kids@englove.org',
+      email: 'isabella.kids@upwardenglish.org',
       birth: new Date('2017-09-08'),
       segment: AgeSegment.kids,
       level: Level.A2,
@@ -171,7 +171,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000009',
       name: 'Emiliano Lopez',
-      email: 'emiliano.pending@englove.org',
+      email: 'emiliano.pending@upwardenglish.org',
       birth: new Date('2018-02-14'),
       segment: AgeSegment.kids,
       level: null,
@@ -181,7 +181,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000010',
       name: 'Mariana Silva',
-      email: 'mariana.pending@englove.org',
+      email: 'mariana.pending@upwardenglish.org',
       birth: new Date('2013-06-22'),
       segment: AgeSegment.teens,
       level: null,
@@ -191,7 +191,7 @@ export async function seedDev() {
     {
       id: '10000000-0000-4000-8000-000000000011',
       name: 'Martin Herrera',
-      email: 'martin.pending@englove.org',
+      email: 'martin.pending@upwardenglish.org',
       birth: new Date('2015-10-18'),
       segment: AgeSegment.kids,
       level: null,

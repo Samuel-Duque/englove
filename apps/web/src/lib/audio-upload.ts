@@ -1,7 +1,7 @@
 import type {
   MediaUploadUrlInput,
   MediaUploadUrlResponse,
-} from "@englove/shared";
+} from "@upward-english/shared";
 import { ApiError, requestSharedRefresh } from "./api";
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;

@@ -1,4 +1,4 @@
-# Englove — Guía para agentes
+# Upward English — Guía para agentes
 
 Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. La base funcional de las etapas 1–10 está implementada bajo Spec-Driven Development, con verificación histórica de SPEC-01 a SPEC-11; el aprovisionamiento de Etapa 0 sigue el taskboard. La auditoría del 2026-11-12 y su remediación están en `planning/auditoria-general-2026-11-12.md` y `planning/remediacion-auditoria-2026-11-12.md`; la enmienda NEG-01 de SPEC-08 requiere re-verificación en CI. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding y tablets reales antes de cerrar la Etapa 11. No se escribe código de producción sin spec aprobada; consultar estados vigentes en `specs/README.md`.
 
@@ -8,7 +8,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 1. `.agents/CONTEXT.md` — fuente única de verdad.
    - §2.4: lo que queda **fuera del piloto**.
-   - §14: registro de decisiones (1–145).
+   - §14: registro de decisiones (1–146).
    - §15: pendientes abiertos (sin P-n abiertos para el piloto; preguntas Q-01 a Q-08 de SPEC-11 todas decididas).
    - §16: **convenciones obligatorias para agentes**.
    - §17: **glosario** del dominio.
@@ -20,7 +20,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 
 Auditorías y pendientes operativos vigentes: `planning/pendientes-cierre-auditorias.md` (consolidado accionable de lo pendiente para la próxima sesión), `planning/auditoria-general-2026-11-12.md`, `planning/remediacion-auditoria-2026-11-12.md`, `planning/auditoria-adversarial-2026-11-13.md` y `planning/despliegue-staging.md` (los documentos históricos cerrados de Etapa 12 y rondas previas fueron retirados del árbol y permanecen en el historial de Git; la fuente única de verdad es `.agents/CONTEXT.md`).
 
-Otros documentos: `planning/skills-propias-pendientes.md` (skills propias: `englove-spec` y `englove-guardrails` creadas; las demás, pendientes).
+Otros documentos: `planning/skills-propias-pendientes.md` (3 de 5 skills propias creadas: `upward-english-spec`, `upward-english-guardrails` y `upward-english-kids-ux`; las otras dos, pendientes).
 
 ## Para las skills que buscan `GLOSSARY.md` y `docs/adr/`
 
@@ -53,5 +53,6 @@ Las skills del proyecto están en `.agents/skills/` (con copias versionadas en `
 
 Skills propias del proyecto (fuente en `.agents/skills/`; al modificarlas, actualiza también sus copias en `.claude/skills/` y `.kiro/skills/`):
 
-- `englove-spec`: redactar, revisar o actualizar specs `SPEC-NN` y crear `specs/` (SPEC-00). Úsala antes de tocar cualquier archivo de `specs/` y antes de empezar una tarea `ENG`, para comprobar que su spec está Aprobada. Incluye `scripts/check-spec.mjs` para verificar la estructura de una spec.
-- `englove-guardrails`: verificar de forma automatizada e interactiva las invariantes de persistencia (Neon y Prisma), despliegue (Cloudflare Workers con `vinext`, Render en instancia única y Cloudflare R2) y negocio (`CONTEXT.md` §16 y `architecture-overview.md`). Úsala antes de escribir o cerrar código de producción y junto con `code-review` y `security-review`. Incluye `scripts/check-guardrails.mjs` y el catálogo `references/reglas.md`.
+- `upward-english-spec`: redactar, revisar o actualizar specs `SPEC-NN` y crear `specs/` (SPEC-00). Úsala antes de tocar cualquier archivo de `specs/` y antes de empezar una tarea `ENG`, para comprobar que su spec está Aprobada. Incluye `scripts/check-spec.mjs` para verificar la estructura de una spec.
+- `upward-english-guardrails`: verificar de forma automatizada e interactiva las invariantes de persistencia (Neon y Prisma), despliegue (Cloudflare Workers con `vinext`, Render en instancia única y Cloudflare R2) y negocio (`CONTEXT.md` §16 y `architecture-overview.md`). Úsala antes de escribir o cerrar código de producción y junto con `code-review` y `security-review`. Incluye `scripts/check-guardrails.mjs` y el catálogo `references/reglas.md`.
+- `upward-english-kids-ux` (también identificable como `englove-kids-ux`): diseñar, implementar o revisar UX del portal del alumno Kids/Teens y microjuegos, respetando permisos de tema, interacción táctil/teclado, movimiento reducido, voz y WCAG 2.2 AA. Entrada breve y referencias de interacción/verificación bajo demanda; no sustituye contenido MCER ni revisiones exclusivas del panel o backend.

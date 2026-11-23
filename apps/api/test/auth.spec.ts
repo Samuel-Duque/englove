@@ -17,7 +17,7 @@ import {
   ApprovalStatus,
   AgeSegment,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AuthService } from '../src/auth/auth.service';
 import { StudentsService } from '../src/students/students.service';
 import { MaintenanceService } from '../src/maintenance/maintenance.service';
@@ -82,7 +82,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       get: vi.fn((key: string, defaultValue?: string) => {
         const config: Record<string, string> = {
           JWT_SECRET,
-          COOKIE_PREFIX: 'englove_',
+          COOKIE_PREFIX: 'upward_english_',
           COOKIE_DOMAIN: '',
           WEB_BASE_URL: 'http://localhost:3000',
         };
@@ -154,12 +154,12 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
 
       // Verify session cookies were set (access, refresh, session_hint per QA-02)
       expect(res.cookie).toHaveBeenCalledTimes(3);
-      expect(res.cookies['englove_access_token']?.options.httpOnly).toBe(true);
-      expect(res.cookies['englove_access_token']?.options.path).toBe('/');
-      expect(res.cookies['englove_refresh_token']?.options.httpOnly).toBe(true);
-      expect(res.cookies['englove_refresh_token']?.options.path).toBe('/api/v1/auth');
-      expect(res.cookies['englove_session_hint']?.options.httpOnly).toBe(false);
-      expect(res.cookies['englove_session_hint']?.options.path).toBe('/');
+      expect(res.cookies['upward_english_access_token']?.options.httpOnly).toBe(true);
+      expect(res.cookies['upward_english_access_token']?.options.path).toBe('/');
+      expect(res.cookies['upward_english_refresh_token']?.options.httpOnly).toBe(true);
+      expect(res.cookies['upward_english_refresh_token']?.options.path).toBe('/api/v1/auth');
+      expect(res.cookies['upward_english_session_hint']?.options.httpOnly).toBe(false);
+      expect(res.cookies['upward_english_session_hint']?.options.path).toBe('/');
     }, 15000);
 
     it('devuelve respuesta uniforme 401 AUTH_INVALID_CREDENTIALS ante correo inexistente o contraseña errónea', async () => {
@@ -1484,7 +1484,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => ({
-            cookies: { englove_access_token: token },
+            cookies: { upward_english_access_token: token },
             headers: {},
           }),
         }),
@@ -1532,7 +1532,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       const mockContext = {
         switchToHttp: () => ({
           getRequest: () => ({
-            cookies: { englove_access_token: token },
+            cookies: { upward_english_access_token: token },
             headers: {},
           }),
         }),

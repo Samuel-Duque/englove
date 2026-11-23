@@ -9,7 +9,7 @@ import {
   GroupViewSchema,
   StudentListResponse,
   StudentListResponseSchema,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { ConfirmDialog } from '../../../../components/ui/modal';
 

@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   MediaAssetStatus,
   JobRunStatus,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 describe('SPEC-07 RF-11: Job nocturno de retención de audios en R2 (ENG-095)', () => {
   const orgId = '11111111-1111-4111-8111-111111111111';

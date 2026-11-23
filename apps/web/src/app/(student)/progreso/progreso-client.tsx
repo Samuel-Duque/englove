@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { StudentProgressView, StudentProgressViewSchema, BadgeAwardView } from '@englove/shared';
+import { StudentProgressView, StudentProgressViewSchema, BadgeAwardView } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { renderBadgeIcon } from '../../../lib/badges';
 import { fetchSharedProfile } from '../../../lib/auth-session';

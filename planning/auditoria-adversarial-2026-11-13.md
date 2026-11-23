@@ -1,4 +1,4 @@
-# Auditoría adversarial de Englove — 13 de noviembre de 2026
+# Auditoría adversarial de Upward English — 13 de noviembre de 2026
 
 ## Dictamen ejecutivo
 
@@ -19,12 +19,12 @@ La prioridad no equivale a un exploit crítico. No se asigna CVSS sin acreditar 
 
 ## 1. Alcance, autorización y método
 
-- **Repositorio:** Englove; rama `develop`; commit `116465e` (`chore(turbo): excluir .next/dev de outputs de build`). Árbol versionado limpio al comenzar.
+- **Repositorio:** Upward English; rama `develop`; commit `116465e` (`chore(turbo): excluir .next/dev de outputs de build`). Árbol versionado limpio al comenzar.
 - **Fecha:** 2026-11-13, America/Bogota.
 - **Autorizado:** inspección del proyecto completo, pruebas adversariales locales y este informe nuevo, sin solucionar problemas.
 - **No realizado:** cambios de código/configuración/specs, commits, push, PR, despliegues, acceso a cloud/staging/producción, ataques a otros equipos, correos a destinatarios reales ni destrucción de datos existentes.
 - **Actores:** anónimo, alumno propietario, otro alumno del tenant, profesora, profesora de otra organización, siguiente usuario de dispositivo compartido, cliente que falsifica cabeceras y dependencias que fallan después de una escritura.
-- **Skills:** `security-review` y referencias pertinentes; `englove-guardrails`; `systematic-debugging`; `pwa-development`; `playwright-best-practices`; `webapp-testing`; `verification-before-completion`; `supabase-postgres-best-practices` para bases efímeras; `cognitive-doc-design` para el informe.
+- **Skills:** `security-review` y referencias pertinentes; `upward-english-guardrails`; `systematic-debugging`; `pwa-development`; `playwright-best-practices`; `webapp-testing`; `verification-before-completion`; `supabase-postgres-best-practices` para bases efímeras; `cognitive-doc-design` para el informe.
 - **Autoridad:** `.agents/CONTEXT.md`, arquitectura, specs pertinentes y fuentes dueñas de cada comportamiento. Resultados históricos no se atribuyen a esta ejecución.
 - **Memoria:** Engram no expuso herramientas en esta sesión; no se leyó ni guardó memoria mediante ese servidor.
 
@@ -45,21 +45,21 @@ La prioridad no equivale a un exploit crítico. No se asigna CVSS sin acreditar 
 |---|---|
 | Frontend existente | `localhost:3000/login`: 200; Chromium real. |
 | API existente | `localhost:3001/health`: 200; reconocimiento no destructivo. |
-| PostgreSQL | `englove-postgres`, PostgreSQL 18, puerto host 5433. |
-| MinIO | `englove-minio`, 9000/9001; health 200. |
-| Mailpit | `englove-mailpit`, SMTP 1025, API/UI 8025 sin autenticación. |
+| PostgreSQL | `upward-english-postgres`, PostgreSQL 18, puerto host 5433. |
+| MinIO | `upward-english-minio`, 9000/9001; health 200. |
+| Mailpit | `upward-english-mailpit`, SMTP 1025, API/UI 8025 sin autenticación. |
 | Audio en Windows | `ffmpeg` y `ffprobe` ausentes (`ENOENT`). |
 | Puertos Docker | PostgreSQL, MinIO y Mailpit publicados en `0.0.0.0` y `[::]`, no solo loopback. |
 
 Se crearon únicamente recursos nuevos y sintéticos:
 
-- `englove_redteam_20261113`: cuatro migraciones existentes, seed de 11 alumnos ficticios y segunda organización de prueba. API separada en `localhost:3101`, cookies con prefijo exclusivo.
-- `englove_redteam_suites_20261113`: cuatro migraciones existentes y suite API completa.
-- `englove_audit_migration_49080d086f8443d39ed820262ae4df98`: base nueva creada por DAT-01.
-- Bucket privado `englove-redteam-20261113`: audio sintético.
+- `upward_english_redteam_20261113`: cuatro migraciones existentes, seed de 11 alumnos ficticios y segunda organización de prueba. API separada en `localhost:3101`, cookies con prefijo exclusivo.
+- `upward_english_redteam_suites_20261113`: cuatro migraciones existentes y suite API completa.
+- `upward_english_audit_migration_49080d086f8443d39ed820262ae4df98`: base nueva creada por DAT-01.
+- Bucket privado `upward-english-redteam-20261113`: audio sintético.
 - Cuatro correos de prueba capturados solo por Mailpit; ninguno salió del equipo.
 
-No se migró, sembró ni modificó deliberadamente `englove_dev`, ni se reescribió una migración histórica. RT-03 usó un trigger de fallo temporal exclusivamente en la base de auditoría, retirado tras la sonda. RT-02 simuló el paso del tiempo solo sobre una fixture.
+No se migró, sembró ni modificó deliberadamente `upward_english_dev`, ni se reescribió una migración histórica. RT-03 usó un trigger de fallo temporal exclusivamente en la base de auditoría, retirado tras la sonda. RT-02 simuló el paso del tiempo solo sobre una fixture.
 
 La API de las sondas usó el build local. Una compilación adicional a un directorio temporal confirmó que los actuales `AuthService`, `AttemptsService`, `MediaService` y `AllExceptionsFilter` producen exactamente los archivos JavaScript utilizados por esa API.
 
@@ -67,8 +67,8 @@ La API de las sondas usó el build local. Una compilación adicional a un direct
 
 | Comprobación | Resultado actual | Límite |
 |---|---|---|
-| `pnpm --filter @englove/shared test` | **69/69**, exit 0 | No acredita integración desplegada. |
-| `pnpm --filter @englove/web test` | **276/276**, exit 0 | No descarta escenarios nuevos entre pestañas. |
+| `pnpm --filter @upward-english/shared test` | **69/69**, exit 0 | No acredita integración desplegada. |
+| `pnpm --filter @upward-english/web test` | **276/276**, exit 0 | No descarta escenarios nuevos entre pestañas. |
 | API completa, PostgreSQL obligatorio y DAT-01 habilitado | **455/456**, 1 fallo, 0 omitidas; exit 1 | Audio real no operativo. |
 | Playwright completo, headless | **50/50**, exit 0; 3,2 min | API interceptada; speaking no acredita proveedores reales. |
 | Scripts CI/despliegue con servicios sintéticos | **8/8**, exit 0 | No ejecuta GitHub Actions/Render/Cloudflare reales. |
@@ -206,7 +206,7 @@ Mismo proceso/destino TCP, correos inexistentes y contraseña inválida, sin afe
 ```http
 POST /api/v1/auth/refresh
 Origin: http://localhost:3000
-Cookie: englove_rt_refresh_token=not-a-uuid.secret
+Cookie: upward_english_rt_refresh_token=not-a-uuid.secret
 ```
 
 **Esperado:** 401 sin consultar un UUID inválido. **Observado:** HTTP 500, `INTERNAL_ERROR`. El SID llega a Prisma sin validación de formato. No se expusieron stack/SQL ni se burló autenticación.
@@ -370,7 +370,7 @@ const headers = { Origin: "http://localhost:3000", "Content-Type": "application/
 
 await fetch(`${base}/api/v1/auth/refresh`, {
   method: "POST",
-  headers: { ...headers, Cookie: "englove_rt_refresh_token=not-a-uuid.secret" },
+  headers: { ...headers, Cookie: "upward_english_rt_refresh_token=not-a-uuid.secret" },
 }); // RT-07: 500. Adaptar el prefijo al servidor de pruebas.
 
 await fetch(`${base}/api/v1/auth/login`, {
@@ -414,12 +414,12 @@ Chromium, un contexto, dos páginas `/inicio`, API interceptada con identidad si
 ### API completa aislada
 
 ```powershell
-$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5433/englove_redteam_suites_20261113'
+$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5433/upward_english_redteam_suites_20261113'
 $env:MIGRATION_DATABASE_URL=$env:DATABASE_URL
 $env:REQUIRE_POSTGRES_TESTS='1'
 $env:RUN_AUDIT_MIGRATION_POSTGRES='1'
 $env:AUDIT_MIGRATION_ADMIN_URL='postgresql://postgres:postgres@127.0.0.1:5433/postgres'
-pnpm --filter @englove/api test
+pnpm --filter @upward-english/api test
 ```
 
 Credenciales del compose local de pruebas, no extraídas de remoto. DAT-01 crea una base aleatoria nueva; quien repita debe gestionar sus recursos efímeros.
@@ -447,7 +447,7 @@ Credenciales del compose local de pruebas, no extraídas de remoto. DAT-01 crea 
 Retirada comprobada al cierre:
 
 - API de auditoría detenida: 3101 cerrado; frontend/API preexistentes 3000/3001 y servicios locales seguían disponibles.
-- Eliminadas únicamente las tres bases nuevas enumeradas en §2; inventario final de bases no plantilla: `postgres` y `englove_dev`.
+- Eliminadas únicamente las tres bases nuevas enumeradas en §2; inventario final de bases no plantilla: `postgres` y `upward_english_dev`.
 - Eliminado el bucket de auditoría con su único objeto sintético.
 - Retirados los cuatro mensajes identificados de RT-08; preservados dos mensajes ajenos a esa sonda. Se usó borrado con lista explícita de IDs, nunca vaciado global, conforme al [contrato oficial de Mailpit](https://raw.githubusercontent.com/axllent/mailpit/master/server/ui/api/v1/swagger.json).
 - Retirados los cuatro destinos temporales de sondas/logs/compilación/capturas tras validar sus rutas absolutas; retirado el metadato de ejecución Playwright.
@@ -464,7 +464,7 @@ Se remediaron los hallazgos `RT-01` a `RT-12` siguiendo las recomendaciones de e
 - **RT-01 (deduplicación duradera en intentos):** eliminado el recorte FIFO `.slice(-500)` sobre `processed_events` en `apps/api/src/attempts/attempts.service.ts` para conservar todos los `clientEventId` procesados hasta el techo de seguridad de 10.000 eventos. Verificado con regresión en PostgreSQL real (`apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`).
 - **RT-02 (ventana `completeUntil` en juegos autónomos):** eliminada la condición `assignment_id !== null` en `completeAttempt` (`apps/api/src/attempts/attempts.service.ts`) y añadida la verificación `now > completeUntil` tras el bloqueo `FOR UPDATE`, manteniendo la respuesta idempotente únicamente para intentos ya en `graded` o `pending_review`. Verificado en PostgreSQL real (`apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`).
 - **RT-03 (atomicidad `Attempt` + `ProgressEvent`):** incorporado `TransactionContext` (`apps/api/src/common/tenant/transaction.context.ts`) para ejecutar `GamificationService.recordAttemptCompleted` y `recordAudioSubmitted` (`apps/api/src/gamification/gamification.service.ts`) dentro de la misma transacción SQL de `AttemptsService` (`apps/api/src/attempts/attempts.service.ts`), difiriendo la evaluación de medallas tras el commit. Verificado con trigger `BEFORE INSERT ON progress_events` en PostgreSQL real (`apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`).
-- **RT-04 (sincronización de logout y cambio de cuenta multi-pestaña):** añadida generación/época de sesión persistente (`SESSION_EPOCH_KEY`), canal `BroadcastChannel('englove_auth_sync')` y suscriptores a `storage`, `focus`, `pageshow` y `visibilitychange` en `apps/web/src/lib/auth-session.ts`, `apps/web/src/lib/auth-hygiene.ts`, `apps/web/src/components/session-sync-listener.tsx` y `apps/web/src/app/providers.tsx`, junto con aislamiento por identidad de `queryKey` en `apps/web/src/app/inicio/inicio-client.tsx`, respaldo de `baselineUid` en rutas protegidas sin `tabBoundEpoch` hidratado (p. ej. `/alumnos`) y limpieza inmediata de caché en memoria/`QueryClient` ante cambio de cuenta. Verificado con Vitest (`apps/web/test/logout-regressions.spec.ts`) y Playwright multi-pestaña en Chromium real (`apps/web/e2e/audit-session-regressions.spec.ts` y `apps/web/e2e/spec-00-cross-cutting-and-conflicts.spec.ts`).
+- **RT-04 (sincronización de logout y cambio de cuenta multi-pestaña):** añadida generación/época de sesión persistente (`SESSION_EPOCH_KEY`), canal `BroadcastChannel('upward_english_auth_sync')` y suscriptores a `storage`, `focus`, `pageshow` y `visibilitychange` en `apps/web/src/lib/auth-session.ts`, `apps/web/src/lib/auth-hygiene.ts`, `apps/web/src/components/session-sync-listener.tsx` y `apps/web/src/app/providers.tsx`, junto con aislamiento por identidad de `queryKey` en `apps/web/src/app/inicio/inicio-client.tsx`, respaldo de `baselineUid` en rutas protegidas sin `tabBoundEpoch` hidratado (p. ej. `/alumnos`) y limpieza inmediata de caché en memoria/`QueryClient` ante cambio de cuenta. Verificado con Vitest (`apps/web/test/logout-regressions.spec.ts`) y Playwright multi-pestaña en Chromium real (`apps/web/e2e/audit-session-regressions.spec.ts` y `apps/web/e2e/spec-00-cross-cutting-and-conflicts.spec.ts`).
 - **RT-05 (anti-spoofing de `X-Forwarded-For` y `trust proxy`):** añadida la variable opcional `TRUST_PROXY` en `apps/api/src/config/env.validation.ts`, `resolveTrustProxySetting` en `apps/api/src/common/utils/identity.utils.ts` (`false` en `local`; `'loopback, linklocal, uniquelocal'` por defecto en `staging`/`production`), aplicación en `apps/api/src/main.ts` y eliminación del parseo manual de `x-forwarded-for` en `extractClientIp`. Verificado con pruebas HTTP reales en `apps/api/test/security-rate-limit-proxy.spec.ts`.
 - **RT-06 (rate limiting pre-autenticación en rutas rechazadas con 401/403):** registrado `PreAuthRateLimiterGuard` como primer `APP_GUARD` en `apps/api/src/app.module.ts`, consumo deduplicado por petición (`consumeAnonymousIpBudgetOnce`) en `apps/api/src/common/rate-limiting/rate-limiter.guard.ts`, `OriginGuard`, `JwtAuthGuard` y `RolesGuard`, y exención de salud restringida exactamente a `/health` y `/api/v1/health` (sin sufijos `.../health`). Verificado en `apps/api/test/security-rate-limit-proxy.spec.ts`.
 - **RT-07 (validación UUID temprana en `refresh`):** validado el formato UUID de `sid` en `AuthService.refresh` (`apps/api/src/auth/auth.service.ts`) limpiando cookies y devolviendo `401 AUTH_UNAUTHORIZED` antes de consultar PostgreSQL. Verificado en `apps/api/test/wp02-security-regression.postgres.spec.ts`.
@@ -483,19 +483,19 @@ Se remediaron los hallazgos `RT-01` a `RT-12` siguiendo las recomendaciones de e
 - **C-06 (bloqueo de URLs firmadas para `pending_delete` y estados no `ready`):** `MediaService.getPlaybackUrl` y `getDownloadUrl` exigen `status === MediaAssetStatus.ready` (devolviendo `404 MEDIA_NOT_FOUND` en caso contrario), y `transcodeAsset` persiste `converted_key` de forma condicional sobre `status: ready`. Verificado en `apps/api/test/media.spec.ts` y `apps/api/test/attempts-adversarial-regressions.postgres.spec.ts`.
 - **Endurecimiento de semilla, cabeceras del Worker y pinning de supply chain:**
   - `apps/api/prisma/seeds/seed.ts` exige `PILOT_TEACHER_PASSWORD` explícita (`>= 8` caracteres) fuera de `local` (`apps/api/test/config.spec.ts`).
-  - `apps/web/src/proxy.ts` inyecta `Content-Security-Policy` (restringiendo orígenes loopback y `'unsafe-eval'` a `local`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: strict-origin-when-cross-origin` (`apps/web/test/proxy-routing.spec.ts`, compilación `@englove/web` y `audit-session-regressions.spec.ts`).
+  - `apps/web/src/proxy.ts` inyecta `Content-Security-Policy` (restringiendo orígenes loopback y `'unsafe-eval'` a `local`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: strict-origin-when-cross-origin` (`apps/web/test/proxy-routing.spec.ts`, compilación `@upward-english/web` y `audit-session-regressions.spec.ts`).
   - `docker-compose.yml` fija `pgsty/minio`, `pgsty/mc` y `axllent/mailpit` por digest `@sha256:`, y `.github/workflows/ci.yml` fija todas las acciones por SHA de 40 caracteres (`scripts/ci-pipeline.test.mjs`, `apps/api/test/config.spec.ts`).
 - **Aislamiento de `DAT-01` sin bases huérfanas:** `apps/api/test/audit-migration-procedure.postgres.spec.ts` ejecuta la prueba dentro de un esquema efímero con `SAVEPOINT` y `ROLLBACK` final en PostgreSQL, verificado con `RUN_AUDIT_MIGRATION_POSTGRES=1` sin crear bases temporales persistentes.
 
 ### Verificación ejecutada tras las correcciones (cierre completo)
 
-- `node .agents/skills/englove-guardrails/scripts/check-guardrails.mjs`: `0` errores, `0` avisos, `2` suprimidos.
+- `node .agents/skills/upward-english-guardrails/scripts/check-guardrails.mjs`: `0` errores, `0` avisos, `2` suprimidos.
 - `node --test scripts/ci-pipeline.test.mjs`: `5/5` tests aprobados.
-- `pnpm --filter @englove/shared test`: `5` archivos / `69` tests aprobados.
-- `REQUIRE_POSTGRES_TESTS=1 RUN_AUDIT_MIGRATION_POSTGRES=1 AUDIT_MIGRATION_ADMIN_URL=postgresql://postgres:postgres@127.0.0.1:5433/postgres pnpm --filter @englove/api test`: `48` archivos / `482` tests aprobados, `0` fallos, `0` errores no capturados (incluyendo `DAT-01`, PostgreSQL, MinIO y `ffprobe`/`ffmpeg` reales).
-- `pnpm --filter @englove/api build` y `pnpm --filter @englove/web build`: exit `0`.
-- `pnpm --filter @englove/web test`: `29` archivos / `285` tests aprobados.
-- `HEADLESS=true pnpm --filter @englove/web exec playwright test e2e/audit-session-regressions.spec.ts --reporter=list`: `4/4` tests aprobados en Chromium real.
+- `pnpm --filter @upward-english/shared test`: `5` archivos / `69` tests aprobados.
+- `REQUIRE_POSTGRES_TESTS=1 RUN_AUDIT_MIGRATION_POSTGRES=1 AUDIT_MIGRATION_ADMIN_URL=postgresql://postgres:postgres@127.0.0.1:5433/postgres pnpm --filter @upward-english/api test`: `48` archivos / `482` tests aprobados, `0` fallos, `0` errores no capturados (incluyendo `DAT-01`, PostgreSQL, MinIO y `ffprobe`/`ffmpeg` reales).
+- `pnpm --filter @upward-english/api build` y `pnpm --filter @upward-english/web build`: exit `0`.
+- `pnpm --filter @upward-english/web test`: `29` archivos / `285` tests aprobados.
+- `HEADLESS=true pnpm --filter @upward-english/web exec playwright test e2e/audit-session-regressions.spec.ts --reporter=list`: `4/4` tests aprobados en Chromium real.
 - `pnpm lint` y `pnpm typecheck`: exit `0` en todo el monorepo.
 
 ### Qué queda pendiente

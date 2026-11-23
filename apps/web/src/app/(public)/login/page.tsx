@@ -4,7 +4,7 @@ import { LoginClient } from './login-client';
 
 export const metadata: Metadata = {
   title: 'Iniciar Sesión',
-  description: 'Ingresa a la plataforma Englove para continuar tus actividades de inglés.',
+  description: 'Ingresa a la plataforma Upward English para continuar tus actividades de inglés.',
 };
 
 export default function LoginPage() {

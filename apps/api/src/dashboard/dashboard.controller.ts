@@ -9,7 +9,7 @@ import { PendingSummaryService } from './pending-summary.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { NoCacheInterceptor } from '../common/interceptors/no-cache.interceptor';
-import { Role, RemindersResponse } from '@englove/shared';
+import { Role, RemindersResponse } from '@upward-english/shared';
 
 @Controller('dashboard')
 @Roles(Role.teacher)

@@ -57,3 +57,5 @@ HU/
 .playwright-mcp/
 test-results/
 playwright-report/
+# Local AI runtime state
+.atl/

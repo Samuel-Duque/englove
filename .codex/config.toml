@@ -1,0 +1,3 @@
+[mcp_servers.magicui]
+command = "pnpm"
+args = ["dlx", "shadcn@latest", "mcp"]

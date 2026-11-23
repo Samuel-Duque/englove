@@ -25,7 +25,7 @@ import {
   LeaderboardResponse,
   StudentStatsResponse,
   GamesLeaderboardResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 @Controller('stats')
 @Roles(Role.teacher)

@@ -1,5 +1,5 @@
 import { IsOptional, IsISO8601, IsIn, IsUUID, IsEnum } from 'class-validator';
-import { Level, ActivityType } from '@englove/shared';
+import { Level, ActivityType } from '@upward-english/shared';
 
 export class StatsOverviewQueryDto {
   @IsOptional()

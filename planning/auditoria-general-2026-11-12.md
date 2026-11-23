@@ -6,8 +6,8 @@
 
 - Snapshot: `7aed256` (`develop`), árbol inicialmente limpio. Auditoría del estado completo, no de un diff ni de un PR.
 - Fuentes: CONTEXT, arquitectura, proceso SDD, etapas, taskboard, specs, código, pruebas, manifiestos y configuración de despliegue. Se contrastaron también los informes de auditoría y remediación del 11 de noviembre; sus pendientes no se asumieron resueltos por el cierre de SPEC-11.
-- Skills: security-review, englove-guardrails, verification-before-completion, systematic-debugging y Context7. Se adaptaron los ejes Standards/Spec de code-review a este snapshot con dos revisores de solo lectura; el auditor principal contrastó los hallazgos y ejecutó las comprobaciones.
-- Node `24.16.0`, pnpm `11.5.1`, PostgreSQL local en Docker. Se usó una base exclusiva `englove_audit_20261112`, sin migrar ni cargar fixtures en `englove_dev`. La regresión DAT-01 creó otra base con UUID.
+- Skills: security-review, upward-english-guardrails, verification-before-completion, systematic-debugging y Context7. Se adaptaron los ejes Standards/Spec de code-review a este snapshot con dos revisores de solo lectura; el auditor principal contrastó los hallazgos y ejecutó las comprobaciones.
+- Node `24.16.0`, pnpm `11.5.1`, PostgreSQL local en Docker. Se usó una base exclusiva `upward_english_audit_20261112`, sin migrar ni cargar fixtures en `upward_english_dev`. La regresión DAT-01 creó otra base con UUID.
 - Sin cambios de producción, configuración de CI, contratos aprobados o estados de tareas. Sin publicación, despliegue, push, envío de correos reales ni carga contra servicios cloud. Wrangler se ejecutó con `--dry-run`.
 - Se crearon diagnósticos desechables en `test-evidence/`, ignorado por Git. Los logs están en `test-evidence/audit-2026-11-12/`; el test de audio se ejecutó temporalmente dentro de API y se archivó como `audio-runtime-local.spec.ts.txt` en esa carpeta de evidencia. Se retiró del descubrimiento de Vitest para no afectar ejecuciones futuras. No son una suite de regresión permanente.
 
@@ -51,8 +51,8 @@ El [aviso del mantenedor/GitHub GHSA-27r3-jxmh-p828](https://github.com/advisori
 
 Los otros dos avisos altos requieren tratamiento distinto:
 
-- **Zod 3.25.76:** usado realmente en API/shared; [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) reporta agotamiento de memoria durante validación de colecciones. Falta demostrar un payload explotable bajo los límites HTTP y esquemas de Englove. Migrar a una versión mayor requiere revisar contratos; no es una actualización automática inocua.
-- **Multer 2.4.0:** dependencia transitiva de Nest. El [aviso GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m) exige un `fileFilter` asíncrono en uso. No se encontró esa configuración en las rutas revisadas; los audios suben directamente a S3. **No se reporta un exploit alcanzable de Multer en Englove.**
+- **Zod 3.25.76:** usado realmente en API/shared; [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) reporta agotamiento de memoria durante validación de colecciones. Falta demostrar un payload explotable bajo los límites HTTP y esquemas de Upward English. Migrar a una versión mayor requiere revisar contratos; no es una actualización automática inocua.
+- **Multer 2.4.0:** dependencia transitiva de Nest. El [aviso GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m) exige un `fileFilter` asíncrono en uso. No se encontró esa configuración en las rutas revisadas; los audios suben directamente a S3. **No se reporta un exploit alcanzable de Multer en Upward English.**
 
 Las comprobaciones revisadas muestran defensas útiles: cookies HttpOnly, validación de Origin, JWT con tipo de token y sesión vigente, controles de aprobación, extensión tenant, secretos por entorno, nota en servidor, R2 privado, límites de audio, invocación estructurada de procesos y saneamiento de logs. Las regresiones PostgreSQL de seguridad pasaron. Esto no constituye una certificación exhaustiva de seguridad ni reemplaza el ejercicio adversarial posterior.
 
@@ -156,7 +156,7 @@ La carga relevante debe reproducir navegación del alumno, apertura de asignacio
 
 La documentación oficial de [Grafana k6 sobre automatización](https://grafana.com/docs/k6/latest/testing-guides/automated-performance-testing/) recomienda comenzar con smoke y carga habitual; estrés y resistencia responden preguntas diferentes. Los [thresholds](https://grafana.com/docs/k6/latest/using-k6/thresholds/) permiten fallar automáticamente por errores/latencia. Se consultó mediante Context7.
 
-Para Englove, diseñar datos sintéticos y usuarios distintos, pausas realistas, métricas de DB/memoria/CPU/cola, y separar rechazo esperado por rate limit de fallo inesperado. Acordar concurrencia de clase: 10 alumnos iniciales, 30 activos y objetivo 100 registrados no significan 100 peticiones simultáneas. El presupuesto de estadísticas <500 ms es un punto de partida contractual, no un SLO p95 ya aprobado para todos los endpoints. No se ejecutaron cargas o pruebas de estrés en esta auditoría.
+Para Upward English, diseñar datos sintéticos y usuarios distintos, pausas realistas, métricas de DB/memoria/CPU/cola, y separar rechazo esperado por rate limit de fallo inesperado. Acordar concurrencia de clase: 10 alumnos iniciales, 30 activos y objetivo 100 registrados no significan 100 peticiones simultáneas. El presupuesto de estadísticas <500 ms es un punto de partida contractual, no un SLO p95 ya aprobado para todos los endpoints. No se ejecutaron cargas o pruebas de estrés en esta auditoría.
 
 ## Secuencia recomendada y criterios de salida
 
@@ -175,4 +175,4 @@ En `test-evidence/audit-2026-11-12/`: `static-verified.log`, `shared.log`, `api.
 
 Las evidencias ignoradas existen en esta máquina y no viajarán con un clon del repositorio. Este informe es el entregable versionable. Los dos fallos iniciales por restricciones del sandbox/pnpm no se contabilizaron como bugs: se repitieron las comprobaciones autorizadas fuera del sandbox y se registraron sus resultados reales.
 
-Al terminar se eliminaron exclusivamente las dos bases sintéticas creadas por esta auditoría, se comprobó que `englove_dev` seguía existiendo y se detuvieron PostgreSQL, MinIO y Mailpit, que estaban detenidos al inicio. El árbol de trabajo conserva únicamente este informe como archivo versionable nuevo; los artefactos de diagnóstico/build quedan ignorados.
+Al terminar se eliminaron exclusivamente las dos bases sintéticas creadas por esta auditoría, se comprobó que `upward_english_dev` seguía existiendo y se detuvieron PostgreSQL, MinIO y Mailpit, que estaban detenidos al inicio. El árbol de trabajo conserva únicamente este informe como archivo versionable nuevo; los artefactos de diagnóstico/build quedan ignorados.

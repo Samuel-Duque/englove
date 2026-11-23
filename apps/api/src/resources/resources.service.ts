@@ -11,7 +11,7 @@ import {
   ExternalResourceItem,
   ExternalResourceListResponse,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   CreateResourceDto,
   UpdateResourceDto,

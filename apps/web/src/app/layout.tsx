@@ -4,8 +4,8 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Englove — Aprende inglés jugando',
-    template: '%s | Englove',
+    default: 'Upward English — Aprende inglés jugando',
+    template: '%s | Upward English',
   },
   description: 'Plataforma web gamificada para enseñar inglés a niños y adolescentes.',
   manifest: '/manifest.webmanifest',

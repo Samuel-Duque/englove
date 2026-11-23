@@ -6,7 +6,7 @@ import {
   Level,
   Role,
   parseFillBlankSimpleSyntax,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AssignmentsService } from '../src/assignments/assignments.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { PrismaService } from '../src/prisma/prisma.service';

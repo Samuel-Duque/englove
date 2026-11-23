@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
-import { RemindersResponse, ApprovalStatus, AttemptStatus, ActivityType } from '@englove/shared';
+import { RemindersResponse, ApprovalStatus, AttemptStatus, ActivityType } from '@upward-english/shared';
 
 @Injectable()
 export class PendingSummaryService {

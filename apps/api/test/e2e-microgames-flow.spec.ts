@@ -9,7 +9,7 @@ import {
   AgeSegment,
   GameConfig,
   GameAnswerKey,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AssignmentsService } from '../src/assignments/assignments.service';
@@ -126,7 +126,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-06: Flujo integral de microjuegos en
         data: {
           id: teacherId,
           organization_id: orgId,
-          email: 'teacher-microgames@englove.test',
+          email: 'teacher-microgames@upwardenglish.test',
           name: 'Teacher Microjuegos',
           password_hash: 'mock-hash-pass',
           role: Role.teacher,
@@ -138,7 +138,7 @@ describe.skipIf(!isPostgresAvailable)('SPEC-06: Flujo integral de microjuegos en
         data: {
           id: studentUserId,
           organization_id: orgId,
-          email: 'student-microgames@englove.test',
+          email: 'student-microgames@upwardenglish.test',
           name: 'Student Microjuegos',
           password_hash: 'mock-hash-pass',
           role: Role.student,

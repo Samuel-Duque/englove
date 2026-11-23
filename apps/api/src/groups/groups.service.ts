@@ -10,7 +10,7 @@ import {
   GroupListResponse,
   StudentView,
   StudentListResponse,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   CreateGroupDto,
   UpdateGroupDto,

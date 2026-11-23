@@ -16,9 +16,9 @@ describe('SPEC-11 RF-7, SPEC-09 RF-3, RF-4, Decisión 118, 135: Serwist Service 
     expect(stats.size).toBeLessThan(100 * 1024);
   });
 
-  it('does NOT contain legacy manual public/sw.js code (englove-static-v1)', () => {
+  it('does NOT contain legacy manual public/sw.js code (upward-english-static-v1)', () => {
     const content = fs.readFileSync(swPath, 'utf8');
-    expect(content).not.toContain('englove-static-v1');
+    expect(content).not.toContain('upward-english-static-v1');
     expect(content).not.toContain('CACHE_VERSION');
   });
 

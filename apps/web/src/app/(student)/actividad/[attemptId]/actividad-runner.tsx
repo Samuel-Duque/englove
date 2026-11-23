@@ -22,7 +22,7 @@ import {
   scoreToGameStars,
   getGameMotivationMessage,
   AgeSegment,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { GameRenderer } from '../../../../components/activities/GameRenderer';
 import { CorrectionFeedback } from '../../../../components/activities/CorrectionFeedback';

@@ -15,8 +15,8 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     const manifestRes = await request.get('/manifest.webmanifest');
     expect(manifestRes.status()).toBe(200);
     const manifest = await manifestRes.json();
-    expect(manifest.name).toBe('Englove');
-    expect(manifest.short_name).toBe('Englove');
+    expect(manifest.name).toBe('Upward English');
+    expect(manifest.short_name).toBe('Upward English');
     expect(manifest.start_url).toBe('/inicio');
     expect(manifest.scope).toBe('/');
     expect(manifest.display).toBe('standalone');
@@ -64,8 +64,8 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
   test('RF-7: Aviso de actualización obligatoria por X-App-Min-Version mayor a la del cliente', async ({ page, context }) => {
     // Add student session cookies so client loads authenticated shell
     await context.addCookies([
-      { name: 'englove_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
     ]);
 
     const corsHeaders = {
@@ -143,13 +143,13 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     // Mock teacher session
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
         domain: 'localhost',
         path: '/',
@@ -256,13 +256,13 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     // Mock student session and feature flags
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`,
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`,
         domain: 'localhost',
         path: '/',
@@ -275,7 +275,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
         json: {
           user: {
             id: 'std-e2e-rf18',
-            email: 'laura@englove.local',
+            email: 'laura@upwardenglish.local',
             name: 'Laura Alumno',
             role: 'student',
           },
@@ -291,7 +291,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
         json: {
           user: {
             id: 'std-e2e-rf18',
-            email: 'laura@englove.local',
+            email: 'laura@upwardenglish.local',
             name: 'Laura Alumno',
             role: 'student',
           },
@@ -354,7 +354,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
 
     // Simulate an item added to IndexedDB offline queue
     await page.evaluate(async () => {
-      const DB_NAME = 'englove_offline';
+      const DB_NAME = 'upward_english_offline';
       const DB_VERSION = 2;
       const req = window.indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
@@ -434,14 +434,14 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
 
     // 2. Rutas autenticadas Estudiante (/inicio, /juegos, /progreso, /perfil)
     await context.addCookies([
-      { name: 'englove_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
     ]);
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@englove.local' },
+          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@upwardenglish.local' },
           student: { id: 'std-a11y-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
           organizationId: 'org-a11y',
         },
@@ -451,7 +451,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@englove.local' },
+          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@upwardenglish.local' },
           student: { id: 'std-a11y-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
           organizationId: 'org-a11y',
         },
@@ -461,7 +461,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@englove.local' },
+          user: { id: 'std-a11y-1', name: 'Laura Alumno', role: 'student', email: 'laura@upwardenglish.local' },
           student: { id: 'std-a11y-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false, birthDate: '2017-05-10' },
         },
       });
@@ -511,7 +511,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@englove.local' },
+          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@upwardenglish.local' },
           student: { id: 'std-a11y-2', level: 'B1', ageSegment: 'teens', canSwitchInterface: false },
           organizationId: 'org-a11y',
         },
@@ -521,7 +521,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@englove.local' },
+          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@upwardenglish.local' },
           student: { id: 'std-a11y-2', level: 'B1', ageSegment: 'teens', canSwitchInterface: false },
           organizationId: 'org-a11y',
         },
@@ -531,7 +531,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@englove.local' },
+          user: { id: 'std-a11y-2', name: 'Marcos Teens', role: 'student', email: 'marcos@upwardenglish.local' },
           student: { id: 'std-a11y-2', level: 'B1', ageSegment: 'teens', canSwitchInterface: false, birthDate: '2012-03-15' },
         },
       });
@@ -547,14 +547,14 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     // 3. Rutas autenticadas Docente (/inicio, /actividades, /asignaciones, /revision, /estadisticas, /grupos, /alumnos)
     await context.clearCookies();
     await context.addCookies([
-      { name: 'englove_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
     ]);
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@englove.local' },
+          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@upwardenglish.local' },
           organizationId: 'org-a11y',
         },
       });
@@ -563,7 +563,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@englove.local' },
+          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@upwardenglish.local' },
           organizationId: 'org-a11y',
         },
       });
@@ -572,7 +572,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@englove.local' },
+          user: { id: 'tch-a11y-1', name: 'Profesora Clara', role: 'teacher', email: 'clara@upwardenglish.local' },
         },
       });
     });

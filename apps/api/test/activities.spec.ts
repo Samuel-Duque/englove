@@ -7,7 +7,7 @@ import {
   ActivityType,
   ActivityStatus,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 

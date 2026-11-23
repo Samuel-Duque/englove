@@ -34,7 +34,7 @@ export function loadEnvFile(): void {
     // ignore
   }
   if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/englove_dev?schema=public';
+    process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/upward_english_dev?schema=public';
   }
 }
 

@@ -20,7 +20,7 @@ import {
   StudentListQuery,
   TransferStudentGroupInput,
   ChangeStudentEmailInput,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 export class ApproveStudentDto implements ApproveStudentInput {
   @IsEnum(Level, { message: 'El nivel debe ser A1, A2, B1 o B2' })

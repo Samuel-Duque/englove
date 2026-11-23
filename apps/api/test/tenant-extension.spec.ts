@@ -247,10 +247,10 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
     await TenantContext.runBypass(async () => {
       const res = await findUniqueHook({
         model: 'User',
-        args: { where: { email: 'profesora@englove.org' } },
+        args: { where: { email: 'profesora@upwardenglish.org' } },
         query: mockQuery,
       });
-      expect(res).toEqual({ where: { email: 'profesora@englove.org' } });
+      expect(res).toEqual({ where: { email: 'profesora@upwardenglish.org' } });
 
       const resThrow = await findUniqueOrThrowHook({
         model: 'User',

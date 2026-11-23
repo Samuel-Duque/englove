@@ -8,7 +8,7 @@ import {
   MatchSettingsSchema,
   MatchSolutionSchema,
   deterministicShuffle,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { soundManager } from '../../../lib/sound';
 

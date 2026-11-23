@@ -12,7 +12,7 @@ import {
   setSharedSession,
   clearSharedSession,
 } from '../src/lib/auth-session';
-import { Role, AgeSegment } from '@englove/shared';
+import { Role, AgeSegment } from '@upward-english/shared';
 
 describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => {
   let mockStorage: Record<string, string> = {};
@@ -83,7 +83,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
       checkAppMinVersion('99.0.0');
       const html = renderToString(<PwaUpdateBanner />);
 
-      expect(html).toContain('¡Englove tiene novedades! Toca Actualizar para verlas.');
+      expect(html).toContain('¡Upward English tiene novedades! Toca Actualizar para verlas.');
       expect(html).toContain('Actualizar');
       expect(html).not.toContain('Hay una actualización disponible.');
       expect(html).not.toContain('Reiniciar y actualizar');
@@ -94,7 +94,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
         user: {
           id: 'u-teen',
           name: 'Teen User',
-          email: 'teen@englove.edu',
+          email: 'teen@upwardenglish.edu',
           role: Role.student,
         },
         student: {
@@ -109,7 +109,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
 
       expect(html).toContain('Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.');
       expect(html).toContain('Reiniciar y actualizar');
-      expect(html).not.toContain('¡Englove tiene novedades!');
+      expect(html).not.toContain('¡Upward English tiene novedades!');
     });
 
     it('renders Teacher (panel) copy when user has teacher role', () => {
@@ -117,7 +117,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
         user: {
           id: 'u-teach',
           name: 'Teacher User',
-          email: 'teacher@englove.edu',
+          email: 'teacher@upwardenglish.edu',
           role: Role.teacher,
         },
         student: null,
@@ -128,7 +128,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
 
       expect(html).toContain('Hay una actualización disponible. La aplicación necesita reiniciarse para aplicar los cambios.');
       expect(html).toContain('Reiniciar y actualizar');
-      expect(html).not.toContain('¡Englove tiene novedades!');
+      expect(html).not.toContain('¡Upward English tiene novedades!');
     });
 
     it('renders Teacher copy when user has admin role', () => {
@@ -136,7 +136,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
         user: {
           id: 'u-admin',
           name: 'Admin User',
-          email: 'admin@englove.edu',
+          email: 'admin@upwardenglish.edu',
           role: Role.admin,
         },
         student: null,
@@ -147,7 +147,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
 
       expect(html).toContain('Hay una actualización disponible.');
       expect(html).toContain('Reiniciar y actualizar');
-      expect(html).not.toContain('¡Englove tiene novedades!');
+      expect(html).not.toContain('¡Upward English tiene novedades!');
     });
 
     it('renders Teacher copy when pathname is a panel route', () => {
@@ -160,7 +160,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
 
       expect(html).toContain('Hay una actualización disponible.');
       expect(html).toContain('Reiniciar y actualizar');
-      expect(html).not.toContain('¡Englove tiene novedades!');
+      expect(html).not.toContain('¡Upward English tiene novedades!');
     });
   });
 
@@ -192,7 +192,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
         user: {
           id: 'u-teen',
           name: 'Teen',
-          email: 'teen@englove.edu',
+          email: 'teen@upwardenglish.edu',
           role: Role.student,
         },
         student: {
@@ -223,7 +223,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
         user: {
           id: 'u-teach',
           name: 'Teacher',
-          email: 'teacher@englove.edu',
+          email: 'teacher@upwardenglish.edu',
           role: Role.teacher,
         },
         student: null,
@@ -263,7 +263,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
     });
 
     it('renders Teens/Teacher confirmation when justFlushed is true', () => {
-      mockStorage['englove_segment'] = 'teens';
+      mockStorage['upward_english_segment'] = 'teens';
 
       const html = renderToString(
         <OfflineStatusBanner
@@ -292,7 +292,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
     });
 
     it('renders Teens offline copy when stored in localStorage', () => {
-      mockStorage['englove_segment'] = 'teens';
+      mockStorage['upward_english_segment'] = 'teens';
       const html = renderToString(<OfflineClient />);
 
       expect(html).toContain('Sin conexión');
@@ -301,7 +301,7 @@ describe('PWA & Offline Banners Segment Copy (SPEC-09 §7, RF-7, P2-10)', () => 
     });
 
     it('renders Teacher offline copy when stored in localStorage', () => {
-      mockStorage['englove_segment'] = 'teacher';
+      mockStorage['upward_english_segment'] = 'teacher';
       const html = renderToString(<OfflineClient />);
 
       expect(html).toContain('Sin conexión');

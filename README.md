@@ -1,4 +1,4 @@
-# Englove
+# Upward English
 
 Plataforma web educativa, interactiva y gamificada para la enseñanza de inglés a niños y adolescentes de **7 a 14 años**. Diseñada para potenciar la labor pedagógica de una profesora particular y concebida con arquitectura SaaS multi-tenant escalable para academias de idiomas.
 
@@ -30,7 +30,7 @@ Plataforma web educativa, interactiva y gamificada para la enseñanza de inglés
 
 ## Descripción general
 
-Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y juego, adaptándose a las necesidades de aprendizaje de cada edad:
+Upward English une la enseñanza rigurosa del idioma con mecánicas de motivación y juego, adaptándose a las necesidades de aprendizaje de cada edad:
 
 - **Alineación curricular con el MCER:** Niveles **A1, A2, B1 y B2**.
 - **Dos segmentos de experiencia adaptativa:**
@@ -94,43 +94,43 @@ Englove une la enseñanza rigurosa del idioma con mecánicas de motivación y ju
 
 ## Stack tecnológico y versiones
 
-| Capa / Módulo             | Tecnología              | Versión               | Propósito clave                                                 |
-| ------------------------- | ----------------------- | --------------------- | --------------------------------------------------------------- |
-| **Runtime & Gestor**      | Node.js                 | `>=24.0.0` (LTS)      | Entorno de ejecución estándar del backend y tooling             |
-|                           | pnpm                    | `11.5.1`              | Gestor de paquetes eficiente y estructuración de monorepo       |
-|                           | Turborepo               | `^2.4.4`              | Orquestación de compilación, caché remota y tareas cruzadas     |
-| **Frontend (`apps/web`)** | Next.js                 | `16.4.2`              | Framework fullstack (App Router, Turbopack, React Compiler)     |
-|                           | React                   | `19.3.1`              | Biblioteca de interfaz de usuario reactiva                      |
-|                           | Tailwind CSS            | `^4.0.9`              | Sistema de estilos CSS atómico moderno                          |
-|                           | Pragmatic Drag and Drop | `^1.5.0`              | Motor accesible de arrastrar y soltar para ejercicios           |
-|                           | vinext / Wrangler       | `^1.2.1` / `^4.149.0` | Adaptador y CLI para despliegue en Cloudflare Workers           |
-| **Backend (`apps/api`)**  | NestJS                  | `^11.0.11`            | Arquitectura modular orientada a servicios, guards y DI         |
-|                           | Express                 | `^5.3.0`              | Servidor HTTP subyacente para el framework NestJS               |
-|                           | Prisma ORM              | `^7.0.0`              | Mapeo objeto-relacional y migraciones tipadas                   |
-|                           | `@prisma/adapter-pg`    | `^7.10.1`             | Adaptador nativo PostgreSQL para poolers y servidor             |
-|                           | Argon2                  | `^0.41.1`             | Algoritmo resistente para hash seguro de contraseñas            |
-|                           | Pino / nestjs-pino      | `^9.6.0` / `^4.3.1`   | Logger estructurado de alto rendimiento sin fugas de PII        |
-|                           | ffmpeg (CLI)            | Binario / spawn       | Transcodificación de audio en servidor con child_process.spawn |
-|                           | AWS SDK S3              | `^3.750.0`            | Cliente S3 para generación de URLs prefirmadas en Cloudflare R2 |
-|                           | Resend SDK              | `^4.1.2`              | Envío de correos transaccionales institucionales                |
-| **Tipado y Compartido**   | `@englove/shared`       | `0.0.1`               | Contratos de actividad, enums canónicos y DTOs comunes          |
-|                           | TypeScript              | `~5.9.3`              | Tipado estricto sin comodines `any` en todo el repositorio      |
-|                           | Zod                     | `^4.6.6`              | Validación de esquemas estructurales de actividades y DTOs      |
-| **Base de Datos & Infra** | PostgreSQL              | `18`                  | Base de datos relacional (Neon en la nube / Docker en local)    |
-|                           | Cloudflare R2           | S3 Compatible         | Almacenamiento seguro de objetos multimedia privados            |
-|                           | ffmpeg / ffprobe        | Binario del SO        | Validación técnica, métricas de decibelios y transcodificación  |
-| **Testing & Calidad**     | Vitest                  | `^3.0.7`              | Ejecutor ultrarrápido de pruebas unitarias e integración        |
-|                           | ESLint / Prettier       | `^9.21.0` / `^3.5.3`  | Análisis estático y formateo estricto del código fuente         |
+| Capa / Módulo             | Tecnología               | Versión               | Propósito clave                                                 |
+| ------------------------- | ------------------------ | --------------------- | --------------------------------------------------------------- |
+| **Runtime & Gestor**      | Node.js                  | `>=24.0.0` (LTS)      | Entorno de ejecución estándar del backend y tooling             |
+|                           | pnpm                     | `11.5.1`              | Gestor de paquetes eficiente y estructuración de monorepo       |
+|                           | Turborepo                | `^2.4.4`              | Orquestación de compilación, caché remota y tareas cruzadas     |
+| **Frontend (`apps/web`)** | Next.js                  | `16.4.2`              | Framework fullstack (App Router, Turbopack, React Compiler)     |
+|                           | React                    | `19.3.1`              | Biblioteca de interfaz de usuario reactiva                      |
+|                           | Tailwind CSS             | `^4.0.9`              | Sistema de estilos CSS atómico moderno                          |
+|                           | Pragmatic Drag and Drop  | `^1.5.0`              | Motor accesible de arrastrar y soltar para ejercicios           |
+|                           | vinext / Wrangler        | `^1.2.1` / `^4.149.0` | Adaptador y CLI para despliegue en Cloudflare Workers           |
+| **Backend (`apps/api`)**  | NestJS                   | `^11.0.11`            | Arquitectura modular orientada a servicios, guards y DI         |
+|                           | Express                  | `^5.3.0`              | Servidor HTTP subyacente para el framework NestJS               |
+|                           | Prisma ORM               | `^7.0.0`              | Mapeo objeto-relacional y migraciones tipadas                   |
+|                           | `@prisma/adapter-pg`     | `^7.10.1`             | Adaptador nativo PostgreSQL para poolers y servidor             |
+|                           | Argon2                   | `^0.41.1`             | Algoritmo resistente para hash seguro de contraseñas            |
+|                           | Pino / nestjs-pino       | `^9.6.0` / `^4.3.1`   | Logger estructurado de alto rendimiento sin fugas de PII        |
+|                           | ffmpeg (CLI)             | Binario / spawn       | Transcodificación de audio en servidor con child_process.spawn  |
+|                           | AWS SDK S3               | `^3.750.0`            | Cliente S3 para generación de URLs prefirmadas en Cloudflare R2 |
+|                           | Resend SDK               | `^4.1.2`              | Envío de correos transaccionales institucionales                |
+| **Tipado y Compartido**   | `@upward-english/shared` | `0.0.1`               | Contratos de actividad, enums canónicos y DTOs comunes          |
+|                           | TypeScript               | `~5.9.3`              | Tipado estricto sin comodines `any` en todo el repositorio      |
+|                           | Zod                      | `^4.6.6`              | Validación de esquemas estructurales de actividades y DTOs      |
+| **Base de Datos & Infra** | PostgreSQL               | `18`                  | Base de datos relacional (Neon en la nube / Docker en local)    |
+|                           | Cloudflare R2            | S3 Compatible         | Almacenamiento seguro de objetos multimedia privados            |
+|                           | ffmpeg / ffprobe         | Binario del SO        | Validación técnica, métricas de decibelios y transcodificación  |
+| **Testing & Calidad**     | Vitest                   | `^3.0.7`              | Ejecutor ultrarrápido de pruebas unitarias e integración        |
+|                           | ESLint / Prettier        | `^9.21.0` / `^3.5.3`  | Análisis estático y formateo estricto del código fuente         |
 
 ---
 
 ## Estructura del repositorio (Monorepo)
 
 ```
-englove/
+upward-english/
 ├── .agents/
 │ ├── CONTEXT.md # Fuente única de verdad técnica y de producto (Decisiones 1–137)
-│ └── skills/ # Habilidades y scripts automáticos del proyecto (guardrails, spec)
+│ └── skills/ # Habilidades del proyecto (guardrails, spec, UX Kids/Teens)
 ├── apps/
 │ ├── api/ # Backend NestJS 11
 │ │ ├── prisma/ # Esquema schema.prisma, migraciones y scripts de seed
@@ -206,8 +206,8 @@ Asegúrate de tener instalados los siguientes componentes en tu sistema operativ
 ### 2. Clonar el repositorio
 
 ```bash
-git clone https://github.com/Samuel-Duque/englove.git
-cd englove
+git clone https://github.com/Samuel-Duque/upward-english.git
+cd upward-english
 ```
 
 ### 3. Configurar variables de entorno
@@ -219,7 +219,7 @@ cp .env.example .env
 ```
 
 > [!NOTE]
-> Las variables en `.env.example` vienen listas para el entorno local con MinIO (emulación local de Cloudflare R2 con el bucket `englove-dev`) y Mailpit (servidor SMTP local e interfaz web de inspección de correos en `http://localhost:8025`).
+> Las variables en `.env.example` vienen listas para el entorno local con MinIO (emulación local de Cloudflare R2 con el bucket `upward-english-dev`) y Mailpit (servidor SMTP local e interfaz web de inspección de correos en `http://localhost:8025`).
 
 Al iniciar la API desde `apps/api`, revisa también `apps/api/.env`: sus variables de R2 deben apuntar a MinIO local (`R2_ENDPOINT=http://localhost:9000`) y coincidir con las credenciales y el bucket del `.env` raíz. Un archivo antiguo con valores de ejemplo para R2 puede generar URLs inaccesibles. Con los servicios iniciados, `node scripts/check-local-audio.mjs` comprueba la configuración local, el bucket y las herramientas de audio sin subir archivos.
 
@@ -288,14 +288,14 @@ Una vez iniciados los servicios, abre tu navegador web y comprueba los siguiente
 
 El script `pnpm seed:dev` provee las siguientes cuentas listas para probar los distintos roles y flujos de la plataforma:
 
-| Rol / Tipo             | Correo electrónico             | Contraseña        | Segmento / Nivel    | Propósito de prueba                                             |
-| ---------------------- | ------------------------------ | ----------------- | ------------------- | --------------------------------------------------------------- |
-| **Profesora**          | `profesora@englove.org`        | `Englove2026!`    | Docente / Admin     | Creación de actividades, asignaciones, revisión y panel docente |
-| **Alumno (Kids)**      | `lucas.kids@englove.org`       | `Estudiante2026!` | Kids (7–10) · A1    | Experiencia visual lúdica, intentos resueltos y pendientes      |
-| **Alumno (Kids)**      | `sofia.kids@englove.org`       | `Estudiante2026!` | Kids (7–10) · A1    | Pruebas de asignaciones y actividades de completar              |
-| **Alumno (Teens)**     | `camila.teens@englove.org`     | `Estudiante2026!` | Teens (11–14+) · B1 | Interfaz sobria, microjuegos y actividades avanzadas            |
-| **Alumno (Teens)**     | `daniel.teens@englove.org`     | `Estudiante2026!` | Teens (11–14+) · A2 | Ejercicios de audio, feedback recibido y rachas                 |
-| **Registro Pendiente** | `emiliano.pending@englove.org` | `Estudiante2026!` | Kids · Pendiente    | Verificación del flujo de aprobación docente de nuevos alumnos  |
+| Rol / Tipo             | Correo electrónico                   | Contraseña           | Segmento / Nivel    | Propósito de prueba                                             |
+| ---------------------- | ------------------------------------ | -------------------- | ------------------- | --------------------------------------------------------------- |
+| **Profesora**          | `profesora@upwardenglish.org`        | `UpwardEnglish2026!` | Docente / Admin     | Creación de actividades, asignaciones, revisión y panel docente |
+| **Alumno (Kids)**      | `lucas.kids@upwardenglish.org`       | `Estudiante2026!`    | Kids (7–10) · A1    | Experiencia visual lúdica, intentos resueltos y pendientes      |
+| **Alumno (Kids)**      | `sofia.kids@upwardenglish.org`       | `Estudiante2026!`    | Kids (7–10) · A1    | Pruebas de asignaciones y actividades de completar              |
+| **Alumno (Teens)**     | `camila.teens@upwardenglish.org`     | `Estudiante2026!`    | Teens (11–14+) · B1 | Interfaz sobria, microjuegos y actividades avanzadas            |
+| **Alumno (Teens)**     | `daniel.teens@upwardenglish.org`     | `Estudiante2026!`    | Teens (11–14+) · A2 | Ejercicios de audio, feedback recibido y rachas                 |
+| **Registro Pendiente** | `emiliano.pending@upwardenglish.org` | `Estudiante2026!`    | Kids · Pendiente    | Verificación del flujo de aprobación docente de nuevos alumnos  |
 
 ---
 
@@ -324,7 +324,7 @@ pnpm guardrails
 
 ## Metodología y estado del proyecto
 
-Englove sigue **Spec-Driven Development (SDD)**: el código de producción requiere una especificación previa aprobada. La implementación se verifica después conforme al proceso y sus criterios de aceptación.
+Upward English sigue **Spec-Driven Development (SDD)**: el código de producción requiere una especificación previa aprobada. La implementación se verifica después conforme al proceso y sus criterios de aceptación.
 Para conocer en detalle el proceso y las especificaciones activas:
 
 - [Proceso SDD y ciclo de vida](./planning/sdd-process.md)
@@ -333,19 +333,19 @@ Para conocer en detalle el proceso y las especificaciones activas:
 
 ### Estado actual de las especificaciones
 
-| Especificación                                     | Título                                                | Estado         | Etapa   |
-| -------------------------------------------------- | ----------------------------------------------------- | -------------- | ------- |
-| [SPEC-01](./specs/SPEC-01-scaffold.md)             | Scaffold del monorepo y entorno base                  | **Verificada** | Etapa 1 |
-| [SPEC-02](./specs/SPEC-02-identidad-y-sesion.md)   | Identidad, autenticación y roles                      | **Verificada** | Etapa 2 |
-| [SPEC-03](./specs/SPEC-03-gestor-de-contenidos.md) | Gestor de contenidos y actividades                    | **Verificada** | Etapa 3 |
-| [SPEC-04](./specs/SPEC-04-asignacion.md)           | Asignación y ventanas de entrega                      | **Verificada** | Etapa 4 |
-| [SPEC-05](./specs/SPEC-05-portal-e-intentos.md)    | Portal del alumno y resolución de intentos            | **Verificada** | Etapa 5 |
-| [SPEC-06](./specs/SPEC-06-microjuegos.md)          | Microjuegos formativos autónomos                      | **Verificada** | Etapa 6 |
-| [SPEC-07](./specs/SPEC-07-revision-y-feedback.md)  | Revisión docente, retroalimentación y nuevo intento   | **Verificada** | Etapa 7 |
-| [SPEC-08](./specs/SPEC-08-estadisticas.md)         | Estadísticas de rendimiento, constancia y leaderboard | **Implementada** (enmienda NEG-01; re-verificación CI pendiente) | Etapa 8 |
-| [SPEC-09](./specs/SPEC-09-pwa-offline-a11y.md)     | PWA, offline y accesibilidad                          | **Verificada** | Etapa 9 |
-| [SPEC-10](./specs/SPEC-10-contenido-extra.md)      | Contenido extra                                       | **Verificada** | Etapa 10 |
-| [SPEC-11](./specs/SPEC-11-calidad-y-correcciones.md) | Calidad, correcciones y verificación                  | **Verificada** | Etapa 12 |
+| Especificación                                       | Título                                                | Estado                                                           | Etapa    |
+| ---------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------- | -------- |
+| [SPEC-01](./specs/SPEC-01-scaffold.md)               | Scaffold del monorepo y entorno base                  | **Verificada**                                                   | Etapa 1  |
+| [SPEC-02](./specs/SPEC-02-identidad-y-sesion.md)     | Identidad, autenticación y roles                      | **Verificada**                                                   | Etapa 2  |
+| [SPEC-03](./specs/SPEC-03-gestor-de-contenidos.md)   | Gestor de contenidos y actividades                    | **Verificada**                                                   | Etapa 3  |
+| [SPEC-04](./specs/SPEC-04-asignacion.md)             | Asignación y ventanas de entrega                      | **Verificada**                                                   | Etapa 4  |
+| [SPEC-05](./specs/SPEC-05-portal-e-intentos.md)      | Portal del alumno y resolución de intentos            | **Verificada**                                                   | Etapa 5  |
+| [SPEC-06](./specs/SPEC-06-microjuegos.md)            | Microjuegos formativos autónomos                      | **Verificada**                                                   | Etapa 6  |
+| [SPEC-07](./specs/SPEC-07-revision-y-feedback.md)    | Revisión docente, retroalimentación y nuevo intento   | **Verificada**                                                   | Etapa 7  |
+| [SPEC-08](./specs/SPEC-08-estadisticas.md)           | Estadísticas de rendimiento, constancia y leaderboard | **Implementada** (enmienda NEG-01; re-verificación CI pendiente) | Etapa 8  |
+| [SPEC-09](./specs/SPEC-09-pwa-offline-a11y.md)       | PWA, offline y accesibilidad                          | **Verificada**                                                   | Etapa 9  |
+| [SPEC-10](./specs/SPEC-10-contenido-extra.md)        | Contenido extra                                       | **Verificada**                                                   | Etapa 10 |
+| [SPEC-11](./specs/SPEC-11-calidad-y-correcciones.md) | Calidad, correcciones y verificación                  | **Verificada**                                                   | Etapa 12 |
 
 El cierre histórico de Etapa 12 consta en SPEC-11. Las correcciones de la auditoría posterior del 2026-11-12 se registran por separado en su informe de remediación; no constituyen aceptación operativa ni cierre de Etapa 11.
 
@@ -353,7 +353,7 @@ El cierre histórico de Etapa 12 consta en SPEC-11. Las correcciones de la audit
 
 ## Reglas invariantes de diseño
 
-Todo colaborador y agente de desarrollo en Englove debe respetar las siguientes reglas canónicas (detalladas en [`.agents/CONTEXT.md`](./.agents/CONTEXT.md) §16):
+Todo colaborador y agente de desarrollo en Upward English debe respetar las siguientes reglas canónicas (detalladas en [`.agents/CONTEXT.md`](./.agents/CONTEXT.md) §16):
 
 1. **Separación estricta de responsabilidades:** NestJS (`apps/api`) es el único backend de negocio y la única fuente de autorización. El frontend jamás consulta directamente la base de datos.
 2. **Aislamiento Multi-Tenant (Anti-IDOR):** Toda consulta a tablas de tenant incluye explícitamente `organization_id`. Prohibido utilizar `findUnique` por ID simple sin validar pertenencia de organización y alumno.
@@ -373,6 +373,7 @@ La plataforma está optimizada para operar con alta disponibilidad y costos cont
 - **Backend API (`apps/api`):** Destino previsto: **Render**, contenedor Docker en instancia única, con cola serial de `ffmpeg`.
 
 El aprovisionamiento y la aceptación operativa siguen el [taskboard](./planning/taskboard.md). La promoción a staging queda documentada en [despliegue-staging.md](./planning/despliegue-staging.md); no se declara infraestructura creada ni producción operativa por existir el workflow.
+
 - **Base de datos:** **PostgreSQL 18** gestionado en **Neon**, utilizando endpoint con PgBouncer para runtime y conexión directa para migraciones estructuradas de Prisma.
 - **Almacenamiento multimedia:** **Cloudflare R2** para la retención y entrega privada de archivos de audio e imágenes sin costos de egreso de datos.
 - **Correo transaccional:** **Resend** para notificaciones críticas, alertas de entrega y recuperación de accesos.
@@ -381,5 +382,5 @@ El aprovisionamiento y la aceptación operativa siguen el [taskboard](./planning
 
 ## Licencia y autoría
 
-Proyecto desarrollado y mantenido para la plataforma educativa **Englove**.  
+Proyecto desarrollado y mantenido para la plataforma educativa **Upward English**.  
 Todos los derechos reservados © 2026.

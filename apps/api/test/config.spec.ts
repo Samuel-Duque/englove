@@ -7,21 +7,21 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
   const baseValidLocalConfig = {
     APP_ENV: 'local',
     PORT: '3001',
-    DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/englove_dev?schema=public',
+    DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/upward_english_dev?schema=public',
     R2_ACCOUNT_ID: 'fake_r2_account_id',
     R2_ACCESS_KEY_ID: 'fake_r2_access_key',
     R2_SECRET_ACCESS_KEY: 'fake_r2_secret_key',
-    R2_BUCKET_NAME: 'englove-dev',
+    R2_BUCKET_NAME: 'upward-english-dev',
     WEB_BASE_URL: 'http://localhost:3000',
     NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-    MAIL_FROM: 'Englove <notificaciones@englove.org>',
+    MAIL_FROM: 'Upward English <notificaciones@upwardenglish.org>',
   };
 
   it('validates a correct local configuration without requiring RESEND_API_KEY', () => {
     const env = validateEnvironment(baseValidLocalConfig);
     expect(env.APP_ENV).toBe(AppEnv.local);
     expect(env.PORT).toBe(3001);
-    expect(env.COOKIE_PREFIX).toBe('englove_');
+    expect(env.COOKIE_PREFIX).toBe('upward_english_');
   });
 
   it('requires RESEND_API_KEY, COOKIE_DOMAIN, and secure JWT_SECRET in staging or production (SEC-01, RF-02)', () => {
@@ -39,7 +39,7 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     const stagingConfig = {
       ...baseValidLocalConfig,
       APP_ENV: 'staging',
-      COOKIE_DOMAIN: '.englove.org',
+      COOKIE_DOMAIN: '.upwardenglish.org',
     };
 
     expect(() => validateEnvironment(stagingConfig)).toThrowError(
@@ -53,7 +53,7 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     };
     const env = validateEnvironment(validStagingConfig);
     expect(env.APP_ENV).toBe(AppEnv.staging);
-    expect(env.COOKIE_DOMAIN).toBe('.englove.org');
+    expect(env.COOKIE_DOMAIN).toBe('.upwardenglish.org');
     expect(env.JWT_SECRET).toBe('a-secure-production-jwt-secret-min-32-chars!');
   });
 

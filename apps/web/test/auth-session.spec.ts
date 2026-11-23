@@ -8,8 +8,8 @@ import {
   fetchSharedProfile,
   clearSharedProfile,
 } from '../src/lib/auth-session';
-import type { SessionView, StudentProfileView } from '@englove/shared';
-import { Role, AgeSegment, Level } from '@englove/shared';
+import type { SessionView, StudentProfileView } from '@upward-english/shared';
+import { Role, AgeSegment, Level } from '@upward-english/shared';
 
 describe('P0-02, P0-03, QA-02: auth-session continuous session and refresh coordination', () => {
   const originalFetch = globalThis.fetch;
@@ -207,7 +207,7 @@ describe('P0-02, P0-03, QA-02: auth-session continuous session and refresh coord
 
     it('coordinates refresh using navigator.locks when available', async () => {
       const mockLockRequest = vi.fn().mockImplementation(async (lockName: string, callback: () => Promise<boolean>) => {
-        expect(lockName).toBe('englove_auth_refresh');
+        expect(lockName).toBe('upward_english_auth_refresh');
         return callback();
       });
 
@@ -235,7 +235,7 @@ describe('P0-02, P0-03, QA-02: auth-session continuous session and refresh coord
     it('when another tab refreshed within last 3 seconds, verifies session via GET /auth/session without double-rotating (P0-03, QA-02)', async () => {
       // Simulate another tab having completed a refresh 500ms ago and storing timestamp in localStorage
       const mockStorage: Record<string, string> = {
-        englove_tab_sync_ts: String(Date.now() - 500),
+        upward_english_tab_sync_ts: String(Date.now() - 500),
       };
       const mockWindow = {
         localStorage: {

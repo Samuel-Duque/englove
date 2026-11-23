@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidHttpsResourceUrl } from '@englove/shared';
+import { isValidHttpsResourceUrl } from '@upward-english/shared';
 
 describe('SPEC-10: Extra Content UI Rules & Contracts (ENG-120, ENG-121)', () => {
   describe('RF-1 y RF-4: Validación de URL https en cliente y formulario docente', () => {

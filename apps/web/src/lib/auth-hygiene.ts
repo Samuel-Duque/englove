@@ -45,7 +45,7 @@ export async function clearSharedDeviceSession(
   // Clear IndexedDB pending queues if running in browser (RF-6, ISSUE-04)
   if (typeof window !== "undefined" && "indexedDB" in window) {
     try {
-      const dbNames = ["englove_offline", "englove_storage"];
+      const dbNames = ["upward_english_offline", "upward_english_storage"];
       let targetDbs = dbNames;
 
       // Check if databases() API exists so we do NOT prematurely create empty DBs (ISSUE-04)
@@ -150,7 +150,7 @@ export async function clearSharedDeviceSession(
   }
 
   // Clear non-static entries from Cache Storage (RF-5, RF-18, Decisión 135)
-  // Preserves static precache (serwist precache or englove-static)
+  // Preserves static precache (serwist precache or upward-english-static)
   if (typeof window !== "undefined" && "caches" in window) {
     try {
       const cacheStorage = window.caches;
@@ -160,8 +160,8 @@ export async function clearSharedDeviceSession(
           const isPrecache =
             key.includes("-precache-") ||
             key.startsWith("serwist-precache") ||
-            key.startsWith("englove-precache") ||
-            key.startsWith("englove-static-");
+            key.startsWith("upward-english-precache") ||
+            key.startsWith("upward-english-static-");
           if (!isPrecache) {
             await cacheStorage.delete(key);
           }
@@ -178,7 +178,7 @@ export async function clearSharedDeviceSession(
       if ("sessionStorage" in window) window.sessionStorage.clear();
       if (typeof document !== "undefined") {
         document.cookie =
-          "englove_user_logged=; path=/; max-age=0; SameSite=Lax";
+          "upward_english_user_logged=; path=/; max-age=0; SameSite=Lax";
         const cookies = document.cookie.split(";");
         for (const c of cookies) {
           const name = c.split("=")[0]?.trim();
@@ -233,7 +233,7 @@ export function reconcilePendingLogout(): Promise<boolean> {
         typeof navigator !== "undefined" &&
         typeof navigator.locks?.request === "function"
           ? navigator.locks.request(
-              "englove_auth_refresh",
+              "upward_english_auth_refresh",
               { signal: controller.signal },
               revoke,
             )
@@ -368,7 +368,7 @@ export function startCrossTabSessionSync(
       evaluate(event.newValue === null);
       return;
     }
-    if (event.key === "englove_logout_pending") {
+    if (event.key === "upward_english_logout_pending") {
       evaluate(false);
     }
   };

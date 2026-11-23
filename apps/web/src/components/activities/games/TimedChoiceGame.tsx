@@ -7,7 +7,7 @@ import {
   GameAnswers,
   TimedChoiceSettingsSchema,
   TimedChoiceSolutionSchema,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { soundManager } from '../../../lib/sound';
 
 export function TimedChoiceGame({

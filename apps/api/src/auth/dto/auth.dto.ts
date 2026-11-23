@@ -14,7 +14,7 @@ import {
   ResetPasswordInput,
   EmailChangeInput,
   EmailChangeConfirmInput,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 export class LoginDto implements LoginInput {
   @IsString({ message: 'El correo electrónico debe ser una cadena de texto' })

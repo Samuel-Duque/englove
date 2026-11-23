@@ -3,7 +3,7 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityEditorComponent } from '../activity-editor';
-import { ActivityEditor, ActivityEditorSchema } from '@englove/shared';
+import { ActivityEditor, ActivityEditorSchema } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 
 export function ActividadDetailClient({ id }: { id: string }) {

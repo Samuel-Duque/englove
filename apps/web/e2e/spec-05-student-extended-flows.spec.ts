@@ -5,13 +5,13 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
     // 1. Simular cookie de sesión de estudiante
     await context.addCookies([
       {
-        name: 'englove_local_access_token',
+        name: 'upward_english_local_access_token',
         value: 'mock-student-token',
         domain: 'localhost',
         path: '/',
       },
       {
-        name: 'englove_access_token',
+        name: 'upward_english_access_token',
         value: 'mock-student-token',
         domain: 'localhost',
         path: '/',
@@ -24,7 +24,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
         json: {
           user: {
             id: 'std-e2e-ext',
-            email: 'student.extended@englove.local',
+            email: 'student.extended@upwardenglish.local',
             name: 'Valeria Restrepo',
             role: 'student',
           },
@@ -47,7 +47,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
           user: {
             id: 'std-e2e-ext',
             name: 'Valeria Restrepo',
-            email: 'student.extended@englove.local',
+            email: 'student.extended@upwardenglish.local',
             role: 'student',
           },
           student: {
@@ -160,7 +160,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
     // Información básica
     await expect(page.locator('h1:has-text("Tu Perfil de Alumno")')).toBeVisible();
     await expect(page.locator('main').locator('text=Valeria Restrepo')).toBeVisible();
-    await expect(page.locator('text=student.extended@englove.local')).toBeVisible();
+    await expect(page.locator('text=student.extended@upwardenglish.local')).toBeVisible();
 
     // Conmutación de interfaz Kids -> Teens (canSwitchInterface = true)
     await page.route('**/api/v1/me/interface', async (route) => {
@@ -185,7 +185,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
     await expect(changeEmailToggle).toBeVisible();
     await changeEmailToggle.click();
 
-    await page.fill('input[type="email"]', 'valeria.new@englove.local');
+    await page.fill('input[type="email"]', 'valeria.new@upwardenglish.local');
     await page.fill('input[type="password"]', 'CurrentPassword123');
     await page.click('button:has-text("Solicitar cambio")');
 

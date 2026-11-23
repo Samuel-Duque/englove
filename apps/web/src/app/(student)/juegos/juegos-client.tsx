@@ -12,7 +12,7 @@ import {
   scoreToGameStars,
   getGameMotivationMessage,
   z,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
 import { fetchSharedProfile } from '../../../lib/auth-session';

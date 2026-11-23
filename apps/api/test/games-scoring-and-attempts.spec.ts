@@ -9,7 +9,7 @@ import {
   GameConfig,
   GameAnswerKey,
   Level,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { ConflictException } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';

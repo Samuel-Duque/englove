@@ -11,7 +11,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AssignmentAvailability } from '@englove/shared';
+import { AssignmentAvailability } from '@upward-english/shared';
 
 export function isValidIsoWithTimezone(value: unknown): boolean {
   if (typeof value !== 'string') return false;

@@ -13,9 +13,9 @@ export async function seedMinimal() {
 
   const prisma = getPrisma();
   const orgSlug = process.env.PILOT_ORG_SLUG || 'pilot';
-  const orgName = process.env.PILOT_ORG_NAME || 'Academia Englove Piloto';
-  const teacherEmail = process.env.PILOT_TEACHER_EMAIL || 'profesora@englove.org';
-  const teacherPassword = explicitPassword || 'Englove2026!';
+  const orgName = process.env.PILOT_ORG_NAME || 'Academia Upward English Piloto';
+  const teacherEmail = process.env.PILOT_TEACHER_EMAIL || 'profesora@upwardenglish.org';
+  const teacherPassword = explicitPassword || 'UpwardEnglish2026!';
 
   // Organization
   const org = await prisma.organization.upsert({
@@ -123,7 +123,7 @@ export async function seedMinimal() {
     },
     {
       key: 'anniversary_5',
-      name: '5 años en Englove',
+      name: '5 años en Upward English',
       description: 'Cumpliste 5 años de trayectoria en la plataforma',
       icon: 'medal',
       rule: { type: 'anniversary_years', threshold: 5 },

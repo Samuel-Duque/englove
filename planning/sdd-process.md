@@ -1,6 +1,6 @@
-# Englove — Proceso de desarrollo: Spec-Driven Development (SDD)
+# Upward English — Proceso de desarrollo: Spec-Driven Development (SDD)
 
-> **Propósito.** Definir cómo se construye Englove día a día: qué es una especificación, dónde vive, quién la aprueba, cómo se relaciona con el código, las pruebas y el taskboard. Es **Decidido** (CONTEXT §14, decisión 21). Desarrolla la metodología; no contiene ninguna especificación. La redacción de las specs empieza en la Etapa 0 (SPEC-00 y SPEC-01) y sigue el calendario de §7.
+> **Propósito.** Definir cómo se construye Upward English día a día: qué es una especificación, dónde vive, quién la aprueba, cómo se relaciona con el código, las pruebas y el taskboard. Es **Decidido** (CONTEXT §14, decisión 21). Desarrolla la metodología; no contiene ninguna especificación. La redacción de las specs empieza en la Etapa 0 (SPEC-00 y SPEC-01) y sigue el calendario de §7.
 >
 > Documentos hermanos: [`architecture-overview.md`](./architecture-overview.md) (cómo está construida la plataforma), [`pbp-development.md`](./pbp-development.md) (etapas), [`taskboard.md`](./taskboard.md) (tareas y estado). La fuente de verdad de producto es `.agents/CONTEXT.md`.
 >
@@ -16,7 +16,7 @@
 
 ## Índice
 
-1. Qué significa SDD en Englove
+1. Qué significa SDD en Upward English
 2. Jerarquía de documentos
 3. Qué es una spec y qué no
 4. Estructura de la carpeta `specs/`
@@ -29,7 +29,7 @@
 
 ---
 
-## 1. Qué significa SDD en Englove
+## 1. Qué significa SDD en Upward English
 
 **La especificación se escribe, se revisa y se aprueba antes de escribir código.** El código implementa la spec; las pruebas verifican la spec; el taskboard rastrea la spec. Si el código y la spec discrepan, se corrige la spec primero (si el cambio es deseado) o el código (si no lo es). Nunca se deja la discrepancia sin resolver.
 
@@ -266,7 +266,7 @@ A 2026-11-04, SPEC-00 está Hecho, **SPEC-01 — Scaffold figura Verificada** y 
 4. Al terminar, actualizar en el mismo cambio: estado de la tarea en el taskboard, estado de la spec si corresponde, y CONTEXT §14/§15 si se cerró un pendiente o cambió una decisión.
 5. Toda spec respeta lo Decidido en CONTEXT (§16). Si una spec necesita cambiar una decisión, la ruta es CONTEXT §14 primero.
 6. Las specs se escriben para que las lea la próxima persona o agente sin contexto previo. Enlaces en vez de repeticiones; ejemplos concretos en vez de adjetivos.
-7. **Apoyo para agentes:** la skill propia `englove-spec` (`.agents/skills/englove-spec/`) aplica este proceso para crear `specs/` (SPEC-00) y para redactar, revisar o actualizar una spec. Su script `scripts/check-spec.mjs` verifica la estructura contra la plantilla de §5 y los pendientes de CONTEXT §15; no sustituye la revisión semántica ni la aprobación del líder del proyecto. Si la skill y este documento discrepan, manda este documento.
+7. **Apoyo para agentes:** la skill propia `upward-english-spec` (`.agents/skills/upward-english-spec/`) aplica este proceso para crear `specs/` (SPEC-00) y para redactar, revisar o actualizar una spec. Su script `scripts/check-spec.mjs` verifica la estructura contra la plantilla de §5 y los pendientes de CONTEXT §15; no sustituye la revisión semántica ni la aprobación del líder del proyecto. Si la skill y este documento discrepan, manda este documento.
 
 ---
 

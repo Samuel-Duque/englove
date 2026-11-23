@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright E2E configuration for @englove/web (ENG-145).
+ * Playwright E2E configuration for @upward-english/web (ENG-145).
  * Tests run against real Chromium browser with API routes mocked at network level.
  */
 export default defineConfig({

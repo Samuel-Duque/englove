@@ -6,7 +6,7 @@ import { MediaService } from '../src/media/media.service';
 import {
   AttemptStatus,
   MediaAssetStatus,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 type MockFn = ReturnType<typeof vi.fn>;
 

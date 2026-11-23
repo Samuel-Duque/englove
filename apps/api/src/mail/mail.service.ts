@@ -31,7 +31,7 @@ export class MailService {
 
   constructor(private readonly configService: ConfigService) {
     this.appEnv = this.configService.get<string>('APP_ENV', 'local');
-    this.mailFrom = this.configService.get<string>('MAIL_FROM', 'notificaciones@englove.org');
+    this.mailFrom = this.configService.get<string>('MAIL_FROM', 'notificaciones@upwardenglish.org');
     this.smtpHost = this.configService.get<string>('SMTP_HOST', 'localhost');
     this.smtpPort = Number(this.configService.get<number>('SMTP_PORT', 1025));
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
@@ -109,7 +109,7 @@ export class MailService {
           socket.write('DATA\r\n');
         } else if (state === 4 && lastLine.startsWith('354')) {
           state = 5;
-          const msgId = `<${Date.now()}@englove.local>`;
+          const msgId = `<${Date.now()}@upwardenglish.local>`;
           const boundary = `boundary_${Date.now()}`;
           const raw = [
             `From: ${params.from}`,

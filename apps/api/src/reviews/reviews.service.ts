@@ -36,7 +36,7 @@ import {
   ExamConfigSchema,
   ExamAnswerKeySchema,
   getOpenQuestionItems,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
@@ -1072,7 +1072,7 @@ export class ReviewsService {
     retry_extend_until: Date | null;
     student: {
       id: string;
-      age_segment: import('@englove/shared').AgeSegment;
+      age_segment: import('@upward-english/shared').AgeSegment;
       user: { name: string };
     };
     assignment: {
@@ -1092,7 +1092,7 @@ export class ReviewsService {
     } | null;
     media_assets: Array<{
       id: string;
-      status: import('@englove/shared').MediaAssetStatus;
+      status: import('@upward-english/shared').MediaAssetStatus;
       duration_seconds: number | null;
       converted_key: string | null;
       retention_until: Date | null;

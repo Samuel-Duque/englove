@@ -14,7 +14,7 @@ import {
   MessageResponse,
   MessageResponseSchema,
   z,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { ConfirmDialog, AccessibleModal } from '../../../../components/ui/modal';
 

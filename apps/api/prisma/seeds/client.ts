@@ -6,7 +6,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 function createClient() {
   const connectionString =
     process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@localhost:5432/englove_dev?schema=public';
+    'postgresql://postgres:postgres@localhost:5432/upward_english_dev?schema=public';
   const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
 

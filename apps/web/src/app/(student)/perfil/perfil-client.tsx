@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { StudentProfileView, StudentProfileViewSchema } from '@englove/shared';
+import { StudentProfileView, StudentProfileViewSchema } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { clearSharedProfile } from '../../../lib/auth-session';
 import { syncUserSegment } from '../../../lib/user-segment';

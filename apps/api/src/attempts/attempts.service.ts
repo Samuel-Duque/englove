@@ -53,7 +53,7 @@ import {
   StudentGameCard,
   StudentGamesListResponse,
   getOpenQuestionItems,
-} from '@englove/shared';
+} from '@upward-english/shared';
 
 function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
@@ -130,7 +130,7 @@ interface ActivityEntityLike {
   id: string;
   title: string;
   type: ActivityType;
-  level: import('@englove/shared').Level;
+  level: import('@upward-english/shared').Level;
   min_plausible_seconds?: number | null;
   fill_blank_detail?: { config: unknown } | null;
   open_question_detail?: { config: unknown } | null;
@@ -1520,7 +1520,7 @@ export class AttemptsService {
       }
 
         // Emit ProgressEvent inside the same SQL transaction so Attempt completion and progress never diverge (RT-03)
-        let recordedBadges: import('@englove/shared').BadgeAwardView[] = [];
+        let recordedBadges: import('@upward-english/shared').BadgeAwardView[] = [];
         if (isAudioSubmitted) {
           recordedBadges =
             (await this.gamificationService.recordAudioSubmitted(

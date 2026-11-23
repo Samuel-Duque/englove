@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { scoreToStars } from '@englove/shared';
+import { scoreToStars } from '@upward-english/shared';
 import { StudentNav } from '../src/components/student-nav';
 
 vi.mock('next/navigation', () => ({usePathname: () => '/inicio'}));

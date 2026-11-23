@@ -43,9 +43,6 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.750.0
         version: 3.1152.0
-      '@englove/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@nestjs/common':
         specifier: ^11.0.11
         version: 11.2.7(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -73,6 +70,9 @@ importers:
       '@prisma/client':
         specifier: ^7.0.0
         version: 7.10.1(prisma@7.10.1(@types/node@24.19.2)(@types/react-dom@19.0.4(@types/react@19.0.10))(@types/react@19.0.10)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3))(typescript@5.9.3)
+      '@upward-english/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       argon2:
         specifier: ^0.41.1
         version: 0.41.1
@@ -116,15 +116,6 @@ importers:
         specifier: ^4.6.6
         version: 4.6.7
     devDependencies:
-      '@englove/eslint-config':
-        specifier: workspace:*
-        version: link:../../tooling/eslint
-      '@englove/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
-      '@englove/tsconfig':
-        specifier: workspace:*
-        version: link:../../tooling/tsconfig
       '@nestjs/cli':
         specifier: ^12.0.11
         version: 12.0.11(@types/node@24.19.2)(prettier@3.9.10)(webpack@5.112.2(lightningcss@1.33.0))
@@ -143,6 +134,15 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      '@upward-english/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@upward-english/prettier-config':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@upward-english/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
       eslint:
         specifier: ^9.21.0
         version: 9.39.5(jiti@2.7.0)
@@ -164,15 +164,15 @@ importers:
       '@atlaskit/pragmatic-drag-and-drop':
         specifier: ^1.5.0
         version: 1.8.1
-      '@englove/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@radix-ui/react-slot':
         specifier: ^1.1.2
         version: 1.5.0(@types/react@19.0.10)(react@19.3.1)
       '@tanstack/react-query':
         specifier: ^5.105.0
         version: 5.105.0(@types/react@19.0.10)(react@19.3.1)
+      '@upward-english/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@vinext/cloudflare':
         specifier: ^1.3.0
         version: 1.3.0(cc469d0141f7feb468362efff2080036)
@@ -213,15 +213,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20250224.0
         version: 4.20260702.1
-      '@englove/eslint-config':
-        specifier: workspace:*
-        version: link:../../tooling/eslint
-      '@englove/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
-      '@englove/tsconfig':
-        specifier: workspace:*
-        version: link:../../tooling/tsconfig
       '@playwright/test':
         specifier: ^1.64.1
         version: 1.64.1
@@ -246,6 +237,15 @@ importers:
       '@types/react-dom':
         specifier: 19.0.4
         version: 19.0.4(@types/react@19.0.10)
+      '@upward-english/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@upward-english/prettier-config':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@upward-english/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
       '@vitejs/plugin-react':
         specifier: ^6.1.2
         version: 6.1.2(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(oxc-transform-react@0.156.0)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
@@ -286,13 +286,13 @@ importers:
         specifier: ^4.6.6
         version: 4.6.7
     devDependencies:
-      '@englove/eslint-config':
+      '@upward-english/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@englove/prettier-config':
+      '@upward-english/prettier-config':
         specifier: workspace:*
         version: link:../../tooling/prettier
-      '@englove/tsconfig':
+      '@upward-english/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/tsconfig
       eslint:

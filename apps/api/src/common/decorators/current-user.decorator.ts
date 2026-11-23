@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Role, AgeSegment } from '@englove/shared';
+import { Role, AgeSegment } from '@upward-english/shared';
 
 export interface AuthenticatedUser {
   id: string;

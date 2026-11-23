@@ -81,8 +81,8 @@ async function bootstrap() {
   // Swagger Documentation: enabled in local and staging, disabled (404) in production (Rule G-C07, RF-4)
   if (appEnv !== 'production') {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Englove API')
-      .setDescription('API de plataforma educativa Englove')
+      .setTitle('Upward English API')
+      .setDescription('API de plataforma educativa Upward English')
       .setVersion('1.0')
       .build();
 

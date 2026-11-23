@@ -34,7 +34,7 @@ import {
   GamesLeaderboardResponse,
   scoreToGameStars,
   formatBogotaDateTime,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import {
   StatsOverviewQueryDto,
   StatsGroupQueryDto,

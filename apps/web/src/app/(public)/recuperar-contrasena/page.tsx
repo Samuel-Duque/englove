@@ -4,7 +4,7 @@ import { RecuperarContrasenaClient } from './recuperar-contrasena-client';
 
 export const metadata: Metadata = {
   title: 'Recuperar Contraseña',
-  description: 'Solicita un enlace para restablecer la contraseña de tu cuenta en Englove.',
+  description: 'Solicita un enlace para restablecer la contraseña de tu cuenta en Upward English.',
 };
 
 export default function RecuperarContrasenaPage() {

@@ -7,12 +7,12 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
   }) => {
     // 1.1 Iniciar sesión con Alumno 1
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-student-1', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-student-1', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-student-1', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-student-1', domain: 'localhost', path: '/' },
     ]);
 
     const student1Session = {
-      user: { id: 'std-1', email: 'alumno1@englove.local', name: 'Alumno Uno', role: 'student' },
+      user: { id: 'std-1', email: 'alumno1@upwardenglish.local', name: 'Alumno Uno', role: 'student' },
       student: { id: 'std-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
       organizationId: 'org-test',
     };
@@ -36,7 +36,7 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-1', email: 'alumno1@englove.local', name: 'Alumno Uno', role: 'student' },
+          user: { id: 'std-1', email: 'alumno1@upwardenglish.local', name: 'Alumno Uno', role: 'student' },
           student: { id: 'std-1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
         },
       });
@@ -71,7 +71,7 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
       await route.fulfill({
         status: 200,
         headers: {
-          'Set-Cookie': 'englove_access_token=; Path=/; Max-Age=0',
+          'Set-Cookie': 'upward_english_access_token=; Path=/; Max-Age=0',
         },
         json: { message: 'Sesión cerrada' },
       });
@@ -94,14 +94,14 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
 
     // 1.4 Simular inicio de sesión con Alumno 2 en la misma tablet
     currentSession = {
-      user: { id: 'std-2', email: 'alumno2@englove.local', name: 'Alumno Dos', role: 'student' },
+      user: { id: 'std-2', email: 'alumno2@upwardenglish.local', name: 'Alumno Dos', role: 'student' },
       student: { id: 'std-2', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
       organizationId: 'org-test',
     };
     await context.clearCookies();
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-student-2', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-student-2', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-student-2', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-student-2', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
@@ -115,7 +115,7 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-2', email: 'alumno2@englove.local', name: 'Alumno Dos', role: 'student' },
+          user: { id: 'std-2', email: 'alumno2@upwardenglish.local', name: 'Alumno Dos', role: 'student' },
           student: { id: 'std-2', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
         },
       });
@@ -153,15 +153,15 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
   }) => {
     // Sesión de estudiante
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-student-only', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-student-only', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-student-only', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-student-only', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-only', email: 'student@englove.local', name: 'Estudiante', role: 'student' },
+          user: { id: 'std-only', email: 'student@upwardenglish.local', name: 'Estudiante', role: 'student' },
           student: { id: 'std-only', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
           organizationId: 'org-test',
         },
@@ -204,7 +204,7 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
 
     await page.goto('/registro');
     await page.fill('input[name="name"], input#name-input, input#name', 'Mateo Nuevo');
-    await page.fill('input[name="email"], input#email-input, input#email', 'mateo.nuevo@englove.local');
+    await page.fill('input[name="email"], input#email-input, input#email', 'mateo.nuevo@upwardenglish.local');
     await page.fill('input[name="birthDate"], input#birth-date-input, input#birthDate', '2016-03-20');
     await page.fill('input[name="password"], input#password-input, input#password', 'ClaveSegura123');
     await page.check('input[type="checkbox"]');
@@ -214,15 +214,15 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
 
     // 3.2 Profesora entra a /alumnos?tab=requests y aprueba
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'tch-1', email: 'teacher@englove.local', name: 'Profesora Clara', role: 'teacher' },
+          user: { id: 'tch-1', email: 'teacher@upwardenglish.local', name: 'Profesora Clara', role: 'teacher' },
           organizationId: 'org-test',
         },
       });
@@ -236,7 +236,7 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
             {
               id: 'std-req-mateo',
               name: 'Mateo Nuevo',
-              email: 'mateo.nuevo@englove.local',
+              email: 'mateo.nuevo@upwardenglish.local',
               birthDate: '2016-03-20',
               level: null,
               approvalStatus: 'pending_approval',
@@ -295,15 +295,15 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
   }) => {
     // 4.1 Profesora publica y asigna actividad a Grupo A1
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'tch-1', email: 'teacher@englove.local', name: 'Profesora Clara', role: 'teacher' },
+          user: { id: 'tch-1', email: 'teacher@upwardenglish.local', name: 'Profesora Clara', role: 'teacher' },
           organizationId: 'org-test',
         },
       });
@@ -353,12 +353,12 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
     // 4.2 Alumno del grupo A1 entra a /inicio y ve la nueva asignación
     await context.clearCookies();
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-student-a1', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-student-a1', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-student-a1', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-student-a1', domain: 'localhost', path: '/' },
     ]);
 
     const studentA1Session = {
-      user: { id: 'std-a1', email: 'mateo@englove.local', name: 'Mateo', role: 'student' },
+      user: { id: 'std-a1', email: 'mateo@upwardenglish.local', name: 'Mateo', role: 'student' },
       student: { id: 'std-a1', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
       organizationId: 'org-test',
     };
@@ -407,12 +407,12 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
   }) => {
     // Alumno tiene asignación abierta cuya actividad fue archivada por la profesora
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-student-dec95', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-student-dec95', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-student-dec95', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-student-dec95', domain: 'localhost', path: '/' },
     ]);
 
     const studentDec95Session = {
-      user: { id: 'std-dec95', email: 'carlos@englove.local', name: 'Carlos', role: 'student' },
+      user: { id: 'std-dec95', email: 'carlos@upwardenglish.local', name: 'Carlos', role: 'student' },
       student: { id: 'std-dec95', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
       organizationId: 'org-test',
     };
@@ -530,15 +530,15 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
   }) => {
     // 6.1 Alumno entrega intento de open_question
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-f6', email: 'flow6@englove.local', name: 'Valeria Flow6', role: 'student' },
+          user: { id: 'std-f6', email: 'flow6@upwardenglish.local', name: 'Valeria Flow6', role: 'student' },
           student: { id: 'std-f6', level: 'A2', ageSegment: 'kids', canSwitchInterface: false },
           organizationId: 'org-test',
         },
@@ -593,15 +593,15 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
     // 6.2 Profesora entra a /revision, califica con 4.0, sticker y habilita reintento
     await context.clearCookies();
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-teacher-f6', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-teacher-f6', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-teacher-f6', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-teacher-f6', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'tch-f6', email: 'teacher.f6@englove.local', name: 'Profesora Clara', role: 'teacher' },
+          user: { id: 'tch-f6', email: 'teacher.f6@upwardenglish.local', name: 'Profesora Clara', role: 'teacher' },
           organizationId: 'org-test',
         },
       });
@@ -691,15 +691,15 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
     // 6.3 Alumno entra a /feedback, ve el reintento concedido y lo inicia
     await context.clearCookies();
     await context.addCookies([
-      { name: 'englove_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
-      { name: 'englove_local_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
+      { name: 'upward_english_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
+      { name: 'upward_english_local_access_token', value: 'token-std-flow6', domain: 'localhost', path: '/' },
     ]);
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
         status: 200,
         json: {
-          user: { id: 'std-f6', email: 'flow6@englove.local', name: 'Valeria Flow6', role: 'student' },
+          user: { id: 'std-f6', email: 'flow6@upwardenglish.local', name: 'Valeria Flow6', role: 'student' },
           student: { id: 'std-f6', level: 'A2', ageSegment: 'kids', canSwitchInterface: false },
           organizationId: 'org-test',
         },

@@ -14,7 +14,7 @@ import {
   type AssignmentCardListResponse,
   type RuntimeView,
   type StudentProfileView,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../lib/api';
 import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh, clearSharedSession } from '../../lib/auth-session';
 import { getActivityTypeLabel } from '../../lib/activity-labels';

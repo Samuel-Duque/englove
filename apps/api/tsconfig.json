@@ -1,5 +1,5 @@
 {
-  "extends": "@englove/tsconfig/nestjs.json",
+  "extends": "@upward-english/tsconfig/nestjs.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./"

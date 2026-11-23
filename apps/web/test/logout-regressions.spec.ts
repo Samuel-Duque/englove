@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
-import { Role } from "@englove/shared";
+import { Role } from "@upward-english/shared";
 import {
   logoutSharedDevice,
   reconcilePendingLogout,
@@ -92,7 +92,7 @@ describe("SEG-01: failed logout never silently restores the previous account", (
         code: "LOGOUT_PENDING",
       });
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(document.cookie).toContain("englove_logout_pending=1");
+      expect(document.cookie).toContain("upward_english_logout_pending=1");
     },
   );
 

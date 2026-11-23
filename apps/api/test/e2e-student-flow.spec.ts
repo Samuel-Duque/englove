@@ -7,7 +7,7 @@ import {
   AgeSegment,
   ProgressEventType,
   parseFillBlankSimpleSyntax,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { AttemptsService } from '../src/attempts/attempts.service';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AssignmentsService } from '../src/assignments/assignments.service';

@@ -10,7 +10,7 @@ import {
   AttemptStatus,
   Level,
   ProgressEventType,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { Prisma } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';

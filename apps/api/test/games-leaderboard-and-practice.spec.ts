@@ -8,7 +8,7 @@ import {
   Role,
   GameMechanic,
   AgeSegment,
-} from '@englove/shared';
+} from '@upward-english/shared';
 import { StatsService } from '../src/stats/stats.service';
 import { mockStatsConfiguration } from './stats-config.fixture';
 import { ActivitiesService } from '../src/activities/activities.service';
@@ -40,7 +40,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
     mockConfigService = {
       get: vi.fn((key: string, defaultVal?: string) => {
         if (key === 'WEB_BASE_URL') return 'http://localhost:3000';
-        if (key === 'JWT_SECRET') return 'englove-dev-jwt-secret-min-32-chars-long-local-secret!';
+        if (key === 'JWT_SECRET') return 'upward-english-dev-jwt-secret-min-32-chars-long-local-secret!';
         return defaultVal;
       }),
     };
@@ -351,7 +351,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
         approval_status: ApprovalStatus.approved,
         level: Level.A1,
         created_at: new Date('2026-10-01T00:00:00Z'),
-        user: { name: 'Alice', email: 'alice@englove.org', is_active: true },
+        user: { name: 'Alice', email: 'alice@upwardenglish.org', is_active: true },
         memberships: [{ group: { id: groupId, name: 'Grupo A' } }],
       });
 
@@ -1027,7 +1027,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
         approval_status: ApprovalStatus.approved,
         level: Level.A1,
         created_at: new Date('2026-10-01T00:00:00Z'),
-        user: { name: 'Alice', email: 'alice@englove.org', is_active: true },
+        user: { name: 'Alice', email: 'alice@upwardenglish.org', is_active: true },
         memberships: [{ group: { id: groupId, name: 'Grupo A' } }],
       });
 

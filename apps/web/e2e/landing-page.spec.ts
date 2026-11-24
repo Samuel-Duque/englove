@@ -275,7 +275,7 @@ test.describe('Landing Page Pública de Upward English', () => {
         label: 'Entrar',
         scope: '.header-actions',
         expectedPath: '/login',
-        expectedHeading: /Upward English/,
+        expectedHeading: /Inicia sesión/,
       },
       {
         label: 'Empezar mi aventura',

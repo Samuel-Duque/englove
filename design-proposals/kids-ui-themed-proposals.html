@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Englove Kids — Propuestas con Identidad y Lema (D &amp; E)</title>
+  <title>Upward English Kids — Diseño Zorro Explorador</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect x='1.5' y='1.5' width='33' height='33' rx='9' fill='%23FFCA3A' stroke='%234A2511' stroke-width='2.5'/%3E%3Cpath d='M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z' fill='%23C6470B' stroke='%232B150A' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpath d='M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z' fill='%23B9251D' stroke='%232B150A' stroke-width='1.9' stroke-linejoin='round'/%3E%3Cpath d='M18 10.6L20.3 13.6L18 16.6L15.7 13.6Z' fill='%23FFFDF5'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Nunito:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     /* ==========================================================================
-       0. RESET & ACCESSIBILITY BASE
+       0. RESET & ACCESSIBILITY BASE (WCAG 2.2 AA)
        ========================================================================== */
     *, *::before, *::after { box-sizing: border-box; }
     html { color-scheme: light; -webkit-text-size-adjust: 100%; }
@@ -23,7 +24,7 @@
       -webkit-font-smoothing: antialiased;
     }
     img, svg { display: block; max-width: 100%; }
-    button, a { font: inherit; color: inherit; }
+    button, a, input, select, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; }
 
     .visually-hidden:where(:not(:focus-within, :active)) {
@@ -57,7 +58,7 @@
     }
 
     /* ==========================================================================
-       1. STUDIO PRESENTATION BAR
+       1. STUDIO PRESENTATION BAR (PREVIEW CONTROLS ONLY)
        ========================================================================== */
     .studio-bar {
       position: sticky;
@@ -82,17 +83,21 @@
     .studio-brand {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.55rem;
       font-size: 0.82rem;
       font-weight: 700;
       color: #FFD27D;
       white-space: nowrap;
     }
-    .studio-brand__dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #E6392E, #FFCA3A);
+    .studio-brand__mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 7px;
+      background: #FFCA3A;
+      border: 1.5px solid #4A2511;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
     }
     .studio-controls {
       display: flex;
@@ -108,28 +113,34 @@
       border-radius: 0.65rem;
       padding: 0.15rem;
       gap: 0.15rem;
+      flex-wrap: wrap;
     }
     .studio-btn {
       border: 0;
       background: transparent;
       color: #E7D6C7;
-      font-size: 0.76rem;
+      font-size: 0.75rem;
       font-weight: 700;
-      padding: 0.38rem 0.65rem;
+      padding: 0.36rem 0.62rem;
       min-block-size: 34px;
       border-radius: 0.48rem;
       transition: background-color 140ms ease-out, color 140ms ease-out;
       white-space: nowrap;
     }
     .studio-btn:hover { background: rgba(255, 255, 255, 0.12); color: #FFFFFF; }
-    .studio-btn[aria-pressed="true"] { background: #F97316; color: #1F0B02; }
+    .studio-btn[aria-pressed="true"] { background: #C6470B; color: #FFFFFF; }
     .studio-btn--outline {
-      border: 1px solid rgba(255, 200, 61, 0.35);
-      background: rgba(255, 200, 61, 0.1);
+      border: 1px solid rgba(255, 200, 61, 0.38);
+      background: rgba(255, 200, 61, 0.11);
       color: #FFE08A;
       border-radius: 0.65rem;
     }
-    .studio-btn--outline:hover { background: rgba(255, 200, 61, 0.2); color: #FFF7D6; }
+    .studio-btn--outline:hover { background: rgba(255, 200, 61, 0.22); color: #FFF7D6; }
+    .studio-btn--outline[aria-pressed="true"] {
+      background: #FFCA3A;
+      color: #2B150A;
+      border-color: #FFCA3A;
+    }
     .studio-btn:focus-visible { outline: 3px solid #FFD23F; outline-offset: 2px; }
 
     .studio-restore-btn {
@@ -141,6 +152,7 @@
       background: #1B1310;
       color: #FFF7D6;
       padding: 0.65rem 1rem;
+      min-block-size: 48px;
       border-radius: 999px;
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       font-size: 0.8125rem;
@@ -150,7 +162,7 @@
     .studio-restore-btn[hidden] { display: none; }
 
     /* ==========================================================================
-       2. VIEWPORT STAGE (DESKTOP / TABLET / MOBILE)
+       2. VIEWPORT STAGE & ZORRO EXPLORADOR DESIGN TOKENS ([data-theme="kids"])
        ========================================================================== */
     .stage {
       min-height: calc(100vh - 54px);
@@ -164,6 +176,39 @@
       padding: 1.5rem 1rem 2.5rem;
       background: radial-gradient(circle at top, #2D201B 0%, #19110E 70%);
     }
+
+    :root {
+      --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+      --font-body: 'Nunito', system-ui, sans-serif;
+
+      --app-bg: #FFF9EC;
+      --surface-1: #FFFFFF;
+      --surface-2: #FFF2D6;
+      --surface-featured: #FFF9E6;
+      --surface-soft-red: #FFE6E1;
+      --surface-soft-orange: #FFECD6;
+      --surface-soft-yellow: #FFF2B3;
+
+      --ink-1: #2B150A;
+      --ink-2: #61361F;
+
+      --red: #B9251D;
+      --red-hover: #991D16;
+      --orange: #C6470B;
+      --orange-hover: #A53906;
+      --yellow: #FFCA3A;
+      --yellow-hover: #FFD55C;
+
+      --status-ok-bg: #E6F5EA;
+      --status-ok-ink: #14532D;
+
+      --border-strong: #4A2511;
+      --border-dashed: #C78E54;
+      --border-soft: #E8C79B;
+      --radius-card: 22px;
+      --radius-btn: 14px;
+    }
+
     .viewport-shell {
       width: 100%;
       min-height: calc(100vh - 54px);
@@ -174,6 +219,16 @@
       overflow-x: clip;
       transition: max-width 220ms ease-out, border-radius 220ms ease-out;
     }
+    .viewport-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(198, 71, 11, 0.08) 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
     .stage[data-device="tablet"] .viewport-shell {
       max-width: 820px;
       min-height: 920px;
@@ -190,107 +245,16 @@
     }
 
     /* ==========================================================================
-       3. TWO IDENTITY PROPOSALS WITH SLOGANS
-       D: "Zorro Explorador" — "Explora, habla y descubre tu inglés"
-       E: "Cohete Sol"       — "Despega con cada palabra"
-       ========================================================================== */
-    .viewport-shell[data-proposal="d"] {
-      --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
-      --font-body: 'Nunito', system-ui, sans-serif;
-
-      --app-bg: #FFF9EC;
-      --surface-1: #FFFFFF;
-      --surface-2: #FFF2D6;
-      --surface-soft-red: #FFE6E1;
-      --surface-soft-orange: #FFECD6;
-      --surface-soft-yellow: #FFF2B3;
-
-      --ink-1: #2B150A;
-      --ink-2: #61361F;
-
-      --red: #B9251D;
-      --red-hover: #991D16;
-      --orange: #C6470B;
-      --orange-hover: #A53906;
-      --yellow: #FFCA3A;
-
-      --border-strong: #4A2511;
-      --border-soft: #E8C79B;
-      --radius-card: 22px;
-      --radius-btn: 14px;
-    }
-
-    .viewport-shell[data-proposal="e"] {
-      --font-display: 'Fredoka', system-ui, sans-serif;
-      --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
-
-      --app-bg: #FFF6EB;
-      --surface-1: #FFFFFF;
-      --surface-2: #FFEEDB;
-      --surface-soft-red: #FFE4E6;
-      --surface-soft-orange: #FFE8D4;
-      --surface-soft-yellow: #FFF3B8;
-
-      --ink-1: #26110B;
-      --ink-2: #5E3524;
-
-      --red: #C81E2B;
-      --red-hover: #A41621;
-      --orange: #C64607;
-      --orange-hover: #A53804;
-      --yellow: #FFC727;
-
-      --border-strong: #E6B484;
-      --border-soft: #F2CFA8;
-      --radius-card: 28px;
-      --radius-btn: 18px;
-    }
-
-    /* Subtle thematic canvas texture */
-    .viewport-shell[data-proposal="d"]::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(rgba(198, 71, 11, 0.08) 1.2px, transparent 1.2px);
-      background-size: 24px 24px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .viewport-shell[data-proposal="e"]::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 auto 0;
-      height: 340px;
-      background:
-        radial-gradient(circle at 18% 12%, rgba(255, 199, 39, 0.34), transparent 44%),
-        radial-gradient(circle at 86% 10%, rgba(200, 30, 43, 0.14), transparent 40%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Identity visibility switching */
-    .viewport-shell[data-proposal="d"] .only-e { display: none !important; }
-    .viewport-shell[data-proposal="e"] .only-d { display: none !important; }
-
-    /* ==========================================================================
-       4. HEADER & BRANDING WITH SLOGAN
+       3. HEADER & NEW UPWARD ENGLISH BRAND EMBLEM
        ========================================================================== */
     .app-header {
       position: sticky;
       top: 0;
       z-index: 50;
       backdrop-filter: blur(8px);
-    }
-    .viewport-shell[data-proposal="d"] .app-header {
       background: rgba(255, 249, 236, 0.96);
-      border-bottom: 2px dashed #C78E54;
+      border-bottom: 2px dashed var(--border-dashed);
     }
-    .viewport-shell[data-proposal="e"] .app-header {
-      background: rgba(255, 255, 255, 0.95);
-      border-bottom: 3px solid #F2CCA0;
-    }
-
     .app-header__inner {
       max-width: 1140px;
       margin: 0 auto;
@@ -298,7 +262,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.9rem;
+      gap: 0.85rem;
     }
 
     .brand-link {
@@ -308,27 +272,21 @@
       text-decoration: none;
       min-block-size: 48px;
       border-radius: 14px;
+      flex-shrink: 0;
     }
-
     .brand-emblem {
       width: 46px;
       height: 46px;
       border-radius: 14px;
+      background: var(--yellow);
+      border: 2px solid var(--border-strong);
+      box-shadow: 2px 2px 0 var(--border-strong);
       display: grid;
       place-items: center;
       flex-shrink: 0;
+      transition: transform 140ms ease-out;
     }
-    .viewport-shell[data-proposal="d"] .brand-emblem {
-      background: #FFCA3A;
-      border: 2px solid #4A2511;
-      box-shadow: 2px 2px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .brand-emblem {
-      background: linear-gradient(145deg, #C81E2B 0%, #F97316 100%);
-      border-radius: 16px;
-      box-shadow: 0 4px 0 #8E121C;
-    }
-
+    .brand-link:hover .brand-emblem { transform: translateY(-1px); }
     .brand-text {
       display: flex;
       flex-direction: column;
@@ -336,16 +294,18 @@
     }
     .brand-name {
       font-family: var(--font-display);
-      font-size: 1.38rem;
+      font-size: 1.25rem;
       font-weight: 800;
       letter-spacing: -0.02em;
       color: var(--ink-1);
+      white-space: nowrap;
     }
     .brand-slogan {
       font-size: 0.72rem;
       font-weight: 800;
       color: var(--orange);
       margin-top: 2px;
+      white-space: nowrap;
     }
 
     .nav-list {
@@ -354,75 +314,69 @@
       padding: 0;
       display: flex;
       align-items: center;
-      gap: 0.3rem;
+      gap: 0.28rem;
     }
-
     .nav-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.38rem;
       min-block-size: 48px;
       min-inline-size: 48px;
-      padding: 0.5rem 0.9rem;
+      padding: 0.48rem 0.82rem;
       border-radius: 14px;
       border: 2px solid transparent;
       background: transparent;
       color: var(--ink-2);
       font-weight: 700;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       transition: background-color 140ms ease-out, color 140ms ease-out, transform 120ms ease-out;
+      white-space: nowrap;
     }
     .nav-btn:hover { background: var(--surface-soft-yellow); color: var(--ink-1); }
     .nav-btn:active { transform: scale(0.97); }
-    .nav-btn[aria-current="page"] { font-weight: 800; }
-
-    .viewport-shell[data-proposal="d"] .nav-btn[aria-current="page"] {
-      background: #C6470B;
+    .nav-btn[aria-current="page"] {
+      font-weight: 800;
+      background: var(--orange);
       color: #FFFFFF;
-      border-color: #4A2511;
-      box-shadow: 2px 2px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .nav-btn[aria-current="page"] {
-      background: #C81E2B;
-      color: #FFFFFF;
-      box-shadow: 0 4px 0 #8E121C;
+      border-color: var(--border-strong);
+      box-shadow: 2px 2px 0 var(--border-strong);
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.42rem;
+      flex-shrink: 0;
     }
-
     .level-pill {
-      padding: 0.32rem 0.72rem;
+      padding: 0.3rem 0.7rem;
       border-radius: 999px;
-      font-size: 0.8rem;
+      font-size: 0.79rem;
       font-weight: 800;
-      background: var(--surface-soft-yellow);
+      background: #FFE58F;
       color: var(--ink-1);
-      border: 1.5px solid #DFB04A;
+      border: 1.5px solid var(--border-strong);
       white-space: nowrap;
     }
-    .viewport-shell[data-proposal="d"] .level-pill {
-      border: 1.5px solid #4A2511;
-      background: #FFE58F;
-    }
-
     .profile-chip {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.42rem;
       min-block-size: 48px;
-      padding: 0.3rem 0.8rem 0.3rem 0.4rem;
+      min-inline-size: 48px;
+      padding: 0.28rem 0.78rem 0.28rem 0.38rem;
       border-radius: 999px;
-      border: 2px solid var(--border-soft);
+      border: 2px solid var(--border-strong);
       background: #FFFFFF;
       font-weight: 800;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
+      transition: background-color 140ms ease-out;
     }
-    .viewport-shell[data-proposal="d"] .profile-chip { border-color: #4A2511; }
-
+    .profile-chip:hover { background: var(--surface-soft-yellow); }
+    .profile-chip[aria-current="page"] {
+      background: var(--yellow);
+      box-shadow: 2px 2px 0 var(--border-strong);
+    }
     .avatar-circle {
       width: 34px;
       height: 34px;
@@ -433,12 +387,12 @@
       font-weight: 800;
       display: grid;
       place-items: center;
+      flex-shrink: 0;
     }
-
     .logout-btn {
       min-block-size: 48px;
       min-inline-size: 48px;
-      padding: 0.45rem 0.75rem;
+      padding: 0.42rem 0.72rem;
       border-radius: 14px;
       border: 2px solid transparent;
       background: transparent;
@@ -447,21 +401,57 @@
       font-weight: 700;
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
+      justify-content: center;
+      gap: 0.32rem;
     }
-    .logout-btn:hover { background: var(--surface-soft-red); color: var(--red); }
+    .logout-btn:hover { background: var(--surface-soft-red); color: var(--red); border-color: #EE9F97; }
+
+    /* Offline Banner (Non-blocking, honest local queue) */
+    .offline-banner {
+      position: relative;
+      z-index: 40;
+      background: #FFE6CC;
+      border-bottom: 2px solid var(--border-strong);
+      color: var(--ink-1);
+    }
+    .offline-banner[hidden] { display: none; }
+    .offline-banner__inner {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.86rem;
+      font-weight: 800;
+    }
+    .offline-banner__msg {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .offline-queue-pill {
+      padding: 0.25rem 0.68rem;
+      border-radius: 999px;
+      background: #FFFFFF;
+      border: 1.5px solid var(--border-strong);
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
 
     .mobile-bottom-nav { display: none; }
 
     /* ==========================================================================
-       5. MAIN & HERO WITH IDENTITY + SLOGAN
+       4. MAIN LAYOUT, HERO & WEEKLY STREAK LOGBOOK
        ========================================================================== */
     .app-main {
       position: relative;
       z-index: 1;
       max-width: 1140px;
       margin: 0 auto;
-      padding: 1.65rem 1.25rem 3.5rem;
+      padding: 1.65rem 1.25rem 4rem;
     }
     .screen-panel[hidden] { display: none; }
     .screen-stack { display: flex; flex-direction: column; gap: 1.65rem; }
@@ -482,21 +472,9 @@
       gap: 1.25rem;
       position: relative;
       overflow: hidden;
-    }
-
-    /* Proposal D Hero: Expedition Journal Cover */
-    .viewport-shell[data-proposal="d"] .hero-card {
       background: linear-gradient(135deg, #FFF0C4 0%, #FFE0A3 100%);
-      border: 2.5px solid #4A2511;
-      box-shadow: 5px 5px 0 #4A2511;
-    }
-
-    /* Proposal E Hero: Solar Launch Deck */
-    .viewport-shell[data-proposal="e"] .hero-card {
-      background: linear-gradient(135deg, #C81E2B 0%, #E85D04 65%, #F59E0B 100%);
-      color: #FFFFFF;
-      border: 3px solid #9A1520;
-      box-shadow: 0 8px 0 #8E131D;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
     }
 
     .identity-tag {
@@ -508,15 +486,9 @@
       font-size: 0.8rem;
       font-weight: 800;
       margin-bottom: 0.75rem;
-    }
-    .viewport-shell[data-proposal="d"] .identity-tag {
       background: #FFFFFF;
       color: #8F2C06;
-      border: 1.5px solid #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .identity-tag {
-      background: #FFC727;
-      color: #26110B;
+      border: 1.5px solid var(--border-strong);
     }
 
     .hero-title {
@@ -524,32 +496,23 @@
       font-size: clamp(1.65rem, 2.7vw, 2.2rem);
       font-weight: 800;
       line-height: 1.14;
-      margin: 0 0 0.45rem;
+      margin: 0 0 0.42rem;
       letter-spacing: -0.02em;
     }
-
     .hero-lema {
       margin: 0 0 0.45rem;
       font-family: var(--font-display);
-      font-size: 1.05rem;
+      font-size: 1.04rem;
       font-weight: 700;
       color: var(--red);
     }
-    .viewport-shell[data-proposal="e"] .hero-lema {
-      color: #FFE699;
-    }
-
     .hero-subtitle {
       margin: 0 0 1.15rem;
       font-size: 0.96rem;
-      line-height: 1.45;
+      line-height: 1.48;
       color: var(--ink-2);
-      max-width: 50ch;
+      max-width: 52ch;
     }
-    .viewport-shell[data-proposal="e"] .hero-subtitle {
-      color: #FFF4E8;
-    }
-
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
@@ -559,71 +522,42 @@
     .quick-pill {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 0.45rem;
       min-block-size: 48px;
-      padding: 0.55rem 1.05rem;
+      padding: 0.52rem 0.95rem;
       border-radius: var(--radius-btn);
+      font-family: var(--font-display);
       font-weight: 800;
-      font-size: 0.9rem;
-      border: 2px solid transparent;
-      transition: transform 120ms ease-out, background-color 140ms ease-out;
+      font-size: 0.89rem;
+      border: 2px solid var(--border-strong);
+      box-shadow: 0 3px 0 var(--border-strong);
+      transition: transform 120ms ease-out, background-color 140ms ease-out, box-shadow 120ms ease-out;
     }
-    .quick-pill:active { transform: scale(0.97); }
-
-    .viewport-shell[data-proposal="d"] .quick-pill--primary {
-      background: #B9251D;
-      color: #FFFFFF;
-      border-color: #4A2511;
-      box-shadow: 0 3px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="d"] .quick-pill--primary:hover { background: #991D16; }
-    .viewport-shell[data-proposal="d"] .quick-pill--secondary {
-      background: #FFFFFF;
-      color: #2B150A;
-      border-color: #4A2511;
-      box-shadow: 0 3px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="d"] .quick-pill--secondary:hover { background: #FFF8E6; }
-
-    .viewport-shell[data-proposal="e"] .quick-pill--primary {
-      background: #FFC727;
-      color: #26110B;
-      box-shadow: 0 4px 0 #A87600;
-    }
-    .viewport-shell[data-proposal="e"] .quick-pill--primary:hover { background: #FFD659; }
-    .viewport-shell[data-proposal="e"] .quick-pill--secondary {
-      background: rgba(255, 255, 255, 0.18);
-      color: #FFFFFF;
-      border-color: rgba(255, 255, 255, 0.5);
-    }
-    .viewport-shell[data-proposal="e"] .quick-pill--secondary:hover { background: rgba(255, 255, 255, 0.28); }
+    .quick-pill:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--border-strong); }
+    .quick-pill--primary { background: var(--red); color: #FFFFFF; }
+    .quick-pill--primary:hover { background: var(--red-hover); }
+    .quick-pill--secondary { background: #FFFFFF; color: var(--ink-1); }
+    .quick-pill--secondary:hover { background: #FFF8E6; }
 
     .hero-mascot {
-      width: 136px;
-      height: 136px;
+      width: 140px;
+      height: 140px;
       flex-shrink: 0;
     }
 
-    /* Streak / Passport Card (Weekly Forgivable Streak) */
+    /* Weekly Forgivable Streak Card */
     .streak-card {
-      background: var(--surface-1);
       border-radius: var(--radius-card);
       padding: 1.35rem 1.45rem;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 0.85rem;
-    }
-    .viewport-shell[data-proposal="d"] .streak-card {
-      border: 2.5px solid #4A2511;
-      box-shadow: 5px 5px 0 #4A2511;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
       background: #FFFDF7;
     }
-    .viewport-shell[data-proposal="e"] .streak-card {
-      border: 3px solid #F2CCA0;
-      box-shadow: 0 6px 0 #E5BC8E;
-    }
-
     .streak-top {
       display: flex;
       align-items: center;
@@ -633,27 +567,20 @@
       width: 56px;
       height: 56px;
       border-radius: 16px;
+      background: #FFE2A8;
+      border: 2px solid var(--border-strong);
       display: grid;
       place-items: center;
       flex-shrink: 0;
     }
-    .viewport-shell[data-proposal="d"] .streak-badge {
-      background: #FFE2A8;
-      border: 2px solid #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .streak-badge {
-      background: linear-gradient(145deg, #FFC727, #F97316);
-    }
-
     .streak-label { margin: 0; font-size: 0.84rem; font-weight: 700; color: var(--ink-2); }
     .streak-value {
       margin: 0.1rem 0 0;
       font-family: var(--font-display);
-      font-size: 1.48rem;
+      font-size: 1.46rem;
       font-weight: 800;
       line-height: 1.15;
     }
-
     .week-track {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -662,7 +589,8 @@
     .week-cell {
       padding: 0.45rem 0.25rem;
       border-radius: 12px;
-      background: #FFE79E;
+      border: 1.5px solid var(--border-strong);
+      background: #FFF0BE;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -671,27 +599,35 @@
       font-weight: 800;
       color: var(--ink-1);
     }
-    .viewport-shell[data-proposal="d"] .week-cell {
-      border: 1.5px solid #4A2511;
-      background: #FFF0BE;
-    }
-
-    .shield-pill {
+    .shield-btn {
       display: flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.5rem 0.75rem;
+      justify-content: space-between;
+      gap: 0.5rem;
+      width: 100%;
+      min-block-size: 48px;
+      padding: 0.48rem 0.78rem;
       border-radius: 12px;
       background: #FFF3D1;
-      border: 1.5px solid #DFB04A;
+      border: 1.5px solid var(--border-strong);
       font-size: 0.8rem;
       font-weight: 800;
-      color: #4A2511;
+      color: var(--border-strong);
+      text-align: left;
     }
-    .viewport-shell[data-proposal="d"] .shield-pill { border: 1.5px solid #4A2511; }
+    .shield-btn:hover { background: #FFE8A3; }
+    .shield-btn__left { display: flex; align-items: center; gap: 0.45rem; }
+    .shield-btn__hint {
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--ink-2);
+      padding: 0.14rem 0.45rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+    }
 
     /* ==========================================================================
-       6. SECTION BAR & FILTERS
+       5. SECTION BAR, FILTERS & CARDS
        ========================================================================== */
     .section-bar {
       display: flex;
@@ -721,7 +657,7 @@
       min-block-size: 48px;
       padding: 0.48rem 1rem;
       border-radius: 999px;
-      border: 2px solid var(--border-soft);
+      border: 2px solid var(--border-strong);
       background: #FFFFFF;
       color: var(--ink-1);
       font-weight: 800;
@@ -733,17 +669,10 @@
     }
     .filter-chip:hover { background: var(--surface-soft-yellow); }
     .filter-chip:active { transform: scale(0.97); }
-    .viewport-shell[data-proposal="d"] .filter-chip { border-color: #4A2511; }
-    .viewport-shell[data-proposal="d"] .filter-chip[aria-pressed="true"] {
-      background: #C6470B;
+    .filter-chip[aria-pressed="true"] {
+      background: var(--orange);
       color: #FFFFFF;
-      box-shadow: 2px 2px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .filter-chip[aria-pressed="true"] {
-      background: #C81E2B;
-      color: #FFFFFF;
-      border-color: #8E121C;
-      box-shadow: 0 4px 0 #8E121C;
+      box-shadow: 2px 2px 0 var(--border-strong);
     }
     .chip-count {
       min-width: 24px;
@@ -757,66 +686,31 @@
     }
     .filter-chip[aria-pressed="true"] .chip-count { background: rgba(255, 255, 255, 0.24); }
 
-    /* ==========================================================================
-       7. MISSIONS LAYOUT (PROPOSAL D: EXPEDITION TRAIL | PROPOSAL E: LAUNCH CARDS)
-       ========================================================================== */
-    /* Proposal D: Expedition Route Timeline + Passport Cards */
-    .viewport-shell[data-proposal="d"] .missions-layout {
+    .missions-layout {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1.25rem;
     }
-
-    /* Proposal E: Featured Mission Spotlight + 3 Launch Cards */
-    .viewport-shell[data-proposal="e"] .missions-layout {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1.25rem;
-    }
-    .viewport-shell[data-proposal="e"] .mission-card--featured {
-      grid-column: 1 / -1;
-    }
-    .viewport-shell[data-proposal="e"] .mission-card--featured .mission-card__inner {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
-      align-items: center;
-      gap: 1.5rem;
-    }
-
     .mission-card {
       background: #FFFFFF;
       border-radius: var(--radius-card);
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 4px 4px 0 var(--border-strong);
       position: relative;
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
     .mission-card[hidden] { display: none; }
+    .mission-card--featured { background: var(--surface-featured); }
 
-    .viewport-shell[data-proposal="d"] .mission-card {
-      border: 2.5px solid #4A2511;
-      box-shadow: 4px 4px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="d"] .mission-card--featured {
-      background: #FFF9E6;
-    }
-
-    .viewport-shell[data-proposal="e"] .mission-card {
-      border: 3px solid #F2CCA0;
-      box-shadow: 0 6px 0 #E5BC8E;
-    }
-    .viewport-shell[data-proposal="e"] .mission-card--featured {
-      background: linear-gradient(135deg, #FFF7E8 0%, #FFE9CF 100%);
-      border-color: #E8964A;
-    }
-
-    /* Stamp header for Proposal D */
     .expedition-strip {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.5rem;
       padding: 0.65rem 1.25rem;
-      border-bottom: 2px dashed #C78E54;
+      border-bottom: 2px dashed var(--border-dashed);
       font-size: 0.82rem;
       font-weight: 800;
     }
@@ -824,6 +718,7 @@
     .expedition-strip--fill { background: #FFE6CC; color: #872E06; }
     .expedition-strip--open { background: #FFF0B3; color: #543200; }
     .expedition-strip--exam { background: #FFEAD5; color: #6B2809; }
+    .expedition-strip--neutral { background: var(--surface-2); color: var(--ink-1); }
 
     .mission-card__inner {
       padding: 1.25rem 1.35rem 1.35rem;
@@ -834,43 +729,11 @@
       flex: 1;
     }
 
-    .card-meta-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .type-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.3rem 0.72rem;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      font-weight: 800;
-    }
-    .type-badge--speaking { background: #FFE2E4; color: #8F131D; }
-    .type-badge--fill { background: #FFE7D1; color: #8A2E05; }
-    .type-badge--open { background: #FFF0B3; color: #573300; }
-    .type-badge--exam { background: #FDE2CE; color: #7C2408; }
-
-    .mission-code {
-      font-size: 0.78rem;
-      font-weight: 800;
-      padding: 0.24rem 0.62rem;
-      border-radius: 999px;
-      background: var(--surface-2);
-      color: var(--ink-2);
-    }
-
     .card-title-row {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 0.65rem;
-      margin-top: 0.55rem;
     }
     .card-title {
       font-family: var(--font-display);
@@ -885,27 +748,23 @@
       min-width: 48px;
       min-height: 48px;
       border-radius: 14px;
-      border: 2px solid var(--border-soft);
-      background: var(--surface-soft-yellow);
+      border: 2px solid var(--border-strong);
+      background: var(--yellow);
       color: var(--ink-1);
+      box-shadow: 2px 2px 0 var(--border-strong);
       display: grid;
       place-items: center;
       transition: background-color 140ms ease-out, transform 120ms ease-out;
     }
-    .viewport-shell[data-proposal="d"] .tts-btn {
-      border-color: #4A2511;
-      background: #FFCA3A;
-      box-shadow: 2px 2px 0 #4A2511;
-    }
-    .tts-btn:hover { background: #FFD659; }
+    .tts-btn:hover { background: var(--yellow-hover); }
     .tts-btn:active { transform: scale(0.95); }
-    .tts-btn[aria-pressed="true"] { background: var(--red); color: #FFFFFF; border-color: var(--red); }
+    .tts-btn[aria-pressed="true"] { background: var(--red); color: #FFFFFF; border-color: var(--border-strong); }
 
     .card-due {
       display: flex;
       align-items: center;
       gap: 0.42rem;
-      margin: 0.6rem 0 0;
+      margin: 0.55rem 0 0;
       font-size: 0.86rem;
       font-weight: 700;
       color: var(--ink-2);
@@ -915,42 +774,43 @@
       margin-top: 0.7rem;
       padding: 0.58rem 0.82rem;
       border-radius: 13px;
-      font-size: 0.82rem;
+      font-size: 0.83rem;
       font-weight: 700;
-      line-height: 1.35;
+      line-height: 1.38;
       display: flex;
       align-items: flex-start;
       gap: 0.45rem;
     }
-    .callout--grace { background: #FFF2C2; color: #522B04; border: 1.5px solid #E5B44A; }
-    .callout--retry { background: #FFE6E3; color: #7D1712; border: 1.5px solid #EE9F97; }
-    .callout--hint { background: var(--surface-2); color: var(--ink-2); }
+    .callout--grace { background: #FFF2C2; color: #522B04; border: 1.5px solid #D9A438; }
+    .callout--retry { background: #FFE6E3; color: #7D1712; border: 1.5px solid #E58C83; }
+    .callout--hint { background: var(--surface-2); color: var(--ink-2); border: 1.5px solid var(--border-soft); }
+    .callout--ok { background: var(--status-ok-bg); color: var(--status-ok-ink); border: 1.5px solid #68B07B; }
 
     .score-strip {
       margin-top: 0.75rem;
       padding: 0.7rem 0.9rem;
       border-radius: 14px;
       background: #FFF4C7;
-      border: 1.5px solid #E5B852;
+      border: 2px solid var(--border-strong);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.65rem;
       flex-wrap: wrap;
     }
-    .viewport-shell[data-proposal="d"] .score-strip { border: 2px solid #4A2511; }
     .score-val { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; }
     .score-sub { display: block; font-size: 0.76rem; font-weight: 700; color: var(--ink-2); }
     .stars-row { display: inline-flex; gap: 0.2rem; }
     .star-icon { width: 24px; height: 24px; }
 
-    /* Buttons (>= 52px tall, AA contrast verified) */
+    /* Tactile Buttons (>= 52px tall, WCAG AA verified) */
     .btn {
       width: 100%;
       min-block-size: 52px;
       padding: 0.72rem 1.1rem;
       border-radius: var(--radius-btn);
-      border: 2px solid transparent;
+      border: 2px solid var(--border-strong);
+      box-shadow: 0 4px 0 var(--border-strong);
       font-family: var(--font-display);
       font-size: 1rem;
       font-weight: 800;
@@ -958,29 +818,23 @@
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      transition: transform 120ms ease-out, background-color 140ms ease-out;
+      text-decoration: none;
+      transition: transform 120ms ease-out, background-color 140ms ease-out, box-shadow 120ms ease-out;
     }
-    .btn:active { transform: translateY(2px) scale(0.98); }
-
+    .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--border-strong); }
+    .btn--auto { width: auto; }
     .btn--red { background: var(--red); color: #FFFFFF; }
     .btn--red:hover { background: var(--red-hover); }
     .btn--orange { background: var(--orange); color: #FFFFFF; }
     .btn--orange:hover { background: var(--orange-hover); }
-    .btn--yellow { background: var(--yellow); color: #26110B; }
-    .btn--yellow:hover { background: #FFD55C; }
-    .btn--secondary { background: var(--surface-2); color: var(--ink-1); border-color: var(--border-soft); }
+    .btn--yellow { background: var(--yellow); color: var(--ink-1); }
+    .btn--yellow:hover { background: var(--yellow-hover); }
+    .btn--secondary { background: var(--surface-2); color: var(--ink-1); }
     .btn--secondary:hover { background: var(--surface-soft-yellow); }
-
-    .viewport-shell[data-proposal="d"] .btn {
-      border-color: #4A2511;
-      box-shadow: 0 4px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .btn--red { box-shadow: 0 5px 0 #89111B; }
-    .viewport-shell[data-proposal="e"] .btn--orange { box-shadow: 0 5px 0 #8E2D03; }
-    .viewport-shell[data-proposal="e"] .btn--yellow { box-shadow: 0 5px 0 #B37E00; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
     /* ==========================================================================
-       8. SCREEN 2: ZONA DE MICROJUEGOS (/juegos)
+       6. SCREEN 2: CAMPAMENTO DE MICROJUEGOS (/juegos) + INTERACTIVE DEMO
        ========================================================================== */
     .games-banner {
       border-radius: var(--radius-card);
@@ -990,32 +844,23 @@
       align-items: center;
       justify-content: space-between;
       gap: 1.25rem;
-    }
-    .viewport-shell[data-proposal="d"] .games-banner {
       background: linear-gradient(135deg, #FFE2B3 0%, #FFD494 100%);
-      border: 2.5px solid #4A2511;
-      box-shadow: 5px 5px 0 #4A2511;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
     }
-    .viewport-shell[data-proposal="e"] .games-banner {
-      background: linear-gradient(135deg, #C81E2B 0%, #E85D04 100%);
-      color: #FFFFFF;
-      border: 3px solid #96141F;
-      box-shadow: 0 7px 0 #8A121C;
-    }
-
     .practice-stats { display: flex; gap: 0.75rem; flex-wrap: wrap; }
     .practice-pill {
       padding: 0.7rem 1rem;
       border-radius: 16px;
       background: #FFFFFF;
       color: var(--ink-1);
+      border: 2px solid var(--border-strong);
+      box-shadow: 3px 3px 0 var(--border-strong);
       display: flex;
       align-items: center;
       gap: 0.6rem;
       font-weight: 800;
     }
-    .viewport-shell[data-proposal="d"] .practice-pill { border: 2px solid #4A2511; box-shadow: 3px 3px 0 #4A2511; }
-    .viewport-shell[data-proposal="e"] .practice-pill { box-shadow: 0 4px 0 rgba(120, 16, 20, 0.35); }
     .practice-num { font-family: var(--font-display); font-size: 1.4rem; line-height: 1; }
     .practice-lbl { display: block; font-size: 0.76rem; color: var(--ink-2); }
 
@@ -1027,46 +872,38 @@
     .game-card {
       background: #FFFFFF;
       border-radius: var(--radius-card);
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 4px 4px 0 var(--border-strong);
       overflow: hidden;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
     .game-card[hidden] { display: none; }
-    .viewport-shell[data-proposal="d"] .game-card {
-      border: 2.5px solid #4A2511;
-      box-shadow: 4px 4px 0 #4A2511;
-    }
-    .viewport-shell[data-proposal="e"] .game-card {
-      border: 3px solid #F2CCA0;
-      box-shadow: 0 6px 0 #E5BC8E;
-    }
-
     .game-top {
       padding: 1.05rem 1.2rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.75rem;
+      border-bottom: 2px dashed var(--border-dashed);
     }
     .game-top--order { background: #FFE2C4; }
     .game-top--mem   { background: #FFECA8; }
     .game-top--match { background: #FFF1BD; }
     .game-top--drag  { background: #FFE0DB; }
     .game-top--timed { background: #FFD8C2; }
-    .viewport-shell[data-proposal="d"] .game-top { border-bottom: 2px dashed #C78E54; }
 
     .mech-icon {
       width: 52px;
       height: 52px;
       border-radius: 14px;
       background: #FFFFFF;
+      border: 2px solid var(--border-strong);
+      box-shadow: 2px 2px 0 var(--border-strong);
       display: grid;
       place-items: center;
     }
-    .viewport-shell[data-proposal="d"] .mech-icon { border: 2px solid #4A2511; box-shadow: 2px 2px 0 #4A2511; }
-    .viewport-shell[data-proposal="e"] .mech-icon { box-shadow: 0 4px 0 rgba(150, 70, 20, 0.2); }
-
     .game-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
     .mech-pill {
       padding: 0.22rem 0.68rem;
@@ -1074,10 +911,17 @@
       background: #FFFFFF;
       font-size: 0.76rem;
       font-weight: 800;
-      border: 1.5px solid rgba(43, 21, 10, 0.22);
+      border: 1.5px solid var(--border-strong);
     }
-    .viewport-shell[data-proposal="d"] .mech-pill { border-color: #4A2511; }
-
+    .mission-code {
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--ink-2);
+      border: 1.5px solid var(--border-soft);
+    }
     .game-body {
       padding: 1.15rem 1.25rem 1.25rem;
       display: flex;
@@ -1098,174 +942,596 @@
     .game-attempts { font-size: 0.78rem; font-weight: 800; color: var(--ink-2); }
     .game-motivation { margin: 0.45rem 0 0; font-size: 0.86rem; font-weight: 700; color: var(--ink-2); }
 
+    /* Interactive Mini-Game Workbench (Hybrid Tap + Keyboard Order Words) */
+    .game-playground {
+      background: #FFFDF7;
+      border-radius: var(--radius-card);
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
+      overflow: hidden;
+    }
+    .game-playground[hidden] { display: none; }
+    .game-playground__body {
+      padding: 1.35rem 1.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .sentence-tray {
+      min-height: 68px;
+      padding: 0.75rem;
+      border-radius: 16px;
+      background: #FFF9EC;
+      border: 2px dashed var(--border-dashed);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .word-bank {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .word-tile {
+      min-height: 48px;
+      min-width: 64px;
+      padding: 0.55rem 1rem;
+      border-radius: 14px;
+      border: 2px solid var(--border-strong);
+      background: #FFFFFF;
+      box-shadow: 0 3px 0 var(--border-strong);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--ink-1);
+    }
+    .word-tile:hover:not(:disabled) { background: var(--surface-soft-yellow); }
+    .word-tile--placed { background: #FFCA3A; }
+    .word-tile:disabled { opacity: 0.42; box-shadow: none; cursor: default; }
+
     /* ==========================================================================
-       9. TOAST & NATIVE DIALOG
+       7. SCREEN 3: CUADERNO DE CAMPO — ACTIVIDAD (/actividad/[attemptId])
        ========================================================================== */
+    .notebook-shell {
+      background: #FFFFFF;
+      border-radius: var(--radius-card);
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
+      overflow: hidden;
+    }
+    .notebook-head {
+      padding: 1rem 1.35rem;
+      background: #FFF0C4;
+      border-bottom: 2px dashed var(--border-dashed);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .back-btn {
+      min-height: 48px;
+      padding: 0.45rem 0.9rem;
+      border-radius: 12px;
+      border: 2px solid var(--border-strong);
+      background: #FFFFFF;
+      font-weight: 800;
+      font-size: 0.88rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .back-btn:hover { background: var(--surface-soft-yellow); }
+
+    .sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.78rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      border: 1.5px solid var(--border-strong);
+      background: var(--status-ok-bg);
+      color: var(--status-ok-ink);
+    }
+    .sync-badge--local {
+      background: #FFE6CC;
+      color: #6B2809;
+    }
+
+    .notebook-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .step-trail {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .step-dot {
+      flex: 1;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border-strong);
+    }
+    .step-dot--done { background: var(--orange); }
+    .step-dot--current { background: var(--yellow); }
+
+    .prompt-box {
+      padding: 1.25rem;
+      border-radius: 18px;
+      background: #FFF9EC;
+      border: 2px solid var(--border-strong);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .fill-sentence {
+      font-size: 1.12rem;
+      font-weight: 700;
+      line-height: 2.1;
+      color: var(--ink-1);
+    }
+    .fill-select {
+      min-height: 48px;
+      padding: 0.35rem 0.85rem;
+      margin: 0 0.25rem;
+      border-radius: 12px;
+      border: 2px solid var(--border-strong);
+      background: #FFFFFF;
+      font-family: var(--font-display);
+      font-weight: 800;
+      color: var(--ink-1);
+      box-shadow: 2px 2px 0 var(--border-strong);
+    }
+
+    .recorder-card {
+      padding: 1.35rem;
+      border-radius: 18px;
+      background: #FFFDF7;
+      border: 2px dashed var(--border-dashed);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .record-circle {
+      min-width: 60px;
+      min-height: 60px;
+      padding: 0 1.25rem;
+      border-radius: 999px;
+      border: 2.5px solid var(--border-strong);
+      background: var(--red);
+      color: #FFFFFF;
+      box-shadow: 0 4px 0 var(--border-strong);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .record-circle[aria-pressed="true"] { background: #2B150A; }
+    .wave-bars {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 28px;
+    }
+    .wave-bars span {
+      width: 5px;
+      border-radius: 999px;
+      background: var(--orange);
+      height: 10px;
+    }
+    .wave-bars[data-recording="true"] span:nth-child(odd) { height: 24px; background: var(--red); }
+    .wave-bars[data-recording="true"] span:nth-child(even) { height: 15px; background: var(--orange); }
+
+    /* ==========================================================================
+       8. SCREEN 4: PROGRESO (/progreso) — BADGE PASSPORT & HISTORY
+       ========================================================================== */
+    .badges-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .passport-stamp {
+      padding: 1.15rem;
+      border-radius: var(--radius-card);
+      background: #FFFDF5;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 4px 4px 0 var(--border-strong);
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .passport-stamp--locked {
+      background: #FFF9EC;
+      border-style: dashed;
+      border-color: var(--border-dashed);
+      box-shadow: none;
+    }
+    .stamp-medal {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: var(--yellow);
+      border: 2px solid var(--border-strong);
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+    }
+    .passport-stamp--locked .stamp-medal {
+      background: var(--surface-2);
+      border-style: dashed;
+      border-color: var(--border-dashed);
+    }
+    .stamp-title { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; margin: 0; }
+    .stamp-desc { margin: 0; font-size: 0.84rem; color: var(--ink-2); font-weight: 700; }
+    .stamp-date { font-size: 0.76rem; font-weight: 800; color: var(--orange); }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .history-row {
+      padding: 1rem 1.25rem;
+      border-radius: 18px;
+      background: #FFFFFF;
+      border: 2px solid var(--border-strong);
+      box-shadow: 3px 3px 0 var(--border-strong);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+
+    /* ==========================================================================
+       9. SCREEN 5: FEEDBACK (/feedback) — TEACHER POSTCARDS
+       ========================================================================== */
+    .postcards-stack { display: flex; flex-direction: column; gap: 1.25rem; }
+    .postcard {
+      background: #FFFFFF;
+      border-radius: var(--radius-card);
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
+      overflow: hidden;
+    }
+    .postcard__body {
+      padding: 1.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .stickers-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .sticker-stamp {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.42rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      background: #FFF2B3;
+      border: 2px solid var(--border-strong);
+      box-shadow: 2px 2px 0 var(--border-strong);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.85rem;
+      transform: rotate(-1.5deg);
+    }
+    .sticker-stamp:nth-child(even) { background: #FFE6CC; transform: rotate(1.5deg); }
+    .teacher-note {
+      padding: 1rem 1.15rem;
+      border-radius: 16px;
+      background: #FFFDF5;
+      border: 1.5px solid var(--border-soft);
+      border-left: 5px solid var(--orange);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.9rem;
+    }
+    .teacher-note p { margin: 0; font-size: 0.96rem; font-weight: 700; color: var(--ink-1); max-width: 62ch; }
+
+    /* ==========================================================================
+       10. SCREEN 6 & 7: EXTRA (/extra) & PERFIL (/perfil)
+       ========================================================================== */
+    .extra-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+    .profile-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 1.25rem;
+    }
+    .field-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .field-label { font-size: 0.85rem; font-weight: 800; color: var(--ink-1); }
+    .field-input {
+      min-height: 48px;
+      padding: 0.55rem 0.85rem;
+      border-radius: 12px;
+      border: 2px solid var(--border-strong);
+      background: #FFFFFF;
+      font-weight: 700;
+    }
+    .segment-options {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+    .segment-card {
+      padding: 0.9rem;
+      min-height: 48px;
+      border-radius: 16px;
+      border: 2px solid var(--border-strong);
+      background: #FFFFFF;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .segment-card[aria-pressed="true"] {
+      background: #FFF0C4;
+      box-shadow: 3px 3px 0 var(--border-strong);
+    }
+
+    /* ==========================================================================
+       11. PWA UPDATE BANNER, TOAST & NATIVE DIALOGS
+       ========================================================================== */
+    .pwa-banner {
+      position: fixed;
+      left: 50%;
+      bottom: 1rem;
+      transform: translateX(-50%);
+      z-index: 280;
+      width: min(94vw, 600px);
+      background: #FFFDF7;
+      border: 2.5px solid var(--border-strong);
+      box-shadow: 5px 5px 0 var(--border-strong);
+      border-radius: 20px;
+      padding: 0.9rem 1.15rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .pwa-banner[hidden] { display: none; }
+
     .app-toast {
       position: fixed;
       left: 50%;
       bottom: 1.25rem;
       transform: translateX(-50%);
       z-index: 300;
-      background: #26110B;
-      color: #FFF9EB;
+      background: #2B150A;
+      color: #FFF9EC;
       padding: 0.8rem 1.2rem;
       border-radius: 16px;
-      border: 2px solid #FFC727;
+      border: 2px solid #FFCA3A;
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       font-size: 0.86rem;
       font-weight: 700;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-      max-width: min(92vw, 480px);
+      max-width: min(92vw, 500px);
       text-align: center;
     }
     .app-toast[hidden] { display: none; }
 
-    dialog.tokens-dialog {
-      border: 2px solid #4A2511;
+    dialog.modal-dialog {
+      border: 2.5px solid #4A2511;
       border-radius: 24px;
       padding: 0;
-      max-width: min(94vw, 680px);
+      max-width: min(94vw, 720px);
       width: 100%;
       background: #FFFDF8;
       color: #2B150A;
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     }
-    dialog.tokens-dialog::backdrop { background: rgba(25, 13, 8, 0.62); backdrop-filter: blur(3px); }
+    dialog.modal-dialog::backdrop { background: rgba(25, 13, 8, 0.62); backdrop-filter: blur(3px); }
     .dialog-head {
-      padding: 1.2rem 1.45rem;
-      border-bottom: 1.5px solid #EFE0CE;
+      padding: 1.15rem 1.4rem;
+      background: #FFF0C4;
+      border-bottom: 2px dashed #C78E54;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.75rem;
     }
-    .dialog-head h2 { margin: 0; font-size: 1.2rem; font-weight: 800; }
+    .dialog-head h2 { margin: 0; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-size: 1.24rem; font-weight: 800; }
     .dialog-close {
-      min-width: 44px;
-      min-height: 44px;
+      min-width: 48px;
+      min-height: 48px;
       border-radius: 12px;
-      border: 1.5px solid #D9C3AE;
+      border: 2px solid #4A2511;
       background: #FFFFFF;
       font-weight: 800;
     }
-    .dialog-body { padding: 1.3rem 1.45rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
-    .swatch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 0.7rem; }
-    .swatch-item { border: 1.5px solid #E6D4C2; border-radius: 14px; overflow: hidden; background: #FFFFFF; }
-    .swatch-color { height: 50px; }
+    .dialog-body { padding: 1.3rem 1.45rem 1.5rem; display: flex; flex-direction: column; gap: 1.05rem; }
+    .icon-showcase {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.15rem;
+      padding: 1rem 1.15rem;
+      border-radius: 16px;
+      background: #FFF9EC;
+      border: 2px solid #4A2511;
+    }
+    .icon-scale-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: #61361F;
+    }
+    .mode-panel { display: flex; flex-direction: column; gap: 1.1rem; }
+    .mode-panel[hidden] { display: none; }
+    .switch-controls-box { display: flex; flex-direction: column; gap: 0.65rem; }
+    .switch-controls-box[hidden] { display: none; }
+
+    .swatch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 0.65rem; }
+    .swatch-item { border: 1.5px solid #4A2511; border-radius: 14px; overflow: hidden; background: #FFFFFF; }
+    .swatch-color { height: 48px; }
     .swatch-info { padding: 0.5rem 0.6rem; font-size: 0.76rem; }
     .swatch-info strong { display: block; font-size: 0.8rem; }
-    .tokens-notes { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.88rem; color: #54311D; }
+    .tokens-notes { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.87rem; color: #54311D; }
 
     /* ==========================================================================
-       10. RESPONSIVE (TABLET & MOBILE)
+       12. RESPONSIVE (TABLET & MOBILE)
        ========================================================================== */
-    .stage[data-device="tablet"] .hero-grid { grid-template-columns: 1fr; }
+    .stage[data-device="tablet"] .hero-grid,
+    .stage[data-device="tablet"] .profile-grid { grid-template-columns: 1fr; }
     .stage[data-device="tablet"] .missions-layout,
-    .stage[data-device="tablet"] .games-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-    .stage[data-device="tablet"] .viewport-shell[data-proposal="e"] .mission-card--featured { grid-column: 1 / -1; }
+    .stage[data-device="tablet"] .games-grid,
+    .stage[data-device="tablet"] .extra-grid,
+    .stage[data-device="tablet"] .badges-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .stage[data-device="tablet"] .app-header__inner { padding: 0.5rem 0.85rem; gap: 0.45rem; }
     .stage[data-device="tablet"] .brand-slogan,
     .stage[data-device="tablet"] .nav-btn svg,
     .stage[data-device="tablet"] .level-pill,
     .stage[data-device="tablet"] .profile-name,
     .stage[data-device="tablet"] .logout-label { display: none; }
-    .stage[data-device="tablet"] .nav-btn { padding: 0.45rem 0.62rem; font-size: 0.84rem; }
+    .stage[data-device="tablet"] .nav-btn { padding: 0.45rem 0.6rem; font-size: 0.83rem; }
     .stage[data-device="tablet"] .profile-chip { padding: 0.28rem; }
 
     .stage[data-device="mobile"] .hero-grid,
     .stage[data-device="mobile"] .missions-layout,
-    .stage[data-device="mobile"] .games-grid { grid-template-columns: 1fr !important; }
-    .stage[data-device="mobile"] .mission-card--featured .mission-card__inner { display: flex !important; }
+    .stage[data-device="mobile"] .games-grid,
+    .stage[data-device="mobile"] .extra-grid,
+    .stage[data-device="mobile"] .profile-grid,
+    .stage[data-device="mobile"] .badges-grid,
+    .stage[data-device="mobile"] .segment-options { grid-template-columns: 1fr !important; }
     .stage[data-device="mobile"] .app-header .nav-list,
     .stage[data-device="mobile"] .level-pill,
+    .stage[data-device="mobile"] .profile-name,
     .stage[data-device="mobile"] .logout-label,
     .stage[data-device="mobile"] .hero-mascot { display: none; }
+    .stage[data-device="mobile"] .profile-chip { padding: 0.28rem; }
+    .stage[data-device="mobile"] .brand-name { font-size: 1.08rem; }
     .stage[data-device="mobile"] .app-main { padding: 1.1rem 0.9rem 5.5rem; }
     .stage[data-device="mobile"] .hero-card,
     .stage[data-device="mobile"] .games-banner { padding: 1.2rem; }
     .stage[data-device="mobile"] .mobile-bottom-nav {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       position: sticky;
       bottom: 0;
       z-index: 60;
-      background: #FFFFFF;
-      border-top: 2px solid var(--border-soft);
-      padding: 0.35rem 0.4rem;
-      gap: 0.25rem;
+      background: #FFFDF7;
+      border-top: 2px solid var(--border-strong);
+      padding: 0.35rem 0.3rem;
+      gap: 0.2rem;
     }
 
     @media (max-width: 960px) {
-      .hero-grid { grid-template-columns: 1fr; }
-      .games-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero-grid, .profile-grid { grid-template-columns: 1fr; }
+      .games-grid, .badges-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .app-header__inner { padding: 0.5rem 0.85rem; gap: 0.45rem; }
+      .brand-slogan, .nav-btn svg, .level-pill, .profile-name, .logout-label { display: none; }
+      .nav-btn { padding: 0.45rem 0.6rem; font-size: 0.83rem; }
+      .profile-chip { padding: 0.28rem; }
     }
     @media (max-width: 680px) {
-      .missions-layout, .games-grid { grid-template-columns: 1fr !important; }
-      .mission-card--featured .mission-card__inner { display: flex !important; }
-      .app-header .nav-list, .level-pill, .logout-label { display: none; }
+      .missions-layout, .games-grid, .extra-grid, .badges-grid, .segment-options { grid-template-columns: 1fr !important; }
+      .app-header .nav-list, .level-pill, .profile-name, .logout-label, .hero-mascot { display: none; }
+      .profile-chip { padding: 0.28rem; }
+      .studio-restore-btn { bottom: 5.2rem; right: 0.75rem; }
       .mobile-bottom-nav {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         position: fixed;
         inset: auto 0 0 0;
         z-index: 60;
-        background: #FFFFFF;
-        border-top: 2px solid var(--border-soft);
-        padding: 0.35rem 0.4rem;
-        gap: 0.25rem;
+        background: #FFFDF7;
+        border-top: 2px solid var(--border-strong);
+        padding: 0.35rem 0.3rem;
+        gap: 0.2rem;
       }
       .app-main { padding-bottom: 5.5rem; }
     }
 
     .mobile-nav-item {
       min-block-size: 52px;
-      border: 0;
+      border: 2px solid transparent;
       background: transparent;
-      border-radius: 14px;
+      border-radius: 12px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0.18rem;
-      font-size: 0.72rem;
+      gap: 0.14rem;
+      font-size: 0.68rem;
       font-weight: 800;
       color: var(--ink-2);
+      padding: 0.2rem;
     }
-    .mobile-nav-item[aria-current="page"] { background: var(--surface-soft-yellow); color: var(--ink-1); }
+    .mobile-nav-item[aria-current="page"] {
+      background: var(--orange);
+      color: #FFFFFF;
+      border-color: var(--border-strong);
+    }
 
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+      .sticker-stamp, .sticker-stamp:nth-child(even) { transform: none !important; }
+      .btn:active, .quick-pill:active, .brand-link:hover .brand-emblem { transform: none !important; }
     }
     @media (forced-colors: active) {
-      .hero-card, .streak-card, .mission-card, .game-card, .games-banner, .btn, .filter-chip, .nav-btn[aria-current="page"] {
+      .hero-card, .streak-card, .mission-card, .game-card, .games-banner, .postcard, .passport-stamp, .notebook-shell, .btn, .filter-chip, .nav-btn[aria-current="page"] {
         border: 2px solid CanvasText !important;
         box-shadow: none !important;
       }
-      :where(a, button):focus-visible { outline: 3px solid Highlight !important; }
+      :where(a, button, input, select):focus-visible { outline: 3px solid Highlight !important; }
     }
   </style>
 </head>
 <body>
   <a href="#main-content" class="skip-link visually-hidden">Ir al contenido principal</a>
 
-  <!-- STUDIO BAR -->
-  <aside class="studio-bar" id="studio-bar" aria-label="Selector de propuestas con identidad y lema">
+  <!-- STUDIO BAR (SOLO CONTROLES DEL BOCETO) -->
+  <aside class="studio-bar" id="studio-bar" aria-label="Controles del boceto Upward English Zorro Explorador">
     <div class="studio-bar__inner">
       <div class="studio-brand">
-        <span class="studio-brand__dot" aria-hidden="true"></span>
-        <span>Englove Kids · Identidad &amp; Lema</span>
+        <span class="studio-brand__mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 36 36" fill="none">
+            <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M18 10.6L20.3 13.6L18 16.6L15.7 13.6Z" fill="#FFFDF5"/>
+          </svg>
+        </span>
+        <span>Upward English Kids · Zorro Explorador</span>
       </div>
 
       <div class="studio-controls">
-        <div class="studio-group" role="group" aria-label="Propuesta temática">
-          <button type="button" class="studio-btn" data-set-proposal="d" aria-pressed="true">D · Zorro Explorador</button>
-          <button type="button" class="studio-btn" data-set-proposal="e" aria-pressed="false">E · Cohete Sol</button>
-        </div>
-
-        <div class="studio-group" role="group" aria-label="Pantalla">
-          <button type="button" class="studio-btn" data-set-screen="home" aria-pressed="true">1. Inicio (Misiones)</button>
-          <button type="button" class="studio-btn" data-set-screen="games" aria-pressed="false">2. Zona de Juegos</button>
+        <div class="studio-group" role="group" aria-label="Pantallas del portal">
+          <button type="button" class="studio-btn" data-set-screen="home" aria-pressed="true">Inicio</button>
+          <button type="button" class="studio-btn" data-set-screen="games" aria-pressed="false">Juegos</button>
+          <button type="button" class="studio-btn" data-set-screen="activity" aria-pressed="false">Actividad</button>
+          <button type="button" class="studio-btn" data-set-screen="progress" aria-pressed="false">Progreso</button>
+          <button type="button" class="studio-btn" data-set-screen="feedback" aria-pressed="false">Feedback</button>
+          <button type="button" class="studio-btn" data-set-screen="extra" aria-pressed="false">Extra</button>
+          <button type="button" class="studio-btn" data-set-screen="profile" aria-pressed="false">Perfil</button>
         </div>
 
         <div class="studio-group" role="group" aria-label="Dispositivo">
@@ -1274,50 +1540,38 @@
           <button type="button" class="studio-btn" data-set-device="mobile" aria-pressed="false">Móvil</button>
         </div>
 
-        <button type="button" class="studio-btn studio-btn--outline" id="open-tokens-btn">Identidad y paleta</button>
+        <button type="button" class="studio-btn studio-btn--outline" id="toggle-offline-btn" aria-pressed="false">Simular sin red</button>
+        <button type="button" class="studio-btn studio-btn--outline" id="toggle-pwa-btn" aria-pressed="false">Aviso PWA</button>
+        <button type="button" class="studio-btn studio-btn--outline" id="open-tokens-btn">Ícono y paleta</button>
         <button type="button" class="studio-btn" id="hide-bar-btn">Ocultar barra</button>
       </div>
     </div>
   </aside>
 
-  <button type="button" class="studio-restore-btn" id="restore-bar-btn" hidden>Mostrar selector</button>
+  <button type="button" class="studio-restore-btn" id="restore-bar-btn" hidden>Mostrar controles</button>
 
   <!-- VIEWPORT STAGE -->
   <div class="stage" id="stage" data-device="desktop">
-    <div class="viewport-shell" id="viewport-shell" data-proposal="d">
+    <div class="viewport-shell" id="viewport-shell" data-theme="kids">
 
       <!-- HEADER -->
       <header class="app-header">
         <div class="app-header__inner">
           <a href="#main-content" class="brand-link" data-nav-screen="home">
             <span class="brand-emblem" aria-hidden="true">
-              <!-- Fox emblem (Proposal D) -->
-              <svg class="only-d" width="30" height="30" viewBox="0 0 36 36" fill="none">
-                <path d="M7 9L13 15L9 20L7 9Z" fill="#C6470B" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
-                <path d="M29 9L23 15L27 20L29 9Z" fill="#C6470B" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
-                <path d="M8 18C8 13.5 12.5 11 18 11C23.5 11 28 13.5 28 18C28 23.5 22.5 28 18 29C13.5 28 8 23.5 8 18Z" fill="#E85D04" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
-                <path d="M10 21C12.5 21 15 23 18 28.5C21 23 23.5 21 26 21C25 25 21 28 18 29C15 28 11 25 10 21Z" fill="#FFFDF5"/>
-                <circle cx="14.2" cy="18.5" r="1.6" fill="#2B150A"/>
-                <circle cx="21.8" cy="18.5" r="1.6" fill="#2B150A"/>
-                <ellipse cx="18" cy="23.2" rx="2.1" ry="1.5" fill="#2B150A"/>
-              </svg>
-              <!-- Rocket emblem (Proposal E) -->
-              <svg class="only-e" width="28" height="28" viewBox="0 0 36 36" fill="none">
-                <path d="M18 5C23 9.5 25 16 24 23H12C11 16 13 9.5 18 5Z" fill="#FFFDF5" stroke="#26110B" stroke-width="2" stroke-linejoin="round"/>
-                <circle cx="18" cy="15.5" r="3.2" fill="#FFC727" stroke="#26110B" stroke-width="1.8"/>
-                <path d="M12 19L7.5 24L12.5 23.5" fill="#FFC727" stroke="#26110B" stroke-width="1.8" stroke-linejoin="round"/>
-                <path d="M24 19L28.5 24L23.5 23.5" fill="#FFC727" stroke="#26110B" stroke-width="1.8" stroke-linejoin="round"/>
-                <path d="M15 23.5L18 30L21 23.5" fill="#FFC727" stroke="#26110B" stroke-width="1.8" stroke-linejoin="round"/>
+              <!-- NUEVO ÍCONO DE MARCA: BRÚJULA ASCENDENTE UPWARD -->
+              <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+                <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/>
               </svg>
             </span>
             <span class="brand-text">
-              <span class="brand-name">Englove</span>
-              <span class="brand-slogan only-d">Explora tu inglés</span>
-              <span class="brand-slogan only-e">Despega con cada palabra</span>
+              <span class="brand-name">Upward English</span>
             </span>
           </a>
 
-          <nav aria-label="Principal del estudiante">
+          <nav aria-label="Navegación del estudiante">
             <ul class="nav-list">
               <li>
                 <button type="button" class="nav-btn" data-nav-screen="home" aria-current="page">
@@ -1332,19 +1586,19 @@
                 </button>
               </li>
               <li>
-                <button type="button" class="nav-btn" data-demo-action="Progreso (/progreso): racha semanal, insignias e historial.">
+                <button type="button" class="nav-btn" data-nav-screen="progress">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 19.6l1-5.8-4.2-4.1 5.9-.9L12 3.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
                   <span>Progreso</span>
                 </button>
               </li>
               <li>
-                <button type="button" class="nav-btn" data-demo-action="Feedback (/feedback): comentarios y stickers de tu profesora.">
+                <button type="button" class="nav-btn" data-nav-screen="feedback">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
                   <span>Feedback</span>
                 </button>
               </li>
               <li>
-                <button type="button" class="nav-btn" data-demo-action="Contenido extra (/extra): enlaces recomendados.">
+                <button type="button" class="nav-btn" data-nav-screen="extra" title="Contenido extra">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.6 0l2.8-2.8a4 4 0 0 0-5.6-5.6L11.2 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M14 10a4 4 0 0 0-5.6 0l-2.8 2.8a4 4 0 1 0 5.6 5.6l1.6-1.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
                   <span>Extra</span>
                 </button>
@@ -1354,23 +1608,36 @@
 
           <div class="header-right">
             <span class="level-pill">Nivel A1</span>
-            <button type="button" class="profile-chip" aria-label="Perfil de Mateo" data-demo-action="Perfil de Mateo (/perfil).">
+            <button type="button" class="profile-chip" data-nav-screen="profile" title="Perfil de Mateo">
               <span class="avatar-circle" aria-hidden="true">M</span>
               <span class="profile-name">Mateo</span>
+              <span class="visually-hidden">Perfil de Mateo</span>
             </button>
-            <button type="button" class="logout-btn" aria-label="Cerrar sesión" data-demo-action="Cierre de sesión seguro en tablet compartida.">
+            <button type="button" class="logout-btn" id="logout-btn" title="Cerrar sesión">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 16l4-4-4-4M19 12H9M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span class="logout-label">Salir</span>
+              <span class="visually-hidden">Cerrar sesión</span>
             </button>
           </div>
         </div>
       </header>
 
+      <!-- NON-BLOCKING OFFLINE STATUS BANNER -->
+      <div class="offline-banner" id="offline-banner" role="status" aria-live="polite" hidden>
+        <div class="offline-banner__inner">
+          <div class="offline-banner__msg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4l16 16M9.5 6.5A6.5 6.5 0 0 1 19 12a4 4 0 0 1 1.5 6.5M6.5 9.8A4.5 4.5 0 0 0 6.5 18H16" stroke="#872E06" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Sin conexión. Tus respuestas se guardan en este dispositivo y se enviarán al volver la señal.</span>
+          </div>
+          <span class="offline-queue-pill">1 respuesta pendiente en cola</span>
+        </div>
+      </div>
+
       <!-- MAIN -->
       <main id="main-content" class="app-main" tabindex="-1">
 
         <!-- ================================================================
-             SCREEN 1: INICIO (/inicio)
+             SCREEN 1: INICIO (/inicio) — RUTA DE EXPEDICIÓN
              ================================================================ -->
         <div class="screen-panel" id="screen-home" data-screen-panel="home">
           <div class="screen-stack">
@@ -1378,151 +1645,112 @@
             <div class="hero-grid">
               <section class="hero-card" aria-labelledby="home-title">
                 <div>
-                  <span class="identity-tag only-d">
+                  <span class="identity-tag">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 8.5L13.5 13.5L8.5 15.5L10.5 10.5L15.5 8.5Z" fill="currentColor"/></svg>
                     <span>Club Exploradores · Diario A1</span>
                   </span>
-                  <span class="identity-tag only-e">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l2.5 5.2L20 9l-4 3.9.9 5.6L12 16l-4.9 2.5.9-5.6L4 9l5.5-.8L12 3Z" fill="currentColor"/></svg>
-                    <span>Estación Solar · Nivel A1</span>
-                  </span>
 
                   <h1 class="hero-title" id="home-title">¡Hola, Mateo!</h1>
-                  <p class="hero-lema only-d">«Explora, habla y descubre tu inglés»</p>
-                  <p class="hero-lema only-e">«Despega con cada palabra»</p>
+                  <p class="hero-lema">«Explora, habla y descubre tu inglés»</p>
 
-                  <p class="hero-subtitle only-d">
-                    Tienes 2 paradas listas en tu ruta de esta semana y una nota con sticker de tu profesora.
-                  </p>
-                  <p class="hero-subtitle only-e">
-                    Tienes 2 misiones listas para despegar esta semana y un mensaje nuevo de tu profesora.
+                  <p class="hero-subtitle">
+                    Tienes 2 paradas listas en tu ruta de esta semana y una postal con sticker de tu profesora.
                   </p>
 
                   <div class="hero-actions">
                     <button type="button" class="quick-pill quick-pill--primary" data-nav-screen="games">
-                      <span class="only-d">Ir al campamento de juegos</span>
-                      <span class="only-e">Entrar al simulador de juegos</span>
+                      <span>Ir al campamento de juegos</span>
                     </button>
-                    <button type="button" class="quick-pill quick-pill--secondary" data-demo-action="Feedback nuevo de tu profesora en Colors & Numbers Quiz.">
+                    <button type="button" class="quick-pill quick-pill--secondary" data-nav-screen="feedback">
                       <span>Ver mi feedback (1 nuevo)</span>
                     </button>
                   </div>
                 </div>
 
-                <!-- Mascot D: Explorer Fox -->
-                <div class="hero-mascot only-d" aria-hidden="true">
+                <!-- Mascota Zorro Explorador con pin Upward en su bufanda -->
+                <div class="hero-mascot" aria-hidden="true">
                   <svg viewBox="0 0 140 140" fill="none">
                     <circle cx="70" cy="70" r="60" fill="#FFFDF5" stroke="#4A2511" stroke-width="3.5" stroke-dasharray="7 5"/>
-                    <!-- Ears -->
                     <path d="M35 30L56 50L38 66L35 30Z" fill="#C6470B" stroke="#2B150A" stroke-width="3.5" stroke-linejoin="round"/>
                     <path d="M105 30L84 50L102 66L105 30Z" fill="#C6470B" stroke="#2B150A" stroke-width="3.5" stroke-linejoin="round"/>
                     <path d="M40 39L51 50L42 58L40 39Z" fill="#FFE0A3"/>
                     <path d="M100 39L89 50L98 58L100 39Z" fill="#FFE0A3"/>
-                    <!-- Head -->
                     <path d="M34 72C34 52 50 42 70 42C90 42 106 52 106 72C106 94 88 106 70 110C52 106 34 94 34 72Z" fill="#E85D04" stroke="#2B150A" stroke-width="3.5" stroke-linejoin="round"/>
-                    <!-- White cheeks -->
                     <path d="M38 78C49 77 58 84 70 108C82 84 91 77 102 78C98 96 84 106 70 110C56 106 42 96 38 78Z" fill="#FFFDF5"/>
-                    <!-- Eyes & smile -->
                     <circle cx="56" cy="70" r="4.5" fill="#2B150A"/>
                     <circle cx="84" cy="70" r="4.5" fill="#2B150A"/>
                     <circle cx="57.5" cy="68.5" r="1.5" fill="#FFFFFF"/>
                     <circle cx="85.5" cy="68.5" r="1.5" fill="#FFFFFF"/>
                     <ellipse cx="70" cy="84" rx="5.5" ry="4" fill="#2B150A"/>
                     <path d="M62 92C66 96.5 74 96.5 78 92" stroke="#2B150A" stroke-width="3" stroke-linecap="round"/>
-                    <!-- Yellow explorer scarf -->
                     <path d="M46 105C56 112 84 112 94 105L90 118C78 123 62 123 50 118L46 105Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="3" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-
-                <!-- Mascot E: Solar Rocket -->
-                <div class="hero-mascot only-e" aria-hidden="true">
-                  <svg viewBox="0 0 140 140" fill="none">
-                    <!-- Sparkles -->
-                    <path d="M26 36L29 43L36 46L29 49L26 56L23 49L16 46L23 43L26 36Z" fill="#FFE699"/>
-                    <path d="M114 28L116 33L121 35L116 37L114 42L112 37L107 35L112 33L114 28Z" fill="#FFE699"/>
-                    <circle cx="114" cy="96" r="4.5" fill="#FFE699" opacity="0.85"/>
-                    <!-- Flame -->
-                    <path d="M58 98C58 112 65 124 70 128C75 124 82 112 82 98H58Z" fill="#FFC727" stroke="#26110B" stroke-width="3.2" stroke-linejoin="round"/>
-                    <path d="M64 100C64 108 67 115 70 118C73 115 76 108 76 100H64Z" fill="#FFFDF5"/>
-                    <!-- Fins -->
-                    <path d="M46 72L27 94L48 92" fill="#FFC727" stroke="#26110B" stroke-width="3.2" stroke-linejoin="round"/>
-                    <path d="M94 72L113 94L92 92" fill="#FFC727" stroke="#26110B" stroke-width="3.2" stroke-linejoin="round"/>
-                    <!-- Body -->
-                    <path d="M70 16C90 32 96 58 93 96H47C44 58 50 32 70 16Z" fill="#FFFDF5" stroke="#26110B" stroke-width="3.5" stroke-linejoin="round"/>
-                    <!-- Nose cone -->
-                    <path d="M70 16C79 23.5 85 33 88 43H52C55 33 61 23.5 70 16Z" fill="#C81E2B" stroke="#26110B" stroke-width="3.5" stroke-linejoin="round"/>
-                    <!-- Window -->
-                    <circle cx="70" cy="64" r="14" fill="#FFC727" stroke="#26110B" stroke-width="3.5"/>
-                    <circle cx="65.5" cy="62" r="2.2" fill="#26110B"/>
-                    <circle cx="74.5" cy="62" r="2.2" fill="#26110B"/>
-                    <path d="M65.5 68.5C67.5 71 72.5 71 74.5 68.5" stroke="#26110B" stroke-width="2.4" stroke-linecap="round"/>
+                    <!-- Mini pin Upward en la bufanda -->
+                    <circle cx="70" cy="114.5" r="6.5" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8"/>
+                    <path d="M70 110.2L73.6 115.2H71.2V118.2H68.8V115.2H66.4Z" fill="#B9251D"/>
                   </svg>
                 </div>
               </section>
 
-              <!-- Weekly Forgivable Streak Card -->
+              <!-- Bitácora Semanal (Racha perdonable) -->
               <section class="streak-card" aria-labelledby="streak-title">
                 <div class="streak-top">
                   <div class="streak-badge" aria-hidden="true">
                     <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
-                      <path d="M16.5 3.5C16.5 3.5 24 9.5 24 17.5C24 22.7 20.3 27 15.5 27C10.8 27 7.5 23 7.5 18C7.5 14 10 10.5 11.5 9.2C11.2 12.2 12.8 13.7 14 14C13.6 10.3 15.2 6.5 16.5 3.5Z" fill="#C81E2B" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
+                      <path d="M16.5 3.5C16.5 3.5 24 9.5 24 17.5C24 22.7 20.3 27 15.5 27C10.8 27 7.5 23 7.5 18C7.5 14 10 10.5 11.5 9.2C11.2 12.2 12.8 13.7 14 14C13.6 10.3 15.2 6.5 16.5 3.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
                       <path d="M16 14.5C18 16.5 19.5 19 19.5 21.3C19.5 23.6 17.8 25.3 15.7 25.3C13.6 25.3 12 23.6 12 21.5C12 19.7 13.2 17.9 14.5 16.8C14.6 18 15.3 18.7 16 18.7C16.1 17.2 16 15.8 16 14.5Z" fill="#FFCA3A"/>
                     </svg>
                   </div>
                   <div>
-                    <p class="streak-label only-d" id="streak-title">Bitácora semanal</p>
-                    <p class="streak-label only-e">Energía semanal</p>
+                    <p class="streak-label" id="streak-title">Bitácora semanal</p>
                     <p class="streak-value">4 semanas seguidas</p>
                   </div>
                 </div>
 
-                <div class="week-track" aria-label="4 semanas activas consecutivas">
+                <div class="week-track" role="group" aria-label="4 semanas activas consecutivas">
                   <div class="week-cell"><span>Sem 1</span><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C6470B"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                   <div class="week-cell"><span>Sem 2</span><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C6470B"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                   <div class="week-cell"><span>Sem 3</span><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#C6470B"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                   <div class="week-cell"><span>Esta</span><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#B9251D"/><path d="M6.5 10.2L9 12.7L13.8 7.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 </div>
 
-                <div class="shield-pill">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.6-3 8.1-7 9.5-4-1.4-7-4.9-7-9.5V6l7-3Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#2B150A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span>Escudo de perdón activo esta semana</span>
-                </div>
+                <button type="button" class="shield-btn" id="toggle-shield-demo" aria-pressed="false" title="Pulsa para previsualizar el estado de recuperación del escudo">
+                  <span class="shield-btn__left">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.6-3 8.1-7 9.5-4-1.4-7-4.9-7-9.5V6l7-3Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#2B150A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span id="shield-status-text">Escudo de perdón activo esta semana</span>
+                  </span>
+                  <span class="shield-btn__hint">Ver estado</span>
+                </button>
               </section>
             </div>
 
             <!-- Section Header + Filters -->
             <div class="section-bar">
               <div>
-                <h2 class="section-heading only-d">Tu ruta de expedición</h2>
-                <h2 class="section-heading only-e">Panel de misiones</h2>
+                <h2 class="section-heading">Tu ruta de expedición</h2>
                 <p class="section-sub">Actividades asignadas para tu grupo A1 · Tarde</p>
               </div>
 
-              <div class="filter-group" role="group" aria-label="Filtrar misiones">
+              <div class="filter-group" role="group" aria-label="Filtrar paradas">
                 <button type="button" class="filter-chip" data-mission-filter="all" aria-pressed="true"><span>Todas</span><span class="chip-count">4</span></button>
                 <button type="button" class="filter-chip" data-mission-filter="pending" aria-pressed="false"><span>Por hacer</span><span class="chip-count">2</span></button>
                 <button type="button" class="filter-chip" data-mission-filter="completed" aria-pressed="false"><span>Entregadas</span><span class="chip-count">2</span></button>
               </div>
             </div>
 
-            <!-- 4 Real Englove Missions -->
+            <!-- 4 Real Upward English Assignable Activities -->
             <div class="missions-layout" id="missions-grid">
 
-              <!-- Mission 1: Speaking In Progress -->
+              <!-- Parada 01: Speaking In Progress -->
               <article class="mission-card mission-card--featured" data-mission-status="pending">
-                <div class="expedition-strip expedition-strip--speaking only-d">
+                <div class="expedition-strip expedition-strip--speaking">
                   <span>Parada 01 · Speaking (En progreso)</span>
                   <span>Nivel A1</span>
                 </div>
                 <div class="mission-card__inner">
                   <div>
-                    <div class="card-meta-row only-e">
-                      <span class="type-badge type-badge--speaking">Speaking · En progreso</span>
-                      <span class="mission-code">Misión #01 · A1</span>
-                    </div>
                     <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Describe your favorite animal</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Describe your favorite animal" aria-pressed="false" aria-label="Escuchar título: Describe your favorite animal">
+                      <button type="button" class="tts-btn" data-speak="Describe your favorite animal" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Describe your favorite animal">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
                       </button>
                     </div>
@@ -1531,95 +1759,83 @@
                       <span>Ya empezaste esta grabación. Puedes terminarla hasta 24 horas después del cierre.</span>
                     </div>
                   </div>
-                  <button type="button" class="btn btn--red" data-demo-action="Abriendo intento en progreso (/actividad/att-101) — Speaking.">
+                  <button type="button" class="btn btn--red" data-open-activity="speaking">
                     <span>Continuar actividad</span>
                   </button>
                 </div>
               </article>
 
-              <!-- Mission 2: Fill in the blanks -->
+              <!-- Parada 02: Fill in the blanks -->
               <article class="mission-card" data-mission-status="pending">
-                <div class="expedition-strip expedition-strip--fill only-d">
+                <div class="expedition-strip expedition-strip--fill">
                   <span>Parada 02 · Completar espacios</span>
                   <span>Nivel A1</span>
                 </div>
                 <div class="mission-card__inner">
                   <div>
-                    <div class="card-meta-row only-e">
-                      <span class="type-badge type-badge--fill">Completar espacios</span>
-                      <span class="mission-code">Misión #02 · A1</span>
-                    </div>
                     <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">At the zoo: Complete the story</span></h3>
-                      <button type="button" class="tts-btn" data-speak="At the zoo: Complete the story" aria-pressed="false" aria-label="Escuchar título: At the zoo: Complete the story">
+                      <button type="button" class="tts-btn" data-speak="At the zoo: Complete the story" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: At the zoo: Complete the story">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
                       </button>
                     </div>
-                    <p class="card-due">Límite: viernes 22 nov, 5:00 p. m.</p>
+                    <p class="card-due">Límite: viernes 27 nov, 5:00 p. m.</p>
                     <div class="callout callout--hint">
                       <span>Si empiezas antes del cierre, tendrás 24 horas adicionales para terminar.</span>
                     </div>
                   </div>
-                  <button type="button" class="btn btn--orange" data-demo-action="Iniciando Fill in the blanks (/assignments/asg-202/attempts).">
+                  <button type="button" class="btn btn--orange" data-open-activity="fill">
                     <span>Empezar actividad</span>
                   </button>
                 </div>
               </article>
 
-              <!-- Mission 3: Open Question with Retry -->
+              <!-- Parada 03: Open Question with Retry -->
               <article class="mission-card" data-mission-status="completed">
-                <div class="expedition-strip expedition-strip--open only-d">
+                <div class="expedition-strip expedition-strip--open">
                   <span>Parada 03 · Pregunta abierta</span>
                   <span>Nivel A1</span>
                 </div>
                 <div class="mission-card__inner">
                   <div>
-                    <div class="card-meta-row only-e">
-                      <span class="type-badge type-badge--open">Pregunta abierta</span>
-                      <span class="mission-code">Misión #03 · A1</span>
-                    </div>
                     <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">My daily routine</span></h3>
-                      <button type="button" class="tts-btn" data-speak="My daily routine" aria-pressed="false" aria-label="Escuchar título: My daily routine">
+                      <button type="button" class="tts-btn" data-speak="My daily routine" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: My daily routine">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
                       </button>
                     </div>
                     <div class="callout callout--retry">
-                      <span>Tu profesora te habilitó un nuevo intento hasta el lunes 25 nov.</span>
+                      <span>Tu profesora te habilitó un nuevo intento hasta el lunes 30 nov.</span>
                     </div>
                     <div class="score-strip">
                       <div>
                         <span class="score-val">3,4 / 5,0</span>
                         <span class="score-sub">Intento anterior</span>
                       </div>
-                      <div class="stars-row" aria-label="2 de 3 estrellas">
+                      <div class="stars-row" role="img" aria-label="2 de 3 estrellas">
                         <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
                         <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
                         <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
                       </div>
                     </div>
                   </div>
-                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando nuevo intento autorizado (/actividad/att-304).">
+                  <button type="button" class="btn btn--yellow" data-open-activity="fill">
                     <span>Intentar de nuevo</span>
                   </button>
                 </div>
               </article>
 
-              <!-- Mission 4: Graded Exam -->
+              <!-- Parada 04: Graded Exam -->
               <article class="mission-card" data-mission-status="completed">
-                <div class="expedition-strip expedition-strip--exam only-d">
+                <div class="expedition-strip expedition-strip--exam">
                   <span>Parada 04 · Examen sellado</span>
                   <span>Nivel A1</span>
                 </div>
                 <div class="mission-card__inner">
                   <div>
-                    <div class="card-meta-row only-e">
-                      <span class="type-badge type-badge--exam">Examen · Calificado</span>
-                      <span class="mission-code">Misión #04 · A1</span>
-                    </div>
                     <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Colors &amp; Numbers Quiz</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Colors and Numbers Quiz" aria-pressed="false" aria-label="Escuchar título: Colors and Numbers Quiz">
+                      <button type="button" class="tts-btn" data-speak="Colors and Numbers Quiz" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Colors and Numbers Quiz">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
                       </button>
                     </div>
@@ -1628,14 +1844,14 @@
                         <span class="score-val">4,8 / 5,0</span>
                         <span class="score-sub">Con sticker y feedback</span>
                       </div>
-                      <div class="stars-row" aria-label="3 de 3 estrellas">
+                      <div class="stars-row" role="img" aria-label="3 de 3 estrellas">
                         <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
                         <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
                         <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
                       </div>
                     </div>
                   </div>
-                  <button type="button" class="btn btn--secondary" data-demo-action="Abriendo entrega calificada y comentario (/actividad/att-098).">
+                  <button type="button" class="btn btn--secondary" data-nav-screen="feedback">
                     <span>Ver entrega y feedback</span>
                   </button>
                 </div>
@@ -1646,32 +1862,68 @@
         </div>
 
         <!-- ================================================================
-             SCREEN 2: ZONA DE MICROJUEGOS (/juegos)
+             SCREEN 2: CAMPAMENTO DE MICROJUEGOS (/juegos)
              ================================================================ -->
         <div class="screen-panel" id="screen-games" data-screen-panel="games" hidden>
           <div class="screen-stack">
 
             <section class="games-banner" aria-labelledby="games-heading">
               <div style="max-width:56ch;">
-                <span class="identity-tag only-d">Campamento de práctica · Abierto 24/7</span>
-                <span class="identity-tag only-e">Simulador libre · Sin notas ni límite</span>
-                <h1 class="hero-title" id="games-heading">
-                  <span class="only-d">Campamento de Microjuegos</span>
-                  <span class="only-e">Simulador de Microjuegos</span>
-                </h1>
+                <span class="identity-tag">Campamento de práctica · Abierto 24/7</span>
+                <h1 class="hero-title" id="games-heading">Campamento de Microjuegos</h1>
                 <p class="hero-subtitle" style="margin-bottom:0;">
-                  Juega para practicar inglés a tu ritmo, colecciona estrellas de práctica y repite tantas partidas como quieras.
+                  Practica inglés a tu ritmo sin notas ni límite de intentos. Colecciona estrellas de práctica en las 5 mecánicas.
                 </p>
               </div>
 
               <div class="practice-stats">
                 <div class="practice-pill">
                   <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
-                  <div><span class="practice-num">6 / 15</span><span class="practice-lbl">Estrellas de práctica</span></div>
+                  <div><span class="practice-num" id="practice-stars-total">6 / 15</span><span class="practice-lbl">Estrellas de práctica</span></div>
                 </div>
                 <div class="practice-pill">
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="7" width="18" height="11" rx="5.5" fill="#FFE2B8" stroke="#2B150A" stroke-width="1.9"/><path d="M8.5 10.5v4M6.5 12.5h4" stroke="#B9251D" stroke-width="2.1" stroke-linecap="round"/><circle cx="15.8" cy="11.5" r="1.2" fill="#C6470B"/><circle cx="17.8" cy="13.5" r="1.2" fill="#C6470B"/></svg>
                   <div><span class="practice-num">7</span><span class="practice-lbl">Partidas jugadas</span></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Interactive Order Words Mini-Demo (Hybrid Tap + Keyboard) -->
+            <section class="game-playground" id="order-words-demo" aria-labelledby="demo-game-title" hidden>
+              <div class="expedition-strip expedition-strip--fill">
+                <span id="demo-game-title">Práctica interactiva · Ordenar palabras (Toque y teclado)</span>
+                <button type="button" class="back-btn" id="close-game-demo" style="min-height:48px;">Cerrar práctica</button>
+              </div>
+              <div class="game-playground__body">
+                <div class="card-title-row">
+                  <div>
+                    <h2 class="card-title">Arma la oración: «El zorro explora el bosque»</h2>
+                    <p class="section-sub">Toca las palabras en orden o usa el teclado. No necesitas arrastrar.</p>
+                  </div>
+                  <button type="button" class="tts-btn" data-speak="The fox explores the forest" data-lang="en-US" aria-pressed="false" aria-label="Escuchar pista en inglés">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
+
+                <div class="sentence-tray" id="sentence-tray" aria-live="polite" aria-label="Oración armada">
+                  <span style="color:var(--ink-2);font-weight:700;">Toca una palabra de abajo para colocarla aquí…</span>
+                </div>
+
+                <div class="word-bank" id="word-bank" role="group" aria-label="Banco de palabras">
+                  <button type="button" class="word-tile" data-word="explores"><span lang="en">explores</span></button>
+                  <button type="button" class="word-tile" data-word="forest"><span lang="en">forest</span></button>
+                  <button type="button" class="word-tile" data-word="The"><span lang="en">The</span></button>
+                  <button type="button" class="word-tile" data-word="the"><span lang="en">the</span></button>
+                  <button type="button" class="word-tile" data-word="fox"><span lang="en">fox</span></button>
+                </div>
+
+                <div id="game-demo-status" class="callout callout--hint" role="status" aria-live="polite">
+                  <span>Selecciona las 5 palabras en orden. Recuerda: en los microjuegos practicas por estrellas, no por nota.</span>
+                </div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:0.65rem;">
+                  <button type="button" class="btn btn--orange btn--auto" id="check-sentence-btn">Comprobar oración</button>
+                  <button type="button" class="btn btn--secondary btn--auto" id="reset-sentence-btn">Limpiar orden</button>
                 </div>
               </div>
             </section>
@@ -1692,19 +1944,19 @@
               <!-- 1. Order Words -->
               <article class="game-card" data-game-status="pending">
                 <div class="game-top game-top--order">
-                  <div class="mech-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="8" height="6" rx="2" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8"/><rect x="13" y="5" width="8" height="6" rx="2" fill="#F97316" stroke="#2B150A" stroke-width="1.8"/><rect x="6" y="13.5" width="12" height="5.5" rx="2" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8"/></svg></div>
+                  <div class="mech-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="8" height="6" rx="2" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8"/><rect x="13" y="5" width="8" height="6" rx="2" fill="#C6470B" stroke="#2B150A" stroke-width="1.8"/><rect x="6" y="13.5" width="12" height="5.5" rx="2" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8"/></svg></div>
                   <div class="game-badges"><span class="mech-pill">Ordenar palabras</span><span class="mission-code">Nivel A1</span></div>
                 </div>
                 <div class="game-body">
                   <div>
-                    <div class="card-title-row" style="margin-top:0;">
+                    <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Build the Sentence!</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Build the Sentence!" aria-pressed="false" aria-label="Escuchar título: Build the Sentence!"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                      <button type="button" class="tts-btn" data-speak="Build the Sentence!" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Build the Sentence!"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
                     </div>
-                    <div class="game-stars-bar"><div class="stars-row" aria-label="0 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">En curso</span></div>
-                    <p class="game-motivation">Te falta poquito para completar la oración.</p>
+                    <div class="game-stars-bar"><div class="stars-row" role="img" aria-label="0 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">En curso</span></div>
+                    <p class="game-motivation">Toca para probar la mecánica interactiva aquí mismo.</p>
                   </div>
-                  <button type="button" class="btn btn--red" data-demo-action="Reanudando partida de Build the Sentence!"><span>Reanudar partida</span></button>
+                  <button type="button" class="btn btn--red" id="open-game-demo"><span>Reanudar partida</span></button>
                 </div>
               </article>
 
@@ -1716,52 +1968,52 @@
                 </div>
                 <div class="game-body">
                   <div>
-                    <div class="card-title-row" style="margin-top:0;">
+                    <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Fruit &amp; Colors Memory</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Fruit and Colors Memory" aria-pressed="false" aria-label="Escuchar título: Fruit and Colors Memory"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                      <button type="button" class="tts-btn" data-speak="Fruit and Colors Memory" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Fruit and Colors Memory"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
                     </div>
-                    <div class="game-stars-bar"><div class="stars-row" aria-label="0 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">¡Nuevo!</span></div>
+                    <div class="game-stars-bar"><div class="stars-row" role="img" aria-label="0 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">¡Nuevo!</span></div>
                     <p class="game-motivation">Descubre las parejas y gana tus primeras estrellas.</p>
                   </div>
-                  <button type="button" class="btn btn--orange" data-demo-action="Iniciando Fruit & Colors Memory."><span>Jugar</span></button>
+                  <button type="button" class="btn btn--orange" data-demo-action="Iniciando Fruit & Colors Memory (práctica libre 24/7)."><span>Jugar</span></button>
                 </div>
               </article>
 
               <!-- 3. Match -->
               <article class="game-card" data-game-status="completed">
                 <div class="game-top game-top--match">
-                  <div class="mech-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="7" cy="8" r="3" fill="#B9251D" stroke="#2B150A" stroke-width="1.8"/><circle cx="17" cy="16" r="3" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8"/><path d="M9.6 9.5L14.4 14.5" stroke="#2B150A" stroke-width="2.2" stroke-linecap="round"/><circle cx="17" cy="8" r="2.6" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8"/><circle cx="7" cy="16" r="2.6" fill="#F97316" stroke="#2B150A" stroke-width="1.8"/></svg></div>
+                  <div class="mech-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="7" cy="8" r="3" fill="#B9251D" stroke="#2B150A" stroke-width="1.8"/><circle cx="17" cy="16" r="3" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8"/><path d="M9.6 9.5L14.4 14.5" stroke="#2B150A" stroke-width="2.2" stroke-linecap="round"/><circle cx="17" cy="8" r="2.6" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8"/><circle cx="7" cy="16" r="2.6" fill="#C6470B" stroke="#2B150A" stroke-width="1.8"/></svg></div>
                   <div class="game-badges"><span class="mech-pill">Emparejar</span><span class="mission-code">Nivel A1</span></div>
                 </div>
                 <div class="game-body">
                   <div>
-                    <div class="card-title-row" style="margin-top:0;">
+                    <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Animal Sounds &amp; Names</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Animal Sounds and Names" aria-pressed="false" aria-label="Escuchar título: Animal Sounds and Names"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                      <button type="button" class="tts-btn" data-speak="Animal Sounds and Names" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Animal Sounds and Names"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
                     </div>
-                    <div class="game-stars-bar"><div class="stars-row" aria-label="3 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">4 partidas</span></div>
+                    <div class="game-stars-bar"><div class="stars-row" role="img" aria-label="3 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">4 partidas</span></div>
                     <p class="game-motivation">¡Excelente dominio en este juego!</p>
                   </div>
-                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando Animal Sounds & Names."><span>Jugar de nuevo</span></button>
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando nueva partida de Animal Sounds & Names (arrastre + toque origen→destino)."><span>Jugar de nuevo</span></button>
                 </div>
               </article>
 
               <!-- 4. Drag & Drop -->
               <article class="game-card" data-game-status="completed">
                 <div class="game-top game-top--drag">
-                  <div class="mech-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="7" height="7" rx="2" fill="#F97316" stroke="#2B150A" stroke-width="1.8"/><rect x="13" y="12" width="7" height="7" rx="2" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8" stroke-dasharray="3 2"/><path d="M11 8.5h4.5v3.5" stroke="#B9251D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <div class="mech-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="7" height="7" rx="2" fill="#C6470B" stroke="#2B150A" stroke-width="1.8"/><rect x="13" y="12" width="7" height="7" rx="2" fill="#FFFDF5" stroke="#2B150A" stroke-width="1.8" stroke-dasharray="3 2"/><path d="M11 8.5h4.5v3.5" stroke="#B9251D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                   <div class="game-badges"><span class="mech-pill">Arrastrar y soltar</span><span class="mission-code">Nivel A1</span></div>
                 </div>
                 <div class="game-body">
                   <div>
-                    <div class="card-title-row" style="margin-top:0;">
+                    <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Pack Your School Bag</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Pack Your School Bag" aria-pressed="false" aria-label="Escuchar título: Pack Your School Bag"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                      <button type="button" class="tts-btn" data-speak="Pack Your School Bag" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Pack Your School Bag"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
                     </div>
-                    <div class="game-stars-bar"><div class="stars-row" aria-label="2 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">2 partidas</span></div>
+                    <div class="game-stars-bar"><div class="stars-row" role="img" aria-label="2 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">2 partidas</span></div>
                     <p class="game-motivation">¡Vas muy bien! Busca la tercera estrella.</p>
                   </div>
-                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando Pack Your School Bag."><span>Jugar de nuevo</span></button>
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando Pack Your School Bag (arrastre + toque origen→destino + teclado)."><span>Jugar de nuevo</span></button>
                 </div>
               </article>
 
@@ -1773,105 +2025,607 @@
                 </div>
                 <div class="game-body">
                   <div>
-                    <div class="card-title-row" style="margin-top:0;">
+                    <div class="card-title-row">
                       <h3 class="card-title"><span lang="en">Fast Verbs Challenge</span></h3>
-                      <button type="button" class="tts-btn" data-speak="Fast Verbs Challenge" aria-pressed="false" aria-label="Escuchar título: Fast Verbs Challenge"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
+                      <button type="button" class="tts-btn" data-speak="Fast Verbs Challenge" data-lang="en-US" aria-pressed="false" aria-label="Escuchar título: Fast Verbs Challenge"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg></button>
                     </div>
-                    <div class="game-stars-bar"><div class="stars-row" aria-label="1 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">1 partida</span></div>
+                    <div class="game-stars-bar"><div class="stars-row" role="img" aria-label="1 de 3 estrellas"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span class="game-attempts">1 partida</span></div>
                     <p class="game-motivation">¡Buen comienzo! Cada partida te hace más rápido.</p>
                   </div>
-                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando Fast Verbs Challenge."><span>Jugar de nuevo</span></button>
+                  <button type="button" class="btn btn--yellow" data-demo-action="Iniciando Fast Verbs Challenge (abierto a todos los niveles)."><span>Jugar de nuevo</span></button>
                 </div>
               </article>
             </div>
           </div>
         </div>
+
+        <!-- ================================================================
+             SCREEN 3: CUADERNO DE CAMPO — ACTIVIDAD (/actividad/[attemptId])
+             ================================================================ -->
+        <div class="screen-panel" id="screen-activity" data-screen-panel="activity" hidden>
+          <div class="screen-stack">
+            <section class="notebook-shell" aria-labelledby="activity-title">
+              <div class="notebook-head">
+                <button type="button" class="back-btn" data-nav-screen="home">← Volver a mi ruta</button>
+
+                <div class="filter-group" role="group" aria-label="Tipo de parada de ejemplo">
+                  <button type="button" class="filter-chip" data-activity-mode="speaking" aria-pressed="true">Speaking (Audio)</button>
+                  <button type="button" class="filter-chip" data-activity-mode="fill" aria-pressed="false">Completar espacios</button>
+                </div>
+
+                <span class="sync-badge" id="activity-sync-badge">Respuesta guardada en el servidor</span>
+              </div>
+
+              <div class="notebook-body">
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                    <strong style="font-size:0.84rem;color:var(--ink-2);">Cuaderno de campo · Nivel A1</strong>
+                    <strong style="font-size:0.84rem;color:var(--orange);">Paso 1 de 2</strong>
+                  </div>
+                  <div class="step-trail" aria-hidden="true">
+                    <span class="step-dot step-dot--done"></span>
+                    <span class="step-dot step-dot--current"></span>
+                  </div>
+                </div>
+
+                <!-- MODE A: SPEAKING -->
+                <div id="activity-mode-speaking" class="mode-panel">
+                  <div class="prompt-box">
+                    <div>
+                      <span class="identity-tag" style="margin-bottom:0.45rem;">Parada 01 · Speaking</span>
+                      <h1 class="hero-title" id="activity-title" style="font-size:1.6rem;"><span lang="en">Describe your favorite animal</span></h1>
+                      <p class="section-sub" style="margin-top:0.25rem;">
+                        Cuéntale a tu profesora en inglés cuál es tu animal favorito, de qué color es y qué le gusta comer. Graba entre 2 segundos y 2 minutos.
+                      </p>
+                    </div>
+                    <button type="button" class="tts-btn" data-speak="Describe your favorite animal. What color is it and what does it eat?" data-lang="en-US" aria-pressed="false" aria-label="Escuchar consigna en inglés">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="recorder-card">
+                    <div style="display:flex;align-items:center;gap:0.9rem;flex-wrap:wrap;">
+                      <button type="button" class="record-circle" id="record-toggle-btn" aria-pressed="false">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2.2"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+                        <span id="record-btn-label">Grabar audio</span>
+                      </button>
+                      <div>
+                        <div class="wave-bars" id="wave-bars" data-recording="false" aria-hidden="true">
+                          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                        <div style="font-weight:800;font-size:0.86rem;color:var(--ink-2);margin-top:0.2rem;" id="record-timer-text">
+                          Duración: 00:00 / 02:00 (mínimo 2 s)
+                        </div>
+                      </div>
+                    </div>
+                    <span class="mission-code">Subida segura a R2 · sin perder audio si cae la señal</span>
+                  </div>
+
+                  <div class="callout callout--grace">
+                    <span>Tu intento se inició antes del cierre. Tienes hasta mañana + 24 horas para entregar tu grabación.</span>
+                  </div>
+
+                  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+                    <button type="button" class="btn btn--red btn--auto" id="submit-speaking-btn">Enviar grabación a mi profesora</button>
+                    <button type="button" class="btn btn--secondary btn--auto" data-nav-screen="home">Guardar borrador y salir</button>
+                  </div>
+                </div>
+
+                <!-- MODE B: FILL IN THE BLANKS -->
+                <div id="activity-mode-fill" class="mode-panel" hidden>
+                  <div class="prompt-box">
+                    <div>
+                      <span class="identity-tag" style="margin-bottom:0.45rem;">Parada 02 · Completar espacios</span>
+                      <h2 class="hero-title" style="font-size:1.6rem;"><span lang="en">At the zoo: Complete the story</span></h2>
+                      <p class="section-sub" style="margin-top:0.25rem;">
+                        Elige la palabra correcta en cada espacio para completar la historia del zoológico.
+                      </p>
+                    </div>
+                    <button type="button" class="tts-btn" data-speak="At the zoo, the orange fox runs fast and plays with three little birds." data-lang="en-US" aria-pressed="false" aria-label="Escuchar oración en inglés">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="recorder-card" style="display:block;">
+                    <p class="fill-sentence" lang="en" style="margin:0;">
+                      At the zoo, the orange fox
+                      <label class="visually-hidden" for="blank-1">Primer espacio</label>
+                      <select id="blank-1" class="fill-select">
+                        <option value="">Elige…</option>
+                        <option value="runs">runs</option>
+                        <option value="sleeps">sleeps</option>
+                        <option value="swims">swims</option>
+                      </select>
+                      fast and plays with
+                      <label class="visually-hidden" for="blank-2">Segundo espacio</label>
+                      <select id="blank-2" class="fill-select">
+                        <option value="">Elige…</option>
+                        <option value="three">three</option>
+                        <option value="blue">blue</option>
+                        <option value="table">table</option>
+                      </select>
+                      little birds.
+                    </p>
+                  </div>
+
+                  <div class="callout callout--hint" id="fill-save-note">
+                    <span>Tu nota (escala 0,0–5,0) se calcula en el servidor al entregar. Nunca revelamos respuestas antes de cerrar tu intento.</span>
+                  </div>
+
+                  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+                    <button type="button" class="btn btn--orange btn--auto" id="submit-fill-btn">Entregar actividad</button>
+                    <button type="button" class="btn btn--secondary btn--auto" data-nav-screen="home">Volver a mi ruta</button>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 4: MI PROGRESO (/progreso) — ÁLBUM DE SELLOS E HISTORIAL
+             ================================================================ -->
+        <div class="screen-panel" id="screen-progress" data-screen-panel="progress" hidden>
+          <div class="screen-stack">
+
+            <section class="hero-card" aria-labelledby="progress-title">
+              <div>
+                <span class="identity-tag">Diario de logros · Sin comparaciones</span>
+                <h1 class="hero-title" id="progress-title">Tu progreso en la expedición</h1>
+                <p class="hero-subtitle" style="margin-bottom:0;">
+                  Llevas <strong>4 semanas activas consecutivas</strong> y tu escudo de perdón está listo para cuidar tu racha si alguna semana necesitas descansar.
+                </p>
+              </div>
+              <div class="practice-pill" style="flex-shrink:0;">
+                <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                  <path d="M16.5 3.5C16.5 3.5 24 9.5 24 17.5C24 22.7 20.3 27 15.5 27C10.8 27 7.5 23 7.5 18C7.5 14 10 10.5 11.5 9.2C11.2 12.2 12.8 13.7 14 14C13.6 10.3 15.2 6.5 16.5 3.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
+                  <path d="M16 14.5C18 16.5 19.5 19 19.5 21.3C19.5 23.6 17.8 25.3 15.7 25.3C13.6 25.3 12 23.6 12 21.5C12 19.7 13.2 17.9 14.5 16.8C14.6 18 15.3 18.7 16 18.7C16.1 17.2 16 15.8 16 14.5Z" fill="#FFCA3A"/>
+                </svg>
+                <div><span class="practice-num">4 sem.</span><span class="practice-lbl">Escudo activo</span></div>
+              </div>
+            </section>
+
+            <div class="section-bar">
+              <div>
+                <h2 class="section-heading">Álbum de sellos e insignias</h2>
+                <p class="section-sub">Sellos ganados por tus hitos y constancia semanal</p>
+              </div>
+            </div>
+
+            <div class="badges-grid">
+              <article class="passport-stamp">
+                <div class="stamp-medal" aria-hidden="true">⭐</div>
+                <h3 class="stamp-title">Primer paso</h3>
+                <p class="stamp-desc">Completaste tu primera parada en Upward English.</p>
+                <span class="stamp-date">Sellado · 28 oct</span>
+              </article>
+              <article class="passport-stamp">
+                <div class="stamp-medal" aria-hidden="true">🎙️</div>
+                <h3 class="stamp-title">Primera voz</h3>
+                <p class="stamp-desc">Enviaste tu primera grabación de Speaking.</p>
+                <span class="stamp-date">Sellado · 4 nov</span>
+              </article>
+              <article class="passport-stamp">
+                <div class="stamp-medal" aria-hidden="true">🔥</div>
+                <h3 class="stamp-title">4 semanas en ruta</h3>
+                <p class="stamp-desc">Mantuviste tu constancia durante un mes completo.</p>
+                <span class="stamp-date">Sellado · 21 nov</span>
+              </article>
+              <article class="passport-stamp passport-stamp--locked">
+                <div class="stamp-medal" aria-hidden="true">🧭</div>
+                <h3 class="stamp-title">8 semanas en ruta</h3>
+                <p class="stamp-desc">Próximo sello: te faltan 4 semanas activas para desbloquearlo.</p>
+                <span class="stamp-date" style="color:var(--ink-2);">En camino (4 / 8)</span>
+              </article>
+            </div>
+
+            <div class="section-bar">
+              <div>
+                <h2 class="section-heading">Historial de paradas entregadas</h2>
+                <p class="section-sub">Tus calificaciones oficiales en escala 0,0–5,0</p>
+              </div>
+            </div>
+
+            <div class="history-list">
+              <article class="history-row">
+                <div>
+                  <span class="mission-code">Examen · Nivel A1</span>
+                  <h3 class="card-title" style="margin-top:0.3rem;"><span lang="en">Colors &amp; Numbers Quiz</span></h3>
+                  <p class="card-due" style="margin-top:0.2rem;">Calificada el 20 nov · Con comentario y stickers</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">
+                  <span class="score-val">4,8 / 5,0</span>
+                  <button type="button" class="btn btn--secondary btn--auto" data-nav-screen="feedback">Ver postal</button>
+                </div>
+              </article>
+              <article class="history-row">
+                <div>
+                  <span class="mission-code">Pregunta abierta · Nivel A1</span>
+                  <h3 class="card-title" style="margin-top:0.3rem;"><span lang="en">My daily routine</span></h3>
+                  <p class="card-due" style="margin-top:0.2rem;">Calificada el 18 nov · Nuevo intento habilitado hasta el 30 nov</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">
+                  <span class="score-val">3,4 / 5,0</span>
+                  <button type="button" class="btn btn--yellow btn--auto" data-open-activity="fill">Intentar de nuevo</button>
+                </div>
+              </article>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 5: MI FEEDBACK (/feedback) — POSTALES DE TU PROFESORA
+             ================================================================ -->
+        <div class="screen-panel" id="screen-feedback" data-screen-panel="feedback" hidden>
+          <div class="screen-stack">
+
+            <div class="section-bar">
+              <div>
+                <h1 class="hero-title" style="margin-bottom:0.2rem;">Postales de tu profesora</h1>
+                <p class="section-sub">Lee los comentarios, revisa tus stickers y usa tus nuevos intentos cuando estén habilitados.</p>
+              </div>
+              <span class="level-pill">2 revisiones recibidas</span>
+            </div>
+
+            <div class="postcards-stack">
+              <!-- Postal 1 -->
+              <article class="postcard">
+                <div class="expedition-strip expedition-strip--exam">
+                  <span>Postal nueva · Examen · Nivel A1</span>
+                  <span>Calificada el 20 nov</span>
+                </div>
+                <div class="postcard__body">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75rem;">
+                    <h2 class="card-title"><span lang="en">Colors &amp; Numbers Quiz</span></h2>
+                    <div class="score-strip" style="margin-top:0;">
+                      <span class="score-val">4,8 / 5,0</span>
+                      <div class="stars-row" role="img" aria-label="3 de 3 estrellas">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="stickers-row" role="group" aria-label="Stickers otorgados por tu profesora">
+                    <span class="sticker-stamp">🌟 ¡Excelente trabajo!</span>
+                    <span class="sticker-stamp">🧭 Gran explorador</span>
+                  </div>
+
+                  <div class="teacher-note">
+                    <p>«¡Felicitaciones, Mateo! Reconociste casi todos los números y colores sin dudar. Solo repasa cómo se escribe <em>purple</em> para la próxima parada.»</p>
+                    <button type="button" class="tts-btn" data-speak="Felicitaciones Mateo. Reconociste casi todos los números y colores sin dudar. Solo repasa cómo se escribe purple para la próxima parada." data-lang="es-CO" aria-pressed="false" aria-label="Escuchar comentario de tu profesora">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Postal 2 con reintento -->
+              <article class="postcard">
+                <div class="expedition-strip expedition-strip--open">
+                  <span>Pregunta abierta · Nivel A1</span>
+                  <span>Calificada el 18 nov</span>
+                </div>
+                <div class="postcard__body">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75rem;">
+                    <h2 class="card-title"><span lang="en">My daily routine</span></h2>
+                    <div class="score-strip" style="margin-top:0;">
+                      <span class="score-val">3,4 / 5,0</span>
+                      <div class="stars-row" role="img" aria-label="2 de 3 estrellas">
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFCA3A" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9L12 2.8Z" fill="#FFFDF5" stroke="#B58D67" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="stickers-row">
+                    <span class="sticker-stamp">💡 ¡Buen esfuerzo!</span>
+                  </div>
+
+                  <div class="teacher-note">
+                    <p>«Me encantó cómo contaste tu mañana. Te abrí un nuevo intento para que agregues dos actividades de la tarde usando <em>I play</em> y <em>I read</em>.»</p>
+                    <button type="button" class="tts-btn" data-speak="Me encantó cómo contaste tu mañana. Te abrí un nuevo intento para que agregues dos actividades de la tarde." data-lang="es-CO" aria-pressed="false" aria-label="Escuchar comentario de tu profesora">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="callout callout--retry" style="margin-top:0;">
+                    <span>Tienes un nuevo intento autorizado hasta el lunes 30 nov (hora Colombia).</span>
+                  </div>
+
+                  <div>
+                    <button type="button" class="btn btn--yellow btn--auto" data-open-activity="fill">Intentar de nuevo</button>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 6: CONTENIDO EXTRA (/extra)
+             ================================================================ -->
+        <div class="screen-panel" id="screen-extra" data-screen-panel="extra" hidden>
+          <div class="screen-stack">
+
+            <section class="hero-card" aria-labelledby="extra-title">
+              <div>
+                <span class="identity-tag">Mapa de recursos · Nivel A1 y generales</span>
+                <h1 class="hero-title" id="extra-title">Contenido extra recomendado</h1>
+                <p class="hero-subtitle" style="margin-bottom:0;">
+                  Enlaces seleccionados por tu profesora para practicar canciones, cuentos y vocabulario fuera de calificación. Se abren en una pestaña nueva.
+                </p>
+              </div>
+            </section>
+
+            <div class="extra-grid">
+              <article class="mission-card">
+                <div class="expedition-strip expedition-strip--fill">
+                  <span>Recurso externo · Nivel A1</span>
+                  <span>Fuera de nota</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <h2 class="card-title"><span lang="en">Animals Song &amp; Flashcards</span></h2>
+                    <p class="section-sub" style="margin-top:0.35rem;">Canción interactiva para repasar animales del bosque y la granja antes de tu grabación de Speaking.</p>
+                    <p class="card-due">Sitio externo seguro: <code>https://es.educaplay.com</code></p>
+                  </div>
+                  <button type="button" class="btn btn--orange" data-demo-action="Abriendo enlace externo seguro en una pestaña nueva (sin iframe).">
+                    <span>Abrir recurso externo ↗</span>
+                  </button>
+                </div>
+              </article>
+
+              <article class="mission-card">
+                <div class="expedition-strip expedition-strip--open">
+                  <span>Recurso externo · Para todos los niveles</span>
+                  <span>Fuera de nota</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <h2 class="card-title"><span lang="en">Picture Dictionary for Kids</span></h2>
+                    <p class="section-sub" style="margin-top:0.35rem;">Diccionario visual con pronunciación en audio para descubrir nuevas palabras cada semana.</p>
+                    <p class="card-due">Sitio externo seguro: <code>https://learnenglishkids.britishcouncil.org</code></p>
+                  </div>
+                  <button type="button" class="btn btn--secondary" data-demo-action="Abriendo diccionario visual externo en una pestaña nueva.">
+                    <span>Abrir recurso externo ↗</span>
+                  </button>
+                </div>
+              </article>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SCREEN 7: MI PERFIL (/perfil)
+             ================================================================ -->
+        <div class="screen-panel" id="screen-profile" data-screen-panel="profile" hidden>
+          <div class="screen-stack">
+
+            <div class="section-bar">
+              <div>
+                <h1 class="hero-title" style="margin-bottom:0.2rem;">Credencial de explorador</h1>
+                <p class="section-sub">Consulta tus datos, cambia tu correo con código de verificación o ajusta tu experiencia cuando cumplas 11 años.</p>
+              </div>
+            </div>
+
+            <div class="profile-grid">
+              <!-- Credencial + Cambio de correo OTP -->
+              <section class="mission-card" aria-labelledby="cred-title">
+                <div class="expedition-strip expedition-strip--neutral">
+                  <span id="cred-title">Mis datos de estudiante</span>
+                  <span>Grupo A1 · Tarde</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div style="display:flex;align-items:center;gap:0.9rem;">
+                    <span class="avatar-circle" style="width:52px;height:52px;font-size:1.35rem;" aria-hidden="true">M</span>
+                    <div>
+                      <h2 class="card-title">Mateo Ríos</h2>
+                      <p class="section-sub" style="margin:0;">mateo.rios@correo-ejemplo.co · Nivel A1</p>
+                    </div>
+                  </div>
+
+                  <div class="callout callout--hint" style="margin-top:0;">
+                    <span>Contacto de acudiente registrado: <strong>Carolina Ríos</strong> (solo tu profesora puede actualizar este dato).</span>
+                  </div>
+
+                  <form id="otp-demo-form" style="display:flex;flex-direction:column;gap:0.75rem;">
+                    <h3 class="stamp-title">Cambiar correo electrónico (con código OTP)</h3>
+                    <div class="field-group">
+                      <label class="field-label" for="new-email-input">Nuevo correo electrónico</label>
+                      <input id="new-email-input" type="email" class="field-input" placeholder="nuevo.correo@ejemplo.co">
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label" for="pass-input">Contraseña actual</label>
+                      <input id="pass-input" type="password" class="field-input" placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn btn--orange">Enviar código OTP al correo nuevo</button>
+                  </form>
+                </div>
+              </section>
+
+              <!-- Regla de apariencia Kids / Teens -->
+              <section class="mission-card" aria-labelledby="theme-rule-title">
+                <div class="expedition-strip expedition-strip--open">
+                  <span id="theme-rule-title">Apariencia del portal</span>
+                  <span id="age-segment-pill">7–10 años · Kids</span>
+                </div>
+                <div class="mission-card__inner">
+                  <div>
+                    <h2 class="card-title">Tema activo: Kids · Zorro Explorador</h2>
+                    <p class="section-sub" id="switch-rule-copy" style="margin-top:0.35rem;">
+                      Entre los 7 y 10 años disfrutas siempre de la interfaz Kids con botones grandes y lectura en voz alta. Al cumplir 11 años podrás elegir libremente entre Kids y Teens.
+                    </p>
+                  </div>
+
+                  <div id="switch-controls-box" class="switch-controls-box" hidden>
+                    <p class="field-label" style="margin:0;">Elige tu estilo (habilitado desde 11 años):</p>
+                    <div class="segment-options" role="group" aria-label="Elegir interfaz visual">
+                      <button type="button" class="segment-card" data-demo-segment="kids" aria-pressed="true">
+                        <strong>Kids · Zorro Explorador</strong>
+                        <span style="font-size:0.8rem;color:var(--ink-2);">Cálido, ilustrado y con voz</span>
+                      </button>
+                      <button type="button" class="segment-card" data-demo-segment="teens" aria-pressed="false">
+                        <strong>Teens · Directo</strong>
+                        <span style="font-size:0.8rem;color:var(--ink-2);">Más limpio y directo</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn--secondary" id="toggle-can-switch-demo">
+                    Previsualizar vista de alumno 11+ (can_switch_interface)
+                  </button>
+                </div>
+              </section>
+            </div>
+
+          </div>
+        </div>
+
       </main>
 
-      <!-- MOBILE NAV -->
+      <!-- MOBILE BOTTOM NAV (5 destinos activos, >= 52px alto) -->
       <nav class="mobile-bottom-nav" aria-label="Navegación móvil">
-        <button type="button" class="mobile-nav-item" data-nav-screen="home" aria-current="page"><span>Inicio</span></button>
-        <button type="button" class="mobile-nav-item" data-nav-screen="games"><span>Juegos</span></button>
-        <button type="button" class="mobile-nav-item" data-demo-action="Progreso (/progreso)."><span>Progreso</span></button>
-        <button type="button" class="mobile-nav-item" data-demo-action="Feedback (/feedback)."><span>Feedback</span></button>
+        <button type="button" class="mobile-nav-item" data-nav-screen="home" aria-current="page">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6.5h-5V21H4a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
+          <span>Inicio</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-nav-screen="games">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="7" width="18" height="11" rx="5.5" stroke="currentColor" stroke-width="2.1"/><path d="M8.5 10.5v4M6.5 12.5h4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+          <span>Juegos</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-nav-screen="progress">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 19.6l1-5.8-4.2-4.1 5.9-.9L12 3.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
+          <span>Progreso</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-nav-screen="feedback">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>
+          <span>Feedback</span>
+        </button>
+        <button type="button" class="mobile-nav-item" data-nav-screen="extra">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.6 0l2.8-2.8a4 4 0 0 0-5.6-5.6L11.2 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M14 10a4 4 0 0 0-5.6 0l-2.8 2.8a4 4 0 1 0 5.6 5.6l1.6-1.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+          <span>Extra</span>
+        </button>
       </nav>
+    </div>
+  </div>
+
+  <!-- PWA UPDATE BANNER PREVIEW -->
+  <div class="pwa-banner" id="pwa-banner" role="status" aria-live="polite" hidden>
+    <div>
+      <strong style="font-family:'Bricolage Grotesque',sans-serif;display:block;">Hay una nueva versión de Upward English</strong>
+      <span style="font-size:0.84rem;color:#61361F;font-weight:700;">Se aplaza automáticamente si estás respondiendo una actividad.</span>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button type="button" class="btn btn--red btn--auto" id="pwa-reload-btn" style="min-block-size:48px;font-size:0.88rem;">Reiniciar y actualizar</button>
+      <button type="button" class="btn btn--secondary btn--auto" id="pwa-later-btn" style="min-block-size:48px;font-size:0.88rem;">Ahora no</button>
     </div>
   </div>
 
   <div class="app-toast" id="app-toast" role="status" aria-live="polite" hidden></div>
 
-  <dialog class="tokens-dialog" id="tokens-dialog" aria-labelledby="tokens-title">
+  <!-- DIALOG: ÍCONO, IDENTIDAD Y PALETA -->
+  <dialog class="modal-dialog" id="tokens-dialog" aria-labelledby="tokens-title">
     <div class="dialog-head">
-      <h2 id="tokens-title">Identidad y paleta</h2>
+      <h2 id="tokens-title">Upward English · Zorro Explorador (Ícono y Paleta)</h2>
       <button type="button" class="dialog-close" id="close-tokens-btn" aria-label="Cerrar">✕</button>
     </div>
-    <div class="dialog-body" id="tokens-body"></div>
+    <div class="dialog-body">
+      <p style="margin:0;font-weight:800;color:#B9251D;">Lema: «Explora, habla y descubre tu inglés»</p>
+      <p style="margin:0;font-size:0.92rem;color:#4A2511;">
+        El nuevo ícono <strong>«Brújula Ascendente Upward»</strong> reemplaza la cabeza de zorro duplicada en la cabecera: combina una flecha-brújula que apunta hacia arriba (<em>Upward</em>) sobre un chevrón de ruta en <strong>Amarillo Campamento</strong>, mientras el <strong>Zorro Explorador</strong> permanece como mascota acompañante con el pin Upward en su bufanda.
+      </p>
+
+      <div class="icon-showcase" role="group" aria-label="Escalas del nuevo ícono Upward English">
+        <div class="icon-scale-item">
+          <div style="width:28px;height:28px;border-radius:8px;background:#FFCA3A;border:1.8px solid #4A2511;display:grid;place-items:center;">
+            <svg width="20" height="20" viewBox="0 0 36 36" fill="none"><path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/><path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/><path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/></svg>
+          </div>
+          <span>Favicon 24px</span>
+        </div>
+        <div class="icon-scale-item">
+          <div class="brand-emblem">
+            <svg width="32" height="32" viewBox="0 0 36 36" fill="none"><path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/><path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/><path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/></svg>
+          </div>
+          <span>Cabecera 46px</span>
+        </div>
+        <div class="icon-scale-item">
+          <div style="width:72px;height:72px;border-radius:20px;background:#FFCA3A;border:2.5px solid #4A2511;box-shadow:4px 4px 0 #4A2511;display:grid;place-items:center;">
+            <svg width="52" height="52" viewBox="0 0 36 36" fill="none"><path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.7" stroke-linejoin="round"/><path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.7" stroke-linejoin="round"/><path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/></svg>
+          </div>
+          <span>Ícono PWA 72px</span>
+        </div>
+        <div style="flex:1;min-width:190px;font-size:0.83rem;color:#54311D;font-weight:700;">
+          Tipografía: <strong>Bricolage Grotesque</strong> (títulos/botones) + <strong>Nunito</strong> (cuerpo).<br>
+          Especificación completa en <code>zorro-explorador-diseno.md</code>.
+        </div>
+      </div>
+
+      <div class="swatch-grid">
+        <div class="swatch-item"><div class="swatch-color" style="background:#B9251D;"></div><div class="swatch-info"><strong>Rojo Brújula</strong><code>#B9251D</code><div style="color:#61361F;margin-top:2px;">CTA prioritario · 5,9:1</div></div></div>
+        <div class="swatch-item"><div class="swatch-color" style="background:#C6470B;"></div><div class="swatch-info"><strong>Naranja Zorro</strong><code>#C6470B</code><div style="color:#61361F;margin-top:2px;">Nav activo y CTA · 4,9:1</div></div></div>
+        <div class="swatch-item"><div class="swatch-color" style="background:#FFCA3A;"></div><div class="swatch-info"><strong>Amarillo Campamento</strong><code>#FFCA3A</code><div style="color:#61361F;margin-top:2px;">Ícono y estrellas · 11,7:1</div></div></div>
+        <div class="swatch-item"><div class="swatch-color" style="background:#FFF9EC;"></div><div class="swatch-info"><strong>Pergamino Claro</strong><code>#FFF9EC</code><div style="color:#61361F;margin-top:2px;">Lienzo de cuaderno</div></div></div>
+        <div class="swatch-item"><div class="swatch-color" style="background:#2B150A;"></div><div class="swatch-info"><strong>Tinta Corteza</strong><code>#2B150A</code><div style="color:#61361F;margin-top:2px;">Texto y trazos · &gt;14:1</div></div></div>
+      </div>
+
+      <ul class="tokens-notes">
+        <li>Objetivos táctiles de mínimo <strong>48 × 48 px CSS</strong> en todos los controles y foco visible <code>3px solid #1D4ED8</code> (WCAG 2.2 AA).</li>
+        <li>Microjuegos abiertos 24/7 por estrellas de práctica (sin nota ni ranking visible para estudiantes).</li>
+        <li>Estado sin red honesto y confirmación de salida segura en tablets compartidas.</li>
+      </ul>
+    </div>
+  </dialog>
+
+  <!-- DIALOG: CONFIRMACIÓN DE SALIDA EN TABLET COMPARTIDA CON PENDIENTES -->
+  <dialog class="modal-dialog" id="logout-dialog" aria-labelledby="logout-dialog-title">
+    <div class="dialog-head">
+      <h2 id="logout-dialog-title">Tienes respuestas pendientes por enviar</h2>
+      <button type="button" class="dialog-close" id="close-logout-dialog" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p style="margin:0;font-size:0.94rem;color:#4A2511;font-weight:700;">
+        Como estás sin conexión, todavía hay <strong>1 respuesta guardada en este dispositivo</strong>. Si cierras sesión en una tablet compartida, limpiaremos tus datos locales para proteger tu cuenta.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:0.65rem;">
+        <button type="button" class="btn btn--orange btn--auto" id="stay-online-btn">Quedarme y esperar señal</button>
+        <button type="button" class="btn btn--secondary btn--auto" id="force-logout-btn">Salir y limpiar este dispositivo</button>
+      </div>
+    </div>
   </dialog>
 
   <script>
     (function () {
-      const shell = document.getElementById('viewport-shell');
       const stage = document.getElementById('stage');
       const bar = document.getElementById('studio-bar');
       const restoreBtn = document.getElementById('restore-bar-btn');
       const toast = document.getElementById('app-toast');
-      const dialog = document.getElementById('tokens-dialog');
-      const dialogTitle = document.getElementById('tokens-title');
-      const dialogBody = document.getElementById('tokens-body');
-      let toastTimer = null;
-      let currentProposal = 'd';
-      let activeSpeakBtn = null;
+      const tokensDialog = document.getElementById('tokens-dialog');
+      const logoutDialog = document.getElementById('logout-dialog');
+      const offlineBanner = document.getElementById('offline-banner');
+      const pwaBanner = document.getElementById('pwa-banner');
+      const activitySyncBadge = document.getElementById('activity-sync-badge');
 
-      const META = {
-        d: {
-          title: 'Propuesta D · Zorro Explorador',
-          lema: 'Lema: «Explora, habla y descubre tu inglés»',
-          summary: 'Identidad de club de exploradores con mascota zorro en bufanda amarilla, textura de cuaderno de campo, bordes punteados tipo pasaporte y misiones como paradas de ruta.',
-          fonts: 'Títulos: Bricolage Grotesque · Cuerpo: Nunito',
-          swatches: [
-            { name: 'Rojo Brújula', hex: '#B9251D', role: 'CTA prioritario · 5.9:1 con blanco' },
-            { name: 'Naranja Zorro', hex: '#C6470B', role: 'Nav activo y CTA · 4.9:1 con blanco' },
-            { name: 'Amarillo Campamento', hex: '#FFCA3A', role: 'Emblema y estrellas · 11.7:1 con tinta' },
-            { name: 'Pergamino Claro', hex: '#FFF9EC', role: 'Fondo cálido de cuaderno' },
-            { name: 'Tinta Corteza', hex: '#2B150A', role: 'Texto y trazos · >14:1 contraste' }
-          ],
-          notes: [
-            'Cada actividad es una «Parada» en la ruta semanal del niño, facilitando el sentido de progreso sin competencia.',
-            'El lema aparece sutilmente bajo el logo y en el hero para reforzar identidad de marca propia.'
-          ]
-        },
-        e: {
-          title: 'Propuesta E · Cohete Sol',
-          lema: 'Lema: «Despega con cada palabra»',
-          summary: 'Identidad espacial solar 100% en modo claro: cohete rojo-amarillo, códigos de misión (#01–#04), energía semanal y zona de simulador de microjuegos.',
-          fonts: 'Títulos: Fredoka · Cuerpo: Plus Jakarta Sans',
-          swatches: [
-            { name: 'Rojo Cohete', hex: '#C81E2B', role: 'Hero, nav y reanudar · 5.4:1 con blanco' },
-            { name: 'Naranja Propulsor', hex: '#C64607', role: 'CTA principal · 4.9:1 con blanco' },
-            { name: 'Amarillo Estrella', hex: '#FFC727', role: 'Ventanilla y estrellas · 11.4:1 con tinta' },
-            { name: 'Amanecer Suave', hex: '#FFF6EB', role: 'Fondo cálido luminoso' },
-            { name: 'Órbita Cálida', hex: '#26110B', role: 'Texto principal · >15:1 contraste' }
-          ],
-          notes: [
-            'La misión en curso destaca arriba en formato horizontal de despegue con las 3 misiones siguientes abajo.',
-            'Muy atractiva para niños de 7 a 10 años, manteniendo accesibilidad WCAG 2.2 AA en tablets.'
-          ]
-        }
-      };
+      let toastTimer = null;
+      let activeSpeakBtn = null;
+      let isOffline = false;
+      let isRecording = false;
+      let recordSeconds = 0;
+      let recordInterval = null;
+      let shieldRecovering = false;
+      let canSwitchDemo = false;
 
       function showToast(msg) {
         toast.textContent = msg;
         toast.hidden = false;
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { toast.hidden = true; }, 3400);
-      }
-
-      function setProposal(id) {
-        currentProposal = id;
-        shell.dataset.proposal = id;
-        document.querySelectorAll('[data-set-proposal]').forEach((b) => {
-          b.setAttribute('aria-pressed', String(b.dataset.setProposal === id));
-        });
+        toastTimer = setTimeout(() => { toast.hidden = true; }, 3500);
       }
 
       function setScreen(id) {
@@ -1886,6 +2640,23 @@
           if (b.dataset.navScreen === id) b.setAttribute('aria-current', 'page');
           else b.removeAttribute('aria-current');
         });
+        // Aplazar aviso PWA durante intento activo (Decisión 118)
+        if (id === 'activity' && !pwaBanner.hidden) {
+          pwaBanner.hidden = true;
+          document.getElementById('toggle-pwa-btn').setAttribute('aria-pressed', 'false');
+          showToast('Aviso PWA aplazado mientras estás en una actividad activa.');
+        }
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+
+      function setActivityMode(mode) {
+        const speakBox = document.getElementById('activity-mode-speaking');
+        const fillBox = document.getElementById('activity-mode-fill');
+        speakBox.hidden = mode !== 'speaking';
+        fillBox.hidden = mode !== 'fill';
+        document.querySelectorAll('[data-activity-mode]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b.dataset.activityMode === mode));
+        });
       }
 
       function setDevice(d) {
@@ -1895,15 +2666,39 @@
         });
       }
 
-      document.querySelectorAll('[data-set-proposal]').forEach((b) => b.addEventListener('click', () => setProposal(b.dataset.setProposal)));
+      function updateOfflineUI() {
+        offlineBanner.hidden = !isOffline;
+        document.getElementById('toggle-offline-btn').setAttribute('aria-pressed', String(isOffline));
+        if (isOffline) {
+          activitySyncBadge.textContent = 'Guardado en este dispositivo (sin red)';
+          activitySyncBadge.classList.add('sync-badge--local');
+        } else {
+          activitySyncBadge.textContent = 'Respuesta guardada en el servidor';
+          activitySyncBadge.classList.remove('sync-badge--local');
+        }
+      }
+
+      // Navigation & device controls
       document.querySelectorAll('[data-set-screen], [data-nav-screen]').forEach((b) => {
         b.addEventListener('click', (e) => {
           if (b.tagName === 'A') e.preventDefault();
           setScreen(b.dataset.setScreen || b.dataset.navScreen);
         });
       });
-      document.querySelectorAll('[data-set-device]').forEach((b) => b.addEventListener('click', () => setDevice(b.dataset.setDevice)));
+      document.querySelectorAll('[data-open-activity]').forEach((b) => {
+        b.addEventListener('click', () => {
+          setActivityMode(b.dataset.openActivity);
+          setScreen('activity');
+        });
+      });
+      document.querySelectorAll('[data-activity-mode]').forEach((b) => {
+        b.addEventListener('click', () => setActivityMode(b.dataset.activityMode));
+      });
+      document.querySelectorAll('[data-set-device]').forEach((b) => {
+        b.addEventListener('click', () => setDevice(b.dataset.setDevice));
+      });
 
+      // Filters
       document.querySelectorAll('[data-mission-filter]').forEach((chip) => {
         chip.addEventListener('click', () => {
           const f = chip.dataset.missionFilter;
@@ -1913,7 +2708,6 @@
           });
         });
       });
-
       document.querySelectorAll('[data-game-filter]').forEach((chip) => {
         chip.addEventListener('click', () => {
           const f = chip.dataset.gameFilter;
@@ -1924,11 +2718,157 @@
         });
       });
 
-      document.querySelectorAll('[data-demo-action]').forEach((b) => b.addEventListener('click', () => showToast(b.dataset.demoAction)));
+      // Forgiving streak shield toggle preview
+      document.getElementById('toggle-shield-demo').addEventListener('click', (e) => {
+        shieldRecovering = !shieldRecovering;
+        const btn = e.currentTarget;
+        btn.setAttribute('aria-pressed', String(shieldRecovering));
+        document.getElementById('shield-status-text').textContent = shieldRecovering
+          ? 'Recuperando escudo (1 de 2 semanas activas)'
+          : 'Escudo de perdón activo esta semana';
+      });
 
+      // Interactive Order Words Demo (hybrid tap + keyboard)
+      const demoBox = document.getElementById('order-words-demo');
+      const tray = document.getElementById('sentence-tray');
+      const bank = document.getElementById('word-bank');
+      const demoStatus = document.getElementById('game-demo-status');
+      let placedWords = [];
+
+      function renderSentenceTray() {
+        tray.innerHTML = '';
+        if (placedWords.length === 0) {
+          const span = document.createElement('span');
+          span.style.color = 'var(--ink-2)';
+          span.style.fontWeight = '700';
+          span.textContent = 'Toca una palabra de abajo para colocarla aquí…';
+          tray.appendChild(span);
+          return;
+        }
+        placedWords.forEach((item, idx) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'word-tile word-tile--placed';
+          btn.textContent = item.word;
+          btn.setAttribute('aria-label', 'Quitar palabra ' + item.word);
+          btn.addEventListener('click', () => {
+            placedWords.splice(idx, 1);
+            item.sourceBtn.disabled = false;
+            renderSentenceTray();
+            item.sourceBtn.focus();
+          });
+          tray.appendChild(btn);
+        });
+      }
+
+      bank.querySelectorAll('.word-tile').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          btn.disabled = true;
+          placedWords.push({ word: btn.dataset.word, sourceBtn: btn });
+          renderSentenceTray();
+        });
+      });
+
+      document.getElementById('open-game-demo').addEventListener('click', () => {
+        demoBox.hidden = false;
+        demoBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      document.getElementById('close-game-demo').addEventListener('click', () => { demoBox.hidden = true; });
+      document.getElementById('reset-sentence-btn').addEventListener('click', () => {
+        placedWords.forEach((p) => { p.sourceBtn.disabled = false; });
+        placedWords = [];
+        renderSentenceTray();
+        demoStatus.className = 'callout callout--hint';
+        demoStatus.textContent = 'Orden limpio. Vuelve a elegir las 5 palabras.';
+      });
+      document.getElementById('check-sentence-btn').addEventListener('click', () => {
+        const result = placedWords.map((p) => p.word).join(' ');
+        if (result === 'The fox explores the forest') {
+          demoStatus.className = 'callout callout--ok';
+          demoStatus.textContent = '¡3 de 3 estrellas de práctica! «The fox explores the forest» está perfecta.';
+          document.getElementById('practice-stars-total').textContent = '9 / 15';
+        } else {
+          demoStatus.className = 'callout callout--grace';
+          demoStatus.textContent = '¡Buen intento! Pista: empieza con «The fox» y luego la acción «explores».';
+        }
+      });
+
+      // Activity Recorder & Fill Submit Demo
+      const recordBtn = document.getElementById('record-toggle-btn');
+      const recordLbl = document.getElementById('record-btn-label');
+      const waveBars = document.getElementById('wave-bars');
+      const timerText = document.getElementById('record-timer-text');
+
+      recordBtn.addEventListener('click', () => {
+        isRecording = !isRecording;
+        recordBtn.setAttribute('aria-pressed', String(isRecording));
+        waveBars.dataset.recording = String(isRecording);
+        if (isRecording) {
+          recordSeconds = 0;
+          recordLbl.textContent = 'Detener grabación';
+          timerText.textContent = 'Grabando: 00:00 / 02:00';
+          recordInterval = setInterval(() => {
+            recordSeconds += 1;
+            const s = String(recordSeconds).padStart(2, '0');
+            timerText.textContent = 'Grabando: 00:' + s + ' / 02:00';
+          }, 1000);
+        } else {
+          clearInterval(recordInterval);
+          recordLbl.textContent = 'Grabar de nuevo';
+          const s = String(Math.max(recordSeconds, 4)).padStart(2, '0');
+          timerText.textContent = 'Audio listo (00:' + s + ') · guardado en este dispositivo';
+          showToast(isOffline ? 'Audio guardado en cola local (pendingUploads).' : 'Audio listo para subir a Cloudflare R2.');
+        }
+      });
+
+      document.getElementById('submit-speaking-btn').addEventListener('click', () => {
+        showToast(isOffline
+          ? 'Sin red: tu grabación quedó en cola local y se enviará al reconectar.'
+          : 'Grabación enviada a tu profesora. Recibirás aviso cuando la califique.');
+      });
+      document.getElementById('submit-fill-btn').addEventListener('click', () => {
+        const b1 = document.getElementById('blank-1').value;
+        const b2 = document.getElementById('blank-2').value;
+        if (!b1 || !b2) {
+          showToast('Completa los dos espacios antes de entregar tu actividad.');
+          return;
+        }
+        showToast(isOffline
+          ? 'Guardado en este dispositivo. Se calificará en el servidor al volver la señal.'
+          : 'Respuesta guardada en el servidor. ¡Buen trabajo en la expedición!');
+      });
+
+      // Profile demos (OTP & 11+ switch preview)
+      document.getElementById('otp-demo-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        showToast('Código OTP enviado al nuevo correo electrónico para confirmar el cambio.');
+      });
+      document.getElementById('toggle-can-switch-demo').addEventListener('click', (e) => {
+        canSwitchDemo = !canSwitchDemo;
+        document.getElementById('switch-controls-box').hidden = !canSwitchDemo;
+        document.getElementById('age-segment-pill').textContent = canSwitchDemo ? '11+ años · Puede alternar' : '7–10 años · Kids';
+        document.getElementById('switch-rule-copy').textContent = canSwitchDemo
+          ? 'Como tienes 11 años o más, puedes alternar entre Kids y Teens cuando quieras. El cambio nunca ocurre sin que tú lo elijas.'
+          : 'Entre los 7 y 10 años disfrutas siempre de la interfaz Kids con botones grandes y lectura en voz alta. Al cumplir 11 años podrás elegir libremente entre Kids y Teens.';
+        e.currentTarget.textContent = canSwitchDemo
+          ? 'Volver a vista de alumno 7–10 años (solo Kids)'
+          : 'Previsualizar vista de alumno 11+ (can_switch_interface)';
+      });
+      document.querySelectorAll('[data-demo-segment]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-demo-segment]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+          showToast(btn.dataset.demoSegment === 'teens'
+            ? 'Selección de tema Teens registrada (este boceto muestra exclusivamente Kids · Zorro Explorador).'
+            : 'Tema Kids · Zorro Explorador activo.');
+        });
+      });
+
+      // Demo actions & TTS
+      document.querySelectorAll('[data-demo-action]').forEach((b) => b.addEventListener('click', () => showToast(b.dataset.demoAction)));
       document.querySelectorAll('[data-speak]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const text = btn.dataset.speak;
+          const lang = btn.dataset.lang || 'en-US';
           const same = activeSpeakBtn === btn;
           if ('speechSynthesis' in window) window.speechSynthesis.cancel();
           if (activeSpeakBtn) { activeSpeakBtn.setAttribute('aria-pressed', 'false'); activeSpeakBtn = null; }
@@ -1937,38 +2877,61 @@
           activeSpeakBtn = btn;
           if ('speechSynthesis' in window) {
             const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'en-US';
-            u.rate = 0.9;
+            u.lang = lang;
+            u.rate = 0.92;
             u.onend = u.onerror = () => { btn.setAttribute('aria-pressed', 'false'); activeSpeakBtn = null; };
             window.speechSynthesis.speak(u);
           } else {
             setTimeout(() => { btn.setAttribute('aria-pressed', 'false'); activeSpeakBtn = null; }, 1200);
           }
-          showToast('Leyendo en voz alta: "' + text + '"');
+          showToast('Leyendo en voz alta (' + lang + '): "' + text + '"');
         });
       });
 
+      // Offline, PWA & Shared-tablet logout
+      document.getElementById('toggle-offline-btn').addEventListener('click', () => {
+        isOffline = !isOffline;
+        updateOfflineUI();
+      });
+      document.getElementById('toggle-pwa-btn').addEventListener('click', (e) => {
+        const show = pwaBanner.hidden;
+        pwaBanner.hidden = !show;
+        e.currentTarget.setAttribute('aria-pressed', String(show));
+      });
+      document.getElementById('pwa-later-btn').addEventListener('click', () => {
+        pwaBanner.hidden = true;
+        document.getElementById('toggle-pwa-btn').setAttribute('aria-pressed', 'false');
+      });
+      document.getElementById('pwa-reload-btn').addEventListener('click', () => {
+        pwaBanner.hidden = true;
+        document.getElementById('toggle-pwa-btn').setAttribute('aria-pressed', 'false');
+        showToast('Aplicando nueva versión de Upward English…');
+      });
+
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        if (isOffline) {
+          logoutDialog.showModal();
+        } else {
+          showToast('Sesión cerrada de forma segura: IndexedDB y caché limpiados para tablet compartida.');
+        }
+      });
+      document.getElementById('close-logout-dialog').addEventListener('click', () => logoutDialog.close());
+      document.getElementById('stay-online-btn').addEventListener('click', () => {
+        logoutDialog.close();
+        showToast('Tu sesión sigue abierta para enviar tus respuestas al recuperar la señal.');
+      });
+      document.getElementById('force-logout-btn').addEventListener('click', () => {
+        logoutDialog.close();
+        showToast('Sesión cerrada y almacenamiento local purgado de forma segura.');
+      });
+
+      // Studio bar & Tokens modal
       document.getElementById('hide-bar-btn').addEventListener('click', () => { bar.hidden = true; restoreBtn.hidden = false; });
       restoreBtn.addEventListener('click', () => { bar.hidden = false; restoreBtn.hidden = true; });
-
-      document.getElementById('open-tokens-btn').addEventListener('click', () => {
-        const m = META[currentProposal];
-        dialogTitle.textContent = m.title;
-        dialogBody.innerHTML = `
-          <p style="margin:0;font-weight:800;color:#B9251D;">${m.lema}</p>
-          <p style="margin:0;font-size:0.93rem;color:#4A2511;">${m.summary}</p>
-          <p style="margin:0;font-size:0.85rem;font-weight:700;color:#8A2E05;">${m.fonts}</p>
-          <div class="swatch-grid">${m.swatches.map((s) => `
-            <div class="swatch-item">
-              <div class="swatch-color" style="background:${s.hex};"></div>
-              <div class="swatch-info"><strong>${s.name}</strong><code>${s.hex}</code><div style="color:#6B442B;margin-top:2px;">${s.role}</div></div>
-            </div>`).join('')}</div>
-          <ul class="tokens-notes">${m.notes.map((n) => `<li>${n}</li>`).join('')}</ul>
-        `;
-        dialog.showModal();
-      });
-      document.getElementById('close-tokens-btn').addEventListener('click', () => dialog.close());
-      dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+      document.getElementById('open-tokens-btn').addEventListener('click', () => tokensDialog.showModal());
+      document.getElementById('close-tokens-btn').addEventListener('click', () => tokensDialog.close());
+      tokensDialog.addEventListener('click', (e) => { if (e.target === tokensDialog) tokensDialog.close(); });
+      logoutDialog.addEventListener('click', (e) => { if (e.target === logoutDialog) logoutDialog.close(); });
     })();
   </script>
 </body>

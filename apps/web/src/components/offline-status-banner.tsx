@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { WifiOff, CheckCircle2, CloudUpload } from "lucide-react";
 import {
   subscribeOfflineStatus,
@@ -13,6 +13,28 @@ import {
   isTeensOrTeacherSegment,
   USER_SEGMENT_EVENT,
 } from "../lib/user-segment";
+import styles from './teacher-portal.module.css';
+
+function subscribeConnectivity(onChange: () => void) {
+  window.addEventListener('online', onChange);
+  window.addEventListener('offline', onChange);
+  return () => {
+    window.removeEventListener('online', onChange);
+    window.removeEventListener('offline', onChange);
+  };
+}
+
+export function TeacherOfflineStatusBanner() {
+  const isOffline = useSyncExternalStore(subscribeConnectivity, () => !navigator.onLine, () => false);
+  if (!isOffline) return null;
+
+  return (
+    <div role="status" className={styles.offline}>
+      <WifiOff size={18} aria-hidden="true" />
+      <span>Sin conexión. Algunas acciones no están disponibles.</span>
+    </div>
+  );
+}
 
 export interface OfflineStatusBannerProps {
   initialStatus?: OfflineStatus;

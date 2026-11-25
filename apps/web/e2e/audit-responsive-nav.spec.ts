@@ -8,6 +8,7 @@ for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
     await context.addCookies([
+      { name: `${process.env.COOKIE_PREFIX ?? 'englove_local_'}access_token`, value: token, domain: 'localhost', path: '/' },
       { name: 'upward_english_access_token', value: token, domain: 'localhost', path: '/' },
       { name: 'upward_english_local_access_token', value: token, domain: 'localhost', path: '/' },
     ]);
@@ -23,10 +24,14 @@ for (const width of [320, 390, 768, 1280]) {
     await page.route('**/api/v1/dashboard/reminders', (route) =>
       route.fulfill({
         status: 200,
-        json: { pendingApprovals: 0, overdueReviews: 0, studentsWithoutActivity: [] },
+        json: { pendingRegistrations: 0, overdueReviews: 0, ungradedReminderDays: 3 },
       }),
     );
+    await page.route('**/api/v1/groups?archived=false&limit=20', (route) => route.fulfill({ json: { items: [] } }));
     await page.goto('/inicio');
+    if (width < 1024) {
+      await page.getByRole('button', { name: 'Menú docente' }).click();
+    }
     const logout = page.getByRole('button', { name: 'Cerrar sesión', exact: true });
     await expect(logout).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);

@@ -53,13 +53,14 @@ export function PwaUpdateBanner() {
 
   return (
     <aside
+      data-pwa-update-banner=""
       role="status"
       aria-live="polite"
       className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 bg-zinc-900/95 text-white shadow-2xl backdrop-blur-md border-t border-zinc-700 transition-transform duration-300 ease-out"
     >
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3 text-left w-full sm:w-auto">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+          <div data-pwa-update-icon="" className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
             <Sparkles className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
@@ -84,6 +85,7 @@ export function PwaUpdateBanner() {
 
           <button
             type="button"
+            data-pwa-update-action=""
             onClick={applyUpdate}
             className="inline-flex items-center justify-center gap-2 min-h-[48px] min-w-[48px] px-5 py-2.5 text-xs sm:text-sm font-bold bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-zinc-950 rounded-xl shadow-sm transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >

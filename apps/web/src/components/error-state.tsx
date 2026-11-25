@@ -1,4 +1,6 @@
 import React from 'react';
+import { CircleAlert } from 'lucide-react';
+import styles from './teacher-portal.module.css';
 
 export type ErrorVariant = 'kids' | 'teens' | 'teacher';
 
@@ -8,6 +10,7 @@ export interface ErrorStateProps {
   variant?: ErrorVariant;
   onRetry?: () => void;
   onBack?: () => void;
+  editorial?: boolean;
 }
 
 export function getErrorMessage(code?: string | number, variant: ErrorVariant = 'kids'): string {
@@ -70,8 +73,19 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   variant = 'kids',
   onRetry,
   onBack,
+  editorial = false,
 }) => {
   const displayMessage = message || getErrorMessage(code, variant);
+
+  if (variant === 'teacher' && editorial) {
+    return (
+      <div className={styles.error}>
+        <p role="alert"><CircleAlert size={18} aria-hidden="true" />{displayMessage}</p>
+        {onRetry && <button type="button" className={styles.secondaryButton} onClick={onRetry}>Reintentar</button>}
+        {onBack && <button type="button" className={styles.secondaryButton} onClick={onBack}>Volver</button>}
+      </div>
+    );
+  }
 
   const isKids = variant === 'kids';
 

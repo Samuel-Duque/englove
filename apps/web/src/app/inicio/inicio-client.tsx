@@ -1,15 +1,13 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  RemindersResponseSchema,
   AssignmentCardListResponseSchema,
   RuntimeViewSchema,
   type SessionView,
-  type RemindersResponse,
   type AssignmentCard,
   type AssignmentCardListResponse,
   type RuntimeView,
@@ -18,7 +16,7 @@ import {
 import { apiFetch, ApiError } from '../../lib/api';
 import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh, clearSharedSession } from '../../lib/auth-session';
 import { getActivityTypeLabel } from '../../lib/activity-labels';
-import { TeacherNav } from '../../components/teacher-nav';
+import { TeacherHome } from './teacher-home';
 import { StudentNav } from '../../components/student-nav';
 import { OfflineStatusBanner } from '../../components/offline-status-banner';
 import { AccessibleModal } from '../../components/ui/modal';
@@ -50,15 +48,6 @@ export function InicioClient() {
 
   const session = sessionQuery.data ?? null;
   const activeUserId = session?.user.id ?? null;
-
-  const remindersQuery = useQuery({
-    queryKey: ['teacher', 'reminders', activeUserId],
-    queryFn: () =>
-      apiFetch<RemindersResponse>('/api/v1/dashboard/reminders', {
-        schema: RemindersResponseSchema,
-      }),
-    enabled: session?.user.role === 'teacher',
-  });
 
   const cardsQuery = useQuery({
     queryKey: ['student', 'assignments', activeUserId],
@@ -108,10 +97,8 @@ export function InicioClient() {
     : null;
 
   const isLoading = sessionQuery.isLoading ||
-    (session?.user.role === 'teacher' && remindersQuery.isLoading) ||
     (session?.user.role === 'student' && cardsQuery.isLoading);
 
-  const reminders = remindersQuery.data ?? null;
   const assignmentCards: AssignmentCard[] = cardsQuery.data?.items ?? [];
   const profile: StudentProfileView | null = profileQuery.data ?? null;
 
@@ -144,178 +131,8 @@ export function InicioClient() {
     );
   }
 
-  // Teacher Experience
   if (session?.user.role === 'teacher') {
-    const pendingCount = reminders?.pendingRegistrations ?? 0;
-    const reminderDays = reminders?.ungradedReminderDays ?? 3;
-
-    return (
-      <div className="min-h-screen bg-zinc-50 flex flex-col">
-        <Suspense fallback={<header className="h-16 border-b border-zinc-200 bg-white" />}>
-          <TeacherNav teacherName={session.user.name} />
-        </Suspense>
-
-        <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 outline-none">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900">
-              Panel Docente — Inicio
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              Bienvenida/o, {session.user.name}. Aquí tienes un resumen operativo de tu aula y accesos rápidos.
-            </p>
-          </div>
-
-          <section aria-label="Avisos prioritarios y recordatorios">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div
-                className={`rounded-xl border p-5 transition-all ${
-                  pendingCount > 0
-                    ? 'border-amber-300 bg-amber-50/70 text-amber-900'
-                    : 'border-zinc-200 bg-white text-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl" aria-hidden="true">
-                      {pendingCount > 0 ? '⚠️' : '✅'}
-                    </span>
-                    <div>
-                      <h2 className="text-base font-semibold">Solicitudes de Registro</h2>
-                      <p className="text-sm opacity-90">
-                        {pendingCount === 0
-                          ? 'No hay alumnos pendientes de aprobación.'
-                          : pendingCount === 1
-                            ? 'Hay 1 alumno esperando aprobación de cuenta.'
-                            : `Hay ${pendingCount} alumnos esperando aprobación de cuenta.`}
-                      </p>
-                    </div>
-                  </div>
-                  {pendingCount > 0 && (
-                    <Link
-                      href="/alumnos/solicitudes"
-                      className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
-                    >
-                      Revisar
-                    </Link>
-                  )}
-                </div>
-              </div>
-
-              <div
-                className={`rounded-xl border p-5 transition-all ${
-                  (reminders?.overdueReviews ?? 0) > 0
-                    ? 'border-amber-300 bg-amber-50/70 text-amber-900'
-                    : 'border-zinc-200 bg-white text-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl" aria-hidden="true">
-                      📋
-                    </span>
-                    <div>
-                      <h2 className="text-base font-semibold">Entregas sin Calificar</h2>
-                      <p className="text-sm opacity-90">
-                        {(reminders?.overdueReviews ?? 0) === 0
-                          ? `No hay entregas pendientes con más de ${reminderDays} días desde su cierre.`
-                          : (reminders?.overdueReviews ?? 0) === 1
-                            ? `Hay 1 entrega pendiente de calificar hace más de ${reminderDays} días.`
-                            : `Hay ${reminders?.overdueReviews} entregas pendientes de calificar hace más de ${reminderDays} días.`}
-                      </p>
-                    </div>
-                  </div>
-                  {(reminders?.overdueReviews ?? 0) > 0 && (
-                    <Link
-                      href="/revision"
-                      className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
-                    >
-                      Revisar
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link
-              href="/asignaciones"
-              className="group rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:border-blue-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700 mb-4 font-bold text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                📅
-              </div>
-              <h3 className="text-base font-semibold text-zinc-900 group-hover:text-blue-600 transition-colors">
-                Asignaciones
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Crea tareas, programa fechas de entrega y revisa el progreso del grupo.
-              </p>
-            </Link>
-
-            <Link
-              href="/actividades"
-              className="group rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:border-blue-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700 mb-4 font-bold text-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                📚
-              </div>
-              <h3 className="text-base font-semibold text-zinc-900 group-hover:text-blue-600 transition-colors">
-                Catálogo de Actividades
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Crea, edita y organiza tus ejercicios, juegos y exámenes.
-              </p>
-            </Link>
-
-            <Link
-              href="/grupos"
-              className="group rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:border-blue-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 text-purple-700 mb-4 font-bold text-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                👥
-              </div>
-              <h3 className="text-base font-semibold text-zinc-900 group-hover:text-purple-600 transition-colors">
-                Gestión de Grupos
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Organiza a tus estudiantes en grupos y aulas temáticas.
-              </p>
-            </Link>
-
-            <Link
-              href="/alumnos"
-              className="group rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:border-blue-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 mb-4 font-bold text-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                🎓
-              </div>
-              <h3 className="text-base font-semibold text-zinc-900 group-hover:text-emerald-600 transition-colors">
-                Gestión de Alumnos
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Consulta fichas, aprueba solicitudes y desbloquea accesos.
-              </p>
-            </Link>
-
-            <Link
-              href="/revision"
-              className="group rounded-xl border border-zinc-200 bg-white p-6 shadow-sm hover:border-amber-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700 mb-4 font-bold text-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                ✍️
-              </div>
-              <h3 className="text-base font-semibold text-zinc-900 group-hover:text-amber-600 transition-colors">
-                Revisión y Calificación
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Califica entregas de speaking y respuestas, envía stickers y concede nuevos intentos.
-              </p>
-            </Link>
-          </div>
-        </main>
-      </div>
-    );
+    return <TeacherHome user={session.user} />;
   }
 
   // Student Experience

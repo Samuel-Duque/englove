@@ -3,16 +3,18 @@ import { test, expect } from '@playwright/test';
 test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaciones (ENG-145)', () => {
   test.beforeEach(async ({ context, page }) => {
     // Add teacher session cookies
+    const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
     await context.addCookies([
+      { name: `${process.env.COOKIE_PREFIX ?? 'englove_local_'}access_token`, value: token, domain: 'localhost', path: '/' },
       {
         name: 'upward_english_local_access_token',
-        value: 'mock-teacher-token',
+        value: token,
         domain: 'localhost',
         path: '/',
       },
       {
         name: 'upward_english_access_token',
-        value: 'mock-teacher-token',
+        value: token,
         domain: 'localhost',
         path: '/',
       },
@@ -67,6 +69,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
   test('1. /inicio: Dashboard docente con recordatorios (solicitudes pendientes y entregas vencidas) y accesos rápidos', async ({
     page,
   }) => {
+    await page.route('**/api/v1/groups?archived=false&limit=20', (route) => route.fulfill({ json: { items: [] } }));
     await page.route('**/api/v1/dashboard/reminders', async (route) => {
       await route.fulfill({
         status: 200,
@@ -81,22 +84,20 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.goto('/inicio');
 
     // Header & Welcome
-    await expect(page.locator('h1:has-text("Panel Docente — Inicio")')).toBeVisible();
-    await expect(page.locator('text=Bienvenida/o, Profesora Clara Gómez')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Buen día, Profesora Clara Gómez' })).toBeVisible();
 
     // Reminder cards
-    await expect(page.locator('h2:has-text("Solicitudes de Registro")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Solicitudes de registro' })).toBeVisible();
     await expect(page.locator('text=Hay 3 alumnos esperando aprobación de cuenta.')).toBeVisible();
 
-    await expect(page.locator('h2:has-text("Entregas sin Calificar")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Entregas sin calificar' })).toBeVisible();
     await expect(page.locator('text=Hay 2 entregas pendientes de calificar hace más de 3 días.')).toBeVisible();
 
     // Quick links
-    await expect(page.locator('a[href="/asignaciones"] h3:has-text("Asignaciones")')).toBeVisible();
-    await expect(page.locator('a[href="/actividades"] h3:has-text("Catálogo de Actividades")')).toBeVisible();
-    await expect(page.locator('a[href="/grupos"] h3:has-text("Gestión de Grupos")')).toBeVisible();
-    await expect(page.locator('a[href="/alumnos"] h3:has-text("Gestión de Alumnos")')).toBeVisible();
-    await expect(page.locator('a[href="/revision"] h3:has-text("Revisión y Calificación")')).toBeVisible();
+    const quickLinks = page.getByRole('region', { name: 'Accesos rápidos' });
+    for (const label of ['Asignaciones', 'Actividades', 'Grupos', 'Alumnos', 'Revisión', 'Estadísticas', 'Contenido extra']) {
+      await expect(quickLinks.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    }
   });
 
   test('2. /contenidos y /contenidos/onboarding: Redirecciones declarativas hacia catálogo y creador', async ({

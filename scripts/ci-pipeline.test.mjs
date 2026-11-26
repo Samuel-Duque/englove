@@ -51,6 +51,15 @@ test('CI-BLOCK-02: las pruebas de calidad disponen de MinIO privado y herramient
   assert.match(quality.steps[media].run, /^ffmpeg -version$/m);
   assert.match(quality.steps[media].run, /^ffprobe -version$/m);
 });
+test('CI-BLOCK-02: la API puede inicializar su configuración en las pruebas bajo Turbo strict', () => {
+  const { env } = workflow.jobs['quality-gates'];
+  assert.equal(env.WEB_BASE_URL, 'http://localhost:3000');
+  assert.equal(env.NEXT_PUBLIC_API_URL, 'http://localhost:3001');
+  assert.equal(env.MAIL_FROM, 'ci@example.invalid');
+  for (const key of ['WEB_BASE_URL', 'NEXT_PUBLIC_API_URL', 'MAIL_FROM']) {
+    assert.ok(turbo.tasks.test.passThroughEnv.includes(key));
+  }
+});
 test('CI-BLOCK-02: fullstack es manual, siembra una base efímera y espera la API', () => {
   const fullstack = workflow.jobs.fullstack;
   assert.deepEqual(fullstack.services, workflow.jobs['quality-gates'].services);

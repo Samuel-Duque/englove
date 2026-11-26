@@ -15,7 +15,16 @@
     },
     "test": {
       "cache": false,
-      "passThroughEnv": ["DATABASE_URL", "REQUIRE_POSTGRES_TESTS", "RUN_AUDIT_MIGRATION_POSTGRES", "AUDIT_MIGRATION_ADMIN_URL", "R2_*"],
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "REQUIRE_POSTGRES_TESTS",
+        "RUN_AUDIT_MIGRATION_POSTGRES",
+        "AUDIT_MIGRATION_ADMIN_URL",
+        "R2_*",
+        "WEB_BASE_URL",
+        "NEXT_PUBLIC_API_URL",
+        "MAIL_FROM"
+      ],
       "dependsOn": ["build", "^build"]
     },
     "dev": {

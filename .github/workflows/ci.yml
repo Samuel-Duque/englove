@@ -46,6 +46,9 @@ jobs:
       R2_BUCKET_NAME: &r2-bucket upward-english-dev
       R2_ACCESS_KEY_ID: &r2-key minioadmin
       R2_SECRET_ACCESS_KEY: &r2-secret minioadmin
+      WEB_BASE_URL: &ci-web-url http://localhost:3000
+      NEXT_PUBLIC_API_URL: &ci-api-url http://localhost:3001
+      MAIL_FROM: &ci-mail-from ci@example.invalid
       REQUIRE_POSTGRES_TESTS: '1'
       RUN_AUDIT_MIGRATION_POSTGRES: '1'
       AUDIT_MIGRATION_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5433/postgres
@@ -153,12 +156,12 @@ jobs:
       R2_BUCKET_NAME: *r2-bucket
       R2_ACCESS_KEY_ID: *r2-key
       R2_SECRET_ACCESS_KEY: *r2-secret
-      WEB_BASE_URL: http://localhost:3000
-      API_URL: http://localhost:3001
-      NEXT_PUBLIC_API_URL: http://localhost:3001
+      WEB_BASE_URL: *ci-web-url
+      API_URL: *ci-api-url
+      NEXT_PUBLIC_API_URL: *ci-api-url
       COOKIE_PREFIX: upward_english_local_
       NEXT_PUBLIC_COOKIE_PREFIX: upward_english_local_
-      MAIL_FROM: ci@example.invalid
+      MAIL_FROM: *ci-mail-from
     steps:
       - *checkout
       - *setup-pnpm

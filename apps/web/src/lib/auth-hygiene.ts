@@ -177,24 +177,85 @@ export async function clearSharedDeviceSession(
     try {
       if ("sessionStorage" in window) window.sessionStorage.clear();
       if (typeof document !== "undefined") {
-        document.cookie =
-          "upward_english_user_logged=; path=/; max-age=0; SameSite=Lax";
+        expireClientCookie("upward_english_user_logged");
+        const expiredHintNames = new Set<string>();
         const cookies = document.cookie.split(";");
         for (const c of cookies) {
-          const name = c.split("=")[0]?.trim();
+          const eqIdx = c.indexOf("=");
+          if (eqIdx <= 0) continue;
+          const name = c.slice(0, eqIdx).trim();
           if (
             name &&
+            !expiredHintNames.has(name) &&
             (name === "session_hint" ||
               name.endsWith("_session_hint") ||
               name.includes("session_hint"))
           ) {
-            document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+            expiredHintNames.add(name);
+            expireClientCookie(name);
           }
         }
       }
     } catch {
       // Ignore
     }
+  }
+}
+
+/**
+ * Dominios candidatos (`.app.example.org`, `.example.org`) donde la API pudo emitir la cookie con
+ * `Domain=` (COOKIE_DOMAIN, decisión 58). Sin dominios para localhost, IPs u hosts de una etiqueta.
+ * Los sufijos públicos que el navegador rechace (p. ej. `.edu.co`) se ignoran sin efecto.
+ */
+export function getCookieDomainCandidates(hostname: string): string[] {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
+  if (
+    host === "" ||
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.includes(":") ||
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
+  ) {
+    return [];
+  }
+  const labels = host.split(".");
+  if (labels.some((label) => label === "")) return [];
+  const candidates: string[] = [];
+  for (let i = 0; i <= labels.length - 2; i += 1) {
+    candidates.push(`.${labels.slice(i).join(".")}`);
+  }
+  return candidates;
+}
+
+function resolveLocationOriginParts(
+  location: Partial<Location> | undefined,
+): { hostname: string; protocol: string } {
+  let hostname = typeof location?.hostname === "string" ? location.hostname : "";
+  let protocol = typeof location?.protocol === "string" ? location.protocol : "";
+  if ((!hostname || !protocol) && typeof location?.origin === "string" && location.origin !== "") {
+    try {
+      const parsed = new URL(location.origin);
+      if (!hostname) hostname = parsed.hostname;
+      if (!protocol) protocol = parsed.protocol;
+    } catch {
+      // Ignore malformed origin
+    }
+  }
+  return { hostname, protocol };
+}
+
+/**
+ * SEC-LOGOUT-01: expira la cookie tanto host-only como con cada `Domain=` candidato; una escritura
+ * sin `Domain` no reemplaza una cookie emitida con `Domain=.dominio` (RFC 6265 §5.3).
+ */
+function expireClientCookie(name: string): void {
+  const location = typeof window !== "undefined" ? window.location : undefined;
+  const { hostname, protocol } = resolveLocationOriginParts(location);
+  const secure = protocol === "https:" ? "; Secure" : "";
+  const base = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secure}`;
+  document.cookie = base;
+  for (const domain of getCookieDomainCandidates(hostname)) {
+    document.cookie = `${base}; domain=${domain}`;
   }
 }
 

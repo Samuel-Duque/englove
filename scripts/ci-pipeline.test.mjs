@@ -48,3 +48,16 @@ test('SUPPLY-01: GitHub Actions y contenedores locales quedan fijados por digest
     }
   }
 });
+test('CI-BLOCK-01: overrides de supply chain parchan effect >= 3.22.1 y esbuild >= 0.28.1 y el lockfile no retiene versiones vulnerables', () => {
+  const workspace = parse(readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8'));
+  const effectOverride = workspace.overrides?.['effect@<=3.22.0'];
+  const esbuildOverride = workspace.overrides?.['esbuild@>=0.27.3 <0.28.1'];
+  assert.ok(effectOverride, 'Debe existir override para effect@<=3.22.0');
+  assert.match(String(effectOverride), /^(?:>=)?3\.(?:22\.[1-9]\d*|2[3-9]\.\d+|[3-9]\d*\.\d+)/);
+  assert.ok(esbuildOverride, 'Debe existir override para esbuild@>=0.27.3 <0.28.1');
+  assert.match(String(esbuildOverride), /^(?:>=)?0\.(?:28\.[1-9]\d*|29\.\d+|[3-9]\d*\.\d+)/);
+
+  const lockfile = readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8');
+  assert.doesNotMatch(lockfile, /^\s*effect@(?:[0-2]\.|3\.(?:[01]?\d\.|2[01]\.|22\.0\b))/m);
+  assert.doesNotMatch(lockfile, /^\s*tinypool@(?:[01]\.|2\.0\.|2\.1\.[01]\b)/m);
+});

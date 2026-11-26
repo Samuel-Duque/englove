@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Readable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { MediaService } from '../src/media/media.service';
+import { MediaModule } from '../src/media/media.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -40,6 +41,7 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
   };
   let mockConfig: {
     get: MockFn;
+    getOrThrow: MockFn;
   };
   let mockJwt: {
     sign: MockFn;
@@ -98,7 +100,12 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
         if (key === 'CLOUDFLARE_ACCOUNT_ID') return 'test-account';
         if (key === 'CLOUDFLARE_R2_ACCESS_KEY_ID') return 'test-key';
         if (key === 'CLOUDFLARE_R2_SECRET_ACCESS_KEY') return 'test-secret';
+        if (key === 'JWT_SECRET') return 'test-jwt-secret-min-32-chars-for-media-spec!';
         return null;
+      }),
+      getOrThrow: vi.fn((key: string) => {
+        if (key === 'JWT_SECRET') return 'test-jwt-secret-min-32-chars-for-media-spec!';
+        throw new Error(`Configuration key "${key}" does not exist`);
       }),
     };
 
@@ -901,6 +908,133 @@ describe('SPEC-05: MediaService (ENG-062, RF-12 a RF-16)', () => {
       await expect(
         service.confirmUpload(orgId, studentId, attemptId, mediaId, 60),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('SEC-01: eliminación de JWT_ATTEMPT_SECRET y fallback literal en MediaModule y MediaService', () => {
+    it('SEC-01: verifyAttemptToken exige JWT_SECRET vía getOrThrow e ignora JWT_ATTEMPT_SECRET y el fallback literal', () => {
+      const prevJwtSecret = process.env.JWT_SECRET;
+      const prevAttemptSecret = process.env.JWT_ATTEMPT_SECRET;
+      try {
+        delete process.env.JWT_SECRET;
+        process.env.JWT_ATTEMPT_SECRET = 'legacy-attempt-secret-should-be-ignored-32c!';
+
+        const configWithoutJwtSecret = new ConfigService({
+          JWT_ATTEMPT_SECRET: 'legacy-attempt-secret-should-be-ignored-32c!',
+        });
+        const mediaWithoutSecret = new MediaService(
+          mockPrisma as unknown as PrismaService,
+          configWithoutJwtSecret,
+        );
+
+        const forgedLegacyToken = new JwtService({
+          secret: 'dev-secret-attempt-upward-english',
+        }).sign({ attemptId, studentId, organizationId: orgId, typ: 'attempt' });
+
+        expect(() =>
+          mediaWithoutSecret.verifyAttemptToken(forgedLegacyToken, studentId, orgId, attemptId),
+        ).toThrow(/JWT_SECRET/);
+
+        for (const blankSecret of ['', '   ']) {
+          const mediaWithBlankSecret = new MediaService(
+            mockPrisma as unknown as PrismaService,
+            new ConfigService({ JWT_SECRET: blankSecret }),
+          );
+          const forgedBlankToken = new JwtService({ secret: blankSecret || 'x' }).sign({
+            attemptId,
+            studentId,
+            organizationId: orgId,
+            typ: 'attempt',
+          });
+          expect(() =>
+            mediaWithBlankSecret.verifyAttemptToken(forgedBlankToken, studentId, orgId, attemptId),
+          ).toThrow(/JWT_SECRET/);
+        }
+
+        const realSecret = 'real-jwt-secret-for-sec-01-regression-test-32!';
+        const configWithJwtSecret = new ConfigService({
+          JWT_SECRET: realSecret,
+          JWT_ATTEMPT_SECRET: 'legacy-attempt-secret-should-be-ignored-32c!',
+        });
+        const mediaWithRealSecret = new MediaService(
+          mockPrisma as unknown as PrismaService,
+          configWithJwtSecret,
+        );
+
+        const tokenSignedWithAttemptSecret = new JwtService({
+          secret: 'legacy-attempt-secret-should-be-ignored-32c!',
+        }).sign({ attemptId, studentId, organizationId: orgId, typ: 'attempt' });
+
+        expect(() =>
+          mediaWithRealSecret.verifyAttemptToken(forgedLegacyToken, studentId, orgId, attemptId),
+        ).toThrow();
+        expect(() =>
+          mediaWithRealSecret.verifyAttemptToken(
+            tokenSignedWithAttemptSecret,
+            studentId,
+            orgId,
+            attemptId,
+          ),
+        ).toThrow();
+
+        const validToken = new JwtService({ secret: realSecret }).sign({
+          attemptId,
+          studentId,
+          organizationId: orgId,
+          typ: 'attempt',
+        });
+        expect(
+          mediaWithRealSecret.verifyAttemptToken(validToken, studentId, orgId, attemptId),
+        ).toMatchObject({
+          attemptId,
+          studentId,
+          organizationId: orgId,
+          typ: 'attempt',
+        });
+      } finally {
+        if (prevJwtSecret === undefined) delete process.env.JWT_SECRET;
+        else process.env.JWT_SECRET = prevJwtSecret;
+        if (prevAttemptSecret === undefined) delete process.env.JWT_ATTEMPT_SECRET;
+        else process.env.JWT_ATTEMPT_SECRET = prevAttemptSecret;
+      }
+    });
+
+    it('SEC-01: MediaModule registra JwtModule exclusivamente con config.getOrThrow("JWT_SECRET")', async () => {
+      const prevJwtSecret = process.env.JWT_SECRET;
+      try {
+        delete process.env.JWT_SECRET;
+        const imports = (Reflect.getMetadata('imports', MediaModule) ?? []) as Array<{
+          providers?: Array<{ useFactory?: (config: ConfigService) => { secret?: string } | Promise<{ secret?: string }> }>;
+        }>;
+        const jwtDynamicModule = imports.find((m) =>
+          m?.providers?.some((p) => typeof p.useFactory === 'function'),
+        );
+        const factoryProvider = jwtDynamicModule?.providers?.find(
+          (p) => typeof p.useFactory === 'function',
+        );
+        expect(factoryProvider?.useFactory).toBeTypeOf('function');
+
+        expect(() =>
+          factoryProvider?.useFactory?.(
+            new ConfigService({ JWT_ATTEMPT_SECRET: 'should-not-be-used-32-characters!' }),
+          ),
+        ).toThrow(/JWT_SECRET/);
+
+        expect(() =>
+          factoryProvider?.useFactory?.(new ConfigService({ JWT_SECRET: '   ' })),
+        ).toThrow(/JWT_SECRET/);
+
+        const configured = await factoryProvider?.useFactory?.(
+          new ConfigService({
+            JWT_SECRET: 'canonical-jwt-secret-min-32-characters!',
+            JWT_ATTEMPT_SECRET: 'should-not-be-used-32-characters!',
+          }),
+        );
+        expect(configured).toEqual({ secret: 'canonical-jwt-secret-min-32-characters!' });
+      } finally {
+        if (prevJwtSecret === undefined) delete process.env.JWT_SECRET;
+        else process.env.JWT_SECRET = prevJwtSecret;
+      }
     });
   });
 });

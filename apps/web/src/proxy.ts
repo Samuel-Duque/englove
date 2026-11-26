@@ -93,11 +93,20 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return withSecurityHeaders(NextResponse.next());
   }
 
-  // Session cookie detection: strictly with prefix convention (Decision 58, RF-2)
+  // Session cookie detection: strictly with prefix convention (Decision 58, RF-2).
+  // Staging y producción fijan COOKIE_PREFIX en wrangler.jsonc; el fallback local coincide con
+  // .env.example (SEC-LOGOUT-01).
+  const appEnv = process.env.NEXT_PUBLIC_APP_ENV || process.env.APP_ENV || "local";
+  const defaultCookiePrefix =
+    appEnv === "production"
+      ? "upward_english_"
+      : appEnv === "staging"
+        ? "upward_english_stg_"
+        : "upward_english_local_";
   const cookiePrefix =
     process.env.COOKIE_PREFIX ||
     process.env.NEXT_PUBLIC_COOKIE_PREFIX ||
-    "upward_english_";
+    defaultCookiePrefix;
   const sessionCookie = request.cookies.get(`${cookiePrefix}access_token`);
 
   const jwt = sessionCookie ? decodeJwtPayload(sessionCookie.value) : null;

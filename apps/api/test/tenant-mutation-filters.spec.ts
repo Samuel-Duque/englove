@@ -42,4 +42,54 @@ describe('TEN-01: defensa tenant explícita en mutaciones', () => {
     expect(mutations).toBeGreaterThan(0);
     expect(missing).toEqual([]);
   });
+
+  it('SEC-01: auth.service.ts incluye organization_id explícito en cada mutación Prisma (incluidos todos los user.update)', () => {
+    const path = resolve(__dirname, '../src/auth/auth.service.ts');
+    const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
+    const prismaDelegates = new Set(['user', 'authSession', 'passwordResetToken', 'emailChangeRequest']);
+    const missing: string[] = [];
+    let userUpdateCount = 0;
+    let totalPrismaMutations = 0;
+
+    function visit(node: ts.Node): void {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        mutationNames.has(node.expression.name.text) &&
+        ts.isPropertyAccessExpression(node.expression.expression) &&
+        prismaDelegates.has(node.expression.expression.name.text)
+      ) {
+        totalPrismaMutations += 1;
+        if (
+          node.expression.expression.name.text === 'user' &&
+          node.expression.name.text === 'update'
+        ) {
+          userUpdateCount += 1;
+        }
+        const args = node.arguments[0];
+        const where =
+          args && ts.isObjectLiteralExpression(args)
+            ? args.properties.find(
+                (property) =>
+                  ts.isPropertyAssignment(property) && property.name.getText(source) === 'where',
+              )
+            : undefined;
+        const hasTenant =
+          where &&
+          ts.isPropertyAssignment(where) &&
+          ts.isObjectLiteralExpression(where.initializer) &&
+          hasTenantFilter(where.initializer);
+        if (!hasTenant) {
+          const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+          missing.push(`auth:${line + 1} ${node.expression.getText(source)}`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+
+    visit(source);
+    expect(userUpdateCount).toBeGreaterThanOrEqual(4);
+    expect(totalPrismaMutations).toBeGreaterThan(10);
+    expect(missing).toEqual([]);
+  });
 });

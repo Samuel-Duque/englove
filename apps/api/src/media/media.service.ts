@@ -63,7 +63,6 @@ export class MediaService implements OnModuleInit {
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
   private readonly transcodeQueue: string[] = [];
-  private readonly jwtSecret: string;
   private readonly frozenProbeByKey = new Map<
     string,
     { confirmedKey: string; sha256: string; byteLength: number }
@@ -79,10 +78,6 @@ export class MediaService implements OnModuleInit {
     const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID') || 'mock-key';
     const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || 'mock-secret';
     this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || 'upward-english-dev';
-    this.jwtSecret =
-      this.configService.get<string>('JWT_ATTEMPT_SECRET') ||
-      this.configService.get<string>('JWT_SECRET') ||
-      'dev-secret-attempt-upward-english';
     const r2Endpoint = this.configService.get<string>('R2_ENDPOINT');
 
     const endpoint = r2Endpoint || `https://${accountId}.r2.cloudflarestorage.com`;
@@ -140,7 +135,13 @@ export class MediaService implements OnModuleInit {
       });
     }
 
-    const jwt = this.jwtService || new JwtService({ secret: this.jwtSecret });
+    // SEC-01: el attemptToken lo firma AttemptsService con JWT_SECRET; sin variable alternativa ni
+    // fallback literal (G-C11). Se resuelve aquí para que un JWT_SECRET ausente o vacío falle de forma explícita.
+    const jwtSecret = this.configService.getOrThrow<string>('JWT_SECRET');
+    if (!jwtSecret.trim()) {
+      throw new Error('JWT_SECRET configuration cannot be empty');
+    }
+    const jwt = this.jwtService || new JwtService({ secret: jwtSecret });
     let payload: {
       attemptId: string;
       studentId: string;
@@ -150,7 +151,7 @@ export class MediaService implements OnModuleInit {
 
     try {
       payload = jwt.verify(token, {
-        secret: this.jwtSecret,
+        secret: jwtSecret,
         ignoreExpiration: true,
       });
     } catch {

@@ -487,6 +487,117 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     ).rejects.toThrow(/Operación multi-tenant rechazada: organization_id ausente en TenantContext para \$queryRaw/);
   });
 
+  it('SEC-TENANT-01: intercepta createManyAndReturn/updateManyAndReturn y bloquea $queryRaw/$executeRaw sin organization_id en PostgreSQL real aunque TenantContext esté activo', async () => {
+    const tempGroupIds = [
+      '88888888-0000-4000-8000-999999999001',
+      '88888888-0000-4000-8000-999999999002',
+    ];
+
+    try {
+      await TenantContext.run({ organizationId: orgAId }, async () => {
+        // 1. createManyAndReturn inyecta organization_id automáticamente en PostgreSQL real
+        const createdGroups = await prisma.group.createManyAndReturn({
+          data: [
+            { id: tempGroupIds[0]!, name: 'SEC-TENANT-01 Group 1' } as unknown as import('@prisma/client').Prisma.GroupCreateManyInput,
+            { id: tempGroupIds[1]!, name: 'SEC-TENANT-01 Group 2' } as unknown as import('@prisma/client').Prisma.GroupCreateManyInput,
+          ],
+        });
+        expect(createdGroups).toHaveLength(2);
+        expect(createdGroups.map((g) => g.organization_id)).toEqual([orgAId, orgAId]);
+
+        // 2. createManyAndReturn rechaza organization_id discordante
+        await expect(
+          prisma.group.createManyAndReturn({
+            data: [{ name: 'Cross-Tenant Group', organization_id: orgBId }],
+          }),
+        ).rejects.toThrow(/Violación de aislamiento tenant en Group: organization_id discordante/);
+
+        // 3. updateManyAndReturn restringe al tenant activo y rechaza filtro o data de otro tenant
+        const updatedGroups = await prisma.group.updateManyAndReturn({
+          where: { id: { in: tempGroupIds } },
+          data: { name: 'SEC-TENANT-01 Updated' },
+        });
+        expect(updatedGroups).toHaveLength(2);
+        expect(updatedGroups.every((g) => g.organization_id === orgAId)).toBe(true);
+
+        await expect(
+          prisma.group.updateManyAndReturn({
+            where: { organization_id: orgBId },
+            data: { name: 'Cross-Tenant Hijack' },
+          }),
+        ).rejects.toThrow(/Violación de aislamiento tenant en Group: organization_id discordante/);
+
+        // 4. $queryRaw y $executeRaw sin organization_id fallan AUNQUE TenantContext esté activo
+        //    (incluyendo predicados con NOW(), SELECT 1 FROM, literales con 'organization_id' y *Unsafe)
+        await expect(
+          prisma.$queryRaw`SELECT id FROM users WHERE email = 'student.a@wp02.test'`,
+        ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+        await expect(
+          prisma.$queryRaw`SELECT id FROM users WHERE created_at <= NOW()`,
+        ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+        await expect(
+          prisma.$queryRaw`SELECT 1 FROM users WHERE email = 'student.a@wp02.test'`,
+        ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+        await expect(
+          prisma.$queryRaw`SELECT id FROM users WHERE email = 'organization_id@wp02.test'`,
+        ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+        await expect(
+          prisma.$executeRaw`UPDATE groups SET name = 'Hijacked' WHERE id = ${tempGroupIds[0]!}::uuid`,
+        ).rejects.toThrow(/\$executeRaw sin filtro organization_id con TenantContext activo/);
+
+        const rawUnsafeFn = Reflect.get(prisma, '$' + 'queryRawUnsafe') as (
+          sql: string,
+        ) => Promise<unknown>;
+        await expect(rawUnsafeFn.call(prisma, 'SELECT 1')).rejects.toThrow(
+          /prohibido fuera de bypass explícito/,
+        );
+
+        // 5. El bloqueo raíz de organizations solo permite el id exacto del tenant activo
+        await prisma.$transaction(async (tx) => {
+          const lockedOrg = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM organizations
+            WHERE id = ${orgAId}::uuid
+            FOR UPDATE
+          `;
+          expect(lockedOrg).toEqual([{ id: orgAId }]);
+        });
+
+        await expect(
+          prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`
+              SELECT id FROM organizations
+              WHERE id = ${orgBId}::uuid
+              FOR UPDATE
+            `;
+          }),
+        ).rejects.toThrow(/sin filtro organization_id con TenantContext activo/);
+
+        // 6. SEC-01: user.update con where: { id, organization_id } funciona en PostgreSQL real y rechaza cross-tenant
+        const updatedUser = await prisma.user.update({
+          where: { id: userAId, organization_id: orgAId },
+          data: { failed_login_count: 0, locked_until: null },
+        });
+        expect(updatedUser.id).toBe(userAId);
+        expect(updatedUser.organization_id).toBe(orgAId);
+
+        await expect(
+          prisma.user.update({
+            where: { id: userAId, organization_id: orgBId },
+            data: { failed_login_count: 0 },
+          }),
+        ).rejects.toThrow(/Violación de aislamiento tenant en User: organization_id discordante/);
+      });
+    } finally {
+      await TenantContext.runBypass(async () => {
+        await prisma.group.deleteMany({ where: { id: { in: tempGroupIds } } });
+      });
+    }
+  });
+
   // ============================================================================
   // P1-01: Redacción de x-attempt-token y sanitización de query strings
   // ============================================================================

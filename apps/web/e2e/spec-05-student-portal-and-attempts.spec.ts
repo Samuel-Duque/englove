@@ -1,7 +1,6 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
-
-const cookiePrefix = process.env.COOKIE_PREFIX ?? 'upward_english_local_';
 
 test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)', () => {
   test('RF-17: Acceso no autenticado a /inicio redirige a /login con parametro next seguro', async ({ page }) => {
@@ -16,20 +15,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     context,
   }) => {
     // 1. Simular cookie de sesión para proxy.ts
-    await context.addCookies([
-      {
-        name: cookiePrefix + 'access_token',
-        value: 'mock-student-token',
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: 'mock-student-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     // 2. Mockear endpoints de API a nivel de red
     const sessionPayload1 = {
@@ -289,10 +275,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     page,
     context,
   }) => {
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: cookiePrefix + 'access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     const sessionPayload2 = {
       user: { id: 'std-e2e-open', name: 'Laura Gómez', email: 'laura@upwardenglish.local', role: 'student' },
@@ -375,9 +358,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     page,
     context,
   }) => {
-    await context.addCookies([
-      { name: cookiePrefix + 'access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
     const profile = {
       user: { id: 'student-exam', name: 'Estudiante de prueba', email: 'exam@upwardenglish.local', role: 'student' },
       student: { id: 'student-exam', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
@@ -442,10 +423,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     page,
     context,
   }) => {
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: cookiePrefix + 'access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     const sessionPayload3 = {
       user: { id: 'std-e2e-spk', name: 'Tomás Speaking', email: 'tomas@upwardenglish.local', role: 'student' },

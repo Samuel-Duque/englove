@@ -1,42 +1,15 @@
+import { signInForSmoke, smokeApiUrl } from './session';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { GroupViewSchema } from '@upward-english/shared';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-let teacherState: Awaited<ReturnType<BrowserContext['storageState']>>;
+test.describe.configure({ timeout: 120_000 });
 
-test.beforeAll(async ({ browser, baseURL }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente del entorno local.');
-  if (!email || !password) return;
-  const context = await browser.newContext({ baseURL });
-  try {
-    const page = await context.newPage();
-    await page.goto('/login');
-    await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-    await page.getByLabel('Contraseña', { exact: true }).fill(password);
-    const login = page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === '/api/v1/auth/login' &&
-        response.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    const response = await login;
-    expect(
-      response.status(),
-      `Login local: HTTP ${response.status()}, Retry-After: ${response.headers()['retry-after'] ?? '—'}`,
-    ).toBe(200);
-    await expect(page).toHaveURL(/\/inicio$/);
-    teacherState = await context.storageState();
-  } finally {
-    await context.close();
-  }
+test.beforeEach(async ({ page }) => {
+  await signInForSmoke(page, 'teacher');
 });
-
-test.use({ storageState: async ({}, use) => use(teacherState) });
 
 test('Plan 14: miembros, enlaces, diseño responsive y archivo protegido', async ({ page }) => {
   test.setTimeout(120_000);
@@ -45,7 +18,7 @@ test('Plan 14: miembros, enlaces, diseño responsive y archivo protegido', async
   const detailLink = main.getByRole('link', { name: /Ver detalle de/ }).first();
   await expect(detailLink).toBeVisible();
 
-  const groups = await page.request.get(`${apiUrl}/api/v1/groups?archived=false&limit=100`);
+  const groups = await page.request.get(`${smokeApiUrl}/api/v1/groups?archived=false&limit=100`);
   expect(groups.ok()).toBe(true);
   const populatedGroup = GroupViewSchema.array()
     .parse((await groups.json()).items)
@@ -79,7 +52,7 @@ test('Plan 14: miembros, enlaces, diseño responsive y archivo protegido', async
   await main.getByRole('button', { name: 'Archivar grupo' }).click();
   await expect(main.getByRole('alert')).toContainText('traslada primero a sus alumnos activos');
   await expect(main.getByRole('dialog')).toHaveCount(0);
-  const blocked = await page.request.post(`${apiUrl}/api/v1/groups/${groupId}/archive`, {
+  const blocked = await page.request.post(`${smokeApiUrl}/api/v1/groups/${groupId}/archive`, {
     headers: { Origin: new URL(page.url()).origin },
   });
   expect(blocked.status()).toBe(409);
@@ -126,7 +99,7 @@ test('Plan 14: renombra, archiva y elimina un grupo temporal mediante la API loc
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
   const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
-  const apiGroups = `${apiUrl}/api/v1/groups`;
+  const apiGroups = `${smokeApiUrl}/api/v1/groups`;
   const original = `Prueba plan 14 ${Date.now()}`;
   const created = await page.request.post(apiGroups, {
     data: { name: original },

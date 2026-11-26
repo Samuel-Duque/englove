@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
@@ -93,21 +94,7 @@ async function expectAccessibleMain(page: Page) {
 
 test.describe('Portal Teens Plan 2: Zona de Microjuegos (/juegos)', () => {
   test.beforeEach(async ({ page, context, baseURL }) => {
-    const prefixes = new Set([
-      process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-      'englove_local_',
-      'upward_english_local_',
-      'upward_english_',
-    ]);
-    await context.addCookies(
-      [...prefixes]
-        .filter((prefix): prefix is string => Boolean(prefix))
-        .map((prefix) => ({
-          name: `${prefix}access_token`,
-          value: 'mock-teens-token',
-          url: baseURL ?? 'http://localhost:3000',
-        })),
-    );
+    await addSessionCookie(context, 'mock-teens-token', baseURL);
     await page.route(/\/api\/v1\/(?:me|auth\/session|auth\/refresh)$/, (route) =>
       route.fulfill({ json: teensProfile }),
     );

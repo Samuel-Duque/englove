@@ -1,3 +1,4 @@
+import { addSessionCookie, signInForSmoke } from './session';
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import {
@@ -5,25 +6,14 @@ import {
   StudentStatsResponseSchema,
 } from "@upward-english/shared";
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
 test("Ficha estadística docente con API local: rutas, filtros, polling y diseño responsive", async ({
   page,
 }) => {
-  test.skip(
-    !email || !password,
-    "Requiere una cuenta docente sembrada en el entorno local.",
-  );
-  if (!email || !password) return;
   test.setTimeout(120_000);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/login");
-  await page.getByRole("textbox", { name: "Correo electrónico" }).fill(email);
-  await page.getByLabel("Contraseña", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page).toHaveURL("/inicio", { timeout: 20_000 });
+  await signInForSmoke(page, 'teacher');
 
   const groupRequest = page.waitForResponse((response) =>
     new URL(response.url()).pathname.startsWith("/api/v1/stats/groups/"),
@@ -147,19 +137,7 @@ test("Ficha estadística docente muestra entregas sin conexión y partidas en m�
   page,
 }) => {
   const token = `header.${Buffer.from(JSON.stringify({ role: "teacher" })).toString("base64url")}.signature`;
-  const prefixes = new Set([
-    process.env.COOKIE_PREFIX ?? "englove_local_",
-    "upward_english_local_",
-    "upward_english_",
-  ]);
-  await context.addCookies(
-    Array.from(prefixes, (prefix) => ({
-      name: `${prefix}access_token`,
-      value: token,
-      domain: "localhost",
-      path: "/",
-    })),
-  );
+  await addSessionCookie(context, token);
   await page.route("**/api/v1/auth/session", (route) =>
     route.fulfill({
       json: {

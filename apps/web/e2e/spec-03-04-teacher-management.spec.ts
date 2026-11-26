@@ -1,24 +1,11 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaciones (ENG-145)', () => {
   test.beforeEach(async ({ context, page }) => {
     // Add teacher session cookies
     const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
-    await context.addCookies([
-      { name: `${process.env.COOKIE_PREFIX ?? 'englove_local_'}access_token`, value: token, domain: 'localhost', path: '/' },
-      {
-        name: 'upward_english_local_access_token',
-        value: token,
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: token,
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, token);
 
     // Mock teacher auth refresh & me & session
     await page.route('**/api/v1/auth/session', async (route) => {
@@ -426,7 +413,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       });
     });
 
-    const unlockBtn = page.locator('button:has-text("Desbloquear en 1 clic")');
+    const unlockBtn = page.getByRole('button', { name: 'Desbloquear cuenta (Mateo Bloqueado)', exact: true });
     await expect(unlockBtn).toBeVisible();
     await unlockBtn.click();
     await expect(page.locator('text=desbloqueada exitosamente.')).toBeVisible();

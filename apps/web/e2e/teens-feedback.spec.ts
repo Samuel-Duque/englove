@@ -1,3 +1,4 @@
+import { addSessionCookie, signInForSmoke } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
@@ -24,15 +25,7 @@ test('Plan 6 Teens: feedback responsive, historial, estado vacío y reintento ac
   page, context, baseURL,
 }) => {
   test.setTimeout(90_000);
-  const prefixes = new Set([
-    process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-    'englove_local_',
-    'upward_english_local_',
-    'upward_english_',
-  ]);
-  for (const prefix of prefixes) {
-    if (prefix) await context.addCookies([{ name: `${prefix}access_token`, value: 'mock-teens-token', url: baseURL }]);
-  }
+  await addSessionCookie(context, 'mock-teens-token', baseURL);
 
   const profile = {
     user: { id: 'student-teens', name: 'Valentina Cruz', email: 'teens@example.test', role: 'student' },
@@ -189,17 +182,9 @@ test('Plan 6 Teens: feedback responsive, historial, estado vacío y reintento ac
   await expectAccessible(page);
 });
 
-test('Plan 6 Teens: navegación y reintento con la API y PostgreSQL locales', async ({ page }) => {
-  const email = process.env.ENGLOVE_TEENS_SMOKE_EMAIL;
-  const password = process.env.ENGLOVE_TEENS_SMOKE_PASSWORD;
-  test.skip(!email || !password, 'Requiere una cuenta Teens sembrada.');
-  if (!email || !password) return;
+test('Plan 6 Teens: navegación y reintento con la API y PostgreSQL locales', { tag: '@fullstack' }, async ({ page }) => {
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teens');
 
   const responsePromise = page.waitForResponse((response) =>
     new URL(response.url()).pathname === '/api/v1/student/feedback' && response.request().method() === 'GET',
@@ -221,7 +206,7 @@ test('Plan 6 Teens: navegación y reintento con la API y PostgreSQL locales', as
   await navigation.getByRole('link', { name: 'Progreso' }).click();
   await expect(page).toHaveURL(/\/progreso$/);
 
-  const retryFixtureId = process.env.ENGLOVE_TEENS_SMOKE_RETRY_FIXTURE_ID;
+  const retryFixtureId = process.env.UPWARD_SMOKE_TEENS_RETRY_FIXTURE_ID;
   if (retryFixtureId) {
     const fixture = items.find((item) => item.assignmentId === retryFixtureId);
     expect(fixture?.hasAvailableRetry).toBe(true);

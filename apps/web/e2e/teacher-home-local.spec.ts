@@ -1,13 +1,12 @@
+import { reserveTeacherRateBudget, smokeCredentials } from './session';
 import { expect, test } from '@playwright/test';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
 test('Inicio docente con API y datos locales: sesión, recordatorios, grupos, enlaces y salida', async ({ page }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
+  const { email, password } = smokeCredentials('teacher');
+  await reserveTeacherRateBudget(page);
   await page.goto('/login');
   await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
   await page.getByLabel('Contraseña', { exact: true }).fill(password);

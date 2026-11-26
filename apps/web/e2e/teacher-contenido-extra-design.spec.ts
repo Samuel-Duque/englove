@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
@@ -22,16 +23,7 @@ test("Contenido extra adapta el catálogo y los diálogos y conserva el cupo al 
   context,
   page,
 }) => {
-  await context.addCookies(
-    [`${process.env.COOKIE_PREFIX ?? "englove_local_"}access_token`, "upward_english_access_token"].map(
-      (name) => ({
-        name,
-        value: token,
-        domain: "localhost",
-        path: "/",
-      }),
-    ),
-  );
+  await addSessionCookie(context, token);
   await page.route("**/api/v1/auth/refresh", (route) =>
     route.fulfill({ json: { accessToken: token, user: teacher } }),
   );

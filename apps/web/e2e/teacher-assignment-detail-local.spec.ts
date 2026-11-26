@@ -1,3 +1,4 @@
+import { signInForSmoke, smokeApiUrl } from './session';
 import { expect, test } from '@playwright/test';
 import {
   ActivityListResponseSchema,
@@ -9,22 +10,13 @@ import {
   StudentListResponseSchema,
 } from '@upward-english/shared';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 test('Detalle de asignación con API y datos locales: métricas, entregas, enlaces y cancelación real', async ({
   page,
 }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teacher');
 
   await page.goto('/asignaciones');
   await expect(page.getByRole('heading', { level: 1, name: 'Asignaciones' })).toBeVisible();
@@ -103,7 +95,7 @@ test('Detalle de asignación con API y datos locales: métricas, entregas, enlac
 
   // Crear asignación temporal para verificar cancelación definitiva en PostgreSQL sin alterar los datos del seed
   const activitiesRes = await page.request.get(
-    `${apiBaseUrl}/api/v1/activities?status=published&limit=20`,
+    `${smokeApiUrl}/api/v1/activities?status=published&limit=20`,
   );
   expect(activitiesRes.status()).toBe(200);
   const activitiesData = ActivityListResponseSchema.parse(await activitiesRes.json());
@@ -112,7 +104,7 @@ test('Detalle de asignación con API y datos locales: métricas, entregas, enlac
   if (!assignableActivity) return;
 
   const origin = new URL(page.url()).origin;
-  const tempGroupRes = await page.request.post(`${apiBaseUrl}/api/v1/groups`, {
+  const tempGroupRes = await page.request.post(`${smokeApiUrl}/api/v1/groups`, {
     headers: { Origin: origin },
     data: { name: `Plan07 Smoke ${Date.now()}` },
   });
@@ -121,7 +113,7 @@ test('Detalle de asignación con API y datos locales: métricas, entregas, enlac
 
   try {
     const now = Date.now();
-    const createAssignmentRes = await page.request.post(`${apiBaseUrl}/api/v1/assignments`, {
+    const createAssignmentRes = await page.request.post(`${smokeApiUrl}/api/v1/assignments`, {
       headers: { Origin: origin },
       data: {
         activityId: assignableActivity.id,
@@ -163,7 +155,7 @@ test('Detalle de asignación con API y datos locales: métricas, entregas, enlac
     await expect(page.getByText('Cancelada', { exact: true })).toBeVisible();
     await expect(page.getByText('Excluida', { exact: true })).toBeVisible();
   } finally {
-    await page.request.post(`${apiBaseUrl}/api/v1/groups/${tempGroup.id}/archive`, {
+    await page.request.post(`${smokeApiUrl}/api/v1/groups/${tempGroup.id}/archive`, {
       headers: { Origin: origin },
     });
   }

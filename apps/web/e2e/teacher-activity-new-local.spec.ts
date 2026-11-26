@@ -1,18 +1,11 @@
+import { signInForSmoke, smokeApiUrl } from './session';
 import { expect, test } from '@playwright/test';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
-test('Nueva actividad con API y DB locales: enlaces, borrador, publicación y limpieza', async ({ page }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
+test('Nueva actividad con API y DB locales: enlaces, borrador, publicación y limpieza', async ({ page, baseURL }) => {
   test.setTimeout(90_000);
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teacher');
 
   // 1. Conexión desde /inicio y alias /contenidos/onboarding
   await page.getByRole('main').getByRole('link', { name: 'Nueva actividad', exact: true }).click();
@@ -68,21 +61,10 @@ test('Nueva actividad con API y DB locales: enlaces, borrador, publicación y li
   await page.goto('/actividades');
   await expect(page.getByText(publishedTitle)).toBeVisible();
 
-  await page.evaluate(
-    async ({ draftId, publishedId }) => {
-      const apiBase =
-        window.location.hostname === 'localhost'
-          ? 'http://localhost:3001'
-          : window.location.origin;
-      await fetch(`${apiBase}/api/v1/activities/${draftId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      await fetch(`${apiBase}/api/v1/activities/${publishedId}/archive`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-    },
-    { draftId: createdDraft.id, publishedId: published.id },
-  );
+  const headers = { origin: new URL(baseURL ?? 'http://localhost:3000').origin };
+  const activities = `${smokeApiUrl}/api/v1/activities`;
+  const deleted = await page.request.delete(`${activities}/${createdDraft.id}`, { headers });
+  const archived = await page.request.post(`${activities}/${published.id}/archive`, { headers });
+  expect(deleted.ok()).toBe(true);
+  expect(archived.ok()).toBe(true);
 });

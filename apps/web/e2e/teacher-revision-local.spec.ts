@@ -1,21 +1,14 @@
+import { signInForSmoke } from './session';
 import { expect, test } from '@playwright/test';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
 test('Revisión docente con API y datos locales: navegación, filtros, detalle real, responsividad y enlaces', async ({
   page,
 }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/, { timeout: 15_000 });
+  await signInForSmoke(page, 'teacher');
 
   const groupsPromise = page.waitForResponse(
     (res) => new URL(res.url()).pathname === '/api/v1/groups',
@@ -26,18 +19,24 @@ test('Revisión docente con API y datos locales: navegación, filtros, detalle r
   const gradedPromise = page.waitForResponse(
     (res) => new URL(res.url()).pathname === '/api/v1/reviews/graded',
   );
+  // La vista carga el detalle de la primera entrega automáticamente.
+  const detailPromise = page.waitForResponse(
+    (res) => /^\/api\/v1\/attempts\/[^/]+\/review-detail$/.test(new URL(res.url()).pathname),
+  );
 
   await page.getByRole('main').getByRole('link', { name: 'Ir a revisión', exact: true }).click();
   await expect(page).toHaveURL(/\/revision$/, { timeout: 15_000 });
 
-  const [groupsRes, queueRes, gradedRes] = await Promise.all([
+  const [groupsRes, queueRes, gradedRes, detailRes] = await Promise.all([
     groupsPromise,
     queuePromise,
     gradedPromise,
+    detailPromise,
   ]);
   expect(groupsRes.status()).toBe(200);
   expect(queueRes.status()).toBe(200);
   expect(gradedRes.status()).toBe(200);
+  expect(detailRes.status()).toBe(200);
 
   const {
     GroupListResponseSchema,
@@ -59,23 +58,11 @@ test('Revisión docente con API y datos locales: navegación, filtros, detalle r
       .getByRole('link', { name: 'Revisión', exact: true }),
   ).toHaveAttribute('aria-current', 'page');
 
-  // Verifica detalle real si hay entregas pendientes o calificadas
-  if (queueData.items.length > 0) {
-    const first = queueData.items[0];
-    if (first) {
-      const detailResPromise = page.waitForResponse(
-        (res) =>
-          new URL(res.url()).pathname === `/api/v1/attempts/${first.attempt.attemptId}/review-detail`,
-      );
-      await main.getByRole('button', { name: new RegExp(first.student.displayName, 'i') }).first().click();
-      const detailRes = await detailResPromise;
-      expect(detailRes.status()).toBe(200);
-      AttemptReviewDetailViewSchema.parse(await detailRes.json());
-      await expect(main.locator('input#score-input')).toBeVisible();
-    }
-  } else {
-    await expect(main.getByRole('heading', { name: 'No hay entregas pendientes' })).toBeVisible();
-  }
+  const first = queueData.items[0];
+  expect(first, 'La semilla debe incluir una entrega pendiente.').toBeDefined();
+  const detail = AttemptReviewDetailViewSchema.parse(await detailRes.json());
+  expect(detail.attempt.attemptId).toBe(first?.attempt.attemptId);
+  await expect(main.locator('input#score-input')).toBeVisible();
 
   // Cambiar a pestaña Calificados y validar si existen entregas calificadas
   await main.getByRole('tab', { name: /Calificados/i }).click();

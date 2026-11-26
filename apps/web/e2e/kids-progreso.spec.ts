@@ -1,3 +1,4 @@
+import { addSessionCookie, signInForSmoke } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { StudentProgressViewSchema, type StudentProgressView } from '@upward-english/shared';
@@ -40,17 +41,7 @@ test('Plan 5 Kids: carga, reintento, álbum responsive, historial y estados vac�
       { attemptId: 'attempt-review', activityTitle: 'My school', score: null, stars: 0 },
     ],
   };
-  const cookiePrefixes = new Set([
-    process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-    'englove_local_',
-    'upward_english_local_',
-    'upward_english_',
-  ]);
-  for (const prefix of cookiePrefixes) {
-    if (prefix) {
-      await context.addCookies([{ name: `${prefix}access_token`, value: 'mock-student-token', url: baseURL }]);
-    }
-  }
+  await addSessionCookie(context, 'mock-student-token', baseURL);
   await page.route(/\/api\/v1\/(?:me|auth\/session)$/, (route) => route.fulfill({ json: profile }));
   await page.route('**/api/v1/feature-flags', (route) => route.fulfill({
     json: { flags: { games: true, extra_content: true } },
@@ -129,23 +120,10 @@ test('Plan 5 Kids: carga, reintento, álbum responsive, historial y estados vac�
   await expect(main.getByRole('heading', { name: /^Tu Progreso y Logros/, level: 1 })).toBeVisible();
 });
 
-test('Plan 5 Kids: Inicio, progreso y detalle con API y PostgreSQL locales', async ({ page }) => {
-  const email = process.env.ENGLOVE_KIDS_SMOKE_EMAIL;
-  const password = process.env.ENGLOVE_KIDS_SMOKE_PASSWORD;
-  test.skip(!email || !password, 'Requiere una cuenta Kids sembrada con al menos un intento calificado.');
-  if (!email || !password) return;
+test('Plan 5 Kids: Inicio, progreso y detalle con API y PostgreSQL locales', { tag: '@fullstack' }, async ({ page }) => {
   test.setTimeout(90_000);
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  const loginResponse = page.waitForResponse((res) =>
-    new URL(res.url()).pathname === '/api/v1/auth/login' && res.request().method() === 'POST',
-  );
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  const login = await loginResponse;
-  expect(login.ok(), `Login HTTP ${login.status()}; Retry-After: ${login.headers()['retry-after'] ?? '—'}`).toBe(true);
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'kids');
   const progressResponse = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/v1/me/progress');
   await page.getByRole('navigation').getByRole('link', { name: 'Progreso' }).click();
   await expect(page).toHaveURL(/\/progreso$/);

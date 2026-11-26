@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -8,22 +9,7 @@ const VIEWPORTS = [
 ] as const;
 
 async function mockTeensSession(page: Page) {
-  const prefixes = new Set([
-    process.env.COOKIE_PREFIX || process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-    'upward_english_',
-    'upward_english_local_',
-    'englove_local_',
-  ]);
-
-  await page.context().addCookies(
-    [...prefixes]
-      .filter((prefix): prefix is string => prefix !== undefined)
-      .map((prefix) => ({
-        name: `${prefix}access_token`,
-        value: 'mock-teens-token',
-        url: 'http://localhost:3000',
-      })),
-  );
+  await addSessionCookie(page.context(), 'mock-teens-token');
 
   const profilePayload = {
     user: {
@@ -177,7 +163,7 @@ test.describe('Portal Teens — Plan 3: GameRenderer y 5 mecánicas (/juegos/[ac
     await expect(gameRoot.getByText('1 de 2 parejas formadas')).toBeVisible();
 
     await gameRoot.getByRole('button', { name: 'Finalizar emparejamiento' }).click();
-    expect(completedBody).toBeTruthy();
+    await expect.poll(() => completedBody).toBeTruthy();
     await expect(page.getByText('¡Partida completada!')).toBeVisible();
     await expect(page.getByRole('img', { name: '3 de 3 estrellas' })).toBeVisible();
   });

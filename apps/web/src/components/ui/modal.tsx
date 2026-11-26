@@ -75,9 +75,11 @@ export function AccessibleModal({
     // Initial focus on first interactive element or content container
     const timer = setTimeout(() => {
       if (contentRef.current) {
-        const firstFocusable = contentRef.current.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
+        const firstFocusable =
+          contentRef.current.querySelector<HTMLElement>('[data-initial-focus]') ??
+          contentRef.current.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          );
         if (firstFocusable) {
           firstFocusable.focus();
         } else {

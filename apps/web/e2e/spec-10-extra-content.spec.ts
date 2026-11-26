@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -28,20 +29,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
 
   test.describe('1. Panel Docente: /contenido-extra (ENG-120, RF-1 a RF-4)', () => {
     test.beforeEach(async ({ context, page }) => {
-      await context.addCookies([
-        {
-          name: 'upward_english_local_access_token',
-          value: teacherToken,
-          domain: 'localhost',
-          path: '/',
-        },
-        {
-          name: 'upward_english_access_token',
-          value: teacherToken,
-          domain: 'localhost',
-          path: '/',
-        },
-      ]);
+      await addSessionCookie(context, teacherToken);
 
       await page.route('**/api/v1/auth/refresh', async (route) => {
         await route.fulfill({
@@ -256,26 +244,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
 
   test.describe('2. Portal del Estudiante: /extra (ENG-121, RF-5 a RF-9)', () => {
     test.beforeEach(async ({ context, page }) => {
-      await context.addCookies([
-        {
-          name: 'englove_local_access_token',
-          value: studentToken,
-          domain: 'localhost',
-          path: '/',
-        },
-        {
-          name: 'upward_english_local_access_token',
-          value: studentToken,
-          domain: 'localhost',
-          path: '/',
-        },
-        {
-          name: 'upward_english_access_token',
-          value: studentToken,
-          domain: 'localhost',
-          path: '/',
-        },
-      ]);
+      await addSessionCookie(context, studentToken);
 
       await page.route('**/api/v1/auth/refresh', async (route) => {
         await route.fulfill({

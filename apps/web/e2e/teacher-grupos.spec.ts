@@ -1,3 +1,4 @@
+import { addSessionCookie, signInForSmoke } from './session';
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
@@ -29,15 +30,7 @@ const archived = {
 test.describe("Directorio docente de grupos", () => {
   test.beforeEach(async ({ context, page }) => {
     const token = `header.${Buffer.from(JSON.stringify({ role: "teacher" })).toString("base64url")}.signature`;
-    for (const name of new Set([
-      `${process.env.COOKIE_PREFIX ?? "englove_local_"}access_token`,
-      "upward_english_local_access_token",
-      "upward_english_access_token",
-    ])) {
-      await context.addCookies([
-        { name, value: token, domain: "localhost", path: "/" },
-      ]);
-    }
+    await addSessionCookie(context, token);
     await page.route("**/api/v1/auth/session", (route) =>
       route.fulfill({
         json: {
@@ -218,33 +211,12 @@ test.describe("Directorio docente de grupos", () => {
   });
 });
 
-test("Grupos con API local: listado, detalle, creación, renombrado y archivo", async ({
+test("Grupos con API local: listado, detalle, creación, renombrado y archivo", { tag: '@fullstack' }, async ({
   page,
 }) => {
-  const email = process.env.ENGLOVE_SMOKE_EMAIL;
-  const password = process.env.ENGLOVE_SMOKE_PASSWORD;
-  test.skip(
-    !email || !password,
-    "Requiere una cuenta docente del entorno local.",
-  );
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
-  await page.goto("/login");
-  await page.getByRole("textbox", { name: "Correo electrónico" }).fill(email);
-  await page.getByLabel("Contraseña", { exact: true }).fill(password);
-  const loginResponse = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === "/api/v1/auth/login" &&
-      response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  const login = await loginResponse;
-  expect(
-    login.status(),
-    `Inicio de sesión local. Retry-After: ${login.headers()["retry-after"] ?? "—"}`,
-  ).toBe(200);
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teacher');
 
   const main = page.getByRole("main");
   const groupList = page.waitForResponse((response) => {

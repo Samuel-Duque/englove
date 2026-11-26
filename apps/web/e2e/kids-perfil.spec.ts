@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator } from '@playwright/test';
 import type { StudentProfileView } from '@upward-english/shared';
@@ -25,17 +26,7 @@ test('Plan 8 Kids: carga, reintento, credencial civil, permiso del servidor y co
     },
   };
 
-  const prefixes = new Set([
-    process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-    'englove_local_',
-    'upward_english_local_',
-    'upward_english_',
-  ]);
-  for (const prefix of prefixes) {
-    if (prefix) {
-      await context.addCookies([{ name: `${prefix}access_token`, value: 'mock-student-token', url: baseURL }]);
-    }
-  }
+  await addSessionCookie(context, 'mock-student-token', baseURL);
 
   let releaseLoading: () => void = () => {};
   const loading = new Promise<void>((resolve) => { releaseLoading = resolve; });

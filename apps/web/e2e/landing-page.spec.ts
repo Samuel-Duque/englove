@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import path from 'node:path';
+import { smokeApiUrl, smokeCredentials } from './session';
 
 interface CollectedErrors {
   consoleErrors: string[];
@@ -312,13 +313,13 @@ test.describe('Landing Page Pública de Upward English', () => {
     }
   });
 
-  test('3. Flujo real /inicio + /login + proxy.ts contra API local y PostgreSQL Docker', async ({
+  test('3. Flujo real /inicio + /login + proxy.ts contra API local y PostgreSQL Docker', { tag: '@fullstack' }, async ({
     page,
   }) => {
     test.setTimeout(90_000);
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const healthRes = await page.request.get(`${apiUrl}/health`);
-    expect(healthRes.status(), 'Local API /health debe estar activa en el puerto 3001').toBe(200);
+    const { email, password } = smokeCredentials('kids');
+    const healthRes = await page.request.get(`${smokeApiUrl}/health`);
+    expect(healthRes.status(), 'Local API /health debe estar activa').toBe(200);
 
     const errors = attachErrorListeners(page);
 
@@ -327,14 +328,14 @@ test.describe('Landing Page Pública de Upward English', () => {
     await expect(page).toHaveURL(/\/login\?next=%2Finicio/);
 
     // 3.2 Login real con usuario seed en Docker Postgres -> redirige a /inicio (HTTP 200)
-    await page.fill('input[type="email"]', 'lucas.kids@upwardenglish.org');
-    await page.fill('input[type="password"]', 'Estudiante2026!');
+    await page.getByLabel('Correo electrónico').fill(email);
+    await page.getByLabel('Contraseña', { exact: true }).fill(password);
 
     const [loginResponse] = await Promise.all([
       page.waitForResponse(
         (res) => res.url().includes('/api/v1/auth/login') && res.request().method() === 'POST',
       ),
-      page.click('button[type="submit"]'),
+      page.getByRole('button', { name: 'Entrar', exact: true }).click(),
     ]);
     expect(loginResponse.status()).toBe(200);
 
@@ -350,7 +351,7 @@ test.describe('Landing Page Pública de Upward English', () => {
     assertNoPageErrors(errors);
 
     // Cierre de sesión limpio para no dejar cookies activas
-    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+    await page.getByRole('button', { name: 'Salir', exact: true }).click();
     await page.waitForURL(/\/login/, { timeout: 15_000 });
   });
 

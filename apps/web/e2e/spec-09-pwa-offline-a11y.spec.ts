@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -63,10 +64,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
 
   test('RF-7: Aviso de actualización obligatoria por X-App-Min-Version mayor a la del cliente', async ({ page, context }) => {
     // Add student session cookies so client loads authenticated shell
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-token');
 
     const corsHeaders = {
       'Content-Type': 'application/json',
@@ -141,20 +139,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     const studentId = 'std-offline-late';
 
     // Mock teacher session
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`,
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.sig`);
 
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
@@ -248,26 +233,14 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     const section = page.locator('[data-testid="offline-undelivered-attempts-section"]');
     await expect(section).toBeVisible({ timeout: 5000 });
     await expect(section.locator('text=Entregas que no llegaron a tiempo')).toBeVisible();
-    await expect(section.locator('text=Animal Kingdom Speaking')).toBeVisible();
-    await expect(section.locator('text=Se intentó enviar sin conexión después del límite')).toBeVisible();
+    const lateAttempts = section.getByRole('table', { name: 'Entregas que no llegaron a tiempo' });
+    await expect(lateAttempts.getByRole('columnheader', { name: 'Límite de entrega (Bogotá)' })).toBeVisible();
+    await expect(lateAttempts.getByRole('rowheader', { name: 'Animal Kingdom Speaking' })).toBeVisible();
   });
 
   test('RF-18: Confirmación al salir con trabajo sin enviar en tablet / alumno', async ({ page, context }) => {
     // Mock student session and feature flags
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`,
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`,
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, `header.${Buffer.from(JSON.stringify({ role: 'student' })).toString('base64url')}.sig`);
 
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
@@ -389,8 +362,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
       });
     });
 
-    // Student clicks "Cerrar sesión"
-    const logoutBtn = page.locator('button:has-text("Cerrar sesión")');
+    const logoutBtn = page.getByRole('button', { name: 'Salir', exact: true });
     await logoutBtn.click();
 
     // Confirmation dialog should appear (RF-18, §7)
@@ -403,7 +375,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     await stayBtn.click();
     await expect(alertdialog).not.toBeVisible();
 
-    // Student clicks "Cerrar sesión" again and chooses "Salir de todos modos" (RF-18, RF-5)
+    // Student clicks "Salir" again and chooses "Salir de todos modos" (RF-18, RF-5)
     await logoutBtn.click();
     await expect(alertdialog).toBeVisible();
     await page.route('**/api/v1/auth/logout', async (route) => {
@@ -433,10 +405,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
     }
 
     // 2. Rutas autenticadas Estudiante (/inicio, /juegos, /progreso, /perfil)
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'mock-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-token');
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
         status: 200,
@@ -546,10 +515,7 @@ test.describe('SPEC-09: PWA, offline y accesibilidad (ENG-110, ENG-111, ENG-112,
 
     // 3. Rutas autenticadas Docente (/inicio, /actividades, /asignaciones, /revision, /estadisticas, /grupos, /alumnos)
     await context.clearCookies();
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'mock-teacher-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-teacher-token');
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
         status: 200,

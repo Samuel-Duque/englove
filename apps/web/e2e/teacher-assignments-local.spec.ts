@@ -1,19 +1,12 @@
+import { signInForSmoke } from './session';
 import { AssignmentListResponseSchema, GroupListResponseSchema } from '@upward-english/shared';
 import { expect, test } from '@playwright/test';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
 test('Asignaciones docente con API y datos locales: navegación, filtros y rutas conectadas', async ({ page }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teacher');
 
   const groupsPromise = page.waitForResponse((res) => {
     const url = new URL(res.url());

@@ -1,23 +1,16 @@
+import { signInForSmoke, smokeApiUrl } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { ActivityEditorSchema, ExamConfigSchema } from '@upward-english/shared';
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
 test('Detalle de actividad con API y PostgreSQL locales: duplicar, editar preservando UUIDs, publicar, previsualizar y enlazar desde asignaciones', async ({
-  page,
+  page, baseURL,
 }) => {
-  test.skip(!email || !password, 'Requiere cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teacher');
 
   await page.goto('/actividades');
   await expect(page.getByRole('heading', { level: 1, name: 'Catálogo de Actividades' })).toBeVisible({ timeout: 15_000 });
@@ -67,8 +60,8 @@ test('Detalle de actividad con API y PostgreSQL locales: duplicar, editar preser
 
   // Clean up test copy by archiving so active catalog stays clean
   const archiveRes = await page.request.post(
-    `http://localhost:3001/api/v1/activities/${duplicated.id}/archive`,
-    { headers: { Origin: 'http://localhost:3000' } },
+    `${smokeApiUrl}/api/v1/activities/${duplicated.id}/archive`,
+    { headers: { Origin: baseURL ?? 'http://localhost:3000' } },
   );
   expect(archiveRes.status()).toBe(200);
 

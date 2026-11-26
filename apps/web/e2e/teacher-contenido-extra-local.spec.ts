@@ -1,3 +1,4 @@
+import { signInForSmoke } from './session';
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Response } from "@playwright/test";
@@ -6,8 +7,6 @@ import {
   FeatureFlagsResponseSchema,
 } from "@upward-english/shared";
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 const resourcesPath = "/api/v1/resources";
 const flagsPath = "/api/v1/feature-flags";
 
@@ -22,11 +21,6 @@ test("Gestiona el catálogo desde el panel docente con la API local", async ({
   page,
   baseURL,
 }) => {
-  test.skip(
-    !email || !password,
-    "Requiere la cuenta docente del entorno local.",
-  );
-  if (!email || !password) return;
   test.setTimeout(90_000);
   const loopback = ['localhost', '127.0.0.1', '[::1]'];
   if (!baseURL || !loopback.includes(new URL(baseURL).hostname)) {
@@ -35,15 +29,7 @@ test("Gestiona el catálogo desde el panel docente con la API local", async ({
   const headers = { origin: new URL(baseURL).origin };
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/login");
-  await page.getByRole("textbox", { name: "Correo electrónico" }).fill(email);
-  await page.getByLabel("Contraseña", { exact: true }).fill(password);
-  const loggedIn = page.waitForResponse((response) =>
-    matches(response, "/api/v1/auth/login", "POST"),
-  );
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  expect((await loggedIn).status()).toBe(200);
-  await expect(page).toHaveURL(/\/inicio$/, { timeout: 15_000 });
+  await signInForSmoke(page, 'teacher');
 
   const nav = page.getByRole("navigation", { name: "Navegación docente" });
   const extra = nav.getByRole("link", { name: "Contenido extra" });

@@ -1251,7 +1251,6 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                 }
                 aria-pressed={soundEnabled}
                 title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
-                aria-label={isKids ? undefined : (soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido')}
               >
                 {isKids ? (
                   <>

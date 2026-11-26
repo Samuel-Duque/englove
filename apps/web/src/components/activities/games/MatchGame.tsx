@@ -147,14 +147,14 @@ export function MatchGame({
 
       <div className={`${styles.matchColumns} grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start`}>
         {/* Left Column */}
-        <div className="space-y-3">
-          <h4
+        <div className="space-y-3" role="group" aria-label="Palabras">
+          <p
             className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
               isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
             }`}
           >
             Palabras ({leftItems.length})
-          </h4>
+          </p>
           <div className="space-y-3">
             {leftItems.map((item, index) => {
               const isSelected = selectedLeftId === item.id;
@@ -189,14 +189,14 @@ export function MatchGame({
         </div>
 
         {/* Right Column */}
-        <div className="space-y-3">
-          <h4
+        <div className="space-y-3" role="group" aria-label="Traducciones / Coincidencias">
+          <p
             className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
               isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
             }`}
           >
             Traducciones / Coincidencias ({shuffledRight.length})
-          </h4>
+          </p>
           <div className="space-y-3">
             {shuffledRight.map((item) => {
               const pairedLeftId = rightToLeftMap.get(item.id);

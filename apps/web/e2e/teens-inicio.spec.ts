@@ -1,3 +1,4 @@
+import { addSessionCookie, smokeApiUrl, smokeCredentials } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
@@ -44,20 +45,7 @@ test('Plan 0 y Plan 1 Teens: base compartida, /inicio responsive, estados, naveg
     organizationId: 'org-teens-e2e',
   };
 
-  const cookiePrefixes = new Set([
-    process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-    'englove_local_',
-    'upward_english_local_',
-    'upward_english_',
-  ]);
-
-  for (const prefix of cookiePrefixes) {
-    if (prefix) {
-      await context.addCookies([
-        { name: `${prefix}access_token`, value: 'mock-teens-token', url: baseURL },
-      ]);
-    }
-  }
+  await addSessionCookie(context, 'mock-teens-token', baseURL);
 
   await page.route(/\/api\/v1\/(?:me|auth\/session|auth\/refresh)$/, (route) =>
     route.fulfill({ status: 200, json: profile }),
@@ -385,21 +373,18 @@ test('Plan 0 y Plan 1 Teens: base compartida, /inicio responsive, estados, naveg
   await expect(page).toHaveURL(/\/juegos$/);
 });
 
-test('Plan 0 y Plan 1 Teens: flujo real contra API local y PostgreSQL Docker', async ({
+test('Plan 0 y Plan 1 Teens: flujo real contra API local y PostgreSQL Docker', { tag: '@fullstack' }, async ({
   page,
 }) => {
   test.setTimeout(90_000);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  const healthy = await page.request
-    .get(`${apiUrl}/health`)
-    .then((res) => res.status() === 200)
-    .catch(() => false);
-  test.skip(!healthy, 'Requiere API local activa en http://localhost:3001');
+  const { email, password } = smokeCredentials('teens');
+  const health = await page.request.get(`${smokeApiUrl}/health`);
+  expect(health.status()).toBe(200);
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill('camila.teens@upwardenglish.org');
-  await page.getByLabel('Contraseña', { exact: true }).fill('Estudiante2026!');
+  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
+  await page.getByLabel('Contraseña', { exact: true }).fill(password);
 
   const [loginRes] = await Promise.all([
     page.waitForResponse(
@@ -407,10 +392,6 @@ test('Plan 0 y Plan 1 Teens: flujo real contra API local y PostgreSQL Docker', a
     ),
     page.getByRole('button', { name: 'Entrar', exact: true }).click(),
   ]);
-  if (loginRes.status() === 429) {
-    test.skip(true, `API local en rate limit (429); Retry-After: ${loginRes.headers()['retry-after'] ?? '—'}s`);
-    return;
-  }
   expect(loginRes.status(), `Login HTTP ${loginRes.status()}`).toBe(200);
 
   await expect(page).toHaveURL(/\/inicio$/);

@@ -1,25 +1,6 @@
+import { addSessionCookie, smokeApiUrl, smokeCredentials } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
-
-const cookiePrefixes = Array.from(
-  new Set([
-    process.env.COOKIE_PREFIX ?? 'englove_local_',
-    'englove_local_',
-    'upward_english_local_',
-    'upward_english_',
-  ]),
-);
-
-async function addSessionCookies(context: import('@playwright/test').BrowserContext) {
-  await context.addCookies(
-    cookiePrefixes.map((prefix) => ({
-      name: `${prefix}access_token`,
-      value: 'mock-teens-token',
-      domain: 'localhost',
-      path: '/',
-    })),
-  );
-}
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
@@ -123,61 +104,48 @@ async function setupTeensSessionMocks(page: Page) {
 }
 
 test.describe('Portal Teens — Plan 4 (/actividad/[attemptId])', () => {
-  test('Integración real local con backend: login Teens -> abrir actividad real -> responsive y sin TTS repetido', async ({
+  test('Integración real local con backend: login Teens -> abrir actividad real -> responsive y sin TTS repetido', { tag: '@fullstack' }, async ({
     page,
     request,
   }) => {
-    const healthRes = await request.get('http://localhost:3001/health').catch(() => null);
-    expect(healthRes?.status()).toBe(200);
+    const { email, password } = smokeCredentials('teens');
+    const healthRes = await request.get(`${smokeApiUrl}/health`);
+    expect(healthRes.status()).toBe(200);
 
     await page.goto('/login');
-    await page.getByLabel(/Correo/i).fill('camila.teens@upwardenglish.org');
-    await page.getByLabel(/Contraseña/i).fill('Estudiante2026!');
-    await page.getByRole('button', { name: /^Entrar$/i }).click();
-
-    const rateLimitMsg = page.getByText(/Has hecho varios intentos/i);
-    const outcome = await Promise.race([
-      page.waitForURL(/\/inicio/, { timeout: 10_000 }).then(() => 'logged_in' as const),
-      rateLimitMsg.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'rate_limited' as const),
+    await page.getByLabel('Correo electrónico').fill(email);
+    await page.getByLabel('Contraseña', { exact: true }).fill(password);
+    const [loginResponse] = await Promise.all([
+      page.waitForResponse((response) =>
+        new URL(response.url()).pathname === '/api/v1/auth/login' &&
+        response.request().method() === 'POST',
+      ),
+      page.getByRole('button', { name: 'Entrar', exact: true }).click(),
     ]);
-
-    if (outcome === 'rate_limited') {
-      test.skip(true, 'Local API login rate limit active from prior runs');
-      return;
-    }
+    expect(loginResponse.status(), `Login Teens (HTTP ${loginResponse.status()})`).toBe(200);
+    await expect(page).toHaveURL('/inicio');
 
     await expect(page.locator('[data-theme="teens"]')).toBeVisible();
 
-    // Intentar abrir una actividad asignada o un juego para llegar a /actividad/[attemptId]
-    const startOrContinueBtn = page
-      .locator('#main-content')
-      .getByRole('button', { name: /Continuar actividad|Empezar actividad|Intentar de nuevo/i })
-      .first();
-
-    const activityLink = page
-      .locator('#main-content')
-      .locator('a[href^="/actividad/"]')
-      .first();
-
-    if ((await activityLink.count()) > 0) {
-      await activityLink.click();
-    } else if ((await startOrContinueBtn.count()) > 0) {
-      await startOrContinueBtn.click();
-    } else {
-      // Fallback: abrir un microjuego desde /juegos
-      await page.goto('/juegos');
-      const playLink = page.locator('#main-content a[href^="/juegos/"]').first();
-      await expect(playLink).toBeVisible();
-      await playLink.click();
-      const startGameBtn = page.getByRole('button', { name: /Jugar ahora|Iniciar|Practicar/i }).first();
-      await startGameBtn.click();
-    }
+    await page.goto('/juegos');
+    const game = page.getByRole('article', { name: 'Vocabulary Match: Animals & Objects' });
+    await game.getByRole('button', { name: /^Jugar(?: de nuevo)?$/ }).or(
+      game.getByRole('link', { name: 'Reanudar partida' }),
+    ).click();
 
     await page.waitForURL(/\/actividad\/[^/]+/);
     await expect(page.locator('#main-content h1')).toBeVisible({ timeout: 15_000 });
 
     // Verificar ausencia de botones TTS repetidos en Teens
     await expect(page.locator('#main-content').getByRole('button', { name: /^Escuchar/i })).toHaveCount(0);
+
+    const mutedSound = page.getByRole('button', { name: 'Sonido: Silenciado', exact: true });
+    const activeSound = page.getByRole('button', { name: 'Sonido: Activado', exact: true });
+    await expect(mutedSound).toHaveAttribute('aria-pressed', 'false');
+    await mutedSound.press('Enter');
+    await expect(activeSound).toHaveAttribute('aria-pressed', 'true');
+    await activeSound.press('Space');
+    await expect(mutedSound).toHaveAttribute('aria-pressed', 'false');
 
     // Verificar responsive en los 3 viewports reales
     for (const vp of VIEWPORTS) {
@@ -194,7 +162,7 @@ test.describe('Portal Teens — Plan 4 (/actividad/[attemptId])', () => {
     page,
     context,
   }) => {
-    await addSessionCookies(context);
+    await addSessionCookie(context, 'mock-teens-token');
     await setupTeensSessionMocks(page);
 
     let completed = false;
@@ -302,7 +270,7 @@ test.describe('Portal Teens — Plan 4 (/actividad/[attemptId])', () => {
     page,
     context,
   }) => {
-    await addSessionCookies(context);
+    await addSessionCookie(context, 'mock-teens-token');
     await setupTeensSessionMocks(page);
 
     // Simular MediaRecorder y getUserMedia en navegador de pruebas
@@ -410,7 +378,7 @@ test.describe('Portal Teens — Plan 4 (/actividad/[attemptId])', () => {
     page,
     context,
   }) => {
-    await addSessionCookies(context);
+    await addSessionCookie(context, 'mock-teens-token');
     await setupTeensSessionMocks(page);
 
     await page.route('**/api/v1/attempts/att-closed-teens', async (route) => {

@@ -82,7 +82,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @upward-english/shared build
       - run: pnpm --filter @upward-english/web exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: pnpm test:e2e --project=mocked-ci
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
       - name: Evidencia de navegador incluso ante fallo
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

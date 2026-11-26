@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
@@ -108,11 +109,7 @@ const mockGraded = {
 
 test.beforeEach(async ({ context, page }) => {
   const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
-  await context.addCookies([
-    { name: `${process.env.COOKIE_PREFIX ?? 'englove_local_'}access_token`, value: token, domain: 'localhost', path: '/' },
-    { name: 'upward_english_local_access_token', value: token, domain: 'localhost', path: '/' },
-    { name: 'upward_english_access_token', value: token, domain: 'localhost', path: '/' },
-  ]);
+  await addSessionCookie(context, token);
 
   await page.route('**/api/v1/auth/session', (route) =>
     route.fulfill({

@@ -119,7 +119,6 @@ export function AsignacionDetailClient({ id }: { id: string }) {
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
-  const modalReturnBtnRef = useRef<HTMLButtonElement | null>(null);
   const successBannerRef = useRef<HTMLDivElement | null>(null);
 
   const assignmentQuery = useQuery({
@@ -201,9 +200,6 @@ export function AsignacionDetailClient({ id }: { id: string }) {
   const handleOpenCancelModal = () => {
     setCancelError(null);
     setShowCancelModal(true);
-    setTimeout(() => {
-      modalReturnBtnRef.current?.focus();
-    }, 70);
   };
 
   const handleCloseCancelModal = () => {
@@ -860,7 +856,7 @@ export function AsignacionDetailClient({ id }: { id: string }) {
 
           <div className={styles.modalActions}>
             <button
-              ref={modalReturnBtnRef}
+              data-initial-focus
               type="button"
               onClick={handleCloseCancelModal}
               disabled={isCancelling}

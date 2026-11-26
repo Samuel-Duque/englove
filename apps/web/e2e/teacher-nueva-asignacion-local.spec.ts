@@ -1,18 +1,11 @@
+import { signInForSmoke, smokeApiUrl } from './session';
 import { expect, test } from '@playwright/test';
 
-const email = process.env.ENGLOVE_SMOKE_EMAIL;
-const password = process.env.ENGLOVE_SMOKE_PASSWORD;
 
 test('Nueva asignación con API y PostgreSQL locales: exclusión de game, creación real, conflicto 409 y limpieza', async ({ page }) => {
-  test.skip(!email || !password, 'Requiere una cuenta docente sembrada en el entorno local.');
-  if (!email || !password) return;
   test.setTimeout(90_000);
 
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(email);
-  await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/inicio$/);
+  await signInForSmoke(page, 'teacher');
 
   await page.goto('/asignaciones');
   const activitiesPromise = page.waitForResponse((res) => {
@@ -46,8 +39,7 @@ test('Nueva asignación con API y PostgreSQL locales: exclusión de game, creaci
   expect(activeGroups.length).toBeGreaterThan(0);
 
   // Buscar un par (actividad, grupo) que no tenga ya una asignación activa en la semilla local
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  const existingRes = await page.request.get(`${apiBase}/api/v1/assignments?limit=100`);
+  const existingRes = await page.request.get(`${smokeApiUrl}/api/v1/assignments?limit=100`);
   expect(existingRes.status()).toBe(200);
   const existingAssignments = AssignmentListResponseSchema.parse(await existingRes.json()).items;
   const nowMs = Date.now();
@@ -112,7 +104,7 @@ test('Nueva asignación con API y PostgreSQL locales: exclusión de game, creaci
 
   // 3. Limpiar cancelando la asignación de prueba creada
   if (createdId) {
-    const cancelRes = await page.request.post(`${apiBase}/api/v1/assignments/${createdId}/cancel`, {
+    const cancelRes = await page.request.post(`${smokeApiUrl}/api/v1/assignments/${createdId}/cancel`, {
       headers: { Origin: new URL(page.url()).origin },
     });
     expect(cancelRes.status()).toBe(200);

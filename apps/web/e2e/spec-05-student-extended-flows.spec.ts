@@ -1,23 +1,11 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y Perfil (ENG-145)', () => {
   test.beforeEach(async ({ context, page }) => {
     // 1. Simular cookie de sesión de estudiante
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: 'mock-student-token',
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: 'mock-student-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
@@ -68,11 +56,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
     context,
     baseURL,
   }) => {
-    await context.addCookies([{
-      name: `${process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX ?? 'englove_local_'}access_token`,
-      value: 'mock-student-token',
-      url: baseURL,
-    }]);
+    await addSessionCookie(context, 'mock-student-token', baseURL);
     await page.addInitScript(() => {
       const utterances = document.createElement('div');
       Object.defineProperties(window.speechSynthesis, {
@@ -252,11 +236,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
   });
 
   test('/feedback vacío en Kids vuelve a la ruta del alumno', async ({ page, context, baseURL }) => {
-    await context.addCookies([{
-      name: `${process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX ?? 'englove_local_'}access_token`,
-      value: 'mock-student-token',
-      url: baseURL,
-    }]);
+    await addSessionCookie(context, 'mock-student-token', baseURL);
     await page.route('**/api/v1/student/feedback', (route) => route.fulfill({ json: { items: [] } }));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/feedback');
@@ -273,11 +253,7 @@ test.describe('SPEC-05 & SPEC-07: Portal del Alumno — Feedback, Reintentos y P
     context,
     baseURL,
   }) => {
-    await context.addCookies([{
-      name: `${process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX ?? 'englove_local_'}access_token`,
-      value: 'mock-student-token',
-      url: baseURL,
-    }]);
+    await addSessionCookie(context, 'mock-student-token', baseURL);
     await page.goto('/perfil');
 
     // Información básica

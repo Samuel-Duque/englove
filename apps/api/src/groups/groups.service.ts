@@ -284,14 +284,12 @@ export class GroupsService {
         });
       }
 
-      const [membershipCount, assignmentCount] = await Promise.all([
-        tx.groupMembership.count({
-          where: { group_id: id, organization_id: organizationId },
-        }),
-        tx.assignment.count({
-          where: { group_id: id, organization_id: organizationId },
-        }),
-      ]);
+      const membershipCount = await tx.groupMembership.count({
+        where: { group_id: id, organization_id: organizationId },
+      });
+      const assignmentCount = await tx.assignment.count({
+        where: { group_id: id, organization_id: organizationId },
+      });
 
       if (membershipCount > 0 || assignmentCount > 0) {
         throw new ConflictException({

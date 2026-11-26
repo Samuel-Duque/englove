@@ -1,19 +1,10 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
   test.beforeEach(async ({ page, context, baseURL }) => {
-    const prefixes = new Set([
-      process.env.COOKIE_PREFIX || process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-      'upward_english_',
-      'upward_english_local_',
-      'englove_local_',
-    ]);
-    await context.addCookies([...prefixes].filter((prefix) => prefix !== undefined).map((prefix) => ({
-      name: `${prefix}access_token`,
-      value: 'mock-student-token',
-      url: baseURL ?? 'http://localhost:3000',
-    })));
+    await addSessionCookie(context, 'mock-student-token', baseURL);
     await page.route(/\/api\/v1\/(?:me|auth\/session)$/, (route) => route.fulfill({
       json: {
         user: { id: 'std-e2e-2', email: 'gamer@upwardenglish.local', name: 'Carlos Gamer', role: 'student' },

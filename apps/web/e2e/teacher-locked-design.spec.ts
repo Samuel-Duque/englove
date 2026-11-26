@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
@@ -13,14 +14,7 @@ const student = {
 
 test.beforeEach(async ({ context, page }) => {
   const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
-  await context.addCookies(
-    ['englove_local_', 'upward_english_local_', 'upward_english_'].map((prefix) => ({
-      name: `${prefix}access_token`,
-      value: token,
-      domain: 'localhost',
-      path: '/',
-    })),
-  );
+  await addSessionCookie(context, token);
   await page.route('**/api/v1/auth/session', (route) =>
     route.fulfill({
       json: {

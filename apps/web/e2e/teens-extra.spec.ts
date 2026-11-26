@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
@@ -18,22 +19,7 @@ const profile = {
 };
 
 test.beforeEach(async ({ baseURL, context, page }) => {
-  for (const prefix of new Set([
-    process.env.COOKIE_PREFIX ?? process.env.NEXT_PUBLIC_COOKIE_PREFIX,
-    "englove_local_",
-    "upward_english_local_",
-    "upward_english_",
-  ])) {
-    if (prefix) {
-      await context.addCookies([
-        {
-          name: `${prefix}access_token`,
-          value: "mock-teens-token",
-          url: baseURL,
-        },
-      ]);
-    }
-  }
+  await addSessionCookie(context, "mock-teens-token", baseURL);
   await page.route(/\/api\/v1\/(?:me|auth\/session)$/, (route) =>
     route.fulfill({ json: profile }),
   );

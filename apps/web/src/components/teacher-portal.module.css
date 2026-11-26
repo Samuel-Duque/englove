@@ -192,7 +192,7 @@
 .error svg, .offline svg { flex-shrink: 0; }
 .error .secondaryButton { margin-top: .5rem; }
 .offline { display: flex; align-items: center; gap: .5rem; padding: .75rem var(--gutter); background: var(--accent-primary-soft); color: var(--ink-primary); border-bottom: 1px solid var(--accent-primary); }
-.badge { display: inline-flex; align-items: center; gap: .35rem; padding: .13rem .5rem; border: 1px solid var(--border-hairline); border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--surface-subtle); color: var(--ink-secondary); }
+.badge { display: inline-flex; align-items: center; gap: .35rem; padding: .13rem .5rem; border: 1px solid var(--border-hairline); border-radius: 999px; font-size: .75rem; font-weight: 700; white-space: nowrap; background: var(--surface-subtle); color: var(--ink-secondary); }
 .badge::before { content: ''; width: .4rem; height: .4rem; flex-shrink: 0; border-radius: 50%; background: currentColor; }
 .badge[data-tone='ok'] { background: var(--status-ok-bg); color: var(--status-ok-ink); border-color: #b7dfc2; }
 .badge[data-tone='warm'] { background: var(--accent-warm-soft); color: var(--accent-warm-ink); border-color: #e5c97b; }

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { AuthLoading } from '../../auth-page';
 import { ResetPasswordForm } from './reset-password-form';
 
 export const metadata: Metadata = {
@@ -9,13 +10,7 @@ export const metadata: Metadata = {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense
-      fallback={
-        <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center outline-none">
-          <p className="text-zinc-500">Cargando…</p>
-        </main>
-      }
-    >
+    <Suspense fallback={<AuthLoading message="Cargando…" />}>
       <ResetPasswordForm />
     </Suspense>
   );

@@ -232,7 +232,7 @@
 }
 
 .table thead th {
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -260,7 +260,7 @@
 
 .table tbody th,
 .table tbody td {
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0.75rem;
   min-height: 52px;
   vertical-align: middle;
   color: var(--ink-primary, #2b150a);
@@ -288,7 +288,7 @@
 
 .emailText {
   display: block;
-  max-width: 14rem;
+  max-width: 11rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -340,7 +340,7 @@
 .guardianCell {
   display: grid;
   gap: 0.125rem;
-  max-width: 14rem;
+  max-width: 10rem;
 }
 
 .guardianName {

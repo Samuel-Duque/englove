@@ -424,15 +424,16 @@ export function RevisionClient() {
         },
       ),
     onSuccess: (updated) => {
+      const nextCache: DetailQueryResult = {
+        detail: updated,
+        audioUrl,
+        audioWarning,
+        audioFormat,
+        audioDurationSeconds,
+      };
       queryClient.setQueryData<DetailQueryResult | null>(
         ['teacher', 'review-detail', selectedAttemptId],
-        {
-          detail: updated,
-          audioUrl,
-          audioWarning,
-          audioFormat,
-          audioDurationSeconds,
-        },
+        () => nextCache,
       );
       setScoreInput(
         updated.attempt.score !== null ? formatScore(updated.attempt.score) : '',

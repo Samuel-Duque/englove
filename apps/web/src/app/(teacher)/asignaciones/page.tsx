@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { AsignacionesClient } from './asignaciones-client';
+import styles from './asignaciones.module.css';
 
 export const metadata: Metadata = {
   title: 'Asignaciones',
@@ -11,8 +12,13 @@ export default function AssignmentsPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-16 text-center text-zinc-500 text-sm">
-          Cargando asignaciones…
+        <div role="status" className={styles.skeletonCard}>
+          <span className="sr-only">Cargando asignaciones…</span>
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
         </div>
       }
     >

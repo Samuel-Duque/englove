@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { BookOpen, CircleAlert, CheckCircle2, Info, Plus, X } from 'lucide-react';
 import {
   ActivitySummary,
   ActivitySummarySchema,
@@ -14,21 +15,27 @@ import {
   Level,
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
-import { ConfirmDialog } from '../../../components/ui/modal';
+import { ErrorState } from '../../../components/error-state';
+import {
+  EditorialConfirmDialog,
+  EditorialTable,
+  TeacherStatusBadge,
+} from '../../../components/teacher-editorial';
+import styles from './actividades.module.css';
 
 const typeLabels: Record<ActivityType, string> = {
-  [ActivityType.fill_blank]: 'Rellenar huecos',
+  [ActivityType.fill_blank]: 'Completar espacios',
   [ActivityType.open_question]: 'Pregunta abierta',
   [ActivityType.speaking]: 'Expresión oral (Speaking)',
   [ActivityType.game]: 'Microjuego',
   [ActivityType.exam]: 'Examen',
 };
 
-const statusLabels: Record<ActivityStatus, { label: string; color: string }> = {
-  [ActivityStatus.draft]: { label: 'Borrador', color: 'bg-zinc-100 text-zinc-800' },
-  [ActivityStatus.published]: { label: 'Publicada', color: 'bg-emerald-100 text-emerald-800' },
-  [ActivityStatus.archived]: { label: 'Archivada', color: 'bg-amber-100 text-amber-800' },
-};
+const statusBadgeKinds = {
+  [ActivityStatus.draft]: 'activityDraft',
+  [ActivityStatus.published]: 'activityPublished',
+  [ActivityStatus.archived]: 'activityArchived',
+} as const;
 
 export function ActividadesClient() {
   const router = useRouter();
@@ -38,14 +45,14 @@ export function ActividadesClient() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'active' | 'archived' | 'all'>('active');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [levelFilter, setLevelFilter] = useState<string>('all');
-  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
+  const [deletingActivity, setDeletingActivity] = useState<ActivitySummary | null>(null);
 
   const activitiesQuery = useQuery({
     queryKey: ['teacher', 'activities', statusFilter, typeFilter, levelFilter],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       if (statusFilter === 'archived') {
         params.set('status', ActivityStatus.archived);
@@ -59,6 +66,7 @@ export function ActividadesClient() {
       params.set('limit', '100');
       return apiFetch<ActivityListResponse>(`/api/v1/activities?${params.toString()}`, {
         schema: ActivityListResponseSchema,
+        signal,
       });
     },
   });
@@ -121,150 +129,157 @@ export function ActividadesClient() {
         setActionError('No se pudo eliminar la actividad');
       }
     },
+    onSettled: () => {
+      setDeletingActivity(null);
+    },
   });
 
   const handleDuplicate = (id: string) => {
     setActionError(null);
+    setActionSuccess(null);
     duplicateMutation.mutate(id);
   };
 
   const handleArchive = (id: string) => {
     setActionError(null);
+    setActionSuccess(null);
     archiveMutation.mutate(id);
   };
 
   const handleRestore = (id: string) => {
     setActionError(null);
+    setActionSuccess(null);
     restoreMutation.mutate(id);
   };
 
-  const handleDelete = (id: string) => {
-    setDeletingActivityId(id);
+  const handleDelete = (activity: ActivitySummary) => {
+    setDeletingActivity(activity);
   };
 
   const handleConfirmDelete = () => {
-    const id = deletingActivityId;
-    setDeletingActivityId(null);
-    if (!id) return;
+    if (!deletingActivity) return;
     setActionError(null);
-    deleteMutation.mutate(id);
+    setActionSuccess(null);
+    deleteMutation.mutate(deletingActivity.id);
   };
 
   const isLoading = activitiesQuery.isLoading;
+  const isMutatingRow =
+    duplicateMutation.isPending ||
+    archiveMutation.isPending ||
+    restoreMutation.isPending ||
+    deleteMutation.isPending;
   const activities: ActivitySummary[] = activitiesQuery.data?.items || [];
   const total = activitiesQuery.data?.total || 0;
-  const error = actionError || (activitiesQuery.error instanceof ApiError ? activitiesQuery.error.message : activitiesQuery.error instanceof Error ? activitiesQuery.error.message : null);
+  const hasFilters = statusFilter !== 'active' || typeFilter !== 'all' || levelFilter !== 'all';
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.headerText}>
+          <h1 id="activities-catalog-heading" className={styles.title}>
             Catálogo de Actividades
           </h1>
-          <p className="text-sm text-zinc-600">
-            Diseña y gestiona el contenido pedagógico para tus grupos.
+          <p className={styles.subtitle}>
+            Diseña y gestiona actividades pedagógicas y microjuegos (niveles MCER A1–B2).
           </p>
         </div>
-        <Link
-          href="/actividades/nueva"
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
-        >
-          + Crear actividad
+        <Link href="/actividades/nueva" className={styles.createButton}>
+          <Plus size={18} strokeWidth={2} aria-hidden="true" />
+          Crear actividad
         </Link>
-      </div>
+      </header>
 
-      {/* Alerts */}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
-        >
-          <span>{error}</span>
+      {actionError && (
+        <div role="alert" className={styles.alertError}>
+          <span className={styles.alertMessage}>
+            <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span>{actionError}</span>
+          </span>
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="text-rose-600 hover:text-rose-800 font-bold ml-4"
+            aria-label="Cerrar mensaje de error"
+            className={styles.alertDismiss}
           >
-            ✕
+            <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
       )}
 
       {actionSuccess && (
-        <div
-          role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
-        >
-          <span>{actionSuccess}</span>
+        <div role="status" className={styles.alertSuccess}>
+          <span className={styles.alertMessage}>
+            <CheckCircle2 size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span>{actionSuccess}</span>
+          </span>
           <button
             type="button"
             onClick={() => setActionSuccess(null)}
-            className="text-emerald-600 hover:text-emerald-800 font-bold ml-4"
+            aria-label="Cerrar aviso"
+            className={styles.alertDismiss}
           >
-            ✕
+            <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
       )}
 
-      {/* Filters Bar */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Status Tabs */}
-          <div className="inline-flex rounded-lg border border-zinc-200 p-1 bg-zinc-50 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('active')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                statusFilter === 'active'
-                  ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                  : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              Catálogo activo
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('archived')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                statusFilter === 'archived'
-                  ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                  : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              Archivadas
-            </button>
+      <section aria-label="Filtros del catálogo" className={styles.filtersBar}>
+        <div className={styles.filtersControls}>
+          <div className={styles.segmentedWrap}>
+            <span id="catalog-status-label" className={styles.filterLabel}>
+              Estado
+            </span>
+            <div role="group" aria-labelledby="catalog-status-label" className={styles.segmented}>
+              <button
+                type="button"
+                aria-pressed={statusFilter === 'active'}
+                onClick={() => setStatusFilter('active')}
+                className={styles.segmentButton}
+              >
+                Catálogo activo
+              </button>
+              <button
+                type="button"
+                aria-pressed={statusFilter === 'archived'}
+                onClick={() => setStatusFilter('archived')}
+                className={styles.segmentButton}
+              >
+                Archivadas
+              </button>
+            </div>
           </div>
 
-          {/* Type Filter */}
-          <label htmlFor="filter-type" className="text-xs font-medium text-zinc-600 flex items-center gap-1.5">
-            Tipo:
+          <div className={styles.filterField}>
+            <label htmlFor="filter-type" className={styles.filterLabel}>
+              Tipo de actividad
+            </label>
             <select
               id="filter-type"
               name="filter-type"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={styles.select}
             >
               <option value="all">Todos los tipos</option>
-              <option value={ActivityType.fill_blank}>Rellenar huecos</option>
-              <option value={ActivityType.open_question}>Pregunta abierta</option>
-              <option value={ActivityType.speaking}>Speaking</option>
-              <option value={ActivityType.game}>Microjuego</option>
-              <option value={ActivityType.exam}>Examen</option>
+              <option value={ActivityType.fill_blank}>{typeLabels[ActivityType.fill_blank]}</option>
+              <option value={ActivityType.open_question}>{typeLabels[ActivityType.open_question]}</option>
+              <option value={ActivityType.speaking}>{typeLabels[ActivityType.speaking]}</option>
+              <option value={ActivityType.game}>{typeLabels[ActivityType.game]}</option>
+              <option value={ActivityType.exam}>{typeLabels[ActivityType.exam]}</option>
             </select>
-          </label>
+          </div>
 
-          {/* Level Filter */}
-          <label htmlFor="filter-level" className="text-xs font-medium text-zinc-600 flex items-center gap-1.5">
-            Nivel:
+          <div className={styles.filterField}>
+            <label htmlFor="filter-level" className={styles.filterLabel}>
+              Nivel MCER
+            </label>
             <select
               id="filter-level"
               name="filter-level"
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={styles.select}
             >
               <option value="all">Todos los niveles</option>
               <option value={Level.A1}>A1</option>
@@ -272,149 +287,186 @@ export function ActividadesClient() {
               <option value={Level.B1}>B1</option>
               <option value={Level.B2}>B2</option>
             </select>
-          </label>
+          </div>
         </div>
 
-        <span className="text-xs text-zinc-500">
+        <p className={styles.totalCount}>
           {total} actividad{total !== 1 ? 'es' : ''}
-        </span>
-      </div>
+        </p>
+      </section>
 
-      {/* Activity List / Grid */}
+      <aside className={styles.callout} aria-label="Nota sobre actividades archivadas">
+        <Info size={18} strokeWidth={1.75} className={styles.calloutIcon} aria-hidden="true" />
+        <p>
+          Archivar una actividad la oculta del catálogo activo, pero no cancela sus asignaciones existentes ni elimina las entregas.
+        </p>
+      </aside>
+
       {isLoading ? (
-        <div className="py-12 text-center text-zinc-500 text-sm">
-          Cargando catálogo…
+        <div role="status" className={styles.skeletonCard}>
+          <span className="sr-only">Cargando catálogo de actividades…</span>
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRow} />
         </div>
+      ) : activitiesQuery.isError && !activitiesQuery.data ? (
+        <ErrorState
+          variant="teacher"
+          editorial
+          message={
+            activitiesQuery.error instanceof ApiError
+              ? activitiesQuery.error.message
+              : 'No pudimos cargar el catálogo de actividades.'
+          }
+          onRetry={() => void activitiesQuery.refetch()}
+        />
       ) : activities.length === 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-          {statusFilter === 'active' && typeFilter === 'all' && levelFilter === 'all' ? (
-            <div>
-              <p className="text-base font-semibold text-zinc-800">
-                Aún no tienes actividades
+        <div className={styles.emptyCard}>
+          <span className={styles.emptyIcon} aria-hidden="true">
+            <BookOpen size={22} strokeWidth={1.65} />
+          </span>
+          {!hasFilters ? (
+            <>
+              <h2 className={styles.emptyTitle}>Aún no tienes actividades</h2>
+              <p className={styles.emptyDescription}>
+                Crea tu primera actividad para empezar a armar tus clases, ejercicios y asignaciones.
               </p>
-              <p className="mt-1 text-sm text-zinc-500 mb-6">
-                Crea tu primera actividad para empezar a armar tus clases y asignaciones.
-              </p>
-              <Link
-                href="/actividades/nueva"
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              >
-                Crear mi primera actividad
-              </Link>
-            </div>
+              <div className={styles.emptyActions}>
+                <Link href="/actividades/nueva" className={styles.createButton}>
+                  <Plus size={18} strokeWidth={2} aria-hidden="true" />
+                  Crear actividad
+                </Link>
+              </div>
+            </>
           ) : (
-            <div>
-              <p className="text-base font-semibold text-zinc-800">
-                No encontramos actividades con estos filtros
+            <>
+              <h2 className={styles.emptyTitle}>No hay actividades que coincidan con estos filtros.</h2>
+              <p className={styles.emptyDescription}>
+                Prueba cambiando los criterios de búsqueda, revisando las archivadas o creando una nueva actividad.
               </p>
-              <p className="mt-1 text-sm text-zinc-500 mb-4">
-                Prueba cambiando los criterios de búsqueda o revisa las archivadas.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('active');
-                  setTypeFilter('all');
-                  setLevelFilter('all');
-                }}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
-              >
-                Limpiar filtros
-              </button>
-            </div>
+              <div className={styles.emptyActions}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('active');
+                    setTypeFilter('all');
+                    setLevelFilter('all');
+                  }}
+                  className={styles.secondaryButton}
+                >
+                  Limpiar filtros
+                </button>
+                <Link href="/actividades/nueva" className={styles.createButton}>
+                  <Plus size={18} strokeWidth={2} aria-hidden="true" />
+                  Crear actividad
+                </Link>
+              </div>
+            </>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activities.map((act) => {
-            const statusConfig = statusLabels[act.status];
-
-            return (
-              <div
-                key={act.id}
-                className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm hover:border-zinc-300 transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-zinc-100 text-zinc-700">
-                      Nivel {act.level}
+        <div className={styles.tableWrap}>
+          <EditorialTable labelledBy="activities-catalog-heading">
+            <thead>
+              <tr>
+                <th scope="col">Título</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Nivel</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Versión</th>
+                <th scope="col">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activities.map((act) => (
+                <tr key={act.id}>
+                  <th scope="row">
+                    <span lang="en" className={styles.activityTitle}>
+                      {act.title}
                     </span>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusConfig.color}`}
-                    >
-                      {statusConfig.label}
-                    </span>
-                  </div>
-
-                  <h3 className="text-base font-semibold text-zinc-900 line-clamp-2 mb-1">
-                    {act.title}
-                  </h3>
-                  <p className="text-xs text-zinc-500 mb-4">
-                    {typeLabels[act.type]} • Versión {act.version}
-                  </p>
-                </div>
-
-                {/* Card Actions */}
-                <div className="border-t border-zinc-100 pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/actividades/${act.id}`}
-                      className="font-semibold text-blue-600 hover:text-blue-800 focus:outline-none focus:underline"
-                    >
-                      {act.status === ActivityStatus.archived ? 'Ver' : 'Editar'}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleDuplicate(act.id)}
-                      className="text-zinc-600 hover:text-zinc-900 focus:outline-none focus:underline"
-                    >
-                      Duplicar
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {act.status === ActivityStatus.archived ? (
+                  </th>
+                  <td className={styles.activityType}>{typeLabels[act.type]}</td>
+                  <td>
+                    <span className={styles.levelPill}>{act.level}</span>
+                  </td>
+                  <td>
+                    <TeacherStatusBadge kind={statusBadgeKinds[act.status]} />
+                  </td>
+                  <td className={styles.tabularCell}>v{act.version}</td>
+                  <td>
+                    <div className={styles.rowActions}>
+                      <Link
+                        href={`/actividades/${act.id}`}
+                        aria-label={`${act.status === ActivityStatus.archived ? 'Ver' : 'Editar'} actividad: ${act.title}`}
+                        className={styles.actionEdit}
+                      >
+                        {act.status === ActivityStatus.archived ? 'Ver' : 'Editar'}
+                      </Link>
                       <button
                         type="button"
-                        onClick={() => handleRestore(act.id)}
-                        className="font-medium text-emerald-600 hover:text-emerald-800 focus:outline-none focus:underline"
+                        disabled={isMutatingRow}
+                        onClick={() => handleDuplicate(act.id)}
+                        aria-label={`Duplicar actividad: ${act.title}`}
+                        className={styles.actionNeutral}
                       >
-                        Restaurar al catálogo
+                        Duplicar
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleArchive(act.id)}
-                        className="text-amber-700 hover:text-amber-900 focus:outline-none focus:underline"
-                      >
-                        Archivar
-                      </button>
-                    )}
-
-                    {act.status === ActivityStatus.draft && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(act.id)}
-                        className="text-rose-600 hover:text-rose-800 focus:outline-none focus:underline"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                      {act.status === ActivityStatus.archived ? (
+                        <button
+                          type="button"
+                          disabled={isMutatingRow}
+                          onClick={() => handleRestore(act.id)}
+                          aria-label={`Restaurar actividad: ${act.title}`}
+                          className={styles.actionRestore}
+                        >
+                          Restaurar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isMutatingRow}
+                          onClick={() => handleArchive(act.id)}
+                          aria-label={`Archivar actividad: ${act.title}`}
+                          className={styles.actionArchive}
+                        >
+                          Archivar
+                        </button>
+                      )}
+                      {act.status === ActivityStatus.draft && (
+                        <button
+                          type="button"
+                          disabled={isMutatingRow}
+                          onClick={() => handleDelete(act)}
+                          aria-label={`Eliminar borrador: ${act.title}`}
+                          className={styles.actionDelete}
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </EditorialTable>
         </div>
       )}
-      <ConfirmDialog
-        isOpen={!!deletingActivityId}
+
+      <EditorialConfirmDialog
+        isOpen={!!deletingActivity}
         title="Eliminar borrador"
-        message="¿Seguro que deseas eliminar este borrador? Esta acción no se puede deshacer."
+        message={
+          deletingActivity
+            ? `¿Seguro que deseas eliminar el borrador "${deletingActivity.title}"? Esta acción no se puede deshacer.`
+            : '¿Seguro que deseas eliminar este borrador? Esta acción no se puede deshacer.'
+        }
         confirmText="Eliminar borrador"
+        cancelText="Cancelar"
         isDestructive={true}
+        isPending={deleteMutation.isPending}
         onConfirm={handleConfirmDelete}
-        onCancel={() => setDeletingActivityId(null)}
+        onCancel={() => setDeletingActivity(null)}
       />
     </div>
   );

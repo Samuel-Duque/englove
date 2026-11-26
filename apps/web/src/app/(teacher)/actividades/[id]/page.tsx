@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { ActividadDetailClient } from './actividad-detail-client';
+import { ActividadDetailClient, ActividadDetailSkeleton } from './actividad-detail-client';
 
 export const metadata: Metadata = {
   title: 'Editar Actividad',
@@ -15,13 +15,7 @@ export default async function EditarActividadPage({
   const unwrappedParams = await params;
 
   return (
-    <Suspense
-      fallback={
-        <div className="py-12 text-center text-zinc-500 text-sm">
-          Cargando actividad…
-        </div>
-      }
-    >
+    <Suspense fallback={<ActividadDetailSkeleton />}>
       <ActividadDetailClient id={unwrappedParams.id} />
     </Suspense>
   );

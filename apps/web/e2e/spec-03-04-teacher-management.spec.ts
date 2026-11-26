@@ -206,7 +206,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.fill('input#activity-title', 'Actividad Multitipo E2E');
 
     // 4.1 Tipo fill_blank y previsualización
-    const previewBtn = page.locator('button:has-text("Previsualizar")');
+    const previewBtn = page.getByRole('button', { name: /Previsualizar|Probar vista previa/i });
     await expect(previewBtn).toBeVisible();
     await previewBtn.click();
 
@@ -216,33 +216,34 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(
       dialog.locator('text=Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas.'),
     ).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
     await expect(dialog).not.toBeVisible();
 
     // 4.2 Cambiar a open_question y previsualizar
-    await page.selectOption('select#activity-type', 'open_question');
+    await page.getByRole('radio', { name: /Pregunta abierta/i }).check();
     await expect(page.locator('textarea#oq-prompt-0, textarea#oq-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
 
     // 4.3 Cambiar a speaking y previsualizar
-    await page.selectOption('select#activity-type', 'speaking');
+    await page.getByRole('radio', { name: /Expresión oral/i }).check();
     await expect(page.locator('textarea#sp-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
 
     // 4.4 Cambiar a game con mecánica match y previsualizar
-    await page.selectOption('select#activity-type', 'game');
-    await expect(page.locator('select#game-mechanic')).toBeVisible();
-    await page.selectOption('select#game-mechanic', 'match');
+    await page.getByRole('radio', { name: /Microjuego/i }).check();
+    const matchRadio = page.getByRole('radio', { name: /Emparejar/i });
+    await expect(matchRadio).toBeVisible();
+    await matchRadio.check();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
 
     // 4.5 Cambiar a exam y verificar normalización de pesos a 100%
-    await page.selectOption('select#activity-type', 'exam');
+    await page.getByRole('radio', { name: /Examen/i }).check();
     await expect(page.locator('input#exam-w1')).toBeVisible();
     await expect(page.locator('input#exam-w2')).toBeVisible();
 
@@ -274,7 +275,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     });
 
     await page.fill('input#activity-title', 'Actividad Multitipo E2E');
-    await page.click('button:has-text("Crear borrador")');
+    await page.getByRole('button', { name: 'Guardar borrador' }).click();
     await expect(page.locator('h1:has-text("Editor de actividad")')).toBeVisible();
   });
 
@@ -294,7 +295,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     });
 
     await page.goto('/grupos');
-    await expect(page.locator('h1:has-text("Gestión de Grupos")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Grupos', exact: true })).toBeVisible();
     await expect(page.locator('text=Kids A1 Mañana')).toBeVisible();
     await expect(page.locator('text=Kids A2 Tarde')).toBeVisible();
 
@@ -303,7 +304,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(archiveBtnWithStudents).toBeVisible();
     await archiveBtnWithStudents.click();
     await expect(
-      page.locator('text=No es posible archivar el grupo "Kids A1 Mañana": tiene 5 alumno(s) activo(s)'),
+      page.getByRole('alert').getByText(/Trasládalos a otro grupo/),
     ).toBeVisible();
 
     // 5.2 Creación de nuevo grupo
@@ -314,7 +315,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       });
     });
 
-    const createGroupBtn = page.locator('button:has-text("Crear grupo")');
+    const createGroupBtn = page.getByRole('button', { name: 'Nuevo grupo', exact: true });
     await expect(createGroupBtn).toBeVisible();
     await createGroupBtn.click();
 
@@ -614,7 +615,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.click('button:has-text("Seleccionar todos")');
 
     // Crear asignaciones
-    await page.click('button:has-text("Crear asignación")');
+    await page.click('button:has-text("Programar asignación")');
     await expect(page).toHaveURL(/\/asignaciones/);
 
     // 7.3 Detalle /asignaciones/:id y cancelación idempotente

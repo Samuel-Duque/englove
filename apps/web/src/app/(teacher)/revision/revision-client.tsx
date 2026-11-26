@@ -1,63 +1,178 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  Check,
+  CircleAlert,
+  ClipboardCheck,
+  Download,
+  Lock,
+  Mic,
+  RefreshCw,
+  Star,
+  X,
+} from 'lucide-react';
 import {
   ActivityType,
-  STICKERS,
-  STICKER_CODES,
-  StickerCode,
+  AttemptReviewDetailView,
+  AttemptReviewDetailViewSchema,
+  GroupListResponse,
+  GroupListResponseSchema,
+  GroupView,
+  MediaPlaybackUrlResponse,
+  MediaPlaybackUrlResponseSchema,
   ReviewListItemView,
   ReviewListResponse,
   ReviewListResponseSchema,
-  AttemptReviewDetailView,
-  AttemptReviewDetailViewSchema,
-  GroupView,
-  GroupListResponse,
-  GroupListResponseSchema,
-  MediaPlaybackUrlResponse,
-  MediaPlaybackUrlResponseSchema,
+  STICKERS,
+  STICKER_CODES,
+  StickerCode,
 } from '@upward-english/shared';
+import { ErrorState } from '../../../components/error-state';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { formatBlankPrompt } from '../../../lib/blank-prompt';
 import { POLLING_INTERVAL_MS } from '../../../lib/query-client';
+import styles from './revision.module.css';
+
+const BOGOTA_TIME_FORMATTER = new Intl.DateTimeFormat('es-CO', {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+  timeZone: 'America/Bogota',
+});
+
+const BOGOTA_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('es-CO', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'America/Bogota',
+});
+
+const OVERDUE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
+
+const ACTIVITY_TYPE_BADGE_LABELS: Readonly<Record<string, string>> = {
+  fill_blank: 'Espacios',
+  open_question: 'Pregunta abierta',
+  speaking: 'Speaking',
+  exam: 'Examen',
+  game: 'Minijuego',
+};
+
+function formatScore(score: number): string {
+  return score.toFixed(1).replace('.', ',');
+}
+
+function formatDurationSeconds(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds) || seconds < 0) {
+    return '00:00';
+  }
+  const total = Math.round(seconds);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function formatBogotaDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return BOGOTA_DATE_TIME_FORMATTER.format(date);
+}
+
+function parseBogotaDateTimeLocalToIso(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withSeconds = trimmed.length === 16 ? `${trimmed}:00` : trimmed;
+  const parsed = new Date(`${withSeconds}-05:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    const fallback = new Date(trimmed);
+    return Number.isNaN(fallback.getTime()) ? null : fallback.toISOString();
+  }
+  return parsed.toISOString();
+}
+
+function isPendingOverdue(item: ReviewListItemView): boolean {
+  if (item.attempt.status !== 'pending_review') return false;
+  const deadline = item.attempt.effectiveDueAt || item.assignment.dueAt;
+  if (!deadline) return false;
+  const deadlineMs = new Date(deadline).getTime();
+  if (Number.isNaN(deadlineMs)) return false;
+  return Date.now() - deadlineMs > OVERDUE_THRESHOLD_MS;
+}
+
+function parseScoreValue(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d+(?:[.,]\d+)?$/.test(trimmed)) return null;
+  const normalized = trimmed.replace(',', '.');
+  const parsed = Number.parseFloat(normalized);
+  if (Number.isNaN(parsed) || parsed < 0 || parsed > 5) return null;
+  return Math.round(parsed * 10) / 10;
+}
+
+interface DetailQueryResult {
+  detail: AttemptReviewDetailView;
+  audioUrl: string | null;
+  audioWarning: boolean;
+  audioFormat: 'converted' | 'raw' | null;
+  audioDurationSeconds: number | null;
+}
 
 export function RevisionClient() {
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'pending' | 'graded'>('pending');
+  const pendingTabId = useId();
+  const gradedTabId = useId();
+  const listPanelId = useId();
+  const scoreHintId = useId();
+  const scoreErrorId = useId();
+  const commentErrorId = useId();
 
-  const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
+  const pendingTabRef = useRef<HTMLButtonElement>(null);
+  const gradedTabRef = useRef<HTMLButtonElement>(null);
+  const scoreInputRef = useRef<HTMLInputElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const hydratedAttemptRef = useRef<string | null>(null);
 
-  // Filter states
+  const [activeTab, setActiveTab] = useState<'pending' | 'graded'>('pending');
+  const [mobilePane, setMobilePane] = useState<'list' | 'inspector'>('list');
+  const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
+
+  // Filtros
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
 
-  // Form states in detail view
+  // Estado del formulario de evaluación
   const [scoreInput, setScoreInput] = useState<string>('');
   const [commentInput, setCommentInput] = useState<string>('');
   const [selectedStickers, setSelectedStickers] = useState<StickerCode[]>([]);
   const [allowRetry, setAllowRetry] = useState<boolean>(false);
   const [retryExtendUntil, setRetryExtendUntil] = useState<string>('');
 
-  // Status & notifications
+  // Avisos, errores de campo y región aria-live para stickers
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [scoreFieldError, setScoreFieldError] = useState<string | null>(null);
+  const [commentFieldError, setCommentFieldError] = useState<string | null>(null);
+  const [stickerLimitNotice, setStickerLimitNotice] = useState<string>('');
 
-  // Load groups for filter dropdown
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
         schema: GroupListResponseSchema,
+        signal,
       }),
   });
   const groups: GroupView[] = groupsQuery.data?.items ?? [];
 
-  // Listas con TanStack Query y polling de 30 s (SPEC-07, A2)
   const listParams = new URLSearchParams();
   if (selectedGroupId) listParams.set('groupId', selectedGroupId);
   if (selectedType) listParams.set('type', selectedType);
@@ -67,17 +182,20 @@ export function RevisionClient() {
 
   const pendingQuery = useQuery({
     queryKey: ['reviews', 'queue', listQueryString],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<ReviewListResponse>(`/api/v1/reviews/queue?${listQueryString}`, {
         schema: ReviewListResponseSchema,
+        signal,
       }),
     refetchInterval: POLLING_INTERVAL_MS,
   });
+
   const gradedQuery = useQuery({
     queryKey: ['reviews', 'graded', listQueryString],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<ReviewListResponse>(`/api/v1/reviews/graded?${listQueryString}`, {
         schema: ReviewListResponseSchema,
+        signal,
       }),
     refetchInterval: POLLING_INTERVAL_MS,
   });
@@ -86,47 +204,85 @@ export function RevisionClient() {
   const gradedItems: ReviewListItemView[] = gradedQuery.data?.items ?? [];
   const pendingTotal = pendingQuery.data?.total ?? 0;
   const gradedTotal = gradedQuery.data?.total ?? 0;
-  const isLoadingList = pendingQuery.isFetching || gradedQuery.isFetching;
-  const listError = pendingQuery.error ?? gradedQuery.error;
+
+  const isFetchingLists = pendingQuery.isFetching || gradedQuery.isFetching;
+  const isInitialLoadingList =
+    activeTab === 'pending' ? pendingQuery.isPending : gradedQuery.isPending;
+  const listError = activeTab === 'pending' ? pendingQuery.error : gradedQuery.error;
   const listErrorMessage = listError
     ? listError instanceof ApiError
       ? listError.message
-      : 'Error al cargar las entregas para revisión'
+      : 'Error al cargar las entregas para revisión.'
     : null;
   const shownErrorMessage = errorMessage ?? listErrorMessage;
 
-  // Auto-select first pending if none selected
-  const firstPendingId = pendingItems[0]?.attempt.attemptId ?? null;
-  useEffect(() => {
-    if (!selectedAttemptId && firstPendingId && activeTab === 'pending') {
-      setSelectedAttemptId(firstPendingId);
-    }
-  }, [selectedAttemptId, firstPendingId, activeTab]);
+  const currentList = activeTab === 'pending' ? pendingItems : gradedItems;
 
-  // Load attempt detail via TanStack Query
-  const detailQuery = useQuery({
+  const lastUpdatedAt = Math.max(
+    pendingQuery.dataUpdatedAt ?? 0,
+    gradedQuery.dataUpdatedAt ?? 0,
+  );
+  const pollingHasError = Boolean(pendingQuery.isError || gradedQuery.isError);
+
+  // Autoseleccionar primera entrega disponible cuando cambia la pestaña o la lista
+  useEffect(() => {
+    if (currentList.length === 0) {
+      if (selectedAttemptId !== null) {
+        setSelectedAttemptId(null);
+      }
+      return;
+    }
+    const stillVisible = currentList.some(
+      (item) => item.attempt.attemptId === selectedAttemptId,
+    );
+    if (!stillVisible) {
+      const firstId = currentList[0]?.attempt.attemptId ?? null;
+      setSelectedAttemptId(firstId);
+    }
+  }, [currentList, selectedAttemptId]);
+
+  const detailQuery = useQuery<DetailQueryResult | null>({
     queryKey: ['teacher', 'review-detail', selectedAttemptId],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!selectedAttemptId) return null;
       const data = await apiFetch<AttemptReviewDetailView>(
         `/api/v1/attempts/${selectedAttemptId}/review-detail`,
-        { schema: AttemptReviewDetailViewSchema },
+        { schema: AttemptReviewDetailViewSchema, signal },
       );
-      let audio: string | null = null;
-      let warning = false;
-      if (data.activity.type === ActivityType.speaking && data.mediaAsset && data.mediaAsset.status !== 'deleted') {
+
+      let audioUrl: string | null = null;
+      let audioWarning = false;
+      let audioFormat: 'converted' | 'raw' | null = null;
+      let audioDurationSeconds: number | null = data.mediaAsset?.durationSeconds ?? null;
+
+      if (
+        data.activity.type === ActivityType.speaking &&
+        data.mediaAsset &&
+        data.mediaAsset.status !== 'deleted'
+      ) {
         try {
           const mediaRes = await apiFetch<MediaPlaybackUrlResponse>(
             `/api/v1/media/${data.mediaAsset.id}/url`,
-            { schema: MediaPlaybackUrlResponseSchema },
+            { schema: MediaPlaybackUrlResponseSchema, signal },
           );
-          audio = mediaRes.url;
-          warning = Boolean(mediaRes.compatibilityWarning || mediaRes.format !== 'converted');
+          audioUrl = mediaRes.url;
+          audioFormat = mediaRes.format;
+          audioWarning = Boolean(mediaRes.compatibilityWarning || mediaRes.format !== 'converted');
+          if (mediaRes.durationSeconds !== undefined && mediaRes.durationSeconds !== null) {
+            audioDurationSeconds = mediaRes.durationSeconds;
+          }
         } catch {
-          // ignore audio failure
+          // Mantiene tolerancia si el audio aún no está disponible o el mock de pruebas omite campos opcionales
         }
       }
-      return { detail: data, audioUrl: audio, audioWarning: warning };
+
+      return {
+        detail: data,
+        audioUrl,
+        audioWarning,
+        audioFormat,
+        audioDurationSeconds,
+      };
     },
     enabled: Boolean(selectedAttemptId),
   });
@@ -134,7 +290,9 @@ export function RevisionClient() {
   const detail = detailQuery.data?.detail ?? null;
   const audioUrl = detailQuery.data?.audioUrl ?? null;
   const audioWarning = detailQuery.data?.audioWarning ?? false;
-  const isLoadingAudio = detailQuery.isLoading && detail?.activity.type === ActivityType.speaking;
+  const audioFormat = detailQuery.data?.audioFormat ?? null;
+  const audioDurationSeconds =
+    detailQuery.data?.audioDurationSeconds ?? detail?.mediaAsset?.durationSeconds ?? null;
   const isLoadingDetail = detailQuery.isLoading;
 
   useEffect(() => {
@@ -147,42 +305,116 @@ export function RevisionClient() {
     if (hydratedAttemptRef.current === selectedAttemptId) return;
 
     hydratedAttemptRef.current = selectedAttemptId;
-    setScoreInput(data.attempt.score !== null ? data.attempt.score.toFixed(1).replace('.', ',') : '');
-    setCommentInput(data.review?.comment || '');
-    setSelectedStickers(data.review?.stickers || []);
+    setScoreInput(
+      data.attempt.score !== null ? formatScore(data.attempt.score) : '',
+    );
+    setCommentInput(data.review?.comment ?? '');
+    setSelectedStickers(data.review?.stickers ?? []);
     setAllowRetry(false);
     setRetryExtendUntil('');
     setSuccessMessage(null);
     setErrorMessage(null);
+    setScoreFieldError(null);
+    setCommentFieldError(null);
+    setStickerLimitNotice('');
   }, [selectedAttemptId, detailQuery.data]);
 
+  const handleManualRefresh = () => {
+    void pendingQuery.refetch();
+    void gradedQuery.refetch();
+    if (selectedAttemptId) {
+      void detailQuery.refetch();
+    }
+  };
+
+  const handleTabChange = (nextTab: 'pending' | 'graded') => {
+    setActiveTab(nextTab);
+    setMobilePane('list');
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const next = activeTab === 'pending' ? 'graded' : 'pending';
+      handleTabChange(next);
+      if (next === 'pending') {
+        pendingTabRef.current?.focus();
+      } else {
+        gradedTabRef.current?.focus();
+      }
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      handleTabChange('pending');
+      pendingTabRef.current?.focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      handleTabChange('graded');
+      gradedTabRef.current?.focus();
+    }
+  };
+
+  const handleSelectAttempt = (attemptId: string) => {
+    hydratedAttemptRef.current = null;
+    setSelectedAttemptId(attemptId);
+    setMobilePane('inspector');
+  };
+
+  const handleClearFilters = () => {
+    setSelectedGroupId('');
+    setSelectedType('');
+    setFromDate('');
+    setToDate('');
+  };
+
+  const hasActiveFilters = Boolean(selectedGroupId || selectedType || fromDate || toDate);
+
   const handleDownloadAudio = async () => {
-    if (!detail?.mediaAsset?.id) return;
+    if (!detail?.mediaAsset?.id || detail.mediaAsset.status === 'deleted') return;
     try {
       const downloadRes = await apiFetch<MediaPlaybackUrlResponse>(
         `/api/v1/media/${detail.mediaAsset.id}/download-url`,
         { schema: MediaPlaybackUrlResponseSchema },
       );
-      window.open(downloadRes.url, '_blank');
+      window.open(downloadRes.url, '_blank', 'noopener,noreferrer');
     } catch (err: unknown) {
-      setErrorMessage(err instanceof ApiError ? err.message : 'Error al obtener enlace de descarga de audio');
+      setErrorMessage(
+        err instanceof ApiError
+          ? err.message
+          : 'Error al obtener enlace de descarga de audio.',
+      );
     }
   };
 
   const toggleSticker = (code: StickerCode) => {
     if (selectedStickers.includes(code)) {
       setSelectedStickers(selectedStickers.filter((c) => c !== code));
+      setStickerLimitNotice('');
+      return;
+    }
+    if (selectedStickers.length >= 3) {
+      setStickerLimitNotice('Puedes seleccionar hasta 3 stickers por revisión.');
+      return;
+    }
+    const next = [...selectedStickers, code];
+    setSelectedStickers(next);
+    if (next.length === 3) {
+      setStickerLimitNotice('Has alcanzado el máximo de 3 stickers seleccionados.');
     } else {
-      if (selectedStickers.length >= 3) {
-        setErrorMessage('Solo puedes seleccionar hasta 3 stickers');
-        return;
-      }
-      setSelectedStickers([...selectedStickers, code]);
+      setStickerLimitNotice('');
     }
   };
 
   const reviewMutation = useMutation({
-    mutationFn: (body: unknown) =>
+    mutationFn: (body: {
+      // guardrails-ignore G-C02: payload tipado de calificación manual exclusiva del docente (SPEC-07)
+      score?: number;
+      comment?: string;
+      stickers?: StickerCode[];
+      allowRetry?: boolean;
+      retryExtendUntil?: string | null;
+    }) =>
       apiFetch<AttemptReviewDetailView>(
         `/api/v1/attempts/${selectedAttemptId}/review`,
         {
@@ -192,11 +424,24 @@ export function RevisionClient() {
         },
       ),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['teacher', 'review-detail', selectedAttemptId], {
-        detail: updated,
-        audioUrl,
-        audioWarning,
-      });
+      queryClient.setQueryData<DetailQueryResult | null>(
+        ['teacher', 'review-detail', selectedAttemptId],
+        {
+          detail: updated,
+          audioUrl,
+          audioWarning,
+          audioFormat,
+          audioDurationSeconds,
+        },
+      );
+      setScoreInput(
+        updated.attempt.score !== null ? formatScore(updated.attempt.score) : '',
+      );
+      setAllowRetry(false);
+      setRetryExtendUntil('');
+      setScoreFieldError(null);
+      setCommentFieldError(null);
+      setErrorMessage(null);
       setSuccessMessage('¡Calificación y retroalimentación guardadas exitosamente!');
       void queryClient.invalidateQueries({ queryKey: ['reviews'] });
       void queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -205,9 +450,19 @@ export function RevisionClient() {
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError && err.code === 'SCORE_OUT_OF_RANGE') {
-        setErrorMessage('La calificación debe estar entre 0,0 y 5,0.');
+        const msg = 'La calificación debe estar entre 0,0 y 5,0.';
+        setScoreFieldError(msg);
+        setErrorMessage(msg);
+        scoreInputRef.current?.focus();
+      } else if (err instanceof ApiError && err.code === 'COMMENT_REQUIRED') {
+        const msg = 'El comentario es obligatorio para actividades de Speaking o Pregunta abierta.';
+        setCommentFieldError(msg);
+        setErrorMessage(msg);
+        commentInputRef.current?.focus();
       } else {
-        setErrorMessage(err instanceof ApiError ? err.message : 'Error al guardar la revisión');
+        setErrorMessage(
+          err instanceof ApiError ? err.message : 'Error al guardar la revisión.',
+        );
       }
     },
   });
@@ -220,386 +475,574 @@ export function RevisionClient() {
 
     setErrorMessage(null);
     setSuccessMessage(null);
+    setScoreFieldError(null);
+    setCommentFieldError(null);
 
     const isPendingStatus = detail.attempt.status === 'pending_review';
+    const isManualActivity =
+      detail.activity.type === ActivityType.speaking ||
+      detail.activity.type === ActivityType.open_question;
+    const trimmedComment = commentInput.trim();
+
+    let validatedScore: number | undefined;
+    if (isPendingStatus) {
+      const parsed = parseScoreValue(scoreInput);
+      if (parsed === null) {
+        const msg = 'Ingresa una calificación válida entre 0,0 y 5,0.';
+        setScoreFieldError(msg);
+        setErrorMessage(msg);
+        scoreInputRef.current?.focus();
+        return;
+      }
+      validatedScore = parsed;
+    }
+
+    if (isManualActivity && trimmedComment.length === 0) {
+      const msg =
+        'El comentario de retroalimentación es obligatorio para Speaking y Pregunta abierta.';
+      setCommentFieldError(msg);
+      setErrorMessage(msg);
+      commentInputRef.current?.focus();
+      return;
+    }
+
+    if (!isPendingStatus && !isManualActivity && trimmedComment.length === 0 && selectedStickers.length === 0) {
+      const msg =
+        'Debes ingresar un comentario o elegir al menos un sticker para guardar la retroalimentación.';
+      setCommentFieldError(msg);
+      setErrorMessage(msg);
+      commentInputRef.current?.focus();
+      return;
+    }
+
     const body: {
+      // guardrails-ignore G-C02: calificación manual enviada por docente en POST /attempts/:id/review
       score?: number;
       comment?: string;
       stickers?: StickerCode[];
       allowRetry?: boolean;
       retryExtendUntil?: string | null;
     } = {
-      comment: commentInput.trim(),
+      comment: trimmedComment,
       stickers: selectedStickers,
       allowRetry,
-      retryExtendUntil: retryExtendUntil ? new Date(retryExtendUntil).toISOString() : null,
+      retryExtendUntil: allowRetry
+        ? parseBogotaDateTimeLocalToIso(retryExtendUntil)
+        : null,
     };
 
-    if (isPendingStatus) {
-      const trimmedScore = scoreInput.trim();
-      if (!/^\d+(?:[.,]\d+)?$/.test(trimmedScore)) {
-        setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
-        return;
-      }
-      const normalized = trimmedScore.replace(',', '.');
-      const parsedScore = parseFloat(normalized);
-      if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 5) {
-        setErrorMessage('Ingresa una calificación válida entre 0,0 y 5,0');
-        return;
-      }
-      body.score = Math.round(parsedScore * 10) / 10;
+    if (validatedScore !== undefined) {
+      body.score = validatedScore;
     }
 
     reviewMutation.mutate(body);
   };
 
-  const currentList = activeTab === 'pending' ? pendingItems : gradedItems;
+  const parsedScorePreview = parseScoreValue(scoreInput);
+  const isManualActivity =
+    detail?.activity.type === ActivityType.speaking ||
+    detail?.activity.type === ActivityType.open_question;
+  const maxDurationSec =
+    detail?.items.find((it) => typeof it.maxDurationSeconds === 'number')
+      ?.maxDurationSeconds ?? null;
+  const isRetryExpiredWithoutDate = Boolean(
+    detail &&
+      allowRetry &&
+      !detail.attempt.retryGrantedAt &&
+      new Date(detail.assignment.dueAt).getTime() < Date.now() &&
+      !retryExtendUntil,
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Page Title & Filter Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            Revisión y Calificación Docente
-          </h1>
-          <p className="text-sm text-zinc-600 mt-1">
-            Evalúa las entregas de tus estudiantes, reproduce audios, añade stickers y gestiona nuevos intentos.
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.headerText}>
+          <h1 className={styles.title}>Revisión y Retroalimentación</h1>
+          <p className={styles.subtitle}>
+            Evalúa entregas de Speaking y Pregunta abierta, consulta actividades autocalificadas y habilita nuevos intentos.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl self-start sm:self-center" role="tablist">
+        <div className={styles.headerTools}>
+          <p
+            role="status"
+            className={styles.pollingPill}
+            data-error={pollingHasError ? 'true' : undefined}
+          >
+            <span className={styles.pollingDot} aria-hidden="true" />
+            {pollingHasError ? (
+              <span>No se pudo actualizar la cola</span>
+            ) : lastUpdatedAt ? (
+              <span>
+                Actualizado{' '}
+                <time dateTime={new Date(lastUpdatedAt).toISOString()}>
+                  {BOGOTA_TIME_FORMATTER.format(lastUpdatedAt)}
+                </time>{' '}
+                · cada 30 s
+              </span>
+            ) : (
+              <span>Actualización cada 30 s</span>
+            )}
+          </p>
+
           <button
+            type="button"
+            className={styles.refreshButton}
+            disabled={isFetchingLists}
+            onClick={handleManualRefresh}
+          >
+            <RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span>{isFetchingLists ? 'Actualizando…' : 'Refrescar'}</span>
+          </button>
+        </div>
+      </header>
+
+      <section className={styles.controlsRow} aria-label="Filtros y estado de la cola">
+        <div role="tablist" aria-label="Estado de revisiones" className={styles.tablist}>
+          <button
+            ref={pendingTabRef}
+            id={pendingTabId}
             type="button"
             role="tab"
             aria-selected={activeTab === 'pending'}
-            onClick={() => setActiveTab('pending')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'pending'
-                ? 'bg-white text-zinc-900 shadow-xs'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
+            tabIndex={activeTab === 'pending' ? 0 : -1}
+            onClick={() => handleTabChange('pending')}
+            onKeyDown={handleTabKeyDown}
+            className={styles.tab}
           >
             <span>Pendientes</span>
             <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                pendingTotal > 0 ? 'bg-amber-100 text-amber-900' : 'bg-zinc-200 text-zinc-700'
-              }`}
+              className={styles.tabCount}
+              data-urgent={pendingTotal > 0 ? 'true' : undefined}
             >
               {pendingTotal}
             </span>
           </button>
 
           <button
+            ref={gradedTabRef}
+            id={gradedTabId}
             type="button"
             role="tab"
             aria-selected={activeTab === 'graded'}
-            onClick={() => setActiveTab('graded')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'graded'
-                ? 'bg-white text-zinc-900 shadow-xs'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
+            tabIndex={activeTab === 'graded' ? 0 : -1}
+            onClick={() => handleTabChange('graded')}
+            onKeyDown={handleTabKeyDown}
+            className={styles.tab}
           >
             <span>Calificados</span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-zinc-200 text-zinc-700">
-              {gradedTotal}
-            </span>
+            <span className={styles.tabCount}>{gradedTotal}</span>
           </button>
         </div>
-      </div>
 
-      {/* Filter Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-zinc-50 p-4 rounded-2xl border border-zinc-200 text-xs">
-        <div>
-          <label htmlFor="group-filter" className="block font-semibold text-zinc-700 mb-1">
-            Grupo
-          </label>
-          <select
-            id="group-filter"
-            value={selectedGroupId}
-            onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Todos los grupos</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+        <div className={styles.filterBar}>
+          <div className={styles.filterField}>
+            <label htmlFor="group-filter" className={styles.filterLabel}>
+              Grupo
+            </label>
+            <select
+              id="group-filter"
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value)}
+              className={styles.control}
+            >
+              <option value="">Todos los grupos</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.filterField}>
+            <label htmlFor="type-filter" className={styles.filterLabel}>
+              Tipo de actividad
+            </label>
+            <select
+              id="type-filter"
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className={styles.control}
+            >
+              <option value="">Todos los tipos evaluables</option>
+              <option value="speaking">Expresión oral (Speaking)</option>
+              <option value="open_question">Pregunta abierta</option>
+              <option value="fill_blank">Completar espacios</option>
+              <option value="exam">Examen</option>
+            </select>
+          </div>
+
+          <div className={styles.filterField}>
+            <label htmlFor="from-date" className={styles.filterLabel}>
+              Desde
+            </label>
+            <input
+              id="from-date"
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className={`${styles.control} ${styles.tabular}`}
+            />
+          </div>
+
+          <div className={styles.filterField}>
+            <label htmlFor="to-date" className={styles.filterLabel}>
+              Hasta
+            </label>
+            <input
+              id="to-date"
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className={`${styles.control} ${styles.tabular}`}
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <div className={styles.filterFooter}>
+              <button
+                type="button"
+                className={styles.clearFiltersBtn}
+                onClick={handleClearFilters}
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          )}
         </div>
+      </section>
 
-        <div>
-          <label htmlFor="type-filter" className="block font-semibold text-zinc-700 mb-1">
-            Tipo de Actividad
-          </label>
-          <select
-            id="type-filter"
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Todos los tipos</option>
-            <option value="fill_blank">Espacios en blanco (fill_blank)</option>
-            <option value="open_question">Pregunta abierta (open_question)</option>
-            <option value="speaking">Expresión oral (speaking)</option>
-            <option value="exam">Examen (exam)</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="from-date" className="block font-semibold text-zinc-700 mb-1">
-            Desde
-          </label>
-          <input
-            id="from-date"
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="to-date" className="block font-semibold text-zinc-700 mb-1">
-            Hasta
-          </label>
-          <input
-            id="to-date"
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      {/* Notifications */}
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold flex items-center justify-between">
-          <span>✅ {successMessage}</span>
+        <div role="status" className={styles.bannerSuccess}>
+          <span className={styles.bannerContent}>
+            <Check size={18} strokeWidth={2} aria-hidden="true" />
+            <span>{successMessage}</span>
+          </span>
           <button
             type="button"
+            aria-label="Cerrar aviso de confirmación"
             onClick={() => setSuccessMessage(null)}
-            className="text-xs text-emerald-700 hover:text-emerald-900 font-bold"
+            className={styles.bannerDismiss}
           >
-            ✕
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       )}
 
       {shownErrorMessage && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-semibold flex items-center justify-between">
-          <span>⚠️ {shownErrorMessage}</span>
-          <button
-            type="button"
-            onClick={() => setErrorMessage(null)}
-            className="text-xs text-rose-700 hover:text-rose-900 font-bold"
-          >
-            ✕
-          </button>
+        <div role="alert" className={styles.bannerError}>
+          <span className={styles.bannerContent}>
+            <CircleAlert size={18} strokeWidth={2} aria-hidden="true" />
+            <span>{shownErrorMessage}</span>
+          </span>
+          {errorMessage && (
+            <button
+              type="button"
+              aria-label="Cerrar mensaje de error"
+              onClick={() => setErrorMessage(null)}
+              className={styles.bannerDismiss}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
-      {/* Master-Detail Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Attempt Queue List */}
-        <div className="lg:col-span-5 space-y-3">
-          <div className="flex items-center justify-between text-xs font-bold text-zinc-500 px-1">
-            <span>
-              {activeTab === 'pending' ? 'Entregas por calificar' : 'Historial de calificados'} ({currentList.length})
+      <div className={styles.paneSwitcher} role="group" aria-label="Vista en pantalla compacta">
+        <button
+          type="button"
+          className={styles.paneSwitchBtn}
+          aria-pressed={mobilePane === 'list'}
+          onClick={() => setMobilePane('list')}
+        >
+          <span>Lista de entregas</span>
+          <span className={styles.tabular}>({currentList.length})</span>
+        </button>
+        <button
+          type="button"
+          className={styles.paneSwitchBtn}
+          aria-pressed={mobilePane === 'inspector'}
+          onClick={() => setMobilePane('inspector')}
+        >
+          <span>Inspector</span>
+        </button>
+      </div>
+
+      <div
+        id={listPanelId}
+        role="tabpanel"
+        aria-labelledby={activeTab === 'pending' ? pendingTabId : gradedTabId}
+        className={styles.splitLayout}
+      >
+        <section
+          aria-label="Cola de entregas"
+          className={`${styles.queueColumn} ${mobilePane === 'inspector' ? styles.paneHiddenOnMobile : ''}`}
+        >
+          <div className={styles.queueHeader}>
+            <span className={styles.tabular}>
+              {activeTab === 'pending' ? 'Entregas por calificar' : 'Historial de calificados'} (
+              {currentList.length})
             </span>
-            {isLoadingList && <span className="text-blue-800 font-medium animate-pulse">Actualizando…</span>}
+            {isFetchingLists && <span>Sincronizando…</span>}
           </div>
 
-          {currentList.length === 0 ? (
-            <div className="p-8 text-center rounded-2xl border border-dashed border-zinc-300 bg-white text-zinc-500 space-y-2">
-              <span className="text-3xl">🎉</span>
-              <p className="text-sm font-bold text-zinc-700">
+          {isInitialLoadingList ? (
+            <div className={styles.skeletonStack} role="status">
+              <span className="sr-only">Cargando entregas…</span>
+              <div className={styles.skeleton} />
+              <div className={styles.skeleton} />
+              <div className={styles.skeleton} />
+            </div>
+          ) : listError && currentList.length === 0 ? (
+            <ErrorState
+              variant="teacher"
+              editorial
+              message="No pudimos cargar las entregas de revisión."
+              onRetry={handleManualRefresh}
+            />
+          ) : currentList.length === 0 ? (
+            <div className={styles.emptyCard}>
+              <span className={styles.emptyIcon} aria-hidden="true">
+                <ClipboardCheck size={22} strokeWidth={1.75} />
+              </span>
+              <h2 className={styles.emptyTitle}>
                 {activeTab === 'pending'
-                  ? 'No hay actividades pendientes de revisión.'
-                  : 'No se encontraron entregas calificadas con los filtros aplicados.'}
+                  ? 'No hay entregas pendientes'
+                  : 'No hay entregas calificadas'}
+              </h2>
+              <p className={styles.emptyDesc}>
+                {hasActiveFilters
+                  ? 'No encontramos entregas que coincidan con los filtros seleccionados.'
+                  : activeTab === 'pending'
+                    ? 'Todas las entregas de Speaking y Pregunta abierta están al día.'
+                    : 'Cuando califiques entregas o tus alumnos completen actividades autocalificadas aparecerán aquí.'}
               </p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[700px] overflow-y-auto pr-1">
+            <ul className={styles.queueList}>
               {currentList.map((item) => {
                 const isSelected = selectedAttemptId === item.attempt.attemptId;
-                const formattedScore = item.attempt.score !== null ? item.attempt.score.toFixed(1).replace('.', ',') : null;
+                const overdue = isPendingOverdue(item);
+                const submittedDate =
+                  formatBogotaDateTime(item.attempt.finishedAt ?? item.attempt.gradedAt) ??
+                  'Sin fecha';
+                const formattedScore =
+                  item.attempt.score !== null ? formatScore(item.attempt.score) : null;
+                const typeLabel =
+                  ACTIVITY_TYPE_BADGE_LABELS[item.activity.type] ?? item.activity.type;
 
                 return (
-                  <button
-                    key={item.attempt.attemptId}
-                    type="button"
-                    onClick={() => setSelectedAttemptId(item.attempt.attemptId)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all flex flex-col justify-between gap-2 ${
-                      isSelected
-                        ? 'border-blue-500 bg-blue-50/50 shadow-sm ring-1 ring-blue-500'
-                        : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-xs'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-black text-zinc-900 block">
-                          {item.student.displayName}
-                        </span>
-                        <span className="text-[11px] text-zinc-500 font-medium">
-                          {item.group.name} · {item.student.ageSegment === 'kids' ? 'Kids' : 'Teens'}
-                        </span>
+                  <li key={item.attempt.attemptId}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAttempt(item.attempt.attemptId)}
+                      aria-current={isSelected ? 'true' : undefined}
+                      className={styles.queueCard}
+                    >
+                      <div className={styles.queueCardTop}>
+                        <div>
+                          <span className={styles.queueStudent}>{item.student.displayName}</span>
+                          <div className={styles.queueGroup}>
+                            {item.group.name} ·{' '}
+                            {item.student.ageSegment === 'kids' ? 'Kids' : 'Teens'}
+                          </div>
+                        </div>
+                        <span className={styles.typePill}>{typeLabel}</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-zinc-100 text-zinc-800">
-                        {item.activity.type === 'fill_blank'
-                          ? 'Espacios'
-                          : item.activity.type === 'speaking'
-                            ? 'Speaking'
-                            : item.activity.type === 'exam'
-                              ? 'Examen'
-                              : item.activity.type === 'game'
-                                ? 'Minijuego'
-                                : 'Pregunta'}
-                      </span>
-                    </div>
 
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-100">
-                      <span className="font-semibold text-zinc-700 truncate max-w-[200px]">
+                      <div className={styles.queueTitle} lang="en">
                         {item.activity.title}
-                      </span>
-                      {formattedScore !== null ? (
-                        <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                          {formattedScore} / 5,0
-                        </span>
-                      ) : (
-                        <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md text-[11px]">
-                          Por revisar
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                      </div>
+
+                      <div className={styles.queueCardBottom}>
+                        <span className={styles.tabular}>{submittedDate}</span>
+                        {formattedScore !== null ? (
+                          <span className={styles.statusBadge} data-tone="ok">
+                            {formattedScore} / 5,0
+                          </span>
+                        ) : overdue ? (
+                          <span className={styles.statusBadge} data-tone="danger">
+                            Atrasada
+                          </span>
+                        ) : (
+                          <span className={styles.statusBadge} data-tone="danger">
+                            Por revisar
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
-        </div>
+        </section>
 
-        {/* Right Column: Review & Detail Panel */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-zinc-200 p-6 shadow-xs">
+        <section
+          aria-label="Inspector de evaluación"
+          className={`${styles.inspectorColumn} ${mobilePane === 'list' ? styles.paneHiddenOnMobile : ''}`}
+        >
           {isLoadingDetail ? (
-            <div className="py-20 text-center text-zinc-500 space-y-2">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-sm font-semibold">Cargando contexto de evaluación…</p>
+            <div className={styles.inspectorCard} role="status">
+              <span className="sr-only">Cargando detalle del intento…</span>
+              <div className={styles.skeletonStack}>
+                <div className={styles.skeleton} />
+                <div className={`${styles.skeleton} ${styles.skeletonTall}`} />
+              </div>
             </div>
+          ) : detailQuery.isError && !detail ? (
+            <ErrorState
+              variant="teacher"
+              editorial
+              message="No pudimos cargar el detalle de esta entrega."
+              onRetry={() => void detailQuery.refetch()}
+            />
           ) : !detail ? (
-            <div className="py-20 text-center text-zinc-400 space-y-2">
-              <span className="text-4xl">👉</span>
-              <p className="text-sm font-semibold text-zinc-600">
-                Selecciona una entrega de la lista izquierda para comenzar su revisión.
+            <div className={styles.emptyCard}>
+              <span className={styles.emptyIcon} aria-hidden="true">
+                <ClipboardCheck size={22} strokeWidth={1.75} />
+              </span>
+              <h2 className={styles.emptyTitle}>Selecciona una entrega</h2>
+              <p className={styles.emptyDesc}>
+                Elige un intento de la lista para escuchar o leer la respuesta del estudiante y registrar tu calificación.
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmitReview} className="space-y-6">
-              {/* Header Info */}
-              <div className="border-b border-zinc-200 pb-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                      Intento #{detail.attempt.attemptNumber}
-                    </span>
-                    <h2 className="text-xl font-black text-zinc-900 mt-0.5">
+            <div className={styles.inspectorCard}>
+              <form onSubmit={handleSubmitReview} className={styles.form} noValidate>
+                <div className={styles.inspectorHead}>
+                  <div className={styles.inspectorHeadLeft}>
+                    <div className={styles.attemptEyebrow}>
+                      <span className={styles.tabular}>
+                        Intento #{detail.attempt.attemptNumber}
+                      </span>
+                      <span className={styles.typePill}>
+                        {ACTIVITY_TYPE_BADGE_LABELS[detail.activity.type] ??
+                          detail.activity.type}
+                      </span>
+                    </div>
+                    <h2 className={styles.inspectorTitle} lang="en">
                       {detail.activity.title}
                     </h2>
-                    <p className="text-xs text-zinc-500 mt-1">
-                      Alumno: <strong className="text-zinc-800">{detail.student.displayName}</strong> ({detail.group.name})
+                    <p className={styles.inspectorMeta}>
+                      Estudiante: <strong>{detail.student.displayName}</strong> ·{' '}
+                      {detail.group.name} ·{' '}
+                      {detail.student.ageSegment === 'kids' ? 'Kids' : 'Teens'}
                     </p>
                   </div>
 
                   {detail.attempt.status === 'graded' && detail.attempt.score !== null && (
-                    <div className="text-right">
-                      <span className="text-2xl font-black text-emerald-600">
-                        {detail.attempt.score.toFixed(1).replace('.', ',')}
+                    <div className={styles.scoreSummaryBox}>
+                      <span className={styles.scoreSummaryValue}>
+                        {formatScore(detail.attempt.score)}
                       </span>
-                      <span className="text-xs text-zinc-500 font-bold block">de 5,0</span>
-                      <div className="flex gap-0.5 justify-end mt-0.5" aria-label={`Calificación: ${detail.attempt.stars} estrellas`}>
+                      <span className={styles.scoreSummaryScale}>de 5,0</span>
+                      <div
+                        className={styles.starsRow}
+                        aria-label={`Calificación: ${detail.attempt.stars} estrellas`}
+                      >
                         {[1, 2, 3].map((star) => (
-                          <span key={star} className="text-sm">
-                            {star <= detail.attempt.stars ? '⭐' : '☆'}
-                          </span>
+                          <Star
+                            key={star}
+                            size={16}
+                            strokeWidth={1.75}
+                            fill={star <= detail.attempt.stars ? 'currentColor' : 'none'}
+                            aria-hidden="true"
+                          />
                         ))}
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Audio Playback for speaking */}
-              {detail.activity.type === ActivityType.speaking && (
-                <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                      <span>🎙️</span>
-                      <span>Audio de la entrega</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleDownloadAudio}
-                      className="text-xs font-bold text-blue-700 bg-white border border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
-                    >
-                      <span>📥</span>
-                      <span>Descargar audio</span>
-                    </button>
+                {detail.activity.type === ActivityType.speaking && (
+                  <div className={styles.audioCard}>
+                    <div className={styles.audioHead}>
+                      <div className={styles.audioTitleGroup}>
+                        <span className={styles.audioTitle}>
+                          <Mic size={17} strokeWidth={1.75} aria-hidden="true" />
+                          <span>Grabación de Speaking</span>
+                        </span>
+                        <span className={styles.audioMeta}>
+                          Duración: {formatDurationSeconds(audioDurationSeconds)}
+                          {maxDurationSec ? ` / ${formatDurationSeconds(maxDurationSec)}` : ''} ·{' '}
+                          {audioFormat === 'raw' ? 'Audio original' : 'MP4/AAC'}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadAudio}
+                        disabled={
+                          !detail.mediaAsset || detail.mediaAsset.status === 'deleted'
+                        }
+                        className={styles.downloadButton}
+                      >
+                        <Download size={16} strokeWidth={1.75} aria-hidden="true" />
+                        <span>Descargar audio</span>
+                      </button>
+                    </div>
+
+                    {detail.mediaAsset?.status === 'deleted' ? (
+                      <div className={styles.audioDeletedNote}>
+                        El audio cumplió los 30 días de retención tras la calificación y fue eliminado automáticamente de la nube. La calificación y el comentario se conservan.
+                      </div>
+                    ) : audioUrl ? (
+                      <>
+                        <audio controls className={styles.audioElement} src={audioUrl}>
+                          Tu navegador no soporta el reproductor de audio. Usa el botón Descargar audio.
+                        </audio>
+                        {audioWarning && (
+                          <div className={styles.warningCallout} role="status">
+                            <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" />
+                            <span>
+                              El audio original no pudo convertirse a MP4 estándar. Si tu navegador no lo reproduce directamente, usa el botón Descargar audio.
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className={styles.audioDeletedNote}>
+                        Audio no disponible para reproducción en línea. Puedes usar Descargar audio si el archivo sigue vigente.
+                      </p>
+                    )}
+
+                    <p className={styles.retentionNote}>
+                      Retención en la nube: disponible hasta 30 días después de calificar
+                      {detail.mediaAsset?.retentionUntil
+                        ? ` (expira el ${formatBogotaDateTime(detail.mediaAsset.retentionUntil) ?? detail.mediaAsset.retentionUntil})`
+                        : ''}
+                      . La nota y el comentario se conservan tras la eliminación del archivo.
+                    </p>
                   </div>
+                )}
 
-                  {detail.mediaAsset?.status === 'deleted' ? (
-                    <div className="p-3 bg-zinc-100 rounded-xl text-xs text-zinc-600">
-                      ℹ️ El audio cumplió los 30 días de retención y fue eliminado automáticamente de la nube.
-                    </div>
-                  ) : isLoadingAudio ? (
-                    <div className="text-xs text-zinc-500 animate-pulse">Obteniendo enlace seguro de audio…</div>
-                  ) : audioUrl ? (
-                    <div className="space-y-2">
-                      <audio controls className="w-full h-10 rounded-lg" src={audioUrl}>
-                        Tu navegador no soporta el reproductor de audio. Usa el botón Descargar audio.
-                      </audio>
-                      {audioWarning && (
-                        <p className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                          ⚠️ El audio original no pudo convertirse a MP4 estándar. Si tu navegador no lo reproduce directamente, usa el botón Descargar audio.
-                        </p>
-                      )}
-                    </div>
+                <div className={styles.itemsSection}>
+                  <h3 className={styles.sectionHeading}>
+                    Respuestas del estudiante y guía docente
+                  </h3>
+
+                  {detail.items.length === 0 ? (
+                    <p className={styles.scoreHint}>
+                      Sin ítems adicionales para mostrar en este intento.
+                    </p>
                   ) : (
-                    <p className="text-xs text-zinc-500">Audio no disponible para reproducción en línea.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Submission answers & rubric */}
-              <div className="space-y-4">
-                <h3 className="text-xs font-extrabold uppercase text-zinc-500 tracking-wider">
-                  Respuestas y Contenido de la Actividad
-                </h3>
-
-                {detail.items.length === 0 ? (
-                  <p className="text-xs text-zinc-400">Sin detalles adicionales para mostrar.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {detail.items.map((it, idx) => {
-                      const isSpeaking = detail.activity.type === ActivityType.speaking;
+                    detail.items.map((it, idx) => {
+                      const isSpeakingItem = detail.activity.type === ActivityType.speaking;
                       const isMultiItem = detail.items.length > 1;
                       const rawAnswer = isMultiItem
                         ? detail.answers[it.id]
                         : (detail.answers[it.id] ??
-                           detail.answers['text'] ??
-                           detail.answers[detail.activity.id]);
+                          detail.answers['text'] ??
+                          detail.answers[detail.activity.id]);
+
                       let displayAnswer: string | null = null;
                       if (rawAnswer !== undefined && rawAnswer !== null) {
-                        if (
-                          typeof rawAnswer === 'object' &&
-                          rawAnswer !== null &&
-                          'text' in rawAnswer
-                        ) {
+                        if (typeof rawAnswer === 'object' && 'text' in rawAnswer) {
                           const textVal = Reflect.get(rawAnswer, 'text');
-                          displayAnswer = textVal !== null && textVal !== undefined ? String(textVal) : '';
+                          displayAnswer =
+                            textVal !== null && textVal !== undefined ? String(textVal) : '';
                         } else if (typeof rawAnswer === 'object') {
                           displayAnswer = JSON.stringify(rawAnswer, null, 2);
                         } else {
@@ -607,194 +1050,318 @@ export function RevisionClient() {
                         }
                       }
 
-                      return (
-                        <div
-                          key={it.id || idx}
-                          className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2 text-xs"
-                        >
-                          {it.prompt && <p className="font-bold text-zinc-800">{formatBlankPrompt(it.prompt)}</p>}
-                          {it.question && <p className="font-bold text-zinc-800">{it.question}</p>}
+                      const promptText = it.prompt
+                        ? formatBlankPrompt(it.prompt)
+                        : it.question ?? null;
 
-                          <div className="pt-1">
-                            <span className="font-semibold text-zinc-500 block">
-                              {isSpeaking ? 'Entrega de Speaking:' : 'Respuesta del alumno:'}
+                      return (
+                        <div key={it.id || idx} className={styles.itemCard}>
+                          {promptText && (
+                            <p className={styles.itemPrompt} lang="en">
+                              {promptText}
+                            </p>
+                          )}
+
+                          <div>
+                            <span className={styles.answerBlockLabel}>
+                              {isSpeakingItem ? 'Entrega de Speaking:' : 'Respuesta del alumno:'}
                             </span>
-                            <div className="mt-0.5 p-2 bg-white rounded-lg border border-zinc-200 font-mono text-zinc-900">
-                              {isSpeaking ? (
-                                <span className="font-sans text-blue-900 font-semibold">
-                                  🎙️ Grabación de voz entregada (reproduce o descarga el audio arriba).
-                                </span>
-                              ) : displayAnswer !== null && displayAnswer.trim().length > 0 ? (
-                                displayAnswer
-                              ) : (
-                                '(Sin respuesta registrada)'
-                              )}
+                            <div
+                              className={styles.answerBox}
+                              lang={
+                                !isSpeakingItem &&
+                                displayAnswer !== null &&
+                                displayAnswer.trim().length > 0
+                                  ? 'en'
+                                  : undefined
+                              }
+                            >
+                              {isSpeakingItem
+                                ? 'Grabación de voz entregada (reproduce o descarga el audio en el reproductor superior).'
+                                : displayAnswer !== null && displayAnswer.trim().length > 0
+                                  ? displayAnswer
+                                  : '(Sin respuesta registrada)'}
                             </div>
                           </div>
 
                           {it.rubricText && (
-                            <p className="text-[11px] text-zinc-600 bg-amber-50/70 p-2 rounded-lg border border-amber-200/60">
+                            <div className={styles.rubricBox}>
                               <strong>Rúbrica / Criterio:</strong> {it.rubricText}
-                            </p>
+                            </div>
                           )}
+
                           {it.correctAnswer != null && (
-                            <p className="text-[11px] text-emerald-800 bg-emerald-50/70 p-2 rounded-lg border border-emerald-200/60">
+                            <div className={styles.modelAnswerBox}>
                               <strong>Respuesta modelo / correcta:</strong>{' '}
-                              {typeof it.correctAnswer === 'object'
-                                ? JSON.stringify(it.correctAnswer)
-                                : String(it.correctAnswer)}
-                            </p>
+                              <span lang="en">
+                                {typeof it.correctAnswer === 'object'
+                                  ? JSON.stringify(it.correctAnswer)
+                                  : String(it.correctAnswer)}
+                              </span>
+                            </div>
                           )}
                         </div>
                       );
+                    })
+                  )}
+                </div>
+
+                {detail.attemptHistory.length > 1 && (
+                  <details className={styles.historyDetails}>
+                    <summary className={styles.tabular}>
+                      Historial de intentos ({detail.attemptHistory.length})
+                    </summary>
+                    <ul className={styles.historyList}>
+                      {detail.attemptHistory.map((h) => (
+                        <li key={h.attemptId} className={styles.tabular}>
+                          Intento #{h.attemptNumber}:{' '}
+                          {h.score !== null ? `${formatScore(h.score)} / 5,0` : 'Por revisar'}
+                          {h.gradedAt
+                            ? ` · calificado el ${formatBogotaDateTime(h.gradedAt) ?? h.gradedAt}`
+                            : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="score-input" className={styles.fieldLabel}>
+                    Calificación (0,0 – 5,0)
+                  </label>
+
+                  {detail.attempt.status === 'pending_review' ? (
+                    <>
+                      <div className={styles.scoreRow}>
+                        <input
+                          ref={scoreInputRef}
+                          id="score-input"
+                          type="text"
+                          inputMode="decimal"
+                          value={scoreInput}
+                          onChange={(e) => {
+                            setScoreInput(e.target.value);
+                            if (scoreFieldError) setScoreFieldError(null);
+                          }}
+                          placeholder="Ej. 4,5"
+                          required
+                          aria-invalid={scoreFieldError ? 'true' : 'false'}
+                          aria-describedby={
+                            scoreFieldError ? `${scoreHintId} ${scoreErrorId}` : scoreHintId
+                          }
+                          className={styles.scoreInput}
+                        />
+                        <span className={styles.scoreHint}>sobre 5,0</span>
+                        {parsedScorePreview !== null && (
+                          <span
+                            className={styles.statusBadge}
+                            data-tone={parsedScorePreview >= 3 ? 'ok' : 'warm'}
+                          >
+                            {parsedScorePreview >= 3
+                              ? 'Aprobado (≥ 3,0)'
+                              : 'Por debajo del umbral (< 3,0)'}
+                          </span>
+                        )}
+                      </div>
+                      <p id={scoreHintId} className={styles.scoreHint}>
+                        Acepta un decimal (ej. 4,5). Umbral de aprobación: 3,0.
+                      </p>
+                      {scoreFieldError && (
+                        <p id={scoreErrorId} className={styles.fieldError}>
+                          <CircleAlert size={15} aria-hidden="true" />
+                          <span>{scoreFieldError}</span>
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className={styles.immutableScoreBox}>
+                      <span className={styles.immutableScoreBadge}>
+                        <Lock size={15} strokeWidth={1.75} aria-hidden="true" />
+                        <span>🔒 Calificación inmutable:</span>
+                        <span>
+                          {detail.attempt.score !== null
+                            ? formatScore(detail.attempt.score)
+                            : '—'}{' '}
+                          / 5,0
+                        </span>
+                      </span>
+                      <p className={styles.immutableScoreNote}>
+                        Calificación bloqueada tras la primera revisión. Puedes actualizar el comentario y los stickers en cualquier momento.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.fieldGroup}>
+                  <div className={styles.fieldLabelRow}>
+                    <label htmlFor="comment-input" className={styles.fieldLabel}>
+                      <span>Comentario de retroalimentación</span>
+                      <span
+                        className={styles.requirementBadge}
+                        data-required={isManualActivity ? 'true' : undefined}
+                      >
+                        {isManualActivity ? 'Obligatorio' : 'Opcional'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <textarea
+                    ref={commentInputRef}
+                    id="comment-input"
+                    rows={4}
+                    maxLength={2000}
+                    value={commentInput}
+                    onChange={(e) => {
+                      setCommentInput(e.target.value);
+                      if (commentFieldError) setCommentFieldError(null);
+                    }}
+                    aria-invalid={commentFieldError ? 'true' : 'false'}
+                    aria-describedby={commentFieldError ? commentErrorId : undefined}
+                    placeholder="Escribe palabras de aliento o correcciones específicas para el estudiante..."
+                    className={`${styles.control} ${styles.textarea}`}
+                  />
+
+                  <div className={styles.counterRow}>
+                    {commentFieldError ? (
+                      <p id={commentErrorId} className={styles.fieldError}>
+                        <CircleAlert size={15} aria-hidden="true" />
+                        <span>{commentFieldError}</span>
+                      </p>
+                    ) : (
+                      <span />
+                    )}
+                    <span className={styles.tabular}>
+                      {commentInput.length} / 2000 caracteres
+                    </span>
+                  </div>
+                </div>
+
+                <fieldset className={styles.stickerFieldset}>
+                  <div className={styles.stickerLegendRow}>
+                    <legend className={styles.stickerLegend}>
+                      Stickers de celebración y ánimo (hasta 3)
+                    </legend>
+                    <span className={styles.stickerCounter}>
+                      Seleccionados: {selectedStickers.length} / 3
+                    </span>
+                  </div>
+
+                  <div className={styles.stickerGrid}>
+                    {STICKER_CODES.map((code) => {
+                      const st = STICKERS[code];
+                      const isSelected = selectedStickers.includes(code);
+                      const isDimmed = !isSelected && selectedStickers.length >= 3;
+
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          aria-pressed={isSelected}
+                          data-dimmed={isDimmed ? 'true' : undefined}
+                          onClick={() => toggleSticker(code)}
+                          className={styles.stickerBtn}
+                        >
+                          <span className={styles.stickerEmoji} aria-hidden="true">
+                            {st.emoji}
+                          </span>
+                          <span className={styles.stickerLabel}>{st.label}</span>
+                          {isSelected && (
+                            <Check
+                              size={16}
+                              strokeWidth={2.25}
+                              className={styles.stickerCheck}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      );
                     })}
                   </div>
-                )}
-              </div>
 
-              {/* Score Input (only editable in pending_review) */}
-              <div className="space-y-2 pt-2 border-t border-zinc-100">
-                <label htmlFor="score-input" className="block text-xs font-bold text-zinc-700">
-                  Calificación (0,0 – 5,0)
-                </label>
-                {detail.attempt.status === 'pending_review' ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="score-input"
-                      type="text"
-                      inputMode="decimal"
-                      value={scoreInput}
-                      onChange={(e) => setScoreInput(e.target.value)}
-                      placeholder="Ej. 4,5"
-                      required
-                      className="w-32 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-xs text-zinc-500">sobre 5,0</span>
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-800 text-xs font-black">
-                    <span>🔒 Calificación inmutable:</span>
-                    <span>{detail.attempt.score !== null ? detail.attempt.score.toFixed(1).replace('.', ',') : '—'} / 5,0</span>
-                  </div>
-                )}
-              </div>
+                  <p role="status" aria-live="polite" className={styles.stickerLive}>
+                    {stickerLimitNotice}
+                  </p>
+                </fieldset>
 
-              {/* Feedback Comment */}
-              <div className="space-y-2">
-                <label htmlFor="comment-input" className="block text-xs font-bold text-zinc-700">
-                  Comentario de Retroalimentación
-                  {(detail.activity.type === ActivityType.open_question || detail.activity.type === ActivityType.speaking) && (
-                    <span className="text-rose-500 ml-1">* (Obligatorio)</span>
-                  )}
-                </label>
-                <textarea
-                  id="comment-input"
-                  rows={3}
-                  maxLength={2000}
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  placeholder="Escribe palabras de aliento o correcciones específicas para el estudiante..."
-                  className="w-full rounded-xl border border-zinc-300 bg-white p-3 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-[11px] text-zinc-400 block text-right">
-                  {commentInput.length} / 2000 caracteres
-                </span>
-              </div>
+                {detail.activity.type !== ActivityType.game && (
+                  <div className={styles.retryCard}>
+                    <div className={styles.retryHeader}>
+                      <div className={styles.retryText}>
+                        <span className={styles.retryTitle}>Habilitar nuevo intento</span>
+                        <span className={styles.retrySubtitle}>
+                          Autoriza un intento adicional (#{detail.attempt.attemptNumber + 1}) para este estudiante en esta asignación.
+                        </span>
+                      </div>
 
-              {/* Stickers Selector */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-zinc-700">
-                  Stickers de Celebración y Ánimo (hasta 3)
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {STICKER_CODES.map((code) => {
-                    const st = STICKERS[code];
-                    const isSelected = selectedStickers.includes(code);
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => toggleSticker(code)}
-                        className={`p-2.5 rounded-xl border text-left text-xs transition-all flex items-center gap-2 ${
-                          isSelected
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-950 font-black shadow-xs ring-1 ring-indigo-500'
-                            : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
-                        }`}
-                      >
-                        <span className="text-lg">{st.emoji}</span>
-                        <span className="leading-tight text-[11px]">{st.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      {detail.attempt.retryGrantedAt ? (
+                        <span className={styles.retryGrantedPill}>
+                          <Check size={15} strokeWidth={2.25} aria-hidden="true" />
+                          <span>
+                            Nuevo intento habilitado
+                            {detail.attempt.effectiveDueAt
+                              ? ` · límite efectivo: ${formatBogotaDateTime(detail.attempt.effectiveDueAt) ?? detail.attempt.effectiveDueAt}`
+                              : ''}
+                          </span>
+                        </span>
+                      ) : (
+                        <label htmlFor="allow-retry-toggle" className={styles.switchWrap}>
+                          <input
+                            id="allow-retry-toggle"
+                            name="allowRetry"
+                            role="switch"
+                            aria-label="Permitir nuevo intento al estudiante"
+                            type="checkbox"
+                            checked={allowRetry}
+                            onChange={(e) => setAllowRetry(e.target.checked)}
+                            className={styles.switchInput}
+                          />
+                          <span className={styles.switchTrack} aria-hidden="true" />
+                        </label>
+                      )}
+                    </div>
 
-              {/* Retry Controls */}
-              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-zinc-900 block">Habilitar Nuevo Intento</span>
-                    <span className="text-[11px] text-zinc-500">
-                      Permite que el alumno tome un intento adicional ({detail.attempt.attemptNumber + 1})
-                    </span>
-                  </div>
+                    {allowRetry && !detail.attempt.retryGrantedAt && (
+                      <div className={styles.retryExtendBlock}>
+                        <label htmlFor="extend-date" className={styles.filterLabel}>
+                          Extender fecha límite hasta (hora Colombia, opcional)
+                        </label>
+                        <input
+                          id="extend-date"
+                          type="datetime-local"
+                          value={retryExtendUntil}
+                          onChange={(e) => setRetryExtendUntil(e.target.value)}
+                          className={`${styles.control} ${styles.dateInput} ${styles.tabular}`}
+                        />
 
-                  {detail.attempt.retryGrantedAt ? (
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-900">
-                      ✓ Reintento ya concedido
-                    </span>
-                  ) : (
-                    <label htmlFor="allow-retry-toggle" className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        id="allow-retry-toggle"
-                        name="allowRetry"
-                        aria-label="Permitir nuevo intento al estudiante"
-                        type="checkbox"
-                        checked={allowRetry}
-                        onChange={(e) => setAllowRetry(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-                    </label>
-                  )}
-                </div>
-
-                {allowRetry && !detail.attempt.retryGrantedAt && (
-                  <div className="space-y-2 pt-2 border-t border-zinc-200">
-                    <label htmlFor="extend-date" className="block text-xs font-semibold text-zinc-700">
-                      Extender fecha límite hasta (opcional)
-                    </label>
-                    <input
-                      id="extend-date"
-                      type="datetime-local"
-                      value={retryExtendUntil}
-                      onChange={(e) => setRetryExtendUntil(e.target.value)}
-                      className="w-full sm:w-auto rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-
-                    {/* Deadline & Warning (RF-8, Decision 61) */}
-                    {new Date(detail.assignment.dueAt).getTime() < Date.now() && !retryExtendUntil && (
-                      <p className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                        ⚠️ La actividad ya cerró. Sin una nueva fecha, el alumno no podrá empezar el intento.
-                      </p>
+                        {isRetryExpiredWithoutDate && (
+                          <div className={styles.warningCallout} role="status">
+                            <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" />
+                            <span>
+                              La asignación ya cerró. Si no defines una nueva fecha límite, el estudiante no podrá iniciar este nuevo intento.
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
 
-              {/* Action Button */}
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  {isSubmitting ? 'Guardando…' : 'Guardar Revisión y Retroalimentación'}
-                </button>
-              </div>
-            </form>
+                <div className={styles.submitFooter}>
+                  <p className={styles.privacyNote}>
+                    Al guardar la primera calificación, enviaremos un correo al alumno avisando que su revisión está lista (sin incluir la nota ni el texto del comentario).
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={styles.submitButton}
+                  >
+                    {isSubmitting ? 'Guardando…' : 'Guardar revisión y retroalimentación'}
+                  </button>
+                </div>
+              </form>
+            </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

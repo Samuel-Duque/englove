@@ -213,10 +213,24 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
     await expect(page.locator('h1:has-text("Solicitud")')).toBeVisible();
 
     // 3.2 Profesora entra a /alumnos?tab=requests y aprueba
+    const teacherToken = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
     await context.addCookies([
-      { name: 'upward_english_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'token-teacher', domain: 'localhost', path: '/' },
+      {
+        name: `${process.env.COOKIE_PREFIX ?? 'englove_local_'}access_token`,
+        value: teacherToken,
+        domain: 'localhost',
+        path: '/',
+      },
+      { name: 'upward_english_access_token', value: teacherToken, domain: 'localhost', path: '/' },
     ]);
+    await page.route('**/api/v1/auth/session', (route) =>
+      route.fulfill({
+        json: {
+          user: { id: 'tch-1', email: 'teacher@upwardenglish.local', name: 'Profesora Clara', role: 'teacher' },
+          organizationId: 'org-test',
+        },
+      }),
+    );
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
@@ -282,6 +296,10 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
         },
       });
     });
+
+    const approval = page.getByRole('dialog', { name: /Aprobar alumno/ });
+    await approval.getByLabel('Nivel MCER').selectOption('A1');
+    await approval.getByLabel('Grupo inicial').selectOption({ index: 1 });
 
     // Confirmar aprobación
     await page.click('div[role="dialog"] button:has-text("Confirmar aprobación")');

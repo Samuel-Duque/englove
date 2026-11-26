@@ -11,6 +11,8 @@ import {
 } from '@upward-english/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { soundManager } from '../../../lib/sound';
+import kidsStyles from './kids-game.module.css';
+import teensStyles from './teens-game.module.css';
 
 export function OrderWordsGame({
   config,
@@ -142,8 +144,9 @@ export function OrderWordsGame({
       element: el,
       onDragEnter: () => setIsOverLine(true),
       onDragLeave: () => setIsOverLine(false),
-      onDrop: ({ source }) => {
+      onDrop: ({ source, location, self }) => {
         setIsOverLine(false);
+        if (location.current.dropTargets[0]?.element !== self.element) return;
         const data = source.data;
         if (data?.type === 'bank-token' && typeof data.tokenId === 'string') {
           handleAddToken(data.tokenId);
@@ -175,13 +178,17 @@ export function OrderWordsGame({
   }, [tokenIds]);
 
   const isKids = theme === 'kids';
+  const isTeens = theme === 'teens';
+  const styles = isTeens ? teensStyles : kidsStyles;
 
   return (
     <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
+      className={`${styles.board} w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
         isKids
           ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+          : isTeens
+            ? ''
+            : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
       }`}
     >
       {previewMode && (
@@ -196,7 +203,7 @@ export function OrderWordsGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
+        <div className={`${styles.legacyInstructions} mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs`}>
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
             {config.instructions}
           </p>
@@ -205,37 +212,42 @@ export function OrderWordsGame({
 
       {/* Sentence Construction Line */}
       <div className="space-y-2 mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h4
-            className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+            className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
+              isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
             }`}
           >
             Línea de construcción de oración:
           </h4>
-          <span className="text-xs font-semibold text-zinc-500">
+          <span className={`${styles.meta} text-xs font-semibold ${isTeens ? '' : 'text-zinc-500'}`}>
             {tokenIds.length} de {originalTokens.length} palabras
           </span>
         </div>
 
         <div
           ref={sentenceLineRef}
-          className={`min-h-24 p-4 rounded-2xl border-2 border-dashed flex flex-wrap items-center gap-2.5 transition-colors ${
-            isOverLine
-              ? 'border-indigo-500 ring-4 ring-indigo-200 bg-indigo-50/60 shadow-md'
-              : tokenIds.length === 0
-                ? isKids
-                  ? 'border-amber-300 bg-amber-50/40 justify-center'
-                  : 'border-zinc-700 bg-zinc-800/40 justify-center'
-                : isKids
-                  ? 'border-amber-400 bg-white shadow-inner'
-                  : 'border-zinc-700 bg-zinc-800 shadow-inner'
+          data-target={isOverLine}
+          className={`${styles.zone} min-h-24 p-4 rounded-2xl border-2 border-dashed flex flex-wrap items-center gap-2.5 transition-colors ${
+            isTeens
+              ? tokenIds.length === 0
+                ? 'justify-center'
+                : ''
+              : isOverLine
+                ? 'border-indigo-500 ring-4 ring-indigo-200 bg-indigo-50/60 shadow-md'
+                : tokenIds.length === 0
+                  ? isKids
+                    ? 'border-amber-300 bg-amber-50/40 justify-center'
+                    : 'border-zinc-700 bg-zinc-800/40 justify-center'
+                  : isKids
+                    ? 'border-amber-400 bg-white shadow-inner'
+                    : 'border-zinc-700 bg-zinc-800 shadow-inner'
           }`}
         >
           {tokenIds.length === 0 ? (
             <p
               className={`text-xs sm:text-sm font-semibold text-center select-none ${
-                isKids ? 'text-amber-950 font-medium' : 'text-zinc-400'
+                isKids ? 'text-amber-950 font-medium' : isTeens ? 'text-[#5E3E2C] font-medium' : 'text-zinc-400'
               }`}
             >
               Arrastra o toca palabras del banco hacia aquí para construir la frase.
@@ -253,6 +265,7 @@ export function OrderWordsGame({
                   text={token.text}
                   totalCount={tokenIds.length}
                   isKids={isKids}
+                  isTeens={isTeens}
                   onMoveToken={handleMoveToken}
                   onInsertBankToken={handleInsertBankToken}
                   onRemoveToken={handleRemoveToken}
@@ -266,8 +279,8 @@ export function OrderWordsGame({
       {/* Token Bank */}
       <div className="space-y-3 mb-8">
         <h4
-          className={`text-xs font-extrabold uppercase tracking-wider ${
-            isKids ? 'text-amber-800' : 'text-zinc-400'
+          className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
+            isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
           }`}
         >
           Banco de palabras:
@@ -275,14 +288,17 @@ export function OrderWordsGame({
 
         <div
           ref={bankRef}
-          className={`flex flex-wrap gap-2.5 p-4 rounded-2xl border min-h-16 items-center transition-colors ${
-            isOverBank
-              ? 'border-rose-400 ring-4 ring-rose-200 bg-rose-50/60'
-              : 'bg-white/70 border-amber-200/80'
+          data-target={isOverBank}
+          className={`${styles.zone} flex flex-wrap gap-2.5 p-4 rounded-2xl border min-h-16 items-center transition-colors ${
+            isTeens
+              ? ''
+              : isOverBank
+                ? 'border-rose-400 ring-4 ring-rose-200 bg-rose-50/60'
+                : 'bg-white/70 border-amber-200/80'
           }`}
         >
           {bankTokens.length === 0 ? (
-            <p className="text-xs font-medium text-zinc-400 italic">
+            <p className={`${styles.meta} text-xs font-medium ${isTeens ? '' : 'text-zinc-400'} italic`}>
               Todas las palabras han sido colocadas en la oración.
             </p>
           ) : (
@@ -292,6 +308,7 @@ export function OrderWordsGame({
                 id={token.id}
                 text={token.text}
                 isKids={isKids}
+                isTeens={isTeens}
                 onAddToken={handleAddToken}
               />
             ))
@@ -300,15 +317,20 @@ export function OrderWordsGame({
       </div>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-amber-200/60 flex items-center justify-between">
+    <div className={`${styles.footer} pt-4 ${isTeens ? '' : 'border-t border-amber-200/60'} flex items-center justify-between`}>
         <button
           type="button"
           onClick={() => {
             setTokenIds([]);
+            setLiveStatus('Orden reiniciado');
             onEvent?.({ itemId: 'tokenIds', answer: [] });
           }}
           disabled={tokenIds.length === 0}
-          className="text-xs font-bold text-zinc-500 hover:text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          className={
+            isTeens
+              ? `${styles.secondaryBtn} text-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer`
+              : 'text-xs font-bold text-zinc-500 hover:text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+          }
         >
           Reiniciar orden
         </button>
@@ -316,13 +338,15 @@ export function OrderWordsGame({
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
+          className={`${styles.finish} min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
             isKids
               ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+              : isTeens
+                ? ''
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
-          Comprobar y finalizar ✨
+          {isTeens ? 'Comprobar y finalizar' : 'Comprobar y finalizar ✨'}
         </button>
       </div>
     </div>
@@ -333,13 +357,16 @@ function DraggableBankToken({
   id,
   text,
   isKids,
+  isTeens,
   onAddToken,
 }: {
   id: string;
   text: string;
   isKids: boolean;
+  isTeens: boolean;
   onAddToken: (id: string) => void;
 }) {
+  const styles = isTeens ? teensStyles : kidsStyles;
   const elRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -357,13 +384,15 @@ function DraggableBankToken({
       ref={elRef}
       type="button"
       onClick={() => onAddToken(id)}
-      className={`min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all active:scale-95 touch-manipulation cursor-grab ${
+      className={`${styles.piece} ${styles.word} min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all active:scale-95 touch-manipulation cursor-grab ${
         isKids
           ? 'border-amber-300 bg-amber-200/90 text-amber-950 hover:bg-amber-300 hover:border-amber-400'
-          : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+          : isTeens
+            ? ''
+            : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
       }`}
     >
-      + {text}
+      <span aria-hidden="true">+ </span><span lang="en">{text}</span>
     </button>
   );
 }
@@ -374,6 +403,7 @@ function DraggablePlacedToken({
   text,
   totalCount,
   isKids,
+  isTeens,
   onMoveToken,
   onInsertBankToken,
   onRemoveToken,
@@ -383,10 +413,12 @@ function DraggablePlacedToken({
   text: string;
   totalCount: number;
   isKids: boolean;
+  isTeens: boolean;
   onMoveToken: (fromIndex: number, toIndex: number) => void;
   onInsertBankToken: (tokenId: string, atIndex: number) => void;
   onRemoveToken: (tokenId: string) => void;
 }) {
+  const styles = isTeens ? teensStyles : kidsStyles;
   const elRef = useRef<HTMLDivElement>(null);
   const [isOver, setIsOver] = useState(false);
 
@@ -423,26 +455,31 @@ function DraggablePlacedToken({
   return (
     <div
       ref={elRef}
-      className={`group inline-flex items-center gap-1 rounded-xl border px-3 py-2 shadow-xs transition-all cursor-grab active:scale-95 ${
-        isOver
+      data-state="selected"
+      data-target={isOver}
+      className={`${styles.piece} group inline-flex items-center gap-1 rounded-xl border ${isTeens ? 'px-3 py-1.5' : 'px-3 py-2'} shadow-xs transition-all cursor-grab active:scale-95 ${
+        isOver && !isTeens
           ? 'ring-2 ring-indigo-500 scale-105'
           : ''
       } ${
         isKids
           ? 'bg-amber-100 border-amber-300'
-          : 'bg-zinc-700 border-zinc-600'
+          : isTeens
+            ? ''
+            : 'bg-zinc-700 border-zinc-600'
       }`}
     >
       <span
-        className={`text-xs font-mono font-bold mr-1 select-none ${
-          isKids ? 'text-amber-700' : 'text-zinc-300'
+        className={`text-xs font-mono font-bold mr-1 select-none tabular-nums ${
+          isKids ? 'text-amber-700' : isTeens ? 'text-[#5E3E2C]' : 'text-zinc-300'
         }`}
       >
         #{index + 1}
       </span>
       <span
+        lang="en"
         className={`text-sm sm:text-base font-extrabold ${
-          isKids ? 'text-amber-950' : 'text-zinc-100'
+          isKids ? 'text-amber-950' : isTeens ? 'text-[#2B150A]' : 'text-zinc-100'
         }`}
       >
         {text}
@@ -456,7 +493,11 @@ function DraggablePlacedToken({
             e.stopPropagation();
             onMoveToken(index, index - 1);
           }}
-          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className={
+            isTeens
+              ? `${styles.iconBtn} text-sm font-bold text-[#5E3E2C] hover:text-[#2B150A] cursor-pointer`
+              : 'min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500'
+          }
           title="Mover a la izquierda"
           aria-label={`Mover ${text} a la izquierda`}
         >
@@ -472,7 +513,11 @@ function DraggablePlacedToken({
             e.stopPropagation();
             onMoveToken(index, index + 1);
           }}
-          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className={
+            isTeens
+              ? `${styles.iconBtn} text-sm font-bold text-[#5E3E2C] hover:text-[#2B150A] cursor-pointer`
+              : 'min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-amber-700 hover:text-amber-950 p-1 font-bold rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500'
+          }
           title="Mover a la derecha"
           aria-label={`Mover ${text} a la derecha`}
         >
@@ -487,7 +532,11 @@ function DraggablePlacedToken({
           e.stopPropagation();
           onRemoveToken(id);
         }}
-        className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-rose-600 hover:text-rose-800 font-black p-1 rounded-md ml-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500"
+        className={
+          isTeens
+            ? `${styles.iconBtn} text-xs font-bold text-[#831712] hover:bg-[#FDECE9] ml-0.5 cursor-pointer`
+            : 'min-h-6 min-w-6 inline-flex items-center justify-center text-xs text-rose-600 hover:text-rose-800 font-black p-1 rounded-md ml-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500'
+        }
         title="Devolver al banco"
         aria-label={`Devolver ${text} al banco`}
       >

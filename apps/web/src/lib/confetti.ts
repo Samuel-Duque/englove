@@ -20,8 +20,8 @@ export function fireCelebrationConfetti(options: ConfettiOptions = {}): void {
 
   const colors =
     theme === 'kids'
-      ? ['#f59e0b', '#ec4899', '#3b82f6', '#10b981', '#8b5cf6']
-      : ['#6366f1', '#a855f7', '#ec4899', '#3b82f6'];
+      ? ['#C6470B', '#FFCA3A', '#B9251D', '#2B150A', '#166534']
+      : ['#C6470B', '#FFCA3A', '#B9251D', '#2B150A'];
 
   try {
     confetti({

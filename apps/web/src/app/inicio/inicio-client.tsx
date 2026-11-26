@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   AssignmentCardListResponseSchema,
@@ -15,16 +14,17 @@ import {
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../lib/api';
 import { fetchSharedSession, fetchSharedProfile, requestSharedRefresh, clearSharedSession } from '../../lib/auth-session';
-import { getActivityTypeLabel } from '../../lib/activity-labels';
 import { TeacherHome } from './teacher-home';
-import { StudentNav } from '../../components/student-nav';
-import { OfflineStatusBanner } from '../../components/offline-status-banner';
+import { StudentShell } from '../../components/student-shell';
+import { KidsInicio, type AssignmentFilter } from './kids-inicio';
+import { TeensInicio } from './teens-inicio';
+import { InicioLoading } from './inicio-loading';
 import { AccessibleModal } from '../../components/ui/modal';
 
 export function InicioClient() {
   const router = useRouter();
   const [attemptError, setAttemptError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [activeFilter, setActiveFilter] = useState<AssignmentFilter>('all');
   const [startingCardId, setStartingCardId] = useState<string | null>(null);
 
   const sessionQuery = useQuery({
@@ -96,8 +96,7 @@ export function InicioClient() {
     ? 'Hubo un problema de conexión con el servidor. Por favor, reintenta en unos instantes.'
     : null;
 
-  const isLoading = sessionQuery.isLoading ||
-    (session?.user.role === 'student' && cardsQuery.isLoading);
+  const isLoading = sessionQuery.isLoading;
 
   const assignmentCards: AssignmentCard[] = cardsQuery.data?.items ?? [];
   const profile: StudentProfileView | null = profileQuery.data ?? null;
@@ -114,7 +113,7 @@ export function InicioClient() {
             onClick={() => {
               void sessionQuery.refetch();
             }}
-            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full min-h-[48px] px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             Reintentar conexión
           </button>
@@ -124,313 +123,90 @@ export function InicioClient() {
   }
 
   if (isLoading) {
-    return (
-      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center bg-zinc-50 outline-none">
-        <p className="text-zinc-600 text-lg">Cargando tu espacio…</p>
-      </main>
-    );
+    return <InicioLoading />;
   }
 
   if (session?.user.role === 'teacher') {
     return <TeacherHome user={session.user} />;
   }
 
-  // Student Experience
-  const ageSegment = session?.student?.ageSegment ?? 'kids';
-  const isKids = ageSegment === 'kids';
-
-  const filteredCards = assignmentCards.filter((card) => {
-    if (activeFilter === 'pending') {
-      return card.canStart || card.canContinue;
-    }
-    if (activeFilter === 'completed') {
-      return (
-        card.latestAttempt?.status === 'graded' ||
-        card.latestAttempt?.status === 'pending_review'
-      );
-    }
-    return true;
-  });
-
-  return (
-    <div
-      data-theme={ageSegment}
-      className={`min-h-screen flex flex-col transition-colors ${
-        isKids
-          ? 'bg-amber-50/40 text-amber-950 font-sans'
-          : 'bg-zinc-950 text-zinc-100 font-sans'
-      }`}
-    >
-      <StudentNav
-        studentName={session?.user.name}
-        ageSegment={ageSegment}
-        level={profile?.student?.level}
-      />
-      <OfflineStatusBanner />
-
-      <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 outline-none">
-        {/* Modal for attempt errors */}
+  const studentTheme = profile?.student?.ageSegment ?? session?.student?.ageSegment ?? 'kids';
+  if (session?.user.role === 'student' && studentTheme === 'kids') {
+    return (
+      <StudentShell profile={profile} ageSegment={studentTheme} studentName={session.user.name}>
         <AccessibleModal
           isOpen={!!attemptError}
           onClose={() => setAttemptError(null)}
-          title="Aviso de Actividad"
+          title="Aviso de actividad"
         >
           <div className="space-y-4">
-            <p className="text-sm text-zinc-600">{attemptError}</p>
+            <p>{attemptError}</p>
             <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setAttemptError(null)}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-colors"
-              >
+              <button type="button" className="kids-button" data-tone="orange" onClick={() => setAttemptError(null)}>
                 Entendido
               </button>
             </div>
           </div>
         </AccessibleModal>
+        <KidsInicio
+          userId={session.user.id}
+          name={session.user.name}
+          level={profile?.student?.level ?? session.student?.level}
+          cards={assignmentCards}
+          activeFilter={activeFilter}
+          setFilter={setActiveFilter}
+          startingCardId={startAttemptMutation.isPending ? startingCardId : null}
+          onStart={handleStartAttempt}
+          isLoading={cardsQuery.isLoading}
+          hasError={cardsQuery.isError && !cardsQuery.data}
+          onRetry={() => void cardsQuery.refetch()}
+        />
+      </StudentShell>
+    );
+  }
 
-        {/* Banner Greeting */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-amber-200/80 shadow-xs">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-amber-950">
-              ¡Hola, {session?.user.name}! 🌟
-            </h1>
-            <p className="text-sm font-medium text-zinc-600 mt-1">
-              Aquí tienes tus misiones y actividades de inglés asignadas por tu profesora.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/feedback"
-              className="rounded-2xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-4 py-2.5 text-xs font-black text-indigo-900 transition-colors shadow-xs"
+  // Student Experience (Teens)
+  return (
+    <StudentShell
+      profile={profile}
+      ageSegment="teens"
+      studentName={session?.user.name}
+    >
+      <AccessibleModal
+        isOpen={!!attemptError}
+        onClose={() => setAttemptError(null)}
+        title="Aviso de actividad"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed">{attemptError}</p>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setAttemptError(null)}
+              className="teens-button"
+              data-tone="orange"
             >
-              💬 Ver mi feedback
-            </Link>
-            <Link
-              href="/progreso"
-              className="rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-4 py-2.5 text-xs font-black text-amber-900 transition-colors shadow-xs"
-            >
-              ⭐ Ver mi progreso
-            </Link>
-            <Link
-              href="/perfil"
-              className="rounded-2xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2.5 text-xs font-bold text-zinc-700 transition-colors"
-            >
-              👤 Mi Perfil
-            </Link>
+              Entendido
+            </button>
           </div>
         </div>
+      </AccessibleModal>
 
-        {/* Filter Chips */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveFilter('all')}
-            className={`rounded-full px-4 py-1.5 text-xs font-extrabold transition-all ${
-              activeFilter === 'all'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-white border border-amber-200 text-amber-950 hover:bg-amber-50'
-            }`}
-          >
-            Todas ({assignmentCards.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('pending')}
-            className={`rounded-full px-4 py-1.5 text-xs font-extrabold transition-all ${
-              activeFilter === 'pending'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-white border border-amber-200 text-amber-950 hover:bg-amber-50'
-            }`}
-          >
-            Por hacer (
-            {assignmentCards.filter((c) => c.canStart || c.canContinue).length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('completed')}
-            className={`rounded-full px-4 py-1.5 text-xs font-extrabold transition-all ${
-              activeFilter === 'completed'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-white border border-amber-200 text-amber-950 hover:bg-amber-50'
-            }`}
-          >
-            Entregadas (
-            {
-              assignmentCards.filter(
-                (c) =>
-                  c.latestAttempt?.status === 'graded' ||
-                  c.latestAttempt?.status === 'pending_review',
-              ).length
-            }
-            )
-          </button>
-        </div>
-
-        {/* Cards Grid */}
-        {filteredCards.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-amber-200 bg-white p-12 text-center space-y-3">
-            <span className="text-4xl">🎉</span>
-            <h3 className="text-base font-extrabold text-amber-950">
-              {activeFilter === 'pending'
-                ? '¡Genial! No tienes misiones pendientes por hacer.'
-                : 'No hay actividades disponibles en este momento.'}
-            </h3>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              Tu profesora asignará nuevas actividades y ejercicios para tu grupo próximamente.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredCards.map((card) => {
-              const now = new Date();
-              const due = new Date(card.effectiveDueAt);
-              const completeUntil = new Date(due.getTime() + 24 * 60 * 60 * 1000);
-              const isGracePeriod = now > due && now <= completeUntil;
-
-              // Stars (Decisión 101)
-              const score = card.latestAttempt?.score;
-              let stars = 0;
-              if (score !== null && score !== undefined) {
-                if (score >= 4.5) stars = 3;
-                else if (score >= 3.0) stars = 2;
-                else if (score > 0) stars = 1;
-              }
-
-              return (
-                <div
-                  key={card.id}
-                  className="rounded-3xl border border-amber-200/90 bg-white p-6 shadow-xs flex flex-col justify-between hover:shadow-md transition-all space-y-4"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-amber-100 text-amber-900">
-                        Nivel {card.activity.level}
-                      </span>
-                      <span className="text-xs font-bold text-zinc-500">
-                        {getActivityTypeLabel(card.activity.type)}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="text-base font-extrabold text-amber-950 leading-snug">
-                        {card.activity.title}
-                      </h3>
-                      <p className="text-xs text-zinc-500 mt-1">
-                        Límite:{' '}
-                        {new Date(card.effectiveDueAt ?? card.dueAt).toLocaleDateString('es-CO', {
-                          timeZone: 'America/Bogota',
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-
-                    {card.retryAvailable && (
-                      <div className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[11px] font-bold text-indigo-900">
-                        <span>🔄</span>
-                        <span>
-                          Tu profesora te habilitó un nuevo intento
-                          {card.effectiveDueAt && (
-                            <span className="font-normal text-indigo-700 ml-1">
-                              (hasta el{' '}
-                              {new Date(card.effectiveDueAt).toLocaleDateString('es-CO', {
-                                timeZone: 'America/Bogota',
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                              )
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    )}
-
-                    {isGracePeriod ? (
-                      <div className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100/80 px-2.5 py-1 text-[11px] font-bold text-amber-900">
-                        <span>⏰</span>
-                        <span>
-                          Puedes terminar hasta{' '}
-                          {completeUntil.toLocaleDateString('es-CO', {
-                            timeZone: 'America/Bogota',
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}
-                          (Colombia)
-                        </span>
-                      </div>
-                    ) : (
-                      card.canStart && (
-                        <p className="text-[11px] text-zinc-500 italic">
-                          Si empiezas antes del cierre, tendrás hasta 24 horas más para terminar.
-                        </p>
-                      )
-                    )}
-
-                    {card.latestAttempt && card.latestAttempt.status === 'graded' && (
-                      <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-50/70 border border-amber-200">
-                        <span className="text-xs font-bold text-amber-900">
-                          Nota: {Number(card.latestAttempt.score).toFixed(1).replace('.', ',')} / 5,0
-                        </span>
-                        <span className="text-amber-400 font-bold text-sm tracking-widest">
-                          {'★'.repeat(stars) + '☆'.repeat(3 - stars)}
-                        </span>
-                      </div>
-                    )}
-
-                    {card.latestAttempt && card.latestAttempt.status === 'pending_review' && (
-                      <div className="p-2 rounded-xl bg-zinc-100 text-zinc-700 text-xs font-semibold text-center">
-                        ⏳ En revisión por tu profe
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 1-Click Action Buttons */}
-                  <div>
-                    {card.canContinue && card.latestAttempt ? (
-                      <Link
-                        href={`/actividad/${card.latestAttempt.id}`}
-                        className="w-full flex items-center justify-center rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-3 text-sm shadow-xs transition-colors"
-                      >
-                        Continuar actividad 🚀
-                      </Link>
-                    ) : card.canStart ? (
-                      <button
-                        type="button"
-                        disabled={startingCardId === card.id}
-                        onClick={() => handleStartAttempt(card.id)}
-                        className="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-3 text-sm shadow-xs transition-colors disabled:opacity-50"
-                      >
-                        {startingCardId === card.id ? 'Iniciando…' : 'Empezar actividad ✨'}
-                      </button>
-                    ) : card.latestAttempt ? (
-                      <Link
-                        href={`/actividad/${card.latestAttempt.id}`}
-                        className="w-full flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100 text-amber-950 font-bold px-4 py-2.5 text-xs transition-colors"
-                      >
-                        Ver detalles de entrega
-                      </Link>
-                    ) : (
-                      <button
-                        disabled
-                        className="w-full rounded-2xl bg-zinc-100 text-zinc-400 font-semibold px-4 py-2.5 text-xs cursor-not-allowed"
-                      >
-                        Actividad no disponible
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+      {session?.user && (
+        <TeensInicio
+          userId={session.user.id}
+          name={session.user.name}
+          level={profile?.student?.level ?? session.student?.level}
+          cards={assignmentCards}
+          activeFilter={activeFilter}
+          setFilter={setActiveFilter}
+          startingCardId={startAttemptMutation.isPending ? startingCardId : null}
+          onStart={handleStartAttempt}
+          isLoading={cardsQuery.isLoading}
+          hasError={cardsQuery.isError && !cardsQuery.data}
+          onRetry={() => void cardsQuery.refetch()}
+        />
+      )}
+    </StudentShell>
   );
 }

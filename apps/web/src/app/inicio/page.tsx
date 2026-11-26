@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { InicioClient } from './inicio-client';
+import { InicioLoading } from './inicio-loading';
 
 export const metadata: Metadata = {
   title: 'Inicio',
@@ -9,13 +10,7 @@ export const metadata: Metadata = {
 
 export default function InicioPage() {
   return (
-    <Suspense
-      fallback={
-        <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center bg-zinc-50 outline-none">
-          <p className="text-zinc-600 text-lg">Cargando tu espacio…</p>
-        </main>
-      }
-    >
+    <Suspense fallback={<InicioLoading />}>
       <InicioClient />
     </Suspense>
   );

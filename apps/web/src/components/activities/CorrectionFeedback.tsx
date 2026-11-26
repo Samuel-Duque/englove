@@ -30,9 +30,9 @@ export function CorrectionFeedback({
     if (!isRecord(value)) return null;
     if (typeof value.correct === "boolean") {
       return (
-        <div key={itemId}>
-          {value.correct ? "✅" : "❌"}{" "}
-          <span className="font-semibold text-zinc-800">
+        <div key={itemId} data-correct={value.correct}>
+          <span aria-hidden="true">{value.correct ? "✅" : "❌"}</span>{" "}
+          <span className="font-semibold text-[var(--ink-1,#2B150A)]">
             Respuesta {index + 1}: {value.correct ? "Correcto" : "Incorrecto"}
           </span>
         </div>
@@ -44,9 +44,9 @@ export function CorrectionFeedback({
           if (!isRecord(result) || typeof result.correct !== "boolean")
             return null;
           return (
-            <div key={blankId} className="flex items-center gap-2">
-              <span>{result.correct ? "✅" : "❌"}</span>
-              <span className="font-semibold text-zinc-800">
+            <div key={blankId} data-correct={result.correct} className="flex items-center gap-2">
+              <span aria-hidden="true">{result.correct ? "✅" : "❌"}</span>
+              <span className="font-semibold text-[var(--ink-1,#2B150A)]">
                 Espacio {blankIndex + 1}:{" "}
                 {result.correct ? "Correcto" : "Incorrecto"}
               </span>

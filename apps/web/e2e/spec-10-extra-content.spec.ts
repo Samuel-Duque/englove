@@ -258,6 +258,12 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
     test.beforeEach(async ({ context, page }) => {
       await context.addCookies([
         {
+          name: 'englove_local_access_token',
+          value: studentToken,
+          domain: 'localhost',
+          path: '/',
+        },
+        {
           name: 'upward_english_local_access_token',
           value: studentToken,
           domain: 'localhost',
@@ -330,6 +336,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       await expect(page.locator('text=Contenido extra no disponible')).toBeVisible();
       await expect(page.locator('text=El contenido extra no está habilitado en este momento.')).toBeVisible();
       await expect(page.locator('a:has-text("Volver al inicio")')).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Contenido extra', exact: true })).toHaveCount(0);
     });
 
     test('2.2 Portal /extra activo: navegación, tarjetas, enlace seguro rel="noopener noreferrer" y TTS (RF-5, RF-6, RF-9)', async ({
@@ -389,13 +396,13 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       await expect(page.locator('text=Cambridge English Dictionary')).toBeVisible();
 
       // Verifica enlace externo seguro en pestaña nueva (RF-6)
-      const externalLink = page.locator('a:has-text("Abrir en pestaña nueva ↗")').first();
+      const externalLink = page.getByRole('link', { name: 'Abrir recurso externo' }).first();
       await expect(externalLink).toHaveAttribute('target', '_blank');
       await expect(externalLink).toHaveAttribute('rel', 'noopener noreferrer');
       await expect(externalLink).toHaveAttribute('href', 'https://es.educaplay.com/recursos/animals.html');
 
       // Filtro local por píldora (RF-5)
-      await page.click('button:has-text("Generales")');
+      await page.getByRole('button', { name: 'Para todos' }).click();
       await expect(page.locator('text=Cambridge English Dictionary')).toBeVisible();
       await expect(page.locator('text=Animals Memory Game')).not.toBeVisible();
     });
@@ -435,6 +442,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
 
       // 1. Kids theme
       await page.goto('/extra');
+      await expect(page.getByRole('heading', { name: 'Mapa de Recursos' })).toBeVisible();
       const kidsAxe = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
@@ -468,16 +476,21 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
       });
 
       await page.goto('/extra');
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(300);
+      await expect(page.getByRole('heading', { name: 'Contenido extra', exact: true })).toBeVisible();
+      await page.locator('[data-theme="teens"]').evaluate(async (shell) => {
+        await Promise.all(shell.getAnimations().map((animation) => animation.finished));
+      });
       const teensAxe = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       expect(teensAxe.violations).toEqual([]);
     });
 
-    test('2.4 Tamaño de objetivos táctiles >= 48x48 px en dispositivos móviles (RF-9, T-05)', async ({ page }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
+    test('2.4 Mapa Kids adaptable y controles táctiles (RF-9, T-05)', async ({ page, context }) => {
+      await page.addInitScript(() => {
+        Object.defineProperty(window.speechSynthesis, 'getVoices', { value: () => [{}] });
+        Object.defineProperty(window.speechSynthesis, 'speak', { value: () => undefined });
+      });
 
       await page.route('**/api/v1/feature-flags', async (route) => {
         await route.fulfill({
@@ -497,7 +510,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
               {
                 id: '00000000-0000-4000-8000-000000000001',
                 title: 'Animals Memory Game',
-                url: 'https://es.educaplay.com/recursos/animals.html',
+                url: `https://${'exploradores'.repeat(5)}.${'recursos'.repeat(7)}.example/animals.html`,
                 description: 'Memoria de animales y colores',
                 level: 'A1',
                 position: 0,
@@ -505,21 +518,60 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
                 createdAt: '2026-11-04T12:00:00.000Z',
                 updatedAt: '2026-11-04T12:00:00.000Z',
               },
+              {
+                id: '00000000-0000-4000-8000-000000000002',
+                title: 'Recurso sin HTTPS',
+                url: 'http://example.com',
+                level: 'A1',
+              },
             ],
-            total: 1,
+            total: 2,
           },
         });
       });
 
       await page.goto('/extra');
 
-      const externalButton = page.locator('a:has-text("Abrir en pestaña nueva ↗")');
-      const box = await externalButton.boundingBox();
-      expect(box).not.toBeNull();
-      if (box) {
-        expect(box.width).toBeGreaterThanOrEqual(48);
-        expect(box.height).toBeGreaterThanOrEqual(48);
+      const externalButton = page.getByRole('link', { name: 'Abrir recurso externo' });
+      const listenButton = page.getByRole('button', { name: /Escuchar: .*Animals Memory Game/ });
+      await expect(externalButton).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Enlace no disponible' })).toBeDisabled();
+      await expect(page.locator('main iframe, main embed, main object')).toHaveCount(0);
+
+      const viewports = [
+        { width: 320, height: 720 },
+        { width: 390, height: 844 },
+        { width: 800, height: 1280 },
+        { width: 1280, height: 800 },
+      ];
+      for (const { width, height } of viewports) {
+        await page.setViewportSize({ width, height });
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        const rows = await page.getByRole('list', { name: 'Tarjetas de contenido extra' })
+          .getByRole('listitem').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().top));
+        expect(new Set(rows).size).toBe(width <= 680 ? 2 : 1);
+        for (const control of [externalButton, listenButton, page.getByRole('button', { name: 'Todos', exact: true })]) {
+          const box = await control.boundingBox();
+          expect(box?.width).toBeGreaterThanOrEqual(48);
+          expect(box?.height).toBeGreaterThanOrEqual(48);
+        }
       }
+
+      await listenButton.click();
+      const stopButton = page.getByRole('button', { name: /Detener: .*Animals Memory Game/ });
+      await expect(stopButton).toHaveAttribute('aria-pressed', 'true');
+      await stopButton.click();
+      await expect(listenButton).toHaveAttribute('aria-pressed', 'false');
+
+      await page.getByRole('button', { name: 'Para todos' }).click();
+      await expect(page.getByText('Aún no hay enlaces en este filtro.')).toBeVisible();
+      await page.getByRole('button', { name: 'Tu nivel' }).click();
+      await expect(externalButton).toBeVisible();
+      await context.setOffline(true);
+      await expect(page.getByText('Necesitas conexión a internet para abrir enlaces externos.')).toBeVisible();
+      await expect(externalButton).toHaveCount(0);
+      await context.setOffline(false);
+      await expect(externalButton).toBeVisible();
     });
   });
 });

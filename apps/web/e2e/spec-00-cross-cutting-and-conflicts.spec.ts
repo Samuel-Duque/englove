@@ -783,6 +783,6 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
     });
 
     await page.goto('/progreso');
-    await expect(page.locator('text=4 semanas consecutivas')).toBeVisible();
+    await expect(page.getByText('4 semanas activas', { exact: true })).toBeVisible();
   });
 });

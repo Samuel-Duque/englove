@@ -1,6 +1,6 @@
 # Upward English — Taskboard
 
-> Seguimiento vigente de auditoría (2026-11-12): [correcciones y evidencia](./remediacion-auditoria-2026-11-12.md). Los estados y conteos del cierre anterior se conservan como registro histórico. ENG-015 tiene implementación de promoción serializada y compuertas locales; su primera ejecución cloud depende del aprovisionamiento ENG-003/004. La enmienda NEG-01 de SPEC-08 requiere re-verificación en CI; no se cierran aquí tareas de lanzamiento ni aceptación operativa.
+> Diagnóstico técnico vigente (2026-11-26): [auditoría integral del estado actual](./auditoria-integral-estado-actual.md) (los reportes previos de auditoría y remediación del 2026-11-12 y 2026-11-13 permanecen en el historial de Git). Los estados y conteos del cierre anterior se conservan como registro histórico. ENG-015 tiene implementación de promoción serializada y compuertas locales; su primera ejecución cloud depende del aprovisionamiento ENG-003/004. La enmienda NEG-01 de SPEC-08 requiere re-verificación en CI; no se cierran aquí tareas de lanzamiento ni aceptación operativa.
 
 > Actualización documental (2026-11-16): DOC-10 incorpora la skill `upward-english-kids-ux` (solicitada como `englove-kids-ux`), sus referencias, escenarios de evaluación, copias de agentes y registro local. No modifica código de producto ni cierra aceptación operativa. Resumen vigente: 123 Hecho, 0 En curso, 5 Por hacer, 0 Bloqueado, 8 Backlog (Total 136); los resúmenes siguientes son históricos.
 

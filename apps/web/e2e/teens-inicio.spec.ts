@@ -33,7 +33,7 @@ test('Plan 0 y Plan 1 Teens: base compartida, /inicio responsive, estados, naveg
     user: {
       id: 'std-teens-1',
       name: 'Valentina Cruz',
-      email: 'valentina.teens@upwardenglish.org',
+      email: 'valentina.teens@upwardenglish.app',
       role: 'student',
     },
     student: {

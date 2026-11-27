@@ -14,9 +14,9 @@
   "env": {
     "staging": {
       "name": "upward-english-web-staging",
-      "routes": [{ "pattern": "app-staging.upwardenglish.org", "custom_domain": true }],
+      "routes": [{ "pattern": "app-staging.upwardenglish.app", "custom_domain": true }],
       "vars": {
-        "API_URL": "https://api-staging.upwardenglish.org",
+        "API_URL": "https://api-staging.upwardenglish.app",
         "NEXT_PUBLIC_APP_ENV": "staging",
         "COOKIE_PREFIX": "upward_english_stg_",
         "NEXT_PUBLIC_COOKIE_PREFIX": "upward_english_stg_"
@@ -24,9 +24,9 @@
     },
     "production": {
       "name": "upward-english-web-production",
-      "routes": [{ "pattern": "app.upwardenglish.org", "custom_domain": true }],
+      "routes": [{ "pattern": "app.upwardenglish.app", "custom_domain": true }],
       "vars": {
-        "API_URL": "https://api.upwardenglish.org",
+        "API_URL": "https://api.upwardenglish.app",
         "NEXT_PUBLIC_APP_ENV": "production",
         "COOKIE_PREFIX": "upward_english_",
         "NEXT_PUBLIC_COOKIE_PREFIX": "upward_english_"

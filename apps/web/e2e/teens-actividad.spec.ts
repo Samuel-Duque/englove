@@ -48,7 +48,7 @@ async function setupTeensSessionMocks(page: Page) {
   const sessionPayload = {
     user: {
       id: 'std-teens-e2e-1',
-      email: 'valentina.teens@upwardenglish.org',
+      email: 'valentina.teens@upwardenglish.app',
       name: 'Valentina Cruz',
       role: 'student',
     },

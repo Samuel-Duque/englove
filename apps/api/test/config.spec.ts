@@ -14,7 +14,7 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     R2_BUCKET_NAME: 'upward-english-dev',
     WEB_BASE_URL: 'http://localhost:3000',
     NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-    MAIL_FROM: 'Upward English <notificaciones@upwardenglish.org>',
+    MAIL_FROM: 'Upward English <notificaciones@upwardenglish.app>',
   };
 
   it('validates a correct local configuration without requiring RESEND_API_KEY', () => {
@@ -39,7 +39,7 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     const stagingConfig = {
       ...baseValidLocalConfig,
       APP_ENV: 'staging',
-      COOKIE_DOMAIN: '.upwardenglish.org',
+      COOKIE_DOMAIN: '.upwardenglish.app',
     };
 
     expect(() => validateEnvironment(stagingConfig)).toThrowError(
@@ -53,7 +53,7 @@ describe('RF-3: arranque rechaza variables inválidas sin revelar secretos', () 
     };
     const env = validateEnvironment(validStagingConfig);
     expect(env.APP_ENV).toBe(AppEnv.staging);
-    expect(env.COOKIE_DOMAIN).toBe('.upwardenglish.org');
+    expect(env.COOKIE_DOMAIN).toBe('.upwardenglish.app');
     expect(env.JWT_SECRET).toBe('a-secure-production-jwt-secret-min-32-chars!');
   });
 

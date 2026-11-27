@@ -24,9 +24,9 @@ export function addSessionCookie(
 export const smokeApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 const seededAccounts = {
-  teacher: ['UPWARD_SMOKE', 'profesora@upwardenglish.org', 'UpwardEnglish2026!'],
-  kids: ['UPWARD_SMOKE_KIDS', 'lucas.kids@upwardenglish.org', 'Estudiante2026!'],
-  teens: ['UPWARD_SMOKE_TEENS', 'camila.teens@upwardenglish.org', 'Estudiante2026!'],
+  teacher: ['UPWARD_SMOKE', 'profesora@upwardenglish.app', 'UpwardEnglish2026!'],
+  kids: ['UPWARD_SMOKE_KIDS', 'lucas.kids@upwardenglish.app', 'Estudiante2026!'],
+  teens: ['UPWARD_SMOKE_TEENS', 'camila.teens@upwardenglish.app', 'Estudiante2026!'],
 } as const;
 
 type SmokeRole = keyof typeof seededAccounts;

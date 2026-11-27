@@ -83,8 +83,8 @@ test('CI-BLOCK-02: fullstack es manual, siembra una base efímera y espera la AP
 test('DEPLOY-WEB-01: Wrangler configura el origen de API y el dominio propio por entorno', () => {
   const { env } = JSON.parse(readFileSync(new URL('../apps/web/wrangler.jsonc', import.meta.url), 'utf8'));
   for (const [name, suffix] of [['staging', '-staging'], ['production', '']]) {
-    assert.equal(env[name].vars.API_URL, `https://api${suffix}.upwardenglish.org`);
-    assert.deepEqual(env[name].routes, [{ pattern: `app${suffix}.upwardenglish.org`, custom_domain: true }]);
+    assert.equal(env[name].vars.API_URL, `https://api${suffix}.upwardenglish.app`);
+    assert.deepEqual(env[name].routes, [{ pattern: `app${suffix}.upwardenglish.app`, custom_domain: true }]);
   }
 });
 test('OPS-01: promoción serializada, condicionada y construida para staging', () => {

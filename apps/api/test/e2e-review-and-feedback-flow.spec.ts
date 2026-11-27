@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   ActivityType,
   ActivityStatus,
@@ -24,6 +25,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UnprocessableEntityException, NotFoundException, ConflictException } from '@nestjs/common';
 import { TenantContext } from '../src/common/tenant/tenant.context';
 import { isPostgresAvailable } from './postgres-test-helper';
+import { buildMinimalValidMp4Audio } from '../prisma/seeds/seed-dev';
 
 describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de revisión, feedback, correo único y nuevo intento en PostgreSQL real (ENG-094)', () => {
   let prisma: PrismaService;
@@ -31,6 +33,9 @@ describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de 
   let reviewsService: ReviewsService;
   let pendingSummaryService: PendingSummaryService;
   let mailService: MailService;
+  let s3Client: S3Client | undefined;
+  let convertedKey: string | undefined;
+  const bucket = 'upward-english-dev';
 
   const orgId = 'e2e88888-1111-4111-8111-111111111111';
   const otherOrgId = 'e2e88888-9999-4999-8999-999999999999';
@@ -47,14 +52,24 @@ describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de 
     prisma = new PrismaService();
     await prisma.$connect();
 
+      const endpoint = process.env.R2_ENDPOINT || 'http://127.0.0.1:9000';
+      const accessKeyId = process.env.R2_ACCESS_KEY_ID || 'minioadmin';
+      const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || 'minioadmin';
+      s3Client = new S3Client({
+        endpoint,
+        region: 'auto',
+        credentials: { accessKeyId, secretAccessKey },
+        forcePathStyle: true,
+      });
       const configService = new ConfigService({
         JWT_SECRET: 'e2e-review-flow-test-jwt-secret-min-32-chars-long!',
         APP_ENV: 'local',
-        APP_PUBLIC_URL: 'http://localhost:3000',
+        WEB_BASE_URL: 'http://localhost:3000',
         R2_ACCOUNT_ID: 'mock-account',
-        R2_ACCESS_KEY_ID: 'mock-key',
-        R2_SECRET_ACCESS_KEY: 'mock-secret',
-        R2_BUCKET_NAME: 'upward-english-test-bucket',
+        R2_ENDPOINT: endpoint,
+        R2_ACCESS_KEY_ID: accessKeyId,
+        R2_SECRET_ACCESS_KEY: secretAccessKey,
+        R2_BUCKET_NAME: bucket,
       });
       const jwtService = new JwtService({
         secret: 'e2e-review-flow-test-jwt-secret-min-32-chars-long!',
@@ -251,9 +266,16 @@ describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de 
       await prisma.organization.deleteMany({ where: { id: { in: [orgId, otherOrgId] } } }).catch(() => {});
       await prisma.$disconnect().catch(() => {});
     }
+    try {
+      if (s3Client && convertedKey) {
+        await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: convertedKey }));
+      }
+    } finally {
+      s3Client?.destroy();
+    }
   });
 
-  it('Paso 1: El alumno inicia la actividad de speaking y completa el intento quedando en pending_review', async () => {
+  it('TEST-API-01 / Paso 1: El alumno completa speaking con audio en MinIO y queda en pending_review', async () => {
     return TenantContext.run(
       { organizationId: orgId, userId: studentUserId, role: Role.student, studentId },
       async () => {
@@ -264,14 +286,22 @@ describe.skipIf(!isPostgresAvailable)('SPEC-07 / Flujo 3 E2E: Ciclo completo de 
         expect(runtime.attempt.status).toBe(AttemptStatus.in_progress);
         attemptId = runtime.attempt.id;
 
-        // Create a mock ready audio MediaAsset for this attempt
+        if (!s3Client) throw new Error('El cliente MinIO de pruebas no se inicializó.');
+        convertedKey = `audios/${attemptId}/speaking_converted.mp4`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucket,
+          Key: convertedKey,
+          Body: buildMinimalValidMp4Audio(),
+          ContentType: 'audio/mp4',
+        }));
+
         const mediaAsset = await prisma!.mediaAsset.create({
           data: {
             organization_id: orgId,
             attempt_id: attemptId,
             student_id: studentId,
             key: `audios/${attemptId}/speaking_raw.webm`,
-            converted_key: `audios/${attemptId}/speaking_converted.mp4`,
+            converted_key: convertedKey,
             mime_type: 'audio/webm',
             size_bytes: BigInt(256000),
             duration_seconds: 22,

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   GroupView,
   GroupViewSchema,
@@ -12,46 +12,61 @@ import {
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { ConfirmDialog } from '../../../../components/ui/modal';
+import styles from './grupo-detail.module.css';
+
+const MEMBERS_LIMIT = 100;
+const archiveBlockedMessage =
+  'Para archivar este grupo, traslada primero a sus alumnos activos a otro grupo desde la ficha de cada alumno.';
+
+export function GroupDetailLoading() {
+  return (
+    <div className={styles.loading} role="status">
+      <span className="sr-only">Cargando grupo…</span>
+      <div className={styles.skeletonHeading} aria-hidden="true" />
+      <div className={styles.skeletonTable} aria-hidden="true" />
+    </div>
+  );
+}
 
 export function GrupoDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-
+  const groupHeading = useRef<HTMLHeadingElement>(null);
+  const renameButton = useRef<HTMLButtonElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const [newName, setNewName] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  // Rename modal / inline state
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    isDestructive?: boolean;
-    onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [confirmation, setConfirmation] = useState<'archive' | 'delete' | null>(null);
+  const [membersOffset, setMembersOffset] = useState(0);
 
   const groupQuery = useQuery({
     queryKey: ['teacher', 'group', id],
-    queryFn: () =>
-      apiFetch<GroupView>(`/api/v1/groups/${id}`, {
-        schema: GroupViewSchema,
-      }),
+    queryFn: () => apiFetch<GroupView>(`/api/v1/groups/${id}`, { schema: GroupViewSchema }),
   });
 
   const membersQuery = useQuery({
-    queryKey: ['teacher', 'group', id, 'members'],
+    queryKey:
+      membersOffset === 0
+        ? ['teacher', 'group', id, 'members']
+        : ['teacher', 'group', id, 'members', membersOffset],
     queryFn: () =>
-      apiFetch<StudentListResponse>(`/api/v1/groups/${id}/members?limit=100`, {
-        schema: StudentListResponseSchema,
-      }),
+      apiFetch<StudentListResponse>(
+        `/api/v1/groups/${id}/members?limit=${MEMBERS_LIMIT}${membersOffset ? `&offset=${membersOffset}` : ''}`,
+        { schema: StudentListResponseSchema },
+      ),
+    enabled: Boolean(groupQuery.data),
   });
 
+  const isRenaming = newName !== null;
   useEffect(() => {
-    if (groupQuery.data && !isRenaming) {
-      setNewName(groupQuery.data.name);
-    }
-  }, [groupQuery.data, isRenaming]);
+    if (isRenaming) nameInput.current?.focus();
+  }, [isRenaming]);
+
+  function closeRename() {
+    setNewName(null);
+    renameButton.current?.focus();
+  }
 
   const renameMutation = useMutation({
     mutationFn: (name: string) =>
@@ -64,20 +79,22 @@ export function GrupoDetailClient({ id }: { id: string }) {
       queryClient.setQueryData(['teacher', 'group', id], updated);
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
       void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
-      setIsRenaming(false);
+      void queryClient.invalidateQueries({
+        queryKey: ['teacher', 'assignments'],
+      });
+      closeRename();
       setSuccess('Grupo renombrado exitosamente.');
     },
-    onError: (err: unknown) => {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_ARCHIVED') {
-          setActionError('No es posible renombrar un grupo archivado.');
-        } else {
-          setActionError(err.message);
-        }
-      } else {
-        setActionError('No se pudo renombrar el grupo');
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === 'GROUP_ARCHIVED') {
+        closeRename();
+        void queryClient.invalidateQueries({
+          queryKey: ['teacher', 'group', id],
+        });
+        setActionError('No es posible renombrar un grupo archivado.');
+        return;
       }
+      setActionError(error instanceof ApiError ? error.message : 'No se pudo renombrar el grupo.');
     },
   });
 
@@ -89,290 +106,281 @@ export function GrupoDetailClient({ id }: { id: string }) {
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['teacher', 'group', id], updated);
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
       setSuccess('Grupo archivado exitosamente.');
+      groupHeading.current?.focus();
     },
-    onError: (err: unknown) => {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
-          setActionError(
-            'Este grupo tiene alumnos activos. Para archivarlo, traslada sus alumnos a otro grupo desde su ficha de alumno.',
-          );
-        } else {
-          setActionError(err.message);
-        }
-      } else {
-        setActionError('No se pudo archivar el grupo');
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
+        void queryClient.invalidateQueries({
+          queryKey: ['teacher', 'group', id],
+        });
+        setActionError(archiveBlockedMessage);
+        return;
       }
+      setActionError(error instanceof ApiError ? error.message : 'No se pudo archivar el grupo.');
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => apiFetch(`/api/v1/groups/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
       router.push('/grupos');
     },
-    onError: (err: unknown) => {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_HAS_HISTORY') {
-          setActionError('No se puede borrar un grupo con historial. Archívalo en su lugar.');
-        } else {
-          setActionError(err.message);
-        }
-      } else {
-        setActionError('No se pudo eliminar el grupo');
-      }
+    onError: (error: unknown) => {
+      setActionError(
+        error instanceof ApiError && error.code === 'GROUP_HAS_HISTORY'
+          ? 'No se puede borrar un grupo con historial. Archívalo en su lugar.'
+          : error instanceof ApiError
+            ? error.message
+            : 'No se pudo eliminar el grupo.',
+      );
     },
   });
 
-  const handleSaveRename = () => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
+  const group = groupQuery.data;
+  const members = membersQuery.data?.items ?? [];
+  const memberCount = membersQuery.data?.total ?? group?.activeStudentCount ?? 0;
+  const activeCount = Math.max(group?.activeStudentCount ?? 0, memberCount);
+  const isArchived = Boolean(group?.archivedAt);
+  const isPending =
+    renameMutation.isPending || archiveMutation.isPending || deleteMutation.isPending;
+  const isMissing = groupQuery.error instanceof ApiError && groupQuery.error.statusCode === 404;
+  const groupError = isMissing ? 'Grupo no encontrado.' : groupQuery.error?.message;
+  const membersError = membersQuery.error?.message;
 
+  function clearFeedback() {
     setActionError(null);
     setSuccess(null);
-    renameMutation.mutate(trimmed);
-  };
-
-  const group = groupQuery.data ?? null;
-  const members = membersQuery.data?.items ?? [];
-  const totalMembers = membersQuery.data?.total ?? 0;
-  const isLoading = groupQuery.isLoading || membersQuery.isLoading;
-
-  const handleArchive = () => {
-    const activeCount = group?.activeStudentCount ?? totalMembers ?? members.length;
-    if (activeCount > 0) {
-      setActionError(
-        `No es posible archivar el grupo: tiene ${activeCount} alumno(s) activo(s) (decisión 96). Traslada los alumnos antes de archivar.`,
-      );
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Archivar grupo',
-      message: '¿Seguro que deseas archivar este grupo?',
-      isDestructive: false,
-      onConfirm: () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setActionError(null);
-        setSuccess(null);
-        archiveMutation.mutate();
-      },
-    });
-  };
-
-  const handleDelete = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar grupo',
-      message: '¿Seguro que deseas eliminar este grupo? Solo es posible si no tiene historial.',
-      isDestructive: true,
-      onConfirm: () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setActionError(null);
-        deleteMutation.mutate();
-      },
-    });
-  };
-
-  const error =
-    actionError ||
-    (groupQuery.error instanceof ApiError ? groupQuery.error.message : groupQuery.error instanceof Error ? groupQuery.error.message : null) ||
-    (membersQuery.error instanceof ApiError ? membersQuery.error.message : membersQuery.error instanceof Error ? membersQuery.error.message : null);
-
-  if (isLoading) {
-    return <div className="py-12 text-center text-zinc-500 text-sm">Cargando grupo…</div>;
   }
 
-  if (!group) {
+  function handleSaveRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newName?.trim();
+    if (!name || isPending || isArchived) return;
+    clearFeedback();
+    renameMutation.mutate(name);
+  }
+
+  function handleArchive() {
+    if (isPending) return;
+    clearFeedback();
+    if (activeCount > 0) {
+      setActionError(archiveBlockedMessage);
+      return;
+    }
+    setConfirmation('archive');
+  }
+
+  function confirmAction() {
+    setConfirmation(null);
+    clearFeedback();
+    if (confirmation === 'archive') archiveMutation.mutate();
+    if (confirmation === 'delete') deleteMutation.mutate();
+  }
+
+  if (groupQuery.isLoading) return <GroupDetailLoading />;
+
+  if (!group || isMissing) {
     return (
-      <div role="alert" className="rounded-lg bg-rose-50 border border-rose-200 p-6 text-center text-rose-800">
-        {error || 'Grupo no encontrado'}
+      <div className={styles.page}>
+        <Link href="/grupos" className={styles.link}>
+          Volver a grupos
+        </Link>
+        <div role="alert" className={styles.error}>
+          {groupError || 'Grupo no encontrado.'}
+        </div>
       </div>
     );
   }
 
-  const isArchived = Boolean(group.archivedAt);
-
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/grupos" className="hover:text-zinc-900">
+    <div className={styles.page}>
+      <nav aria-label="Detalle del grupo" className={styles.breadcrumb}>
+        <Link href="/grupos" className={styles.link}>
           Grupos
         </Link>
-        <span>/</span>
-        <span className="text-zinc-800 font-medium truncate">{group.name}</span>
-      </div>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{group.name}</span>
+      </nav>
 
-      {/* Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
-        <div>
-          {isRenaming ? (
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                maxLength={100}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-base font-semibold text-zinc-900"
-              />
-              <button
-                type="button"
-                onClick={handleSaveRename}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-              >
-                Guardar
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsRenaming(false)}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{group.name}</h1>
-              {!isArchived && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewName(group.name);
-                    setIsRenaming(true);
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
-                >
-                  (Renombrar)
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3 mt-2">
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                isArchived ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-              }`}
-            >
-              {isArchived ? 'Grupo Archivado' : 'Grupo Activo'}
+      <header className={styles.header}>
+        <div className={styles.identity}>
+          <h1 ref={groupHeading} tabIndex={-1}>
+            {group.name}
+          </h1>
+          <div className={styles.metadata}>
+            <span className={`${styles.badge} ${isArchived ? styles.archived : styles.active}`}>
+              {isArchived ? 'Archivado' : 'Activo'}
             </span>
-            <span className="text-xs text-zinc-500 font-medium">
-              {totalMembers} alumno{totalMembers !== 1 ? 's' : ''} activo{totalMembers !== 1 ? 's' : ''}
-            </span>
+            <span>{activeCount === 1 ? '1 alumno activo' : `${activeCount} alumnos activos`}</span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/asignaciones?groupId=${id}`}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-          >
+        <div className={styles.actions}>
+          {!isArchived && (
+            <button
+              ref={renameButton}
+              type="button"
+              className={styles.button}
+              aria-disabled={isPending || undefined}
+              aria-expanded={isRenaming}
+              aria-controls={isRenaming ? 'group-rename' : undefined}
+              onClick={() => {
+                if (isPending) return;
+                clearFeedback();
+                if (isRenaming) closeRename();
+                else setNewName(group.name);
+              }}
+            >
+              Renombrar
+            </button>
+          )}
+          <Link href={`/asignaciones?groupId=${encodeURIComponent(id)}`} className={styles.button}>
             Ver asignaciones
+          </Link>
+          <Link href="/estadisticas?tab=groups" className={styles.button}>
+            Ver estadísticas
           </Link>
           {!isArchived && (
             <button
               type="button"
+              className={`${styles.button} ${styles.dangerButton}`}
+              aria-disabled={isPending || undefined}
+              aria-describedby={activeCount > 0 ? 'group-archive-note' : undefined}
               onClick={handleArchive}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
             >
               Archivar grupo
             </button>
           )}
-
           <button
             type="button"
-            onClick={handleDelete}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+            className={`${styles.button} ${styles.dangerButton}`}
+            aria-disabled={isPending || undefined}
+            onClick={() => {
+              if (!isPending) setConfirmation('delete');
+            }}
           >
             Eliminar grupo
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Alerts */}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
+      {!isArchived && newName !== null && (
+        <form
+          id="group-rename"
+          className={`${styles.card} ${styles.rename}`}
+          onSubmit={handleSaveRename}
         >
-          <span>{error}</span>
-          <button type="button" onClick={() => setActionError(null)} className="text-rose-600 font-bold ml-4">
-            ✕
-          </button>
-        </div>
+          <div className={styles.field}>
+            <label htmlFor="group-name">Nombre del grupo</label>
+            <input
+              ref={nameInput}
+              id="group-name"
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+              maxLength={100}
+              readOnly={isPending}
+              required
+            />
+          </div>
+          <div className={styles.actions}>
+            <button
+              type="submit"
+              className={`${styles.button} ${styles.primaryButton}`}
+              disabled={!newName.trim() || isPending}
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={closeRename}
+              disabled={isPending}
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
       )}
 
+      {actionError && (
+        <div role="alert" className={styles.error}>
+          {actionError}
+        </div>
+      )}
+      {groupError && (
+        <div role="alert" className={styles.error}>
+          {groupError}
+        </div>
+      )}
       {success && (
-        <div
-          role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
-        >
-          <span>{success}</span>
-          <button type="button" onClick={() => setSuccess(null)} className="text-emerald-600 font-bold ml-4">
-            ✕
-          </button>
+        <div role="status" className={styles.success}>
+          {success}
         </div>
       )}
 
-      {/* Members List */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
-          Alumnos miembros vigentes ({totalMembers})
+      {!isArchived && activeCount > 0 && (
+        <aside id="group-archive-note" className={styles.callout}>
+          <strong>Antes de archivar</strong>
+          <p>{archiveBlockedMessage}</p>
+        </aside>
+      )}
+
+      <section aria-labelledby="group-members-title" className={styles.card}>
+        <h2 id="group-members-title" className={styles.sectionHeading}>
+          Alumnos miembros vigentes ({memberCount})
         </h2>
 
-        {members.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">
-            Este grupo aún no tiene alumnos asignados.
+        {membersQuery.isLoading && <GroupDetailLoading />}
+        {membersError && (
+          <div role="alert" className={styles.error}>
+            {membersError}
+          </div>
+        )}
+        {membersQuery.isSuccess && members.length === 0 && membersOffset === 0 && (
+          <p className={styles.empty}>
+            {isArchived
+              ? 'Este grupo archivado no tiene miembros vigentes.'
+              : 'Este grupo no tiene miembros vigentes. Puedes archivarlo si ya no lo vas a usar.'}
           </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
+        )}
+        {members.length > 0 && (
+          <div
+            className={styles.tableScroll}
+            role="region"
+            aria-labelledby="group-members-title"
+            tabIndex={0}
+          >
+            <table aria-labelledby="group-members-title">
+              <thead>
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Nombre
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Correo
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Nivel
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-zinc-600 uppercase">
-                    Segmento
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-600 uppercase">
-                    Acción
-                  </th>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Correo</th>
+                  <th scope="col">Nivel MCER</th>
+                  <th scope="col">Segmento</th>
+                  <th scope="col">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200">
+              <tbody>
                 {members.map((member) => (
-                  <tr key={member.id} className="hover:bg-zinc-50">
-                    <td className="px-4 py-3 text-sm font-semibold text-zinc-900">
-                      <Link href={`/alumnos/${member.id}`} className="hover:text-blue-600">
+                  <tr key={member.id}>
+                    <th scope="row">
+                      <Link href={`/alumnos/${member.id}`} className={styles.link}>
                         {member.name}
                       </Link>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600">{member.email}</td>
-                    <td className="px-4 py-3 text-sm text-zinc-800">
-                      <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-zinc-100">
-                        {member.level ?? 'Sin nivel'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600 capitalize">
-                      {member.ageSegment}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right">
+                    </th>
+                    <td>{member.email ?? '—'}</td>
+                    <td>{member.level ?? 'Sin nivel'}</td>
+                    <td className={styles.segment}>{member.ageSegment ?? '—'}</td>
+                    <td>
                       <Link
                         href={`/alumnos/${member.id}`}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                        className={styles.link}
+                        aria-label={`Ver ficha de ${member.name}`}
                       >
-                        Ver ficha →
+                        Ver ficha <span aria-hidden="true">→</span>
                       </Link>
                     </td>
                   </tr>
@@ -381,15 +389,45 @@ export function GrupoDetailClient({ id }: { id: string }) {
             </table>
           </div>
         )}
+        {(memberCount > MEMBERS_LIMIT || membersOffset > 0) && (
+          <nav
+            aria-label="Paginación de miembros"
+            className={`${styles.actions} ${styles.pagination}`}
+          >
+            <button
+              type="button"
+              className={styles.button}
+              disabled={membersOffset === 0}
+              onClick={() => setMembersOffset(membersOffset - MEMBERS_LIMIT)}
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              className={styles.button}
+              disabled={membersOffset + MEMBERS_LIMIT >= memberCount || membersQuery.isLoading}
+              onClick={() => setMembersOffset(membersOffset + MEMBERS_LIMIT)}
+            >
+              Siguiente
+            </button>
+          </nav>
+        )}
+      </section>
+
+      <div className={styles.dialog}>
+        <ConfirmDialog
+          isOpen={confirmation !== null}
+          title={confirmation === 'delete' ? 'Eliminar grupo' : 'Archivar grupo'}
+          message={
+            confirmation === 'delete'
+              ? '¿Seguro que deseas eliminar este grupo? Solo es posible si no tiene historial.'
+              : 'El grupo quedará archivado y conservará su historial. ¿Deseas continuar?'
+          }
+          isDestructive
+          onConfirm={confirmAction}
+          onCancel={() => setConfirmation(null)}
+        />
       </div>
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        isDestructive={confirmDialog.isDestructive}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
-      />
     </div>
   );
 }

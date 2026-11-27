@@ -1,22 +1,11 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaciones (ENG-145)', () => {
   test.beforeEach(async ({ context, page }) => {
     // Add teacher session cookies
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: 'mock-teacher-token',
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: 'mock-teacher-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    const token = `header.${Buffer.from(JSON.stringify({ role: 'teacher' })).toString('base64url')}.signature`;
+    await addSessionCookie(context, token);
 
     // Mock teacher auth refresh & me & session
     await page.route('**/api/v1/auth/session', async (route) => {
@@ -67,6 +56,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
   test('1. /inicio: Dashboard docente con recordatorios (solicitudes pendientes y entregas vencidas) y accesos rápidos', async ({
     page,
   }) => {
+    await page.route('**/api/v1/groups?archived=false&limit=20', (route) => route.fulfill({ json: { items: [] } }));
     await page.route('**/api/v1/dashboard/reminders', async (route) => {
       await route.fulfill({
         status: 200,
@@ -81,22 +71,20 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.goto('/inicio');
 
     // Header & Welcome
-    await expect(page.locator('h1:has-text("Panel Docente — Inicio")')).toBeVisible();
-    await expect(page.locator('text=Bienvenida/o, Profesora Clara Gómez')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Buen día, Profesora Clara Gómez' })).toBeVisible();
 
     // Reminder cards
-    await expect(page.locator('h2:has-text("Solicitudes de Registro")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Solicitudes de registro' })).toBeVisible();
     await expect(page.locator('text=Hay 3 alumnos esperando aprobación de cuenta.')).toBeVisible();
 
-    await expect(page.locator('h2:has-text("Entregas sin Calificar")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Entregas sin calificar' })).toBeVisible();
     await expect(page.locator('text=Hay 2 entregas pendientes de calificar hace más de 3 días.')).toBeVisible();
 
     // Quick links
-    await expect(page.locator('a[href="/asignaciones"] h3:has-text("Asignaciones")')).toBeVisible();
-    await expect(page.locator('a[href="/actividades"] h3:has-text("Catálogo de Actividades")')).toBeVisible();
-    await expect(page.locator('a[href="/grupos"] h3:has-text("Gestión de Grupos")')).toBeVisible();
-    await expect(page.locator('a[href="/alumnos"] h3:has-text("Gestión de Alumnos")')).toBeVisible();
-    await expect(page.locator('a[href="/revision"] h3:has-text("Revisión y Calificación")')).toBeVisible();
+    const quickLinks = page.getByRole('region', { name: 'Accesos rápidos' });
+    for (const label of ['Asignaciones', 'Actividades', 'Grupos', 'Alumnos', 'Revisión', 'Estadísticas', 'Contenido extra']) {
+      await expect(quickLinks.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    }
   });
 
   test('2. /contenidos y /contenidos/onboarding: Redirecciones declarativas hacia catálogo y creador', async ({
@@ -205,7 +193,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.fill('input#activity-title', 'Actividad Multitipo E2E');
 
     // 4.1 Tipo fill_blank y previsualización
-    const previewBtn = page.locator('button:has-text("Previsualizar")');
+    const previewBtn = page.getByRole('button', { name: /Previsualizar|Probar vista previa/i });
     await expect(previewBtn).toBeVisible();
     await previewBtn.click();
 
@@ -215,33 +203,34 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(
       dialog.locator('text=Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas.'),
     ).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
     await expect(dialog).not.toBeVisible();
 
     // 4.2 Cambiar a open_question y previsualizar
-    await page.selectOption('select#activity-type', 'open_question');
+    await page.getByRole('radio', { name: /Pregunta abierta/i }).check();
     await expect(page.locator('textarea#oq-prompt-0, textarea#oq-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
 
     // 4.3 Cambiar a speaking y previsualizar
-    await page.selectOption('select#activity-type', 'speaking');
+    await page.getByRole('radio', { name: /Expresión oral/i }).check();
     await expect(page.locator('textarea#sp-prompt')).toBeVisible();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
 
     // 4.4 Cambiar a game con mecánica match y previsualizar
-    await page.selectOption('select#activity-type', 'game');
-    await expect(page.locator('select#game-mechanic')).toBeVisible();
-    await page.selectOption('select#game-mechanic', 'match');
+    await page.getByRole('radio', { name: /Microjuego/i }).check();
+    const matchRadio = page.getByRole('radio', { name: /Emparejar/i });
+    await expect(matchRadio).toBeVisible();
+    await matchRadio.check();
     await previewBtn.click();
     await expect(dialog).toBeVisible();
-    await dialog.locator('button:has-text("✕")').click();
+    await dialog.locator('button[aria-label="Cerrar modal"]').click();
 
     // 4.5 Cambiar a exam y verificar normalización de pesos a 100%
-    await page.selectOption('select#activity-type', 'exam');
+    await page.getByRole('radio', { name: /Examen/i }).check();
     await expect(page.locator('input#exam-w1')).toBeVisible();
     await expect(page.locator('input#exam-w2')).toBeVisible();
 
@@ -273,7 +262,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     });
 
     await page.fill('input#activity-title', 'Actividad Multitipo E2E');
-    await page.click('button:has-text("Crear borrador")');
+    await page.getByRole('button', { name: 'Guardar borrador' }).click();
     await expect(page.locator('h1:has-text("Editor de actividad")')).toBeVisible();
   });
 
@@ -293,7 +282,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     });
 
     await page.goto('/grupos');
-    await expect(page.locator('h1:has-text("Gestión de Grupos")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Grupos', exact: true })).toBeVisible();
     await expect(page.locator('text=Kids A1 Mañana')).toBeVisible();
     await expect(page.locator('text=Kids A2 Tarde')).toBeVisible();
 
@@ -302,7 +291,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await expect(archiveBtnWithStudents).toBeVisible();
     await archiveBtnWithStudents.click();
     await expect(
-      page.locator('text=No es posible archivar el grupo "Kids A1 Mañana": tiene 5 alumno(s) activo(s)'),
+      page.getByRole('alert').getByText(/Trasládalos a otro grupo/),
     ).toBeVisible();
 
     // 5.2 Creación de nuevo grupo
@@ -313,7 +302,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       });
     });
 
-    const createGroupBtn = page.locator('button:has-text("Crear grupo")');
+    const createGroupBtn = page.getByRole('button', { name: 'Nuevo grupo', exact: true });
     await expect(createGroupBtn).toBeVisible();
     await createGroupBtn.click();
 
@@ -424,7 +413,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
       });
     });
 
-    const unlockBtn = page.locator('button:has-text("Desbloquear en 1 clic")');
+    const unlockBtn = page.getByRole('button', { name: 'Desbloquear cuenta (Mateo Bloqueado)', exact: true });
     await expect(unlockBtn).toBeVisible();
     await unlockBtn.click();
     await expect(page.locator('text=desbloqueada exitosamente.')).toBeVisible();
@@ -613,7 +602,7 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
     await page.click('button:has-text("Seleccionar todos")');
 
     // Crear asignaciones
-    await page.click('button:has-text("Crear asignación")');
+    await page.click('button:has-text("Programar asignación")');
     await expect(page).toHaveURL(/\/asignaciones/);
 
     // 7.3 Detalle /asignaciones/:id y cancelación idempotente

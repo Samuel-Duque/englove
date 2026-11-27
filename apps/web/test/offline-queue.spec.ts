@@ -189,12 +189,14 @@ describe("SPEC-09 RF-10, RF-11, RF-15, RF-5: Offline Queue Service", () => {
     Object.assign(window, {location: {origin: 'http://localhost:3000'}});
     await enqueueUpload({attemptId: 'draft', userId: 'user-1', blob: new Blob(['audio']), mimeType: 'audio/webm',
       durationMs: 3000, mediaId: 'confirmed-media', attemptToken: 'token', isDraft: true});
+    expect(await getPendingCount('user-1')).toBe(0);
     const fetchMock = vi.fn<typeof fetch>(async () => new Response('{}'));
     globalThis.fetch = fetchMock;
     await executeFlush('user-1');
     expect(fetchMock).not.toHaveBeenCalled();
     await enqueueEvent({attemptId: 'draft', userId: 'user-1', clientEventId: 'complete', eventType: 'completed',
       payload: {mediaId: 'confirmed-media'}, attemptToken: 'token'});
+    expect(await getPendingCount('user-1')).toBe(2);
     await executeFlush('user-1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, expect.stringContaining('/confirmed-media/confirm'), expect.anything());

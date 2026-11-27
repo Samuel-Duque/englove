@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [develop, master]
   workflow_dispatch:
+    inputs:
+      fullstack:
+        description: Ejecutar Playwright con PostgreSQL, MinIO y API sembrada
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,7 +20,7 @@ jobs:
     name: Lint, tipos, PostgreSQL, pruebas y build
     runs-on: ubuntu-latest
     services:
-      postgres:
+      postgres: &postgres
         image: postgres:18-alpine
         env:
           POSTGRES_USER: postgres
@@ -25,22 +30,61 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres -d upward_english_ci"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      minio: &minio
+        image: pgsty/minio@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
+        command: server /data
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports: ['127.0.0.1:9000:9000']
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/upward_english_ci
-      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/upward_english_ci
+      DATABASE_URL: &ci-database postgresql://postgres:postgres@127.0.0.1:5433/upward_english_ci
+      MIGRATION_DATABASE_URL: *ci-database
+      # Credenciales desechables del servicio local de este runner.
+      R2_ACCOUNT_ID: &r2-account local
+      R2_ENDPOINT: &r2-endpoint http://127.0.0.1:9000
+      R2_BUCKET_NAME: &r2-bucket upward-english-dev
+      R2_ACCESS_KEY_ID: &r2-key minioadmin
+      R2_SECRET_ACCESS_KEY: &r2-secret minioadmin
+      WEB_BASE_URL: &ci-web-url http://localhost:3000
+      NEXT_PUBLIC_API_URL: &ci-api-url http://localhost:3001
+      MAIL_FROM: &ci-mail-from ci@example.invalid
       REQUIRE_POSTGRES_TESTS: '1'
       RUN_AUDIT_MIGRATION_POSTGRES: '1'
       AUDIT_MIGRATION_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5433/postgres
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - &checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - &setup-pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
         with:
           version: 11.5.1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - &setup-node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - &init-minio
+        name: Inicializar bucket privado en MinIO
+        run: |
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-max-time 45 --max-time 5 "$R2_ENDPOINT/minio/health/ready"
+          docker run --rm --network host --entrypoint /bin/sh \
+            -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_BUCKET_NAME \
+            pgsty/mc@sha256:b532278b7a3747dbab6fe45eebb40a653efa704e6758e24e9d9ec54fc96c1800 -ec '
+              /usr/bin/mc alias set ci "$R2_ENDPOINT" "$R2_ACCESS_KEY_ID" "$R2_SECRET_ACCESS_KEY"
+              /usr/bin/mc mb --ignore-existing "ci/$R2_BUCKET_NAME"
+              /usr/bin/mc anonymous set none "ci/$R2_BUCKET_NAME"
+            '
+      - &install-ffmpeg
+        name: Instalar y verificar ffmpeg y ffprobe
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
+          ffprobe -version
       - name: Bloquear dependencias con avisos moderados o altos
         run: pnpm audit --prod --audit-level=moderate
       - run: node scripts/check-no-db-push.mjs
@@ -82,7 +126,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @upward-english/shared build
       - run: pnpm --filter @upward-english/web exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: pnpm test:e2e --project=mocked-ci
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
       - name: Evidencia de navegador incluso ante fallo
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -93,11 +139,63 @@ jobs:
             apps/web/playwright-report/
           if-no-files-found: ignore
 
+  fullstack:
+    name: Playwright con API sembrada
+    if: github.event_name == 'workflow_dispatch' && inputs.fullstack
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres: *postgres
+      minio: *minio
+    env:
+      APP_ENV: local
+      DATABASE_URL: *ci-database
+      MIGRATION_DATABASE_URL: *ci-database
+      R2_ACCOUNT_ID: *r2-account
+      R2_ENDPOINT: *r2-endpoint
+      R2_BUCKET_NAME: *r2-bucket
+      R2_ACCESS_KEY_ID: *r2-key
+      R2_SECRET_ACCESS_KEY: *r2-secret
+      WEB_BASE_URL: *ci-web-url
+      API_URL: *ci-api-url
+      NEXT_PUBLIC_API_URL: *ci-api-url
+      COOKIE_PREFIX: upward_english_local_
+      NEXT_PUBLIC_COOKIE_PREFIX: upward_english_local_
+      MAIL_FROM: *ci-mail-from
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - run: pnpm install --frozen-lockfile
+      - *init-minio
+      - *install-ffmpeg
+      - run: pnpm db:migrate
+      - run: pnpm exec turbo run build --filter=@upward-english/api
+      - run: pnpm seed:dev
+      - run: pnpm --filter @upward-english/web exec playwright install --with-deps chromium
+      - name: Arrancar API y ejecutar Playwright fullstack
+        working-directory: apps/api
+        run: |
+          node dist/src/main.js > "$RUNNER_TEMP/fullstack-api.log" 2>&1 &
+          trap 'kill "$!" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-max-time 45 --max-time 5 "$API_URL/health"
+          pnpm -w test:e2e --project=fullstack
+      - name: Conservar trazas y logs de fullstack
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-fullstack-${{ github.sha }}
+          path: |
+            apps/web/test-results/
+            ${{ runner.temp }}/fullstack-api.log
+          if-no-files-found: ignore
+
   staging-deploy:
     name: Migrar y desplegar el mismo commit
     needs: [quality-gates, docker-build, e2e-tests]
     if: >-
       github.event_name != 'pull_request' &&
+      !inputs.fullstack &&
       (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master') &&
       vars.STAGING_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest

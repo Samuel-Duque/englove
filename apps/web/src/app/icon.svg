@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="8" fill="#f59e0b" />
-  <text x="16" y="23" font-size="18" text-anchor="middle" fill="#ffffff">⭐</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none">
+  <rect x="1.5" y="1.5" width="33" height="33" rx="9" fill="#FFCA3A" stroke="#4A2511" stroke-width="2.5" />
+  <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.8" stroke-linejoin="round" />
+  <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round" />
+  <path d="M18 10.6L20.3 13.6L18 16.6L15.7 13.6Z" fill="#FFFDF5" />
 </svg>

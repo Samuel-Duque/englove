@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { FeedbackClient } from './feedback-client';
+import { FeedbackKidsLoading, FeedbackTeensLoading } from './feedback-loading';
 
 export const metadata: Metadata = {
   title: 'Mi Retroalimentación',
@@ -11,10 +12,14 @@ export default function StudentFeedbackPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center space-y-3">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
-          <p className="text-sm font-semibold text-zinc-600">Cargando tus comentarios y notas…</p>
-        </div>
+        <>
+          <div className="hidden [[data-theme=kids]_&]:block">
+            <FeedbackKidsLoading />
+          </div>
+          <div className="[[data-theme=kids]_&]:hidden">
+            <FeedbackTeensLoading />
+          </div>
+        </>
       }
     >
       <FeedbackClient />

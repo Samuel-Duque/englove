@@ -1,6 +1,6 @@
 # Upward English — Guía para agentes
 
-Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. La base funcional de las etapas 1–10 está implementada bajo Spec-Driven Development, con verificación histórica de SPEC-01 a SPEC-11; el aprovisionamiento de Etapa 0 sigue el taskboard. La auditoría del 2026-11-12 y su remediación están en `planning/auditoria-general-2026-11-12.md` y `planning/remediacion-auditoria-2026-11-12.md`; la enmienda NEG-01 de SPEC-08 requiere re-verificación en CI. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding y tablets reales antes de cerrar la Etapa 11. No se escribe código de producción sin spec aprobada; consultar estados vigentes en `specs/README.md`.
+Plataforma web gamificada para enseñar inglés a niños de 7 a 14 años. La base funcional de las etapas 1–10 está implementada bajo Spec-Driven Development, con verificación histórica de SPEC-01 a SPEC-11; el aprovisionamiento de Etapa 0 sigue el taskboard. El diagnóstico vigente del repositorio está en `planning/auditoria-integral-estado-actual.md` (los informes históricos de auditoría y remediación del 2026-11-12 y 2026-11-13 fueron retirados del árbol y permanecen en el historial de Git); la enmienda NEG-01 de SPEC-08 requiere re-verificación en CI. Cierre global de Etapa 3/H1, Etapa 5/H2, Etapa 6 y Etapa 7/H3 pendiente de evidencia operativa en staging/onboarding y tablets reales antes de cerrar la Etapa 11. No se escribe código de producción sin spec aprobada; consultar estados vigentes en `specs/README.md`.
 
 ## Dónde está cada cosa
 
@@ -18,7 +18,7 @@ Lee estos documentos antes de trabajar (en este orden de autoridad si hay confli
 5. `planning/taskboard.md` — tareas.
 6. `specs/` — contratos y estados actuales; la verificación histórica no sustituye re-verificar una enmienda ni aceptar staging.
 
-Auditorías y pendientes operativos vigentes: `planning/pendientes-cierre-auditorias.md` (consolidado accionable de lo pendiente para la próxima sesión), `planning/auditoria-general-2026-11-12.md`, `planning/remediacion-auditoria-2026-11-12.md`, `planning/auditoria-adversarial-2026-11-13.md` y `planning/despliegue-staging.md` (los documentos históricos cerrados de Etapa 12 y rondas previas fueron retirados del árbol y permanecen en el historial de Git; la fuente única de verdad es `.agents/CONTEXT.md`).
+Auditoría y pendientes operativos vigentes: `planning/auditoria-integral-estado-actual.md` (diagnóstico integral 360° vigente y plan de acción ordenado) y `planning/despliegue-staging.md` (los documentos históricos cerrados de Etapa 12 y las auditorías/remediaciones previas de noviembre de 2026 fueron retirados del árbol y permanecen en el historial de Git; la fuente única de verdad es `.agents/CONTEXT.md`).
 
 Otros documentos: `planning/skills-propias-pendientes.md` (3 de 5 skills propias creadas: `upward-english-spec`, `upward-english-guardrails` y `upward-english-kids-ux`; las otras dos, pendientes).
 

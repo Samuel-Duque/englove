@@ -1,9 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Archive,
+  ArrowLeft,
+  CheckCircle2,
+  CircleAlert,
+  Copy,
+  Eye,
+  FileText,
+  Gamepad2,
+  GraduationCap,
+  Info,
+  Lock,
+  Mic,
+  PenLine,
+  Plus,
+  RotateCcw,
+  Scale,
+  Trash2,
+} from 'lucide-react';
 import {
   ActivityType,
   ActivityStatus,
@@ -12,11 +31,104 @@ import {
   ActivityEditorSchema,
   GamePublicConfig,
   GameAnswerKey,
+  normalizeExamWeights,
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { formatBlankPrompt } from '../../../lib/blank-prompt';
 import { GameRenderer } from '../../../components/activities/GameRenderer';
 import { AccessibleModal } from '../../../components/ui/modal';
+import { TeacherStatusBadge } from '../../../components/teacher-editorial';
+import styles from './activity-editor.module.css';
+
+const activityTypeLabels: Record<ActivityType, string> = {
+  [ActivityType.fill_blank]: 'Completar espacios',
+  [ActivityType.open_question]: 'Pregunta abierta',
+  [ActivityType.speaking]: 'Expresión oral (Speaking)',
+  [ActivityType.game]: 'Microjuego',
+  [ActivityType.exam]: 'Examen',
+};
+
+const statusBadgeKinds = {
+  [ActivityStatus.published]: 'activityPublished',
+  [ActivityStatus.draft]: 'activityDraft',
+  [ActivityStatus.archived]: 'activityArchived',
+} as const;
+
+const activityTypeOptions: Array<{
+  value: ActivityType;
+  label: string;
+  description: string;
+  gradingTag: string;
+  icon: typeof PenLine;
+}> = [
+  {
+    value: ActivityType.fill_blank,
+    label: 'Completar espacios',
+    description: 'Oraciones en inglés con huecos y opciones múltiples.',
+    gradingTag: 'Autocalificada',
+    icon: PenLine,
+  },
+  {
+    value: ActivityType.open_question,
+    label: 'Pregunta abierta',
+    description: 'Respuesta escrita libre con rúbrica guía para la docente.',
+    gradingTag: 'Revisión manual',
+    icon: FileText,
+  },
+  {
+    value: ActivityType.speaking,
+    label: 'Expresión oral (Speaking)',
+    description: 'Grabación de voz entre 2 y 300 s con audio de ejemplo opcional.',
+    gradingTag: 'Revisión manual',
+    icon: Mic,
+  },
+  {
+    value: ActivityType.game,
+    label: 'Microjuego',
+    description: 'Práctica lúdica disponible 24/7 sin asignación ni nota.',
+    gradingTag: 'Estrellas',
+    icon: Gamepad2,
+  },
+  {
+    value: ActivityType.exam,
+    label: 'Examen',
+    description: 'Mínimo 2 oraciones ponderadas con normalización al 100 %.',
+    gradingTag: 'Autocalificada',
+    icon: GraduationCap,
+  },
+];
+
+const gameMechanicOptions: Array<{
+  value: 'order_words' | 'match' | 'drag_drop' | 'memory' | 'timed_choice';
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'order_words',
+    label: 'Ordenar palabras',
+    description: 'Reconstruir una oración en inglés palabra por palabra.',
+  },
+  {
+    value: 'match',
+    label: 'Emparejar',
+    description: 'Unir conceptos, definiciones o traducciones en pares.',
+  },
+  {
+    value: 'drag_drop',
+    label: 'Arrastrar y soltar',
+    description: 'Clasificar elementos dentro de categorías definidas.',
+  },
+  {
+    value: 'memory',
+    label: 'Memoria',
+    description: 'Encontrar parejas de tarjetas ocultas por turnos.',
+  },
+  {
+    value: 'timed_choice',
+    label: 'Opción contra reloj',
+    description: 'Responder preguntas rápidas dentro de un tiempo límite.',
+  },
+];
 
 interface ActivityEditorProps {
   initialActivity?: ActivityEditor;
@@ -1056,7 +1168,7 @@ export function ActivityEditorComponent({
     getStringProp(initialCfg, 'exampleUrl', ''),
   );
   const [spMaxDuration, setSpMaxDuration] = useState(
-    getStringProp(initialCfg, 'maxDurationSeconds', '60'),
+    getStringProp(initialCfg, 'maxDurationSeconds', '120'),
   );
 
   // Game mechanics states
@@ -1086,19 +1198,41 @@ export function ActivityEditorComponent({
   const [timedQuestions, setTimedQuestions] = useState(initialTc.questions);
 
   // UI state
+  const [draftId, setDraftId] = useState<string | null>(initialActivity?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [weightsAdjustedNotice, setWeightsAdjustedNotice] = useState(false);
+  const [hasAttemptsConflict, setHasAttemptsConflict] = useState(false);
+  const alertRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      alertRef.current?.focus();
+    }
+  }, [error]);
 
   // Helper to build canonical config and answerKey
-  const buildPayload = () => {
-    const trimmedTitle = title.trim();
+  const buildPayload = (options?: { allowFallbackTitle?: boolean }) => {
+    const trimmedTitle =
+      title.trim() || (options?.allowFallbackTitle ? 'Vista previa de microjuego' : '');
     if (!trimmedTitle) {
       throw new Error('El título de la actividad es obligatorio');
     }
 
     const expDur = expectedDuration.trim() ? parseInt(expectedDuration, 10) : null;
-    const minPlaus = minPlausible.trim() ? parseInt(minPlausible, 10) : null;
+    if (expDur !== null && (Number.isNaN(expDur) || expDur < 1)) {
+      throw new Error('La duración esperada debe ser un número entero positivo');
+    }
+    const minPlaus =
+      type !== ActivityType.speaking && minPlausible.trim()
+        ? parseInt(minPlausible, 10)
+        : null;
+    if (minPlaus !== null && (Number.isNaN(minPlaus) || minPlaus < 1)) {
+      throw new Error('El mínimo plausible debe ser un número entero positivo');
+    }
+    if (expDur !== null && minPlaus !== null && minPlaus > expDur) {
+      throw new Error('El mínimo plausible no puede ser mayor que la duración esperada');
+    }
 
     let config: unknown;
     let answerKey: unknown = null;
@@ -1116,26 +1250,23 @@ export function ActivityEditorComponent({
       };
     } else if (type === ActivityType.open_question) {
       if (oqQuestions.length === 0) {
-        setError('Debes agregar al menos una pregunta abierta');
-        return;
+        throw new Error('Debes agregar al menos una pregunta abierta');
       }
       for (let i = 0; i < oqQuestions.length; i++) {
         const q = oqQuestions[i];
         if (!q || !q.prompt.trim()) {
-          setError(`La pregunta ${i + 1} no puede estar vacía`);
-          return;
+          throw new Error(`La pregunta ${i + 1} no puede estar vacía`);
         }
       }
       const firstQ = oqQuestions[0];
       if (!firstQ) {
-        setError('Debes agregar al menos una pregunta abierta');
-        return;
+        throw new Error('Debes agregar al menos una pregunta abierta');
       }
 
       config = {
         instructions: oqInstructions.trim() || undefined,
         items: oqQuestions.map((q) => ({
-          id: q.id,
+          id: q.id || generateUuid(),
           prompt: q.prompt.trim(),
           rubric: q.rubric.trim() || undefined,
           maxLength: q.maxLength ? parseInt(q.maxLength, 10) : 2000,
@@ -1146,15 +1277,31 @@ export function ActivityEditorComponent({
       };
       answerKey = null;
     } else if (type === ActivityType.speaking) {
+      const trimmedPrompt = spPrompt.trim();
+      if (!trimmedPrompt) {
+        throw new Error('La consigna de grabación es obligatoria');
+      }
+      const trimmedUrl = spExampleUrl.trim();
+      if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
+        throw new Error('La URL de audio de ejemplo debe comenzar con https://');
+      }
+      const maxDur = spMaxDuration.trim() ? parseInt(spMaxDuration, 10) : 120;
+      if (Number.isNaN(maxDur) || maxDur < 2 || maxDur > 300) {
+        throw new Error('La duración máxima de grabación debe estar entre 2 y 300 segundos');
+      }
       config = {
-        prompt: spPrompt.trim(),
-        exampleUrl: spExampleUrl.trim() || undefined,
+        prompt: trimmedPrompt,
+        exampleUrl: trimmedUrl || undefined,
         minDurationSeconds: 2, // Fixed 2s per RF-5
-        maxDurationSeconds: spMaxDuration ? parseInt(spMaxDuration, 10) : 60,
+        maxDurationSeconds: maxDur,
       };
       answerKey = null;
     } else if (type === ActivityType.exam) {
       const { items: itemsPayload, answerKeyItems } = buildExamPayloadItems(examItems);
+      const totalWeight = itemsPayload.reduce((acc, it) => acc + it.weight, 0);
+      if (totalWeight <= 0) {
+        throw new Error('La suma de pesos del examen debe ser mayor a 0 %');
+      }
 
       config = {
         items: itemsPayload,
@@ -1393,8 +1540,9 @@ export function ActivityEditorComponent({
       expectedDurationSeconds: number | null;
       minPlausibleSeconds: number | null;
     }) => {
-      if (isEditing && initialActivity?.id) {
-        return apiFetch<ActivityEditor>(`/api/v1/activities/${initialActivity.id}`, {
+      const targetId = initialActivity?.id ?? draftId;
+      if (targetId) {
+        return apiFetch<ActivityEditor>(`/api/v1/activities/${targetId}`, {
           method: 'PATCH',
           body: JSON.stringify({
             title: payload.title,
@@ -1414,43 +1562,106 @@ export function ActivityEditorComponent({
       });
     },
     onSuccess: (data) => {
+      setDraftId(data.id);
       setCurrentStatus(data.status);
       onActivityUpdated?.(data);
       queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      queryClient.setQueryData(['teacher', 'activity', data.id], data);
       if (initialActivity?.id) {
-        queryClient.setQueryData(['teacher', 'activity', initialActivity.id], data);
         setSuccess('Actividad guardada correctamente');
       } else {
-        setSuccess('Actividad creada exitosamente');
+        setSuccess('Borrador guardado correctamente');
         router.push(`/actividades/${data.id}`);
       }
       if (data.weightsAdjusted) setWeightsAdjustedNotice(true);
     },
     onError: (err: unknown) => {
-      if (err instanceof ApiError || err instanceof Error) {
+      if (err instanceof ApiError) {
+        setHasAttemptsConflict(err.code === 'ACTIVITY_HAS_ATTEMPTS');
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setHasAttemptsConflict(false);
         setError(err.message);
       } else {
+        setHasAttemptsConflict(false);
         setError('Error al guardar la actividad');
       }
     },
   });
 
   const publishMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiFetch<ActivityEditor>(`/api/v1/activities/${id}/publish`, {
+    mutationFn: async (payload?: {
+      title: string;
+      type: ActivityType;
+      level: Level;
+      config: unknown;
+      answerKey: unknown;
+      expectedDurationSeconds: number | null;
+      minPlausibleSeconds: number | null;
+    }) => {
+      if (isEditing && initialActivity?.id) {
+        return apiFetch<ActivityEditor>(`/api/v1/activities/${initialActivity.id}/publish`, {
+          method: 'POST',
+          schema: ActivityEditorSchema,
+        });
+      }
+
+      let targetId = draftId;
+      let savedWeightsAdjusted = false;
+      if (targetId && payload) {
+        const updated = await apiFetch<ActivityEditor>(`/api/v1/activities/${targetId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            title: payload.title,
+            level: payload.level,
+            config: payload.config,
+            answerKey: payload.answerKey,
+            expectedDurationSeconds: payload.expectedDurationSeconds,
+            minPlausibleSeconds: payload.minPlausibleSeconds,
+          }),
+          schema: ActivityEditorSchema,
+        });
+        savedWeightsAdjusted = updated.weightsAdjusted;
+      } else if (payload) {
+        const created = await apiFetch<ActivityEditor>('/api/v1/activities', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          schema: ActivityEditorSchema,
+        });
+        targetId = created.id;
+        savedWeightsAdjusted = created.weightsAdjusted;
+        setDraftId(created.id);
+        queryClient.setQueryData(['teacher', 'activity', created.id], created);
+      }
+
+      if (!targetId) {
+        throw new Error('No fue posible determinar el identificador de la actividad');
+      }
+
+      const published = await apiFetch<ActivityEditor>(`/api/v1/activities/${targetId}/publish`, {
         method: 'POST',
         schema: ActivityEditorSchema,
       });
+
+      return {
+        ...published,
+        weightsAdjusted: published.weightsAdjusted || savedWeightsAdjusted,
+      };
     },
     onSuccess: (published) => {
+      setDraftId(published.id);
       setCurrentStatus(ActivityStatus.published);
+      setHasAttemptsConflict(false);
       onActivityUpdated?.(published);
-      if (initialActivity?.id) {
-        queryClient.setQueryData(['teacher', 'activity', initialActivity.id], published);
-      }
+      queryClient.setQueryData(['teacher', 'activity', published.id], published);
       queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      if (published.weightsAdjusted) setWeightsAdjustedNotice(true);
       setSuccess('¡Actividad publicada exitosamente! Ya está disponible en el catálogo.');
-      router.refresh();
+      if (!initialActivity?.id) {
+        router.push(`/actividades/${published.id}`);
+      } else {
+        router.refresh();
+      }
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
@@ -1459,22 +1670,76 @@ export function ActivityEditorComponent({
         } else {
           setError(err.message);
         }
+      } else if (err instanceof Error) {
+        setError(err.message);
       } else {
         setError('Error al publicar la actividad');
       }
     },
   });
 
-  const isSaving = saveMutation.isPending || publishMutation.isPending;
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiFetch<ActivityEditor>(`/api/v1/activities/${id}/restore`, {
+        method: 'POST',
+        schema: ActivityEditorSchema,
+      });
+    },
+    onSuccess: (restored) => {
+      setCurrentStatus(restored.status);
+      setHasAttemptsConflict(false);
+      onActivityUpdated?.(restored);
+      if (initialActivity?.id) {
+        queryClient.setQueryData(['teacher', 'activity', initialActivity.id], restored);
+      }
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      setSuccess('Actividad restaurada al catálogo. Ya puedes editarla.');
+      router.refresh();
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError || err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('No se pudo restaurar la actividad');
+      }
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiFetch<ActivityEditor>(`/api/v1/activities/${id}/duplicate`, {
+        method: 'POST',
+        schema: ActivityEditorSchema,
+      });
+    },
+    onSuccess: (duplicated) => {
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'activities'] });
+      router.push(`/actividades/${duplicated.id}`);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError || err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('No se pudo duplicar la actividad');
+      }
+    },
+  });
+
+  const isArchived = isEditing && currentStatus === ActivityStatus.archived;
+  const isSaving =
+    saveMutation.isPending ||
+    publishMutation.isPending ||
+    restoreMutation.isPending ||
+    duplicateMutation.isPending;
 
   const handleSave = () => {
     setError(null);
     setSuccess(null);
     setWeightsAdjustedNotice(false);
+    setHasAttemptsConflict(false);
 
     try {
       const payload = buildPayload();
-      if (!payload) return;
       saveMutation.mutate(payload);
     } catch (err: unknown) {
       if (err instanceof ApiError || err instanceof Error) {
@@ -1486,648 +1751,908 @@ export function ActivityEditorComponent({
   };
 
   const handlePublish = () => {
+    setError(null);
+    setSuccess(null);
+    setWeightsAdjustedNotice(false);
+    setHasAttemptsConflict(false);
+
+    if (isEditing && initialActivity?.id) {
+      if (type === ActivityType.exam && examItems.length < 2) {
+        setError('Un examen debe tener al menos 2 oraciones para ser publicado.');
+        return;
+      }
+      publishMutation.mutate(undefined);
+      return;
+    }
+
+    try {
+      const payload = buildPayload();
+      if (type === ActivityType.exam && examItems.length < 2) {
+        setError('Un examen debe tener al menos 2 oraciones para ser publicado.');
+        return;
+      }
+      publishMutation.mutate(payload);
+    } catch (err: unknown) {
+      if (err instanceof ApiError || err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Error al publicar la actividad');
+      }
+    }
+  };
+
+  const handleRestore = () => {
     if (!initialActivity?.id) return;
     setError(null);
     setSuccess(null);
-    publishMutation.mutate(initialActivity.id);
+    setHasAttemptsConflict(false);
+    restoreMutation.mutate(initialActivity.id);
   };
 
+  const handleDuplicate = () => {
+    if (!initialActivity?.id) return;
+    setError(null);
+    setSuccess(null);
+    duplicateMutation.mutate(initialActivity.id);
+  };
+
+  const examTotalWeight = examItems.reduce(
+    (acc, it) => acc + (parseFloat(it.weight || '0') || 0),
+    0,
+  );
+  const examWeightFormatted = examTotalWeight.toFixed(1).replace('.', ',');
+  const examNormalizedItems = (() => {
+    if (type !== ActivityType.exam || examItems.length === 0 || examTotalWeight <= 0) {
+      return null;
+    }
+    const itemsWithNumericWeight = examItems.map((it, idx) => {
+      const parsed = parseFloat(it.weight || '0');
+      return {
+        id: it.id || `exam-item-${idx}`,
+        weight: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+      };
+    });
+    const sum = itemsWithNumericWeight.reduce((acc, it) => acc + it.weight, 0);
+    if (sum <= 0) return null;
+    return normalizeExamWeights(itemsWithNumericWeight);
+  })();
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/actividades" className="hover:text-zinc-900">
-          Catálogo de Actividades
+    <div
+      className={
+        type === ActivityType.exam ? `${styles.container} ${styles.containerExam}` : styles.container
+      }
+    >
+      {/* Top Bar: Back link & Breadcrumb */}
+      <div className={styles.topBar}>
+        <Link href="/actividades" className={styles.backLink}>
+          <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+          Volver a actividades
         </Link>
-        <span>/</span>
-        <span className="text-zinc-800 font-medium truncate">
-          {isEditing ? title || 'Sin título' : 'Nueva actividad'}
-        </span>
+        <nav aria-label="Migas de pan de la actividad" className={styles.breadcrumbNav}>
+          <Link href="/actividades" className={styles.breadcrumbLink}>
+            Actividades
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span
+            lang={isEditing && title ? 'en' : undefined}
+            className={styles.breadcrumbCurrent}
+          >
+            {isEditing ? title || 'Sin título' : 'Nueva actividad'}
+          </span>
+        </nav>
       </div>
 
-      {/* Title & Actions Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            {isEditing ? 'Editor de actividad' : 'Nueva actividad'}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                currentStatus === ActivityStatus.published
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : currentStatus === ActivityStatus.archived
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-zinc-100 text-zinc-700'
-              }`}
-            >
-              {currentStatus === ActivityStatus.published
-                ? 'Publicada'
-                : currentStatus === ActivityStatus.archived
-                  ? 'Archivada'
-                  : 'Borrador'}
+      {/* Editorial Header */}
+      <header className={styles.headerBlock}>
+        <h1 id="activity-editor-heading" className={styles.title}>
+          {isEditing ? 'Editor de actividad' : 'Nueva actividad'}
+        </h1>
+        {!isEditing && (
+          <p className={styles.subtitle}>
+            Diseña y publica actividades MCER (A1–B2) en menos de 10 minutos sin editar código.
+          </p>
+        )}
+        {isEditing && title && (
+          <p lang="en" className={styles.activitySubtitle}>
+            {title}
+          </p>
+        )}
+        <div className={styles.metaBadgeRow}>
+          <TeacherStatusBadge kind={statusBadgeKinds[currentStatus]} />
+          <span className={styles.typePill}>{activityTypeLabels[type]}</span>
+          {isEditing && (
+            <span className={styles.versionText}>
+              Versión {initialActivity?.version ?? 1}
             </span>
-            {isEditing && (
-              <span className="text-xs text-zinc-500">
-                Versión {initialActivity?.version}
-              </span>
-            )}
+          )}
+        </div>
+      </header>
+
+      {/* Contextual Status Notices */}
+      {isEditing && currentStatus === ActivityStatus.published && (
+        <div className={styles.calloutBanner} role="note">
+          <div className={styles.bannerLead}>
+            <Info size={18} strokeWidth={1.75} aria-hidden="true" />
+            <p className={styles.bannerText}>
+              Esta actividad está publicada. Los cambios guardados aplican únicamente a nuevos
+              inicios sin alterar entregas cerradas ni calificadas, conservando los identificadores
+              de cada ítem y hueco. Si ya existen intentos de alumnos, deberás duplicarla para
+              crear una nueva versión editable.
+            </p>
           </div>
         </div>
+      )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPreviewOpen(true)}
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-500 min-h-[44px] flex items-center gap-1.5"
-          >
-            <span>👁️</span>
-            <span>Previsualizar</span>
-          </button>
-
-          {isEditing && currentStatus === ActivityStatus.draft && (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={isSaving}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 min-h-[44px]"
-            >
-              Publicar
-            </button>
-          )}
-
-          {currentStatus !== ActivityStatus.archived && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 min-h-[44px]"
-            >
-              {isSaving ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Crear borrador'}
-            </button>
-          )}
+      {isArchived && (
+        <div className={styles.archivedBanner} role="note">
+          <div className={styles.bannerLead}>
+            <Archive size={18} strokeWidth={1.75} aria-hidden="true" />
+            <p className={styles.bannerText}>
+              Esta actividad está archivada y no admite edición directa. Restáurala al catálogo
+              desde el pie de acciones o regresa al listado de actividades.
+            </p>
+          </div>
+          <div className={styles.bannerActions}>
+            <Link href="/actividades" className={styles.secondaryButton}>
+              Ir al catálogo
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Alerts */}
       {error && (
-        <div
-          role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800"
-        >
-          {error}
+        <div ref={alertRef} tabIndex={-1} role="alert" className={styles.errorBanner}>
+          <div className={styles.bannerLead}>
+            <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+            <p className={styles.bannerText}>{error}</p>
+          </div>
+          {hasAttemptsConflict && isEditing && initialActivity?.id && (
+            <div className={styles.bannerActions}>
+              <button
+                type="button"
+                onClick={handleDuplicate}
+                disabled={isSaving}
+                className={styles.secondaryButton}
+              >
+                <Copy size={16} strokeWidth={1.75} aria-hidden="true" />
+                {duplicateMutation.isPending ? 'Duplicando…' : 'Duplicar actividad'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {success && (
-        <div
-          role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800"
-        >
-          {success}
+        <div role="status" className={styles.successBanner}>
+          <div className={styles.bannerLead}>
+            <CheckCircle2 size={18} strokeWidth={1.75} aria-hidden="true" />
+            <p className={styles.bannerText}>{success}</p>
+          </div>
         </div>
       )}
 
       {weightsAdjustedNotice && (
-        <div
-          role="status"
-          className="rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800"
-        >
-          Los pesos de las oraciones del examen fueron ajustados automáticamente en décimas para
-          sumar exactamente 100.0%.
+        <div role="status" className={styles.calloutBanner}>
+          <div className={styles.bannerLead}>
+            <Info size={18} strokeWidth={1.75} aria-hidden="true" />
+            <p className={styles.bannerText}>
+              Los pesos de las oraciones del examen fueron ajustados automáticamente en décimas
+              para sumar exactamente 100,0 %.
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Metadata Form */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-5">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
-          Información básica
-        </h2>
-
-        {/* Title */}
-        <div>
-          <label htmlFor="activity-title" className="block text-sm font-semibold text-zinc-800 mb-1">
-            Título de la actividad *
-          </label>
-          <input
-            id="activity-title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={100}
-            placeholder="Ej. Simple Present vs Continuous"
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="mt-1 text-xs text-zinc-500">{title.length}/100 caracteres</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Level */}
-          <div>
-            <label htmlFor="activity-level" className="block text-sm font-semibold text-zinc-800 mb-1">
-              Nivel pedagógico *
-            </label>
-            <select
-              id="activity-level"
-              value={level}
-              onChange={(e) => {
-                if (isLevel(e.target.value)) setLevel(e.target.value);
-              }}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value={Level.A1}>A1 — Principiante inicial</option>
-              <option value={Level.A2}>A2 — Principiante elemental</option>
-              <option value={Level.B1}>B1 — Intermedio</option>
-              <option value={Level.B2}>B2 — Intermedio alto</option>
-            </select>
-          </div>
-
-          {/* Type Selector (only before creation) */}
-          <div>
-            <label htmlFor="activity-type" className="block text-sm font-semibold text-zinc-800 mb-1">
-              Tipo de actividad
-            </label>
-            <select
-              id="activity-type"
-              value={type}
-              disabled={isEditing}
-              onChange={(e) => {
-                if (isActivityType(e.target.value)) setType(e.target.value);
-              }}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-100 disabled:cursor-not-allowed"
-            >
-              <option value={ActivityType.fill_blank}>Rellenar huecos (Fill in the blanks)</option>
-              <option value={ActivityType.open_question}>Pregunta abierta (Open question)</option>
-              <option value={ActivityType.speaking}>Expresión oral (Speaking)</option>
-              <option value={ActivityType.game}>Microjuego (Game)</option>
-              <option value={ActivityType.exam}>Examen (Exam)</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Durations */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          <div>
-            <label htmlFor="exp-duration" className="block text-xs font-semibold text-zinc-700 mb-1">
-              Duración esperada (segundos, opcional)
-            </label>
-            <input
-              id="exp-duration"
-              type="number"
-              min="1"
-              value={expectedDuration}
-              onChange={(e) => setExpectedDuration(e.target.value)}
-              placeholder="Default según tipo"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="min-duration" className="block text-xs font-semibold text-zinc-700 mb-1">
-              Mínimo plausible (segundos)
-            </label>
-            <input
-              id="min-duration"
-              type="number"
-              min="1"
-              value={type === ActivityType.speaking ? '2' : minPlausible}
-              disabled={type === ActivityType.speaking}
-              onChange={(e) => setMinPlausible(e.target.value)}
-              placeholder={type === ActivityType.speaking ? '2 (fijo)' : 'Default según tipo'}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-100"
-            />
-            {type === ActivityType.speaking && (
-              <p className="mt-1 text-xs text-zinc-500">
-                La duración mínima para Speaking es fija de 2 segundos.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Content Form by Type */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm space-y-5">
-        <h2 className="text-base font-bold text-zinc-900 border-b border-zinc-100 pb-2">
-          Contenido de la actividad
-        </h2>
-
-        {/* FILL BLANK */}
-        {type === ActivityType.fill_blank && (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="fb-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Instrucciones (opcional)
-              </label>
-              <input
-                id="fb-instructions"
-                type="text"
-                value={fbInstructions}
-                onChange={(e) => setFbInstructions(e.target.value)}
-                maxLength={2000}
-                placeholder="Ej. Selecciona la opción correcta para completar la oración."
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-2">
-              <h3 className="text-sm font-bold text-zinc-800">
-                Oraciones con huecos ({fbItems.length})
-              </h3>
-              <button
-                type="button"
-                onClick={() => setFbItems([...fbItems, createDefaultSentence()])}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-              >
-                + Añadir oración
-              </button>
-            </div>
-
-            {fbItems.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-4"
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-zinc-800">Oración {idx + 1}</h4>
-                  {fbItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setFbItems(fbItems.filter((_, i) => i !== idx))}
-                      className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
-                      aria-label={`Eliminar oración ${idx + 1}`}
+      <fieldset disabled={isArchived} className={styles.editorFieldset}>
+        {/* Paso 1: Selector visual de ActivityType (y GameMechanic para game) en creación */}
+        {!isEditing && (
+          <section className={styles.card} aria-labelledby="editor-type-step">
+            <fieldset className={styles.typeFieldset}>
+              <legend id="editor-type-step" className={styles.typeLegend}>
+                1. Tipo de actividad
+              </legend>
+              <div className={styles.typeGrid}>
+                {activityTypeOptions.map((option) => {
+                  const Icon = option.icon;
+                  const selected = type === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={styles.typeCard}
+                      data-selected={selected ? 'true' : undefined}
                     >
-                      Eliminar oración
-                    </button>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor={`fb-prompt-${idx}`}
-                    className="block text-xs font-medium text-zinc-700 mb-1"
-                  >
-                    Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
-                  </label>
-                  <textarea
-                    id={`fb-prompt-${idx}`}
-                    aria-label={`Texto con hueco oración ${idx + 1}`}
-                    rows={2}
-                    value={item.prompt}
-                    onChange={(e) => handlePromptChange(idx, e.target.value, false)}
-                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-700">
-                      Huecos de esta oración ({item.blanks.length})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleAddBlank(idx, false)}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                    >
-                      + Añadir hueco
-                    </button>
-                  </div>
-
-                  {item.blanks.map((blank, bIdx) => (
-                    <div
-                      key={blank.id || bIdx}
-                      className="rounded-md border border-zinc-200 bg-white p-3 space-y-2.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-zinc-800">
-                            Espacio {bIdx + 1}
-                          </span>
-                          <code className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-mono">
-                            &#123;&#123;{blank.id}&#125;&#125;
-                          </code>
-                        </div>
-                        {item.blanks.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBlank(idx, bIdx, false)}
-                            className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
-                            aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
-                          >
-                            Eliminar espacio
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-medium text-zinc-600">
-                            Opciones ({blank.options.length}/6):
-                          </span>
-                          {blank.options.length < 6 && (
-                            <button
-                              type="button"
-                              onClick={() => handleAddOption(idx, bIdx, false)}
-                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                            >
-                              + Opción
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {blank.options.map((opt, oIdx) => (
-                            <div
-                              key={opt.id || oIdx}
-                              className="flex items-center gap-2 bg-zinc-50 p-2 rounded border border-zinc-200"
-                            >
-                              <input
-                                type="text"
-                                aria-label={`Opción ${oIdx + 1} espacio ${bIdx + 1} oración ${idx + 1}`}
-                                placeholder={`Opción ${oIdx + 1}`}
-                                value={opt.text}
-                                onChange={(e) =>
-                                  handleOptionTextChange(idx, bIdx, oIdx, e.target.value, false)
-                                }
-                                className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-900 bg-white"
-                              />
-                              <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer shrink-0">
-                                <input
-                                  type="radio"
-                                  name={`correct-fb-${item.id || idx}-${blank.id || bIdx}`}
-                                  aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
-                                  checked={blank.correctOptionId === opt.id}
-                                  onChange={() =>
-                                    handleCorrectOptionChange(idx, bIdx, opt.id, false)
-                                  }
-                                />
-                                Correcta
-                              </label>
-                              {blank.options.length > 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveOption(idx, bIdx, oIdx, false)}
-                                  className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer px-1"
-                                  aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      <input
+                        type="radio"
+                        name="activity-type"
+                        value={option.value}
+                        checked={selected}
+                        onChange={() => {
+                          setType(option.value);
+                          setError(null);
+                        }}
+                        className={styles.visuallyHidden}
+                      />
+                      <span className={styles.typeCardTop}>
+                        <span className={styles.typeIcon}>
+                          <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+                        </span>
+                        <span className={styles.typeBadge}>{option.gradingTag}</span>
+                      </span>
+                      <span className={styles.typeName}>{option.label}</span>
+                      <span className={styles.typeDesc}>{option.description}</span>
+                    </label>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            </fieldset>
+
+            {type === ActivityType.game && (
+              <fieldset className={`${styles.typeFieldset} ${styles.mechanicBox}`}>
+                <legend className={styles.sectionHeading}>
+                  Mecánica del microjuego
+                </legend>
+                <div className={styles.mechanicGrid}>
+                  {gameMechanicOptions.map((mech) => {
+                    const selected = gameMechanic === mech.value;
+                    return (
+                      <label
+                        key={mech.value}
+                        className={styles.mechanicCard}
+                        data-selected={selected ? 'true' : undefined}
+                      >
+                        <input
+                          type="radio"
+                          name="game-mechanic"
+                          value={mech.value}
+                          checked={selected}
+                          onChange={() => setGameMechanic(mech.value)}
+                          className={styles.visuallyHidden}
+                        />
+                        <span className={styles.typeName}>{mech.label}</span>
+                        <span className={styles.typeDesc}>{mech.description}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )}
+          </section>
         )}
 
-        {/* EXAM */}
-        {type === ActivityType.exam && (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="exam-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Instrucciones del examen (opcional)
-              </label>
-              <input
-                id="exam-instructions"
-                type="text"
-                value={fbInstructions}
-                onChange={(e) => setFbInstructions(e.target.value)}
-                maxLength={2000}
-                placeholder="Ej. Lee con atención cada oración y completa con la forma verbal correcta."
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+        {/* Metadata Form */}
+        <section className={styles.card} aria-labelledby="editor-basic-info">
+          <h2 id="editor-basic-info" className={styles.cardTitle}>
+            {isEditing ? 'Información básica' : '2. Información básica'}
+          </h2>
 
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-800">
-                  Oraciones del examen ({examItems.length})
-                </h3>
-                <p className="text-xs text-zinc-500">
-                  Suma de pesos:{' '}
-                  {examItems
-                    .reduce((acc, it) => acc + (parseFloat(it.weight || '0') || 0), 0)
-                    .toFixed(1)}
-                  % (Debe sumar 100% para publicar)
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExamItems(balanceExamWeights(examItems))}
-                  className="text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1 rounded-md cursor-pointer"
-                >
-                  ⚖️ Balancear pesos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newItems = [...examItems, createDefaultSentence('0')];
-                    setExamItems(balanceExamWeights(newItems));
-                  }}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                >
-                  + Añadir oración
-                </button>
-              </div>
-            </div>
-
-            {examItems.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                className="rounded-lg border border-zinc-200 p-4 bg-zinc-50 space-y-4"
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-zinc-800">
-                    Oración {idx + 1} (Peso: {item.weight || '0'}%)
-                  </h4>
-                  {examItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const filtered = examItems.filter((_, i) => i !== idx);
-                        setExamItems(balanceExamWeights(filtered));
-                      }}
-                      className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
-                      aria-label={`Eliminar oración ${idx + 1}`}
-                    >
-                      Eliminar oración
-                    </button>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor={`exam-w${idx + 1}`}
-                    className="block text-xs font-medium text-zinc-700 mb-1"
-                  >
-                    Peso de la oración (0-100%):
+          <div className={styles.sectionBody}>
+            {isEditing ? (
+              <>
+                {/* Title */}
+                <div className={styles.field}>
+                  <label htmlFor="activity-title" className={styles.label}>
+                    Título de la actividad *
                   </label>
                   <input
-                    id={`exam-w${idx + 1}`}
-                    aria-label={`Peso de la oración ${idx + 1}`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={item.weight ?? '0'}
-                    onChange={(e) =>
-                      setExamItems(
-                        examItems.map((it, i) => (i === idx ? { ...it, weight: e.target.value } : it)),
-                      )
-                    }
-                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
+                    id="activity-title"
+                    type="text"
+                    lang="en"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    maxLength={100}
+                    placeholder="Ej. Simple Present vs Continuous"
+                    className={styles.input}
                   />
+                  <p className={`${styles.helperText} ${styles.tabular}`}>
+                    {title.length}/100 caracteres
+                  </p>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor={`exam-prompt-${idx}`}
-                    className="block text-xs font-medium text-zinc-700 mb-1"
-                  >
-                    Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
-                  </label>
-                  <textarea
-                    id={`exam-prompt-${idx}`}
-                    aria-label={`Texto con hueco oración ${idx + 1}`}
-                    rows={2}
-                    value={item.prompt}
-                    onChange={(e) => handlePromptChange(idx, e.target.value, true)}
-                    className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-700">
-                      Huecos de esta oración ({item.blanks.length})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleAddBlank(idx, true)}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                <div className={styles.gridTwo}>
+                  {/* Level */}
+                  <div className={styles.field}>
+                    <label htmlFor="activity-level" className={styles.label}>
+                      Nivel pedagógico *
+                    </label>
+                    <select
+                      id="activity-level"
+                      value={level}
+                      onChange={(e) => {
+                        if (isLevel(e.target.value)) setLevel(e.target.value);
+                      }}
+                      className={styles.select}
                     >
-                      + Añadir hueco
-                    </button>
+                      <option value={Level.A1}>A1 — Principiante inicial</option>
+                      <option value={Level.A2}>A2 — Principiante elemental</option>
+                      <option value={Level.B1}>B1 — Intermedio</option>
+                      <option value={Level.B2}>B2 — Intermedio alto</option>
+                    </select>
                   </div>
 
-                  {item.blanks.map((blank, bIdx) => (
-                    <div
-                      key={blank.id || bIdx}
-                      className="rounded-md border border-zinc-200 bg-white p-3 space-y-2.5"
+                  {/* Type Selector (only before creation) */}
+                  <div className={styles.field}>
+                    <label htmlFor="activity-type" className={styles.label}>
+                      Tipo de actividad
+                    </label>
+                    <select
+                      id="activity-type"
+                      value={type}
+                      disabled={isEditing}
+                      onChange={(e) => {
+                        if (isActivityType(e.target.value)) setType(e.target.value);
+                      }}
+                      className={styles.select}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-zinc-800">
-                            Espacio {bIdx + 1}
-                          </span>
-                          <code className="text-[11px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-mono">
-                            &#123;&#123;{blank.id}&#125;&#125;
-                          </code>
-                        </div>
-                        {item.blanks.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBlank(idx, bIdx, true)}
-                            className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
-                            aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
-                          >
-                            Eliminar espacio
-                          </button>
-                        )}
-                      </div>
+                      <option value={ActivityType.fill_blank}>
+                        Completar espacios (Fill in the blanks)
+                      </option>
+                      <option value={ActivityType.open_question}>
+                        Pregunta abierta (Open question)
+                      </option>
+                      <option value={ActivityType.speaking}>
+                        Expresión oral (Speaking)
+                      </option>
+                      <option value={ActivityType.game}>Microjuego (Game)</option>
+                      <option value={ActivityType.exam}>Examen (Exam)</option>
+                    </select>
+                    <p className={styles.helperText}>
+                      <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+                      El tipo de actividad no puede cambiarse después de creada.
+                    </p>
+                  </div>
+                </div>
 
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-medium text-zinc-600">
-                            Opciones ({blank.options.length}/6):
-                          </span>
-                          {blank.options.length < 6 && (
+                {/* Durations */}
+                <div className={styles.gridTwo}>
+                  <div className={styles.field}>
+                    <label htmlFor="exp-duration" className={styles.labelCompact}>
+                      Duración esperada (segundos, opcional)
+                    </label>
+                    <input
+                      id="exp-duration"
+                      type="number"
+                      min="1"
+                      value={expectedDuration}
+                      onChange={(e) => setExpectedDuration(e.target.value)}
+                      placeholder="Default según tipo"
+                      className={`${styles.input} ${styles.tabular}`}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor="min-duration" className={styles.labelCompact}>
+                      Mínimo plausible (segundos)
+                    </label>
+                    <input
+                      id="min-duration"
+                      type="number"
+                      min="1"
+                      value={type === ActivityType.speaking ? '2' : minPlausible}
+                      disabled={type === ActivityType.speaking}
+                      onChange={(e) => setMinPlausible(e.target.value)}
+                      placeholder={type === ActivityType.speaking ? '2 (fijo)' : 'Default según tipo'}
+                      className={`${styles.input} ${styles.tabular}`}
+                    />
+                    {type === ActivityType.speaking && (
+                      <p className={styles.helperText}>
+                        La duración mínima para Speaking es fija de 2 segundos.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.metaPrimaryGrid}>
+                  <div className={styles.field}>
+                    <label htmlFor="activity-title" className={styles.label}>
+                      Título de la actividad *
+                    </label>
+                    <input
+                      id="activity-title"
+                      type="text"
+                      lang="en"
+                      required
+                      aria-describedby="activity-title-count"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      maxLength={100}
+                      placeholder="Ej. Simple Present vs Continuous"
+                      className={styles.input}
+                    />
+                    <p id="activity-title-count" className={`${styles.helperText} ${styles.tabular}`}>
+                      {title.length}/100 caracteres
+                    </p>
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor="activity-level" className={styles.label}>
+                      Nivel MCER *
+                    </label>
+                    <select
+                      id="activity-level"
+                      value={level}
+                      onChange={(e) => {
+                        if (isLevel(e.target.value)) setLevel(e.target.value);
+                      }}
+                      className={styles.select}
+                    >
+                      <option value={Level.A1}>A1 — Principiante</option>
+                      <option value={Level.A2}>A2 — Elemental</option>
+                      <option value={Level.B1}>B1 — Intermedio</option>
+                      <option value={Level.B2}>B2 — Intermedio alto</option>
+                    </select>
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor="exp-duration" className={styles.label}>
+                      Duración esperada (s)
+                    </label>
+                    <input
+                      id="exp-duration"
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      value={expectedDuration}
+                      onChange={(e) => setExpectedDuration(e.target.value)}
+                      placeholder="Default según tipo"
+                      className={`${styles.input} ${styles.tabular}`}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.gridTwo}>
+                  <div className={styles.field}>
+                    <label htmlFor="min-duration" className={styles.labelCompact}>
+                      Mínimo plausible (segundos, opcional)
+                    </label>
+                    <input
+                      id="min-duration"
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      value={type === ActivityType.speaking ? '2' : minPlausible}
+                      disabled={type === ActivityType.speaking}
+                      onChange={(e) => setMinPlausible(e.target.value)}
+                      placeholder={type === ActivityType.speaking ? '2 (fijo)' : 'Default según tipo'}
+                      className={`${styles.input} ${styles.tabular}`}
+                    />
+                    {type === ActivityType.speaking && (
+                      <p className={styles.helperText}>
+                        La duración mínima para Speaking es fija de 2 segundos.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* Content Form by Type */}
+        <section className={styles.card} aria-labelledby="editor-activity-content">
+          <h2 id="editor-activity-content" className={styles.cardTitle}>
+            Contenido de la actividad
+          </h2>
+
+          {/* FILL BLANK */}
+          {type === ActivityType.fill_blank && (
+            <div className={styles.sectionBody}>
+              <div className={styles.field}>
+                <label htmlFor="fb-instructions" className={styles.label}>
+                  Instrucciones (opcional)
+                </label>
+                <input
+                  id="fb-instructions"
+                  type="text"
+                  value={fbInstructions}
+                  onChange={(e) => setFbInstructions(e.target.value)}
+                  maxLength={2000}
+                  placeholder="Ej. Selecciona la opción correcta para completar la oración."
+                  className={styles.input}
+                />
+              </div>
+
+              <div className={styles.sectionToolbar}>
+                <h3 className={`${styles.sectionHeading} ${styles.tabular}`}>
+                  Oraciones con huecos ({fbItems.length})
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setFbItems([...fbItems, createDefaultSentence()])}
+                  className={styles.inlineAccentButton}
+                >
+                  <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                  Añadir oración
+                </button>
+              </div>
+
+              {fbItems.map((item, idx) => (
+                <div key={item.id || idx} className={styles.itemCard}>
+                  <div className={styles.itemCardHeader}>
+                    <h4 className={styles.itemTitle}>Oración {idx + 1}</h4>
+                    {fbItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setFbItems(fbItems.filter((_, i) => i !== idx))}
+                        className={styles.inlineDangerButton}
+                        aria-label={`Eliminar oración ${idx + 1}`}
+                      >
+                        <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
+                        Eliminar oración
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor={`fb-prompt-${idx}`} className={styles.labelCompact}>
+                      Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
+                    </label>
+                    <textarea
+                      id={`fb-prompt-${idx}`}
+                      lang="en"
+                      aria-label={`Texto con hueco oración ${idx + 1}`}
+                      rows={2}
+                      value={item.prompt}
+                      onChange={(e) => handlePromptChange(idx, e.target.value, false)}
+                      className={`${styles.textarea} ${styles.textareaMono}`}
+                    />
+                  </div>
+
+                  <div className={styles.sectionBody}>
+                    <div className={styles.sectionToolbar}>
+                      <span className={`${styles.labelCompact} ${styles.tabular}`}>
+                        Huecos de esta oración ({item.blanks.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddBlank(idx, false)}
+                        className={styles.inlineAccentButton}
+                      >
+                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                        Añadir hueco
+                      </button>
+                    </div>
+
+                    {item.blanks.map((blank, bIdx) => (
+                      <div key={blank.id || bIdx} className={styles.blankCard}>
+                        <div className={styles.blankHeader}>
+                          <div className={styles.blankTitleGroup}>
+                            <span className={styles.itemTitle}>Espacio {bIdx + 1}</span>
+                            <code className={styles.blankIdCode}>
+                              &#123;&#123;{blank.id}&#125;&#125;
+                            </code>
+                          </div>
+                          {item.blanks.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => handleAddOption(idx, bIdx, true)}
-                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                              onClick={() => handleRemoveBlank(idx, bIdx, false)}
+                              className={styles.inlineDangerButton}
+                              aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
                             >
-                              + Opción
+                              <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
+                              Eliminar espacio
                             </button>
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {blank.options.map((opt, oIdx) => (
-                            <div
-                              key={opt.id || oIdx}
-                              className="flex items-center gap-2 bg-zinc-50 p-2 rounded border border-zinc-200"
-                            >
-                              <input
-                                type="text"
-                                aria-label={`Opción ${oIdx + 1} espacio ${bIdx + 1} oración ${idx + 1}`}
-                                placeholder={`Opción ${oIdx + 1}`}
-                                value={opt.text}
-                                onChange={(e) =>
-                                  handleOptionTextChange(idx, bIdx, oIdx, e.target.value, true)
-                                }
-                                className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-900 bg-white"
-                              />
-                              <label className="flex items-center gap-1 text-xs text-emerald-700 font-medium cursor-pointer shrink-0">
+                        <div className={styles.sectionBody}>
+                          <div className={styles.sectionToolbar}>
+                            <span className={`${styles.labelCompact} ${styles.tabular}`}>
+                              Opciones ({blank.options.length}/6):
+                            </span>
+                            {blank.options.length < 6 && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddOption(idx, bIdx, false)}
+                                className={styles.inlineAccentButton}
+                              >
+                                <Plus size={14} strokeWidth={2} aria-hidden="true" />
+                                Opción
+                              </button>
+                            )}
+                          </div>
+
+                          <div className={styles.optionsGrid}>
+                            {blank.options.map((opt, oIdx) => (
+                              <div key={opt.id || oIdx} className={styles.optionRow}>
                                 <input
-                                  type="radio"
-                                  name={`correct-exam-${item.id || idx}-${blank.id || bIdx}`}
-                                  aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
-                                  checked={blank.correctOptionId === opt.id}
-                                  onChange={() =>
-                                    handleCorrectOptionChange(idx, bIdx, opt.id, true)
+                                  type="text"
+                                  lang="en"
+                                  aria-label={`Opción ${oIdx + 1} espacio ${bIdx + 1} oración ${idx + 1}`}
+                                  placeholder={`Opción ${oIdx + 1}`}
+                                  value={opt.text}
+                                  onChange={(e) =>
+                                    handleOptionTextChange(idx, bIdx, oIdx, e.target.value, false)
                                   }
+                                  className={`${styles.input} ${styles.inputCompact} ${styles.optionInput}`}
                                 />
-                                Correcta
-                              </label>
-                              {blank.options.length > 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveOption(idx, bIdx, oIdx, true)}
-                                  className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer px-1"
-                                  aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                          ))}
+                                <label className={styles.correctRadioLabel}>
+                                  <input
+                                    type="radio"
+                                    name={`correct-fb-${item.id || idx}-${blank.id || bIdx}`}
+                                    aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
+                                    checked={blank.correctOptionId === opt.id}
+                                    onChange={() =>
+                                      handleCorrectOptionChange(idx, bIdx, opt.id, false)
+                                    }
+                                  />
+                                  Correcta
+                                </label>
+                                {blank.options.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOption(idx, bIdx, oIdx, false)}
+                                    className={styles.iconDangerButton}
+                                    aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* EXAM */}
+          {type === ActivityType.exam && (
+            <div className={styles.sectionBody}>
+              <div className={styles.field}>
+                <label htmlFor="exam-instructions" className={styles.label}>
+                  Instrucciones del examen (opcional)
+                </label>
+                <input
+                  id="exam-instructions"
+                  type="text"
+                  value={fbInstructions}
+                  onChange={(e) => setFbInstructions(e.target.value)}
+                  maxLength={2000}
+                  placeholder="Ej. Lee con atención cada oración y completa con la forma verbal correcta."
+                  className={styles.input}
+                />
+              </div>
+
+              <div className={styles.examWeightBar}>
+                <div className={styles.examWeightMeta}>
+                  <h3 className={`${styles.sectionHeading} ${styles.tabular}`}>
+                    Oraciones del examen ({examItems.length})
+                  </h3>
+                  <p className={`${styles.helperText} ${styles.tabular}`}>
+                    Suma de pesos: <strong>{examWeightFormatted} %</strong> (Debe sumar 100,0 %
+                    para publicar)
+                  </p>
+                  {examItems.length < 2 && (
+                    <p className={styles.examWeightWarning} role="status">
+                      Se requieren al menos 2 oraciones para publicar el examen.
+                    </p>
+                  )}
+                  {examNormalizedItems && (
+                    <div className={styles.examNormList} aria-label="Normalización proporcional al 100 %">
+                      <span className={`${styles.labelCompact} ${styles.tabular}`}>
+                        Normalización proporcional (100 %):
+                      </span>
+                      {examNormalizedItems.items.map((norm, nIdx) => (
+                        <span key={norm.id} className={`${styles.examNormRow} ${styles.tabular}`}>
+                          Oración {nIdx + 1}: {norm.weight.toFixed(1).replace('.', ',')} %
+                        </span>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+                <div className={styles.toolbarActions}>
+                  <button
+                    type="button"
+                    onClick={() => setExamItems(balanceExamWeights(examItems))}
+                    className={styles.secondaryButton}
+                  >
+                    <Scale size={15} strokeWidth={1.75} aria-hidden="true" />
+                    Balancear pesos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newItems = [...examItems, createDefaultSentence('0')];
+                      setExamItems(balanceExamWeights(newItems));
+                    }}
+                    className={styles.inlineAccentButton}
+                  >
+                    <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                    Añadir oración
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* OPEN QUESTION (RFC-01: multi-pregunta) */}
-        {type === ActivityType.open_question && (
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="oq-instructions" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Instrucciones generales de la actividad (opcional)
-              </label>
-              <input
-                id="oq-instructions"
-                type="text"
-                placeholder="Ej. Responde a las siguientes preguntas en inglés con oraciones completas."
-                value={oqInstructions}
-                onChange={(e) => setOqInstructions(e.target.value)}
-                maxLength={2000}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {examItems.map((item, idx) => (
+                <div key={item.id || idx} className={styles.itemCard}>
+                  <div className={styles.itemCardHeader}>
+                    <h4 className={`${styles.itemTitle} ${styles.tabular}`}>
+                      Oración {idx + 1} (Peso: {(item.weight || '0').replace('.', ',')} %)
+                    </h4>
+                    {examItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filtered = examItems.filter((_, i) => i !== idx);
+                          setExamItems(balanceExamWeights(filtered));
+                        }}
+                        className={styles.inlineDangerButton}
+                        aria-label={`Eliminar oración ${idx + 1}`}
+                      >
+                        <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
+                        Eliminar oración
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor={`exam-w${idx + 1}`} className={styles.labelCompact}>
+                      Peso de la oración (0-100%):
+                    </label>
+                    <input
+                      id={`exam-w${idx + 1}`}
+                      aria-label={`Peso de la oración ${idx + 1}`}
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={item.weight ?? '0'}
+                      onChange={(e) =>
+                        setExamItems(
+                          examItems.map((it, i) =>
+                            i === idx ? { ...it, weight: e.target.value } : it,
+                          ),
+                        )
+                      }
+                      className={`${styles.input} ${styles.inputCompact} ${styles.inputNumberShort} ${styles.tabular}`}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label htmlFor={`exam-prompt-${idx}`} className={styles.labelCompact}>
+                      Texto de la oración (los huecos se marcan con <code>&#123;&#123;id&#125;&#125;</code>):
+                    </label>
+                    <textarea
+                      id={`exam-prompt-${idx}`}
+                      lang="en"
+                      aria-label={`Texto con hueco oración ${idx + 1}`}
+                      rows={2}
+                      value={item.prompt}
+                      onChange={(e) => handlePromptChange(idx, e.target.value, true)}
+                      className={`${styles.textarea} ${styles.textareaMono}`}
+                    />
+                  </div>
+
+                  <div className={styles.sectionBody}>
+                    <div className={styles.sectionToolbar}>
+                      <span className={`${styles.labelCompact} ${styles.tabular}`}>
+                        Huecos de esta oración ({item.blanks.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddBlank(idx, true)}
+                        className={styles.inlineAccentButton}
+                      >
+                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                        Añadir hueco
+                      </button>
+                    </div>
+
+                    {item.blanks.map((blank, bIdx) => (
+                      <div key={blank.id || bIdx} className={styles.blankCard}>
+                        <div className={styles.blankHeader}>
+                          <div className={styles.blankTitleGroup}>
+                            <span className={styles.itemTitle}>Espacio {bIdx + 1}</span>
+                            <code className={styles.blankIdCode}>
+                              &#123;&#123;{blank.id}&#125;&#125;
+                            </code>
+                          </div>
+                          {item.blanks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBlank(idx, bIdx, true)}
+                              className={styles.inlineDangerButton}
+                              aria-label={`Eliminar espacio ${bIdx + 1} de oración ${idx + 1}`}
+                            >
+                              <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
+                              Eliminar espacio
+                            </button>
+                          )}
+                        </div>
+
+                        <div className={styles.sectionBody}>
+                          <div className={styles.sectionToolbar}>
+                            <span className={`${styles.labelCompact} ${styles.tabular}`}>
+                              Opciones ({blank.options.length}/6):
+                            </span>
+                            {blank.options.length < 6 && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddOption(idx, bIdx, true)}
+                                className={styles.inlineAccentButton}
+                              >
+                                <Plus size={14} strokeWidth={2} aria-hidden="true" />
+                                Opción
+                              </button>
+                            )}
+                          </div>
+
+                          <div className={styles.optionsGrid}>
+                            {blank.options.map((opt, oIdx) => (
+                              <div key={opt.id || oIdx} className={styles.optionRow}>
+                                <input
+                                  type="text"
+                                  lang="en"
+                                  aria-label={`Opción ${oIdx + 1} espacio ${bIdx + 1} oración ${idx + 1}`}
+                                  placeholder={`Opción ${oIdx + 1}`}
+                                  value={opt.text}
+                                  onChange={(e) =>
+                                    handleOptionTextChange(idx, bIdx, oIdx, e.target.value, true)
+                                  }
+                                  className={`${styles.input} ${styles.inputCompact} ${styles.optionInput}`}
+                                />
+                                <label className={styles.correctRadioLabel}>
+                                  <input
+                                    type="radio"
+                                    name={`correct-exam-${item.id || idx}-${blank.id || bIdx}`}
+                                    aria-label={`Marcar opción ${oIdx + 1} como correcta para espacio ${bIdx + 1} oración ${idx + 1}`}
+                                    checked={blank.correctOptionId === opt.id}
+                                    onChange={() =>
+                                      handleCorrectOptionChange(idx, bIdx, opt.id, true)
+                                    }
+                                  />
+                                  Correcta
+                                </label>
+                                {blank.options.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOption(idx, bIdx, oIdx, true)}
+                                    className={styles.iconDangerButton}
+                                    aria-label={`Eliminar opción ${oIdx + 1} de espacio ${bIdx + 1} oración ${idx + 1}`}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-zinc-900">
+          {/* OPEN QUESTION (RFC-01: multi-pregunta) */}
+          {type === ActivityType.open_question && (
+            <div className={styles.sectionBody}>
+              <div className={styles.field}>
+                <label htmlFor="oq-instructions" className={styles.label}>
+                  Instrucciones generales de la actividad (opcional)
+                </label>
+                <input
+                  id="oq-instructions"
+                  type="text"
+                  placeholder="Ej. Responde a las siguientes preguntas en inglés con oraciones completas."
+                  value={oqInstructions}
+                  onChange={(e) => setOqInstructions(e.target.value)}
+                  maxLength={2000}
+                  className={styles.input}
+                />
+              </div>
+
+              <div className={styles.sectionToolbar}>
+                <span className={`${styles.sectionHeading} ${styles.tabular}`}>
                   Preguntas abiertas ({oqQuestions.length})
                 </span>
                 <button
@@ -2143,45 +2668,39 @@ export function ActivityEditorComponent({
                       },
                     ])
                   }
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition-colors cursor-pointer"
+                  className={styles.inlineAccentButton}
                 >
-                  <span>+</span>
-                  <span>Agregar otra pregunta</span>
+                  <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                  Agregar otra pregunta
                 </button>
               </div>
 
               {oqQuestions.map((q, idx) => (
-                <div
-                  key={q.id || idx}
-                  className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3 relative"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black uppercase text-zinc-600 tracking-wide">
-                      Pregunta #{idx + 1}
-                    </span>
+                <div key={q.id || idx} className={styles.itemCard}>
+                  <div className={styles.itemCardHeader}>
+                    <span className={styles.itemTitle}>Pregunta #{idx + 1}</span>
                     {oqQuestions.length > 1 && (
                       <button
                         type="button"
                         onClick={() =>
                           setOqQuestions((prev) => prev.filter((_, i) => i !== idx))
                         }
-                        className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded transition-colors"
+                        className={styles.inlineDangerButton}
                         aria-label={`Eliminar pregunta ${idx + 1}`}
                       >
+                        <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
                         Eliminar pregunta
                       </button>
                     )}
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor={`oq-prompt-${idx}`}
-                      className="block text-xs font-semibold text-zinc-700 mb-1"
-                    >
+                  <div className={styles.field}>
+                    <label htmlFor={`oq-prompt-${idx}`} className={styles.labelCompact}>
                       Consigna / Pregunta *
                     </label>
                     <textarea
                       id={`oq-prompt-${idx}`}
+                      lang="en"
                       rows={3}
                       value={q.prompt}
                       onChange={(e) =>
@@ -2193,16 +2712,13 @@ export function ActivityEditorComponent({
                       }
                       maxLength={5000}
                       placeholder="Escribe la consigna en inglés..."
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={styles.textarea}
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label
-                        htmlFor={`oq-rubric-${idx}`}
-                        className="block text-xs font-semibold text-zinc-700 mb-1"
-                      >
+                  <div className={styles.gridTwo}>
+                    <div className={styles.field}>
+                      <label htmlFor={`oq-rubric-${idx}`} className={styles.labelCompact}>
                         Rúbrica (opcional)
                       </label>
                       <input
@@ -2218,15 +2734,12 @@ export function ActivityEditorComponent({
                         }
                         maxLength={2000}
                         placeholder="Ej. Vocabulario y tiempos verbales"
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900"
+                        className={`${styles.input} ${styles.inputCompact}`}
                       />
                     </div>
 
-                    <div>
-                      <label
-                        htmlFor={`oq-max-len-${idx}`}
-                        className="block text-xs font-semibold text-zinc-700 mb-1"
-                      >
+                    <div className={styles.field}>
+                      <label htmlFor={`oq-max-len-${idx}`} className={styles.labelCompact}>
                         Límite de caracteres
                       </label>
                       <input
@@ -2242,550 +2755,668 @@ export function ActivityEditorComponent({
                             ),
                           )
                         }
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900"
+                        className={`${styles.input} ${styles.inputCompact} ${styles.tabular}`}
                       />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* SPEAKING */}
-        {type === ActivityType.speaking && (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="sp-prompt" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Consigna de grabación *
-              </label>
-              <textarea
-                id="sp-prompt"
-                rows={3}
-                value={spPrompt}
-                onChange={(e) => setSpPrompt(e.target.value)}
-                maxLength={5000}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="sp-url" className="block text-sm font-semibold text-zinc-800 mb-1">
-                URL de audio de ejemplo (HTTPS, opcional)
-              </label>
-              <input
-                id="sp-url"
-                type="url"
-                value={spExampleUrl}
-                onChange={(e) => setSpExampleUrl(e.target.value)}
-                placeholder="https://assets.upwardenglish.edu/samples/intro.mp3"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="sp-min-dur" className="block text-sm font-semibold text-zinc-800 mb-1">
-                  Duración mínima requerida
-                </label>
-                <input
-                  id="sp-min-dur"
-                  type="number"
-                  value={2}
-                  disabled
-                  readOnly
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm text-zinc-500 cursor-not-allowed"
-                />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Fijo en 2 segundos según las especificaciones pedagógicas (RF-5).
-                </p>
+          {/* SPEAKING */}
+          {type === ActivityType.speaking && (
+            <div className={styles.sectionBody}>
+              <div className={styles.calloutBanner} role="note">
+                <div className={styles.bannerLead}>
+                  <Info size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <p className={styles.bannerText}>
+                    Límites de grabación Speaking: mínimo fijo de 2 s, duración sugerida 120 s y
+                    tope máximo de 300 s.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="sp-max-dur" className="block text-sm font-semibold text-zinc-800 mb-1">
-                  Duración máxima de grabación (segundos, 2-300)
+              <div className={styles.field}>
+                <label htmlFor="sp-prompt" className={styles.label}>
+                  Consigna de grabación *
                 </label>
-                <input
-                  id="sp-max-dur"
-                  type="number"
-                  min="2"
-                  max="300"
-                  value={spMaxDuration}
-                  onChange={(e) => setSpMaxDuration(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                <textarea
+                  id="sp-prompt"
+                  lang="en"
+                  rows={3}
+                  value={spPrompt}
+                  onChange={(e) => setSpPrompt(e.target.value)}
+                  maxLength={5000}
+                  className={styles.textarea}
                 />
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* GAME: MECHANIC & SETTINGS */}
-        {type === ActivityType.game && (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="game-mechanic" className="block text-sm font-semibold text-zinc-800 mb-1">
-                Mecánica del microjuego {isEditing && '(no modificable tras creación)'}
-              </label>
-              <select
-                id="game-mechanic"
-                value={gameMechanic}
-                disabled={isEditing}
-                onChange={(e) => {
-                  if (isGameMechanicType(e.target.value)) setGameMechanic(e.target.value);
-                }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 disabled:bg-zinc-100 disabled:cursor-not-allowed"
-              >
-                <option value="order_words">Ordenar palabras (Order words)</option>
-                <option value="match">Emparejar (Match)</option>
-                <option value="drag_drop">Arrastrar y soltar (Drag & drop)</option>
-                <option value="memory">Memoria (Memory)</option>
-                <option value="timed_choice">Opción contra reloj (Timed choice)</option>
-              </select>
-              {isEditing && (
-                <p className="mt-1 text-xs text-zinc-500">
-                  La mecánica de un microjuego no se puede cambiar después de su creación.
-                </p>
-              )}
-            </div>
-
-            {/* 1. ORDER WORDS */}
-            {gameMechanic === 'order_words' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-2">
-                <label htmlFor="order-words" className="block text-sm font-semibold text-zinc-800 mb-1">
-                  Oración a ordenar (palabras separadas por espacios) *
+              <div className={styles.field}>
+                <label htmlFor="sp-url" className={styles.label}>
+                  URL de audio de ejemplo (HTTPS, opcional)
                 </label>
                 <input
-                  id="order-words"
-                  type="text"
-                  value={orderWordsText}
-                  onChange={(e) => setOrderWordsText(e.target.value)}
-                  placeholder="Ej. The dog plays in the garden"
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  id="sp-url"
+                  type="url"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={spExampleUrl}
+                  onChange={(e) => setSpExampleUrl(e.target.value)}
+                  placeholder="https://assets.upwardenglish.edu/samples/intro.mp3"
+                  className={styles.input}
                 />
-                <p className="text-xs text-zinc-500">
-                  El alumno recibirá las palabras desordenadas y deberá organizarlas en el orden exacto.
-                </p>
               </div>
-            )}
 
-            {/* 2. MATCH */}
-            {gameMechanic === 'match' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-800">Parejas a emparejar</h3>
-                    <p className="text-xs text-zinc-500">Mínimo 2 parejas.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMatchPairs([...matchPairs, { leftText: '', rightText: '' }])}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    + Añadir pareja
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {matchPairs.map((pair, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        id={`match-pair-left-${idx}`}
-                        aria-label={`Elemento izquierdo pareja ${idx + 1}`}
-                        type="text"
-                        placeholder="Elemento izquierdo (ej. Apple)"
-                        value={pair.leftText}
-                        onChange={(e) =>
-                          setMatchPairs(
-                            matchPairs.map((p, i) =>
-                              i === idx ? { ...p, leftText: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <span className="text-xs text-zinc-400">↔</span>
-                      <input
-                        id={`match-pair-right-${idx}`}
-                        aria-label={`Elemento derecho pareja ${idx + 1}`}
-                        type="text"
-                        placeholder="Elemento derecho (ej. Manzana)"
-                        value={pair.rightText}
-                        onChange={(e) =>
-                          setMatchPairs(
-                            matchPairs.map((p, i) =>
-                              i === idx ? { ...p, rightText: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <button
-                        type="button"
-                        disabled={matchPairs.length <= 2}
-                        onClick={() => setMatchPairs(matchPairs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
-                        title="Eliminar pareja"
-                        aria-label={`Eliminar pareja ${idx + 1}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 3. DRAG AND DROP */}
-            {gameMechanic === 'drag_drop' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-4">
-                {/* Targets */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-800">Categorías / Destinos</h3>
-                      <p className="text-xs text-zinc-500">Mínimo 2 destinos.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDragTargets([...dragTargets, { name: '' }])}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                    >
-                      + Añadir categoría
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {dragTargets.map((target, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-500 w-16">Cat. {idx + 1}:</span>
-                        <input
-                          id={`drag-target-${idx}`}
-                          aria-label={`Nombre de la categoría ${idx + 1}`}
-                          type="text"
-                          placeholder="Nombre del destino (ej. Fruits)"
-                          value={target.name}
-                          onChange={(e) =>
-                            setDragTargets(
-                              dragTargets.map((t, i) =>
-                                i === idx ? { ...t, name: e.target.value } : t,
-                              ),
-                            )
-                          }
-                          className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                        />
-                        <button
-                          type="button"
-                          disabled={dragTargets.length <= 2}
-                          onClick={() => {
-                            setDragTargets(dragTargets.filter((_, i) => i !== idx));
-                            setDragObjects(
-                              dragObjects.map((o) => ({
-                                ...o,
-                                targetIndex:
-                                  o.targetIndex >= idx
-                                    ? Math.max(0, o.targetIndex - 1)
-                                    : o.targetIndex,
-                              })),
-                            );
-                          }}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
-                          title="Eliminar categoría"
-                          aria-label={`Eliminar categoría ${idx + 1}`}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Objects */}
-                <div className="space-y-2 border-t border-zinc-200 pt-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-800">Elementos a clasificar</h3>
-                      <p className="text-xs text-zinc-500">Mínimo 2 elementos.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDragObjects([...dragObjects, { text: '', targetIndex: 0 }])
-                      }
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                    >
-                      + Añadir elemento
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {dragObjects.map((obj, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          id={`drag-object-${idx}`}
-                          aria-label={`Texto del elemento a clasificar ${idx + 1}`}
-                          type="text"
-                          placeholder="Texto del elemento (ej. Orange)"
-                          value={obj.text}
-                          onChange={(e) =>
-                            setDragObjects(
-                              dragObjects.map((o, i) =>
-                                i === idx ? { ...o, text: e.target.value } : o,
-                              ),
-                            )
-                          }
-                          className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                        />
-                        <span className="text-xs text-zinc-500">→</span>
-                        <select
-                          id={`drag-target-select-${idx}`}
-                          aria-label={`Categoría asignada para el elemento ${idx + 1}`}
-                          value={obj.targetIndex}
-                          onChange={(e) =>
-                            setDragObjects(
-                              dragObjects.map((o, i) =>
-                                i === idx
-                                  ? { ...o, targetIndex: parseInt(e.target.value, 10) || 0 }
-                                  : o,
-                              ),
-                            )
-                          }
-                          className="rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 max-w-[150px]"
-                        >
-                          {dragTargets.map((t, tIdx) => (
-                            <option key={tIdx} value={tIdx}>
-                              {t.name || `Cat. ${tIdx + 1}`}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={dragObjects.length <= 2}
-                          onClick={() => setDragObjects(dragObjects.filter((_, i) => i !== idx))}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
-                          title="Eliminar elemento"
-                          aria-label={`Eliminar elemento a clasificar ${idx + 1}`}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 4. MEMORY */}
-            {gameMechanic === 'memory' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-800">Parejas de memoria</h3>
-                    <p className="text-xs text-zinc-500">
-                      Mínimo 2 parejas (4 tarjetas en total).
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMemoryPairs([...memoryPairs, { card1Text: '', card2Text: '' }])
-                    }
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                  >
-                    + Añadir pareja
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {memoryPairs.map((pair, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        id={`memory-card-1-${idx}`}
-                        aria-label={`Tarjeta 1 pareja ${idx + 1}`}
-                        type="text"
-                        placeholder="Tarjeta 1 (ej. Dog)"
-                        value={pair.card1Text}
-                        onChange={(e) =>
-                          setMemoryPairs(
-                            memoryPairs.map((p, i) =>
-                              i === idx ? { ...p, card1Text: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <span className="text-xs text-zinc-400">♥</span>
-                      <input
-                        id={`memory-card-2-${idx}`}
-                        aria-label={`Tarjeta 2 pareja ${idx + 1}`}
-                        type="text"
-                        placeholder="Tarjeta 2 (ej. Perro)"
-                        value={pair.card2Text}
-                        onChange={(e) =>
-                          setMemoryPairs(
-                            memoryPairs.map((p, i) =>
-                              i === idx ? { ...p, card2Text: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
-                      <button
-                        type="button"
-                        disabled={memoryPairs.length <= 2}
-                        onClick={() => setMemoryPairs(memoryPairs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed px-1 cursor-pointer"
-                        title="Eliminar pareja"
-                        aria-label={`Eliminar pareja de memoria ${idx + 1}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 5. TIMED CHOICE */}
-            {gameMechanic === 'timed_choice' && (
-              <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-4 space-y-4">
-                <div>
-                  <label htmlFor="timed-limit" className="block text-xs font-semibold text-zinc-700 mb-1">
-                    Tiempo límite por pregunta (segundos, 5-120) *
+              <div className={styles.gridTwo}>
+                <div className={styles.field}>
+                  <label htmlFor="sp-min-dur" className={styles.label}>
+                    Duración mínima requerida
                   </label>
                   <input
-                    id="timed-limit"
+                    id="sp-min-dur"
                     type="number"
-                    min="5"
-                    max="120"
-                    value={timedChoiceLimit}
-                    onChange={(e) => setTimedChoiceLimit(e.target.value)}
-                    className="w-32 rounded border border-zinc-300 px-2 py-1 text-xs"
+                    value={2}
+                    disabled
+                    readOnly
+                    className={`${styles.input} ${styles.tabular}`}
                   />
+                  <p className={styles.helperText}>
+                    Fijo en 2 segundos según las especificaciones pedagógicas (RF-5).
+                  </p>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className={styles.field}>
+                  <label htmlFor="sp-max-dur" className={styles.label}>
+                    Duración máxima de grabación (segundos, 2-300)
+                  </label>
+                  <input
+                    id="sp-max-dur"
+                    type="number"
+                    inputMode="numeric"
+                    min="2"
+                    max="300"
+                    value={spMaxDuration}
+                    onChange={(e) => setSpMaxDuration(e.target.value)}
+                    className={`${styles.input} ${styles.tabular}`}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* GAME: MECHANIC & SETTINGS */}
+          {type === ActivityType.game && (
+            <div className={styles.sectionBody}>
+              {isEditing && (
+                <div className={styles.field}>
+                  <label htmlFor="game-mechanic" className={styles.label}>
+                    Mecánica del microjuego (no modificable tras creación)
+                  </label>
+                  <select
+                    id="game-mechanic"
+                    value={gameMechanic}
+                    disabled={isEditing}
+                    onChange={(e) => {
+                      if (isGameMechanicType(e.target.value)) setGameMechanic(e.target.value);
+                    }}
+                    className={styles.select}
+                  >
+                    <option value="order_words">Ordenar palabras (Order words)</option>
+                    <option value="match">Emparejar (Match)</option>
+                    <option value="drag_drop">Arrastrar y soltar (Drag &amp; drop)</option>
+                    <option value="memory">Memoria (Memory)</option>
+                    <option value="timed_choice">Opción contra reloj (Timed choice)</option>
+                  </select>
+                  <p className={styles.helperText}>
+                    <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+                    La mecánica de un microjuego no se puede cambiar después de su creación.
+                  </p>
+                </div>
+              )}
+
+              {/* 1. ORDER WORDS */}
+              {gameMechanic === 'order_words' && (
+                <div className={styles.mechanicPanel}>
+                  <div className={styles.field}>
+                    <label htmlFor="order-words" className={styles.label}>
+                      Oración a ordenar (palabras separadas por espacios) *
+                    </label>
+                    <input
+                      id="order-words"
+                      lang="en"
+                      type="text"
+                      value={orderWordsText}
+                      onChange={(e) => setOrderWordsText(e.target.value)}
+                      placeholder="Ej. The dog plays in the garden"
+                      className={styles.input}
+                    />
+                    <p className={styles.helperText}>
+                      El alumno recibirá las palabras desordenadas y deberá organizarlas en el orden
+                      exacto.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. MATCH */}
+              {gameMechanic === 'match' && (
+                <div className={styles.mechanicPanel}>
+                  <div className={styles.sectionToolbar}>
                     <div>
-                      <h3 className="text-sm font-bold text-zinc-800">Preguntas contra reloj</h3>
-                      <p className="text-xs text-zinc-500">Mínimo 1 pregunta.</p>
+                      <h3 className={styles.sectionHeading}>Parejas a emparejar</h3>
+                      <p className={styles.helperText}>Mínimo 2 parejas.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMatchPairs([...matchPairs, { leftText: '', rightText: '' }])}
+                      className={styles.inlineAccentButton}
+                    >
+                      <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                      Añadir pareja
+                    </button>
+                  </div>
+                  <div className={styles.pairList}>
+                    {matchPairs.map((pair, idx) => (
+                      <div key={idx} className={styles.pairRow}>
+                        <input
+                          id={`match-pair-left-${idx}`}
+                          lang="en"
+                          aria-label={`Elemento izquierdo pareja ${idx + 1}`}
+                          type="text"
+                          placeholder="Elemento izquierdo (ej. Apple)"
+                          value={pair.leftText}
+                          onChange={(e) =>
+                            setMatchPairs(
+                              matchPairs.map((p, i) =>
+                                i === idx ? { ...p, leftText: e.target.value } : p,
+                              ),
+                            )
+                          }
+                          className={`${styles.input} ${styles.inputCompact}`}
+                        />
+                        <span className={styles.pairConnector} aria-hidden="true">
+                          ↔
+                        </span>
+                        <input
+                          id={`match-pair-right-${idx}`}
+                          aria-label={`Elemento derecho pareja ${idx + 1}`}
+                          type="text"
+                          placeholder="Elemento derecho (ej. Manzana)"
+                          value={pair.rightText}
+                          onChange={(e) =>
+                            setMatchPairs(
+                              matchPairs.map((p, i) =>
+                                i === idx ? { ...p, rightText: e.target.value } : p,
+                              ),
+                            )
+                          }
+                          className={`${styles.input} ${styles.inputCompact}`}
+                        />
+                        <button
+                          type="button"
+                          disabled={matchPairs.length <= 2}
+                          onClick={() => setMatchPairs(matchPairs.filter((_, i) => i !== idx))}
+                          className={styles.iconDangerButton}
+                          title="Eliminar pareja"
+                          aria-label={`Eliminar pareja ${idx + 1}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. DRAG AND DROP */}
+              {gameMechanic === 'drag_drop' && (
+                <div className={styles.mechanicPanel}>
+                  {/* Targets */}
+                  <div className={styles.sectionBody}>
+                    <div className={styles.sectionToolbar}>
+                      <div>
+                        <h3 className={styles.sectionHeading}>Categorías / Destinos</h3>
+                        <p className={styles.helperText}>Mínimo 2 destinos.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDragTargets([...dragTargets, { name: '' }])}
+                        className={styles.inlineAccentButton}
+                      >
+                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                        Añadir categoría
+                      </button>
+                    </div>
+                    <div className={styles.pairList}>
+                      {dragTargets.map((target, idx) => (
+                        <div key={idx} className={styles.dragTargetRow}>
+                          <div className={styles.field}>
+                            <label htmlFor={`drag-target-${idx}`} className={styles.labelCompact}>
+                              Categoría {idx + 1}
+                            </label>
+                            <input
+                              id={`drag-target-${idx}`}
+                              aria-label={`Nombre de la categoría ${idx + 1}`}
+                              type="text"
+                              placeholder="Nombre del destino (ej. Fruits)"
+                              value={target.name}
+                              onChange={(e) =>
+                                setDragTargets(
+                                  dragTargets.map((t, i) =>
+                                    i === idx ? { ...t, name: e.target.value } : t,
+                                  ),
+                                )
+                              }
+                              className={`${styles.input} ${styles.inputCompact}`}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={dragTargets.length <= 2}
+                            onClick={() => {
+                              setDragTargets(dragTargets.filter((_, i) => i !== idx));
+                              setDragObjects(
+                                dragObjects.map((o) => ({
+                                  ...o,
+                                  targetIndex:
+                                    o.targetIndex >= idx
+                                      ? Math.max(0, o.targetIndex - 1)
+                                      : o.targetIndex,
+                                })),
+                              );
+                            }}
+                            className={styles.iconDangerButton}
+                            title="Eliminar categoría"
+                            aria-label={`Eliminar categoría ${idx + 1}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Objects */}
+                  <div className={styles.subsectionDivider}>
+                    <div className={styles.sectionToolbar}>
+                      <div>
+                        <h3 className={styles.sectionHeading}>Elementos a clasificar</h3>
+                        <p className={styles.helperText}>Mínimo 2 elementos.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDragObjects([...dragObjects, { text: '', targetIndex: 0 }])
+                        }
+                        className={styles.inlineAccentButton}
+                      >
+                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                        Añadir elemento
+                      </button>
+                    </div>
+                    <div className={styles.pairList}>
+                      {dragObjects.map((obj, idx) => (
+                        <div key={idx} className={styles.dragObjectRow}>
+                          <input
+                            id={`drag-object-${idx}`}
+                            lang="en"
+                            aria-label={`Texto del elemento a clasificar ${idx + 1}`}
+                            type="text"
+                            placeholder="Texto del elemento (ej. Orange)"
+                            value={obj.text}
+                            onChange={(e) =>
+                              setDragObjects(
+                                dragObjects.map((o, i) =>
+                                  i === idx ? { ...o, text: e.target.value } : o,
+                                ),
+                              )
+                            }
+                            className={`${styles.input} ${styles.inputCompact}`}
+                          />
+                          <span className={styles.pairConnector} aria-hidden="true">
+                            →
+                          </span>
+                          <select
+                            id={`drag-target-select-${idx}`}
+                            aria-label={`Categoría asignada para el elemento ${idx + 1}`}
+                            value={obj.targetIndex}
+                            onChange={(e) =>
+                              setDragObjects(
+                                dragObjects.map((o, i) =>
+                                  i === idx
+                                    ? { ...o, targetIndex: parseInt(e.target.value, 10) || 0 }
+                                    : o,
+                                ),
+                              )
+                            }
+                            className={`${styles.select} ${styles.inputCompact}`}
+                          >
+                            {dragTargets.map((t, tIdx) => (
+                              <option key={tIdx} value={tIdx}>
+                                {t.name || `Cat. ${tIdx + 1}`}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={dragObjects.length <= 2}
+                            onClick={() => setDragObjects(dragObjects.filter((_, i) => i !== idx))}
+                            className={styles.iconDangerButton}
+                            title="Eliminar elemento"
+                            aria-label={`Eliminar elemento a clasificar ${idx + 1}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. MEMORY */}
+              {gameMechanic === 'memory' && (
+                <div className={styles.mechanicPanel}>
+                  <div className={styles.sectionToolbar}>
+                    <div>
+                      <h3 className={styles.sectionHeading}>Parejas de memoria</h3>
+                      <p className={styles.helperText}>Mínimo 2 parejas (4 tarjetas en total).</p>
                     </div>
                     <button
                       type="button"
                       onClick={() =>
-                        setTimedQuestions([
-                          ...timedQuestions,
-                          { prompt: '', opt1: '', opt2: '', correct: 'opt1' },
-                        ])
+                        setMemoryPairs([...memoryPairs, { card1Text: '', card2Text: '' }])
                       }
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      className={styles.inlineAccentButton}
                     >
-                      + Añadir pregunta
+                      <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                      Añadir pareja
                     </button>
                   </div>
-
-                  {timedQuestions.map((q, idx) => (
-                    <div key={idx} className="rounded border border-zinc-200 bg-white p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-zinc-700">Pregunta {idx + 1}</span>
+                  <div className={styles.pairList}>
+                    {memoryPairs.map((pair, idx) => (
+                      <div key={idx} className={styles.pairRow}>
+                        <input
+                          id={`memory-card-1-${idx}`}
+                          lang="en"
+                          aria-label={`Tarjeta 1 pareja ${idx + 1}`}
+                          type="text"
+                          placeholder="Tarjeta 1 (ej. Dog)"
+                          value={pair.card1Text}
+                          onChange={(e) =>
+                            setMemoryPairs(
+                              memoryPairs.map((p, i) =>
+                                i === idx ? { ...p, card1Text: e.target.value } : p,
+                              ),
+                            )
+                          }
+                          className={`${styles.input} ${styles.inputCompact}`}
+                        />
+                        <span className={styles.pairConnector} aria-hidden="true">
+                          ↔
+                        </span>
+                        <input
+                          id={`memory-card-2-${idx}`}
+                          aria-label={`Tarjeta 2 pareja ${idx + 1}`}
+                          type="text"
+                          placeholder="Tarjeta 2 (ej. Perro)"
+                          value={pair.card2Text}
+                          onChange={(e) =>
+                            setMemoryPairs(
+                              memoryPairs.map((p, i) =>
+                                i === idx ? { ...p, card2Text: e.target.value } : p,
+                              ),
+                            )
+                          }
+                          className={`${styles.input} ${styles.inputCompact}`}
+                        />
                         <button
                           type="button"
-                          disabled={timedQuestions.length <= 1}
-                          onClick={() => setTimedQuestions(timedQuestions.filter((_, i) => i !== idx))}
-                          className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                          aria-label={`Eliminar pregunta contra reloj ${idx + 1}`}
+                          disabled={memoryPairs.length <= 2}
+                          onClick={() => setMemoryPairs(memoryPairs.filter((_, i) => i !== idx))}
+                          className={styles.iconDangerButton}
+                          title="Eliminar pareja"
+                          aria-label={`Eliminar pareja de memoria ${idx + 1}`}
                         >
-                          Eliminar
+                          ✕
                         </button>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                      <input
-                        id={`tc-prompt-${idx}`}
-                        aria-label={`Consigna pregunta contra reloj ${idx + 1}`}
-                        type="text"
-                        placeholder="Consigna (ej. What color is the sun?)"
-                        value={q.prompt}
-                        onChange={(e) =>
-                          setTimedQuestions(
-                            timedQuestions.map((item, i) =>
-                              i === idx ? { ...item, prompt: e.target.value } : item,
-                            ),
-                          )
+              {/* 5. TIMED CHOICE */}
+              {gameMechanic === 'timed_choice' && (
+                <div className={styles.mechanicPanel}>
+                  <div className={styles.field}>
+                    <label htmlFor="timed-limit" className={styles.labelCompact}>
+                      Tiempo límite por pregunta (segundos, 5-120) *
+                    </label>
+                    <input
+                      id="timed-limit"
+                      type="number"
+                      min="5"
+                      max="120"
+                      value={timedChoiceLimit}
+                      onChange={(e) => setTimedChoiceLimit(e.target.value)}
+                      className={`${styles.input} ${styles.inputCompact} ${styles.inputNumberShort} ${styles.tabular}`}
+                    />
+                  </div>
+
+                  <div className={styles.sectionBody}>
+                    <div className={styles.sectionToolbar}>
+                      <div>
+                        <h3 className={styles.sectionHeading}>Preguntas contra reloj</h3>
+                        <p className={styles.helperText}>Mínimo 1 pregunta.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTimedQuestions([
+                            ...timedQuestions,
+                            { prompt: '', opt1: '', opt2: '', correct: 'opt1' },
+                          ])
                         }
-                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900"
-                      />
+                        className={styles.inlineAccentButton}
+                      >
+                        <Plus size={15} strokeWidth={2} aria-hidden="true" />
+                        Añadir pregunta
+                      </button>
+                    </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                        <div className="flex items-center gap-2">
-                          <input
-                            id={`tc-opt1-${idx}`}
-                            aria-label={`Opción 1 pregunta ${idx + 1}`}
-                            type="text"
-                            placeholder="Opción 1"
-                            value={q.opt1}
-                            onChange={(e) =>
-                              setTimedQuestions(
-                                timedQuestions.map((item, i) =>
-                                  i === idx ? { ...item, opt1: e.target.value } : item,
-                                ),
-                              )
+                    {timedQuestions.map((q, idx) => (
+                      <div key={idx} className={styles.blankCard}>
+                        <div className={styles.blankHeader}>
+                          <span className={styles.itemTitle}>Pregunta {idx + 1}</span>
+                          <button
+                            type="button"
+                            disabled={timedQuestions.length <= 1}
+                            onClick={() =>
+                              setTimedQuestions(timedQuestions.filter((_, i) => i !== idx))
                             }
-                            className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs"
-                          />
-                          <label className="flex items-center gap-1 text-xs text-emerald-700 cursor-pointer">
-                            <input
-                              type="radio"
-                              name={`tc-correct-${idx}`}
-                              aria-label={`Marcar opción 1 como correcta para pregunta ${idx + 1}`}
-                              checked={q.correct === 'opt1'}
-                              onChange={() =>
-                                setTimedQuestions(
-                                  timedQuestions.map((item, i) =>
-                                    i === idx ? { ...item, correct: 'opt1' } : item,
-                                  ),
-                                )
-                              }
-                            />
-                            Correcta
-                          </label>
+                            className={styles.inlineDangerButton}
+                            aria-label={`Eliminar pregunta contra reloj ${idx + 1}`}
+                          >
+                            <Trash2 size={14} strokeWidth={1.75} aria-hidden="true" />
+                            Eliminar
+                          </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <input
-                            id={`tc-opt2-${idx}`}
-                            aria-label={`Opción 2 pregunta ${idx + 1}`}
-                            type="text"
-                            placeholder="Opción 2"
-                            value={q.opt2}
-                            onChange={(e) =>
-                              setTimedQuestions(
-                                timedQuestions.map((item, i) =>
-                                  i === idx ? { ...item, opt2: e.target.value } : item,
-                                ),
-                              )
-                            }
-                            className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs"
-                          />
-                          <label className="flex items-center gap-1 text-xs text-emerald-700 cursor-pointer">
+                        <input
+                          id={`tc-prompt-${idx}`}
+                          lang="en"
+                          aria-label={`Consigna pregunta contra reloj ${idx + 1}`}
+                          type="text"
+                          placeholder="Consigna (ej. What color is the sun?)"
+                          value={q.prompt}
+                          onChange={(e) =>
+                            setTimedQuestions(
+                              timedQuestions.map((item, i) =>
+                                i === idx ? { ...item, prompt: e.target.value } : item,
+                              ),
+                            )
+                          }
+                          className={`${styles.input} ${styles.inputCompact}`}
+                        />
+
+                        <div className={styles.optionsGrid}>
+                          <div className={styles.optionRow}>
                             <input
-                              type="radio"
-                              name={`tc-correct-${idx}`}
-                              aria-label={`Marcar opción 2 como correcta para pregunta ${idx + 1}`}
-                              checked={q.correct === 'opt2'}
-                              onChange={() =>
+                              id={`tc-opt1-${idx}`}
+                              lang="en"
+                              aria-label={`Opción 1 pregunta ${idx + 1}`}
+                              type="text"
+                              placeholder="Opción 1"
+                              value={q.opt1}
+                              onChange={(e) =>
                                 setTimedQuestions(
                                   timedQuestions.map((item, i) =>
-                                    i === idx ? { ...item, correct: 'opt2' } : item,
+                                    i === idx ? { ...item, opt1: e.target.value } : item,
                                   ),
                                 )
                               }
+                              className={`${styles.input} ${styles.inputCompact} ${styles.optionInput}`}
                             />
-                            Correcta
-                          </label>
+                            <label className={styles.correctRadioLabel}>
+                              <input
+                                type="radio"
+                                name={`tc-correct-${idx}`}
+                                aria-label={`Marcar opción 1 como correcta para pregunta ${idx + 1}`}
+                                checked={q.correct === 'opt1'}
+                                onChange={() =>
+                                  setTimedQuestions(
+                                    timedQuestions.map((item, i) =>
+                                      i === idx ? { ...item, correct: 'opt1' } : item,
+                                    ),
+                                  )
+                                }
+                              />
+                              Correcta
+                            </label>
+                          </div>
+
+                          <div className={styles.optionRow}>
+                            <input
+                              id={`tc-opt2-${idx}`}
+                              lang="en"
+                              aria-label={`Opción 2 pregunta ${idx + 1}`}
+                              type="text"
+                              placeholder="Opción 2"
+                              value={q.opt2}
+                              onChange={(e) =>
+                                setTimedQuestions(
+                                  timedQuestions.map((item, i) =>
+                                    i === idx ? { ...item, opt2: e.target.value } : item,
+                                  ),
+                                )
+                              }
+                              className={`${styles.input} ${styles.inputCompact} ${styles.optionInput}`}
+                            />
+                            <label className={styles.correctRadioLabel}>
+                              <input
+                                type="radio"
+                                name={`tc-correct-${idx}`}
+                                aria-label={`Marcar opción 2 como correcta para pregunta ${idx + 1}`}
+                                checked={q.correct === 'opt2'}
+                                onChange={() =>
+                                  setTimedQuestions(
+                                    timedQuestions.map((item, i) =>
+                                      i === idx ? { ...item, correct: 'opt2' } : item,
+                                    ),
+                                  )
+                                }
+                              />
+                              Correcta
+                            </label>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </section>
+      </fieldset>
+
+      {/* Sticky Actions Footer */}
+      <div className={styles.stickyFooter}>
+        <div className={styles.footerGroup}>
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            className={styles.secondaryButton}
+          >
+            <Eye size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span>
+              {!isEditing && type === ActivityType.game ? 'Probar vista previa' : 'Previsualizar'}
+            </span>
+          </button>
+        </div>
+
+        <div className={styles.footerGroup}>
+          {isArchived ? (
+            <>
+              <Link href="/actividades" className={styles.secondaryButton}>
+                Volver al catálogo
+              </Link>
+              <button
+                type="button"
+                onClick={handleRestore}
+                disabled={isSaving}
+                className={styles.primaryButton}
+              >
+                <RotateCcw size={16} strokeWidth={1.75} aria-hidden="true" />
+                {restoreMutation.isPending ? 'Restaurando…' : 'Restaurar al catálogo'}
+              </button>
+            </>
+          ) : isEditing ? (
+            <>
+              {currentStatus === ActivityStatus.draft && (
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={isSaving}
+                  className={styles.publishButton}
+                >
+                  {publishMutation.isPending ? 'Publicando…' : 'Publicar actividad'}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className={styles.primaryButton}
+              >
+                {saveMutation.isPending ? 'Guardando cambios…' : 'Guardar cambios'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className={styles.secondaryButton}
+              >
+                {saveMutation.isPending ? 'Guardando borrador…' : 'Guardar borrador'}
+              </button>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={isSaving}
+                className={styles.primaryButton}
+              >
+                {publishMutation.isPending ? 'Publicando…' : 'Publicar actividad'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Activity Preview Modal (ENG-039, RF-16 SPEC-04, RF-12 SPEC-05) */}
@@ -2794,80 +3425,71 @@ export function ActivityEditorComponent({
         onClose={() => setIsPreviewOpen(false)}
         title="Previsualización Docente"
         description="Vista previa: no se guardan respuestas (ENG-039). Modo interactivo de prueba sin alterar métricas."
-        maxWidthClass="max-w-2xl"
+        maxWidthClass="max-w-3xl"
+        dialogClassName={styles.previewDialog}
       >
-        <div className="space-y-6">
-          <div className="flex items-center justify-end">
+        <div className={styles.sectionBody}>
+          <div className={styles.previewControlsRow}>
             <div
-              className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200"
+              className={styles.themeToggleGroup}
               role="group"
               aria-label="Selector de tema para previsualización"
             >
               <button
                 type="button"
+                aria-pressed={previewTheme === 'kids'}
+                data-active={previewTheme === 'kids' ? 'kids' : undefined}
                 onClick={() => setPreviewTheme('kids')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  previewTheme === 'kids'
-                    ? 'bg-amber-500 text-amber-950 font-black shadow-xs'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
+                className={styles.themeToggleBtn}
               >
-                🧒 Kids
+                Kids
               </button>
               <button
                 type="button"
+                aria-pressed={previewTheme === 'teens'}
+                data-active={previewTheme === 'teens' ? 'teens' : undefined}
                 onClick={() => setPreviewTheme('teens')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  previewTheme === 'teens'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
+                className={styles.themeToggleBtn}
               >
-                🧑‍🎓 Teens
+                Teens
               </button>
             </div>
           </div>
 
           <div
-            className={`p-6 rounded-2xl border space-y-4 max-h-[60vh] overflow-y-auto ${
-              previewTheme === 'kids'
-                ? 'border-amber-200 bg-amber-50/40 text-amber-950'
-                : 'border-zinc-700 bg-zinc-900 text-zinc-100'
+            className={`${styles.previewStage} ${
+              previewTheme === 'kids' ? styles.previewStageKids : styles.previewStageTeens
             }`}
             data-theme={previewTheme}
           >
-            <div className="flex items-center justify-between">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900">
-                Nivel {level}
-              </span>
-              <span className="text-xs font-semibold text-zinc-500 capitalize">{type}</span>
+            <div className={styles.previewMetaRow}>
+              <span className={styles.previewLevelPill}>Nivel {level}</span>
+              <span className={styles.previewTypeTag}>{activityTypeLabels[type]}</span>
             </div>
-            <h3 className={`text-xl font-black ${previewTheme === 'kids' ? 'text-amber-950' : 'text-zinc-100'}`}>{title || 'Actividad sin título'}</h3>
+            <h3 lang={title ? 'en' : undefined} className={styles.previewTitle}>
+              {title || 'Actividad sin título'}
+            </h3>
 
             {type === ActivityType.fill_blank && (
-              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
-                <p className="text-xs font-bold text-zinc-500">
+              <div className={styles.previewContentBox}>
+                <p className={`${styles.labelCompact} ${styles.tabular}`}>
                   Oraciones con huecos ({fbItems.length})
                 </p>
                 {fbItems.map((it, idx) => (
-                  <div
-                    key={it.id || idx}
-                    className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
-                  >
-                    <p className="text-base text-zinc-800">
+                  <div key={it.id || idx} className={styles.previewItemRow}>
+                    <p lang="en" className={styles.bannerText}>
                       {idx + 1}. {formatBlankPrompt(it.prompt, it.blanks)}
                     </p>
                     {it.blanks.map((b, bIdx) => (
-                      <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
-                        <p className="text-xs font-semibold text-zinc-600">Espacio {bIdx + 1}:</p>
-                        <div className="flex flex-wrap gap-2">
+                      <div key={b.id || bIdx} className={styles.previewBlankGroup}>
+                        <p className={styles.labelCompact}>Espacio {bIdx + 1}:</p>
+                        <div className={styles.toolbarActions}>
                           {b.options.map((opt) => (
                             <span
                               key={opt.id}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                                opt.id === b.correctOptionId
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-amber-100 text-amber-900'
+                              lang="en"
+                              className={`${styles.previewOptionChip} ${
+                                opt.id === b.correctOptionId ? styles.previewOptionChipCorrect : ''
                               }`}
                             >
                               {opt.text} {opt.id === b.correctOptionId ? '✓' : ''}
@@ -2882,34 +3504,41 @@ export function ActivityEditorComponent({
             )}
 
             {type === ActivityType.speaking && (
-              <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200 text-center">
-                <p className="text-sm font-bold text-amber-900">{spPrompt || 'Pronuncia la frase en voz alta'}</p>
-                <div className="p-4 rounded-xl bg-amber-50 inline-block text-xs font-semibold text-zinc-600">
-                  🎙️ Grabadora de voz simulada (2 a 120 segundos)
-                </div>
+              <div className={styles.previewContentBox}>
+                <p lang="en" className={styles.itemTitle}>
+                  {spPrompt || 'Pronuncia la frase en voz alta'}
+                </p>
+                <p className={`${styles.helperText} ${styles.tabular}`}>
+                  Grabadora de voz simulada (2 a {spMaxDuration || '120'} segundos)
+                </p>
               </div>
             )}
 
             {type === ActivityType.open_question && (
-              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
+              <div className={styles.previewContentBox}>
                 {oqInstructions && (
-                  <div className="p-2.5 bg-amber-50 rounded-lg text-xs text-amber-900 border border-amber-200 font-medium">
-                    <strong>Instrucciones:</strong> {oqInstructions}
+                  <div className={styles.calloutBanner}>
+                    <p className={styles.bannerText}>
+                      <strong>Instrucciones:</strong> {oqInstructions}
+                    </p>
                   </div>
                 )}
                 {oqQuestions.map((q, idx) => (
-                  <div key={q.id || idx} className="space-y-1.5 p-3 rounded-lg border border-amber-100 bg-amber-50/30">
-                    <p className="text-xs font-bold text-amber-900">
+                  <div key={q.id || idx} className={styles.itemCard}>
+                    <p className={styles.itemTitle}>
                       {oqQuestions.length > 1 ? `Pregunta ${idx + 1}:` : 'Consigna:'}
                     </p>
-                    <p className="text-sm font-semibold text-zinc-800">{q.prompt || 'Sin consigna'}</p>
+                    <p lang="en" className={styles.bannerText}>
+                      {q.prompt || 'Sin consigna'}
+                    </p>
                     {q.rubric && (
-                      <p className="text-[11px] text-zinc-500 italic">Rúbrica: {q.rubric}</p>
+                      <p className={styles.helperText}>Rúbrica: {q.rubric}</p>
                     )}
                     <textarea
                       disabled
+                      aria-label={`Vista previa respuesta pregunta ${idx + 1}`}
                       placeholder="Aquí el alumno escribirá su respuesta..."
-                      className="w-full rounded-lg border border-zinc-200 p-2 text-xs text-zinc-400 bg-white"
+                      className={styles.textarea}
                       rows={2}
                     />
                   </div>
@@ -2918,32 +3547,28 @@ export function ActivityEditorComponent({
             )}
 
             {type === ActivityType.exam && (
-              <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200">
-                <p className="text-xs font-bold text-zinc-500">
+              <div className={styles.previewContentBox}>
+                <p className={`${styles.labelCompact} ${styles.tabular}`}>
                   Ítems ponderados del examen ({examItems.length})
                 </p>
                 {examItems.map((it, idx) => (
-                  <div
-                    key={it.id || idx}
-                    className="border-b border-amber-100 last:border-b-0 pb-3 last:pb-0 space-y-2"
-                  >
-                    <p className="text-sm font-medium text-zinc-800">
+                  <div key={it.id || idx} className={styles.previewItemRow}>
+                    <p lang="en" className={styles.bannerText}>
                       {idx + 1}. {formatBlankPrompt(it.prompt, it.blanks)}{' '}
-                      <span className="text-xs text-zinc-500 font-normal">
-                        ({it.weight || '0'}%)
+                      <span className={`${styles.versionText} ${styles.tabular}`}>
+                        ({(it.weight || '0').replace('.', ',')}%)
                       </span>
                     </p>
                     {it.blanks.map((b, bIdx) => (
-                      <div key={b.id || bIdx} className="pl-3 border-l-2 border-amber-300 space-y-1">
-                        <p className="text-xs font-semibold text-zinc-600">Espacio {bIdx + 1}:</p>
-                        <div className="flex flex-wrap gap-2">
+                      <div key={b.id || bIdx} className={styles.previewBlankGroup}>
+                        <p className={styles.labelCompact}>Espacio {bIdx + 1}:</p>
+                        <div className={styles.toolbarActions}>
                           {b.options.map((opt) => (
                             <span
                               key={opt.id}
-                              className={`px-2 py-0.5 rounded text-xs font-bold ${
-                                opt.id === b.correctOptionId
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-amber-50 text-amber-900 border border-amber-200'
+                              lang="en"
+                              className={`${styles.previewOptionChip} ${
+                                opt.id === b.correctOptionId ? styles.previewOptionChipCorrect : ''
                               }`}
                             >
                               {opt.text} {opt.id === b.correctOptionId ? '✓' : ''}
@@ -2960,7 +3585,7 @@ export function ActivityEditorComponent({
             {type === ActivityType.game && (() => {
               let previewConfig: GamePublicConfig | null;
               try {
-                const payload = buildPayload();
+                const payload = buildPayload({ allowFallbackTitle: true });
                 if (!payload || !isGamePublicConfig(payload.config) || !isGameAnswerKey(payload.answerKey)) {
                   previewConfig = null;
                 } else {
@@ -2975,17 +3600,18 @@ export function ActivityEditorComponent({
 
               if (!previewConfig) {
                 return (
-                  <div className="p-4 bg-white rounded-xl border border-amber-200 text-center">
-                    <p className="text-xs font-bold text-amber-800 uppercase">Previsualización de {gameMechanic}</p>
-                    <p className="text-xs text-zinc-600 mt-1">
-                      Completa los campos requeridos de la mecánica para interactuar con la previsualización.
+                  <div className={styles.previewContentBox}>
+                    <p className={styles.itemTitle}>Previsualización de {gameMechanic}</p>
+                    <p className={styles.helperText}>
+                      Completa los campos requeridos de la mecánica para interactuar con la
+                      previsualización.
                     </p>
                   </div>
                 );
               }
 
               return (
-                <div className="p-4 bg-white rounded-2xl border border-amber-200">
+                <div className={styles.previewContentBox}>
                   <GameRenderer
                     config={previewConfig}
                     previewMode={true}
@@ -2996,11 +3622,11 @@ export function ActivityEditorComponent({
             })()}
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-zinc-100">
+          <div className={styles.previewCloseRow}>
             <button
               type="button"
               onClick={() => setIsPreviewOpen(false)}
-              className="rounded-xl bg-zinc-900 text-white font-bold px-5 py-2 text-xs hover:bg-zinc-800 cursor-pointer"
+              className={styles.previewCloseButton}
             >
               Cerrar previsualización
             </button>

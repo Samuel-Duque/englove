@@ -1,4 +1,5 @@
-try { process.loadEnvFile?.(); } catch { try { process.loadEnvFile?.('../../.env'); } catch {} }
+try { process.loadEnvFile?.(); } catch {}
+try { process.loadEnvFile?.('../../.env'); } catch {}
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';

@@ -3,7 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useMutation } from '@tanstack/react-query';
+import { Mail } from 'lucide-react';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
+import { AuthAlert, AuthHeading, AuthPage } from '../auth-page';
+import styles from '../auth-page.module.css';
 
 export function RecuperarContrasenaClient() {
   const [email, setEmail] = useState('');
@@ -56,79 +59,71 @@ export function RecuperarContrasenaClient() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (forgotPasswordMutation.isPending) return;
     setErrorMessage(null);
     forgotPasswordMutation.mutate(email);
   };
 
   if (successMessage) {
     return (
-      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 outline-none">
-        <div className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl shadow-sm p-8 text-center">
-          <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-            ✉
-          </div>
-          <h1 className="text-2xl font-bold text-zinc-900 mb-2">Revisa tu correo</h1>
-          <p className="text-sm text-zinc-600 mb-6">{successMessage}</p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Volver a iniciar sesión
-          </Link>
+      <AuthPage variant="success">
+        <div className={styles.successMark} aria-hidden="true">
+          <Mail size={28} strokeWidth={2.2} />
         </div>
-      </main>
+        <h1 className={styles.title}>Revisa tu correo</h1>
+        <p className={styles.subtitle}>{successMessage}</p>
+        <Link href="/login" className={styles.primary}>
+          Volver a iniciar sesión
+        </Link>
+      </AuthPage>
     );
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 outline-none">
-      <div className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-zinc-900 mb-2 text-center">Recuperar contraseña</h1>
-        <p className="text-sm text-zinc-600 mb-6 text-center">
-          Ingresa el correo asociado a tu cuenta y te enviaremos las instrucciones para restablecer tu contraseña.
-        </p>
+    <AuthPage variant="login">
+      <AuthHeading
+        title="Recuperar contraseña"
+        description="Ingresa el correo asociado a tu cuenta y te enviaremos las instrucciones para restablecer tu contraseña."
+      />
 
-        {errorMessage && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg"
-          >
-            {errorMessage}
-          </div>
-        )}
+      {errorMessage && <AuthAlert message={errorMessage} />}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.fields}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">
+            <label htmlFor="email" className={styles.label}>
               Correo electrónico
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+              className={styles.input}
+              placeholder="tu-correo@ejemplo.com"
             />
           </div>
-
-          <button
-            type="submit"
-            disabled={forgotPasswordMutation.isPending}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {forgotPasswordMutation.isPending ? 'Enviando…' : 'Enviar enlace'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-sm text-zinc-600">
-          <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-            Volver a iniciar sesión
-          </Link>
         </div>
+
+        <button
+          type="submit"
+          disabled={forgotPasswordMutation.isPending}
+          aria-busy={forgotPasswordMutation.isPending}
+          className={styles.primary}
+        >
+          {forgotPasswordMutation.isPending ? 'Enviando…' : 'Enviar enlace'}
+        </button>
+      </form>
+
+      <div className={styles.footer}>
+        ¿Recordaste tu contraseña?
+        <Link href="/login" className={styles.link}>
+          Volver a iniciar sesión
+        </Link>
       </div>
-    </main>
+    </AuthPage>
   );
 }

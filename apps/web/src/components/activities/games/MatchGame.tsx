@@ -11,6 +11,8 @@ import {
 } from '@upward-english/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { soundManager } from '../../../lib/sound';
+import kidsStyles from './kids-game.module.css';
+import teensStyles from './teens-game.module.css';
 
 export function MatchGame({
   config,
@@ -111,13 +113,17 @@ export function MatchGame({
   };
 
   const isKids = theme === 'kids';
+  const isTeens = theme === 'teens';
+  const styles = isTeens ? teensStyles : kidsStyles;
 
   return (
     <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
+      className={`${styles.board} w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
         isKids
           ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+          : isTeens
+            ? ''
+            : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
       }`}
     >
       {previewMode && (
@@ -132,25 +138,25 @@ export function MatchGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
+        <div className={`${styles.legacyInstructions} mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs`}>
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
             {config.instructions}
           </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start">
+      <div className={`${styles.matchColumns} grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start`}>
         {/* Left Column */}
-        <div className="space-y-3">
-          <h4
-            className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+        <div className="space-y-3" role="group" aria-label="Palabras">
+          <p
+            className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
+              isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
             }`}
           >
             Palabras ({leftItems.length})
-          </h4>
+          </p>
           <div className="space-y-3">
-            {leftItems.map((item) => {
+            {leftItems.map((item, index) => {
               const isSelected = selectedLeftId === item.id;
               const pairedRightId = pairs[item.id];
               const pairedRightItem = pairedRightId
@@ -165,7 +171,9 @@ export function MatchGame({
                   isSelected={isSelected}
                   isPaired={Boolean(pairedRightId)}
                   pairedText={pairedRightItem?.text}
+                  pairNumber={index + 1}
                   isKids={isKids}
+                  isTeens={isTeens}
                   onSelect={() => {
                     if (isSelected) {
                       setSelectedLeftId(null);
@@ -181,14 +189,14 @@ export function MatchGame({
         </div>
 
         {/* Right Column */}
-        <div className="space-y-3">
-          <h4
-            className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+        <div className="space-y-3" role="group" aria-label="Traducciones / Coincidencias">
+          <p
+            className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
+              isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
             }`}
           >
             Traducciones / Coincidencias ({shuffledRight.length})
-          </h4>
+          </p>
           <div className="space-y-3">
             {shuffledRight.map((item) => {
               const pairedLeftId = rightToLeftMap.get(item.id);
@@ -200,7 +208,9 @@ export function MatchGame({
                   id={item.id}
                   text={item.text}
                   isPaired={Boolean(pairedLeftId)}
+                  pairNumber={leftItems.findIndex(({ id }) => id === pairedLeftId) + 1}
                   isKids={isKids}
+                  isTeens={isTeens}
                   isTargetActive={isTargetActive}
                   onDropLink={(droppedLeftId) => handleLink(droppedLeftId, item.id)}
                   onClickLink={() => {
@@ -216,21 +226,23 @@ export function MatchGame({
       </div>
 
       {/* Action Footer */}
-      <div className="mt-8 pt-4 border-t border-amber-200/60 flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500">
+      <div className={`${styles.footer} mt-8 pt-4 ${isTeens ? '' : 'border-t border-amber-200/60'} flex items-center justify-between`}>
+        <p className={`${styles.meta} text-xs font-medium ${isTeens ? '' : 'text-zinc-500'}`}>
           {Object.keys(pairs).length} de {leftItems.length} parejas formadas
         </p>
 
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
+          className={`${styles.finish} min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
             isKids
               ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+              : isTeens
+                ? ''
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
-          Finalizar emparejamiento ✨
+          {isTeens ? 'Finalizar emparejamiento' : 'Finalizar emparejamiento ✨'}
         </button>
       </div>
     </div>
@@ -243,8 +255,10 @@ function DraggableLeftItem({
   text,
   isSelected,
   isPaired,
+  pairNumber,
   pairedText,
   isKids,
+  isTeens,
   onSelect,
   onUnlink,
 }: {
@@ -252,11 +266,14 @@ function DraggableLeftItem({
   text: string;
   isSelected: boolean;
   isPaired: boolean;
+  pairNumber: number;
   pairedText?: string;
   isKids: boolean;
+  isTeens: boolean;
   onSelect: () => void;
   onUnlink: () => void;
 }) {
+  const styles = isTeens ? teensStyles : kidsStyles;
   const elRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -272,46 +289,77 @@ function DraggableLeftItem({
   return (
     <div
       ref={elRef}
-      className={`min-h-12 p-2 sm:p-2.5 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation select-none ${
-        isSelected
-          ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-100/90 shadow-md'
-          : isPaired
-            ? isKids
-              ? 'border-emerald-400 bg-emerald-50/70'
-              : 'border-emerald-600 bg-emerald-950/80'
-            : isKids
-              ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
-              : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
+      data-state={isSelected ? 'selected' : isPaired ? 'linked' : undefined}
+      className={`${styles.piece} min-h-12 p-2 sm:p-2.5 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation select-none ${
+        isTeens
+          ? ''
+          : isSelected
+            ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-100/90 shadow-md'
+            : isPaired
+              ? isKids
+                ? 'border-emerald-400 bg-emerald-50/70'
+                : 'border-emerald-600 bg-emerald-950/80'
+              : isKids
+                ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
+                : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
       }`}
     >
       <button
         type="button"
         onClick={onSelect}
         aria-pressed={isSelected}
-        className="flex-1 flex items-center justify-between text-left p-1.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className={`${styles.matchControl} flex-1 flex items-center justify-between text-left p-1.5 rounded-xl cursor-pointer ${
+          isTeens ? '' : 'focus:outline-none focus:ring-2 focus:ring-amber-500'
+        }`}
       >
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-bold ${
-            isSelected
-              ? 'text-zinc-900'
-              : isPaired
-                ? isKids
-                  ? 'text-emerald-950'
-                  : 'text-emerald-100'
-                : isKids
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span
+            lang="en"
+            className={`text-sm font-bold ${
+              isTeens
+                ? isSelected
+                  ? 'text-[#872E06]'
+                  : isPaired
+                    ? 'text-[#166534]'
+                    : 'text-[#2B150A]'
+                : isSelected
                   ? 'text-zinc-900'
-                  : 'text-zinc-100'
-          }`}>
+                  : isPaired
+                    ? isKids
+                      ? 'text-emerald-950'
+                      : 'text-emerald-100'
+                    : isKids
+                      ? 'text-zinc-900'
+                      : 'text-zinc-100'
+            }`}
+          >
             {text}
           </span>
           {isPaired && pairedText && (
-            <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
-              🔗 {pairedText}
+            <span
+              className={
+                isTeens
+                  ? 'text-xs font-bold text-[#166534] bg-[#E6F5EA] border border-[#166534]/30 px-2 py-0.5 rounded-lg tabular-nums'
+                  : 'text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg'
+              }
+            >
+              {isTeens ? `Pareja ${pairNumber} · ${pairedText}` : `🔗 ${pairNumber} · ${pairedText}`}
             </span>
           )}
         </div>
-        <span className={`text-xs font-bold mr-1 ${isSelected ? 'text-zinc-900' : 'text-zinc-400'}`} aria-hidden="true">
-          {isSelected ? '✓ Activo' : '👉'}
+        <span
+          className={`text-xs font-bold mr-1 ${
+            isTeens
+              ? isSelected
+                ? 'text-[#872E06]'
+                : 'text-[#5E3E2C]'
+              : isSelected
+                ? 'text-zinc-900'
+                : 'text-zinc-400'
+          }`}
+          aria-hidden="true"
+        >
+          {isTeens ? (isSelected ? 'Seleccionado' : 'Seleccionar') : isSelected ? '✓ Activo' : '👉'}
         </span>
       </button>
 
@@ -319,7 +367,11 @@ function DraggableLeftItem({
         <button
           type="button"
           onClick={onUnlink}
-          className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-bold text-rose-600 hover:text-rose-800 p-1 rounded-md ml-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-500"
+          className={
+            isTeens
+              ? `${styles.iconBtn} text-xs font-bold text-[#831712] hover:bg-[#FDECE9] ml-1 shrink-0 cursor-pointer`
+              : 'min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-bold text-rose-600 hover:text-rose-800 p-1 rounded-md ml-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-500'
+          }
           title="Desvincular"
           aria-label={`Desvincular ${text}`}
         >
@@ -335,7 +387,9 @@ function DropTargetRightItem({
   id,
   text,
   isPaired,
+  pairNumber,
   isKids,
+  isTeens,
   isTargetActive,
   onDropLink,
   onClickLink,
@@ -343,12 +397,15 @@ function DropTargetRightItem({
   id: string;
   text: string;
   isPaired: boolean;
+  pairNumber: number;
   isKids: boolean;
+  isTeens: boolean;
   isTargetActive: boolean;
   onDropLink: (leftId: string) => void;
   onClickLink: () => void;
 }) {
-  const elRef = useRef<HTMLDivElement>(null);
+  const styles = isTeens ? teensStyles : kidsStyles;
+  const elRef = useRef<HTMLButtonElement>(null);
   const [isOver, setIsOver] = useState(false);
 
   useEffect(() => {
@@ -371,44 +428,62 @@ function DropTargetRightItem({
   }, [id, onDropLink]);
 
   return (
-    <div
+    <button
       ref={elRef}
-      className={`min-h-12 p-3 sm:p-4 rounded-2xl border-2 flex items-center justify-between transition-all touch-manipulation cursor-pointer select-none ${
-        isOver
-          ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg scale-102'
-          : isTargetActive
-            ? 'border-dashed border-amber-400 bg-amber-50/60 animate-pulse'
+      type="button"
+      data-state={isPaired ? 'linked' : undefined}
+      data-target={isOver || isTargetActive}
+      className={`${styles.piece} ${styles.matchControl} w-full min-h-12 p-3 sm:p-4 rounded-2xl border-2 flex items-center justify-between text-left transition-all touch-manipulation cursor-pointer select-none ${
+        isTeens
+          ? ''
+          : isOver
+            ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg scale-102'
+            : isTargetActive
+              ? 'border-dashed border-amber-400 bg-amber-50/60 animate-pulse'
+              : isPaired
+                ? isKids
+                  ? 'border-emerald-300 bg-emerald-50/60'
+                  : 'border-emerald-600 bg-emerald-950/80'
+                : isKids
+                  ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
+                  : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
+      }`}
+      onClick={onClickLink}
+    >
+      <span
+        className={`text-sm font-bold ${
+          isTeens
+            ? isPaired
+              ? 'text-[#166534]'
+              : 'text-[#2B150A]'
             : isPaired
               ? isKids
-                ? 'border-emerald-300 bg-emerald-50/60'
-                : 'border-emerald-600 bg-emerald-950/80'
+                ? 'text-emerald-950'
+                : 'text-emerald-100'
               : isKids
-                ? 'border-amber-200/80 bg-white hover:border-amber-400 hover:shadow-xs'
-                : 'border-zinc-700 bg-zinc-800/80 hover:border-zinc-500'
-      }`}
-      role="button"
-      tabIndex={0}
-      onClick={onClickLink}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClickLink();
-        }
-      }}
-    >
-      <span className={`text-sm font-bold ${
-        isPaired
-          ? isKids
-            ? 'text-emerald-950'
-            : 'text-emerald-100'
-          : isKids
-            ? 'text-zinc-900'
-            : 'text-zinc-100'
-      }`}>{text}</span>
-      <span className="text-xs text-zinc-400 font-bold" aria-hidden="true">
-        {isPaired ? '✅' : isTargetActive ? '👈 Tocar aquí' : '🎯'}
+                ? 'text-zinc-900'
+                : 'text-zinc-100'
+        }`}
+      >
+        {text}
       </span>
-    </div>
+      <span
+        className={`text-xs font-bold ${isTeens ? 'text-[#5E3E2C] tabular-nums' : 'text-zinc-400'}`}
+        aria-hidden="true"
+      >
+        {isTeens
+          ? isPaired
+            ? `Pareja ${pairNumber}`
+            : isTargetActive
+              ? 'Colocar aquí'
+              : 'Disponible'
+          : isPaired
+            ? `🔗 ${pairNumber}`
+            : isTargetActive
+              ? '👈 Tocar aquí'
+              : '🎯'}
+      </span>
+    </button>
   );
 }
 

@@ -1,6 +1,6 @@
 # Upward English — Contexto raíz del proyecto
 
-> **Estado vigente de la remediación, 2026-11-12:** la [auditoría general](../planning/auditoria-general-2026-11-12.md) y su [informe de correcciones](../planning/remediacion-auditoria-2026-11-12.md) complementan los registros históricos siguientes. La enmienda NEG-01 de SPEC-08 alinea el umbral con las decisiones vigentes 83/132, autorizada al solicitar corregir los hallazgos; su re-verificación CI está pendiente. Los conteos anteriores son evidencia fechada y el lanzamiento continúa sujeto a staging y aceptación operativa. No cambia el alcance del piloto ni se añade una decisión de producto.
+> **Diagnóstico técnico vigente (2026-11-26):** ver [`planning/auditoria-integral-estado-actual.md`](../planning/auditoria-integral-estado-actual.md) (las auditorías e informes de remediación cerrados del 2026-11-12 y 2026-11-13 se retiraron del árbol y permanecen en el historial de Git). La enmienda NEG-01 de SPEC-08 alinea el umbral con las decisiones vigentes 83/132, autorizada al solicitar corregir los hallazgos; su re-verificación CI está pendiente. Los conteos anteriores son evidencia fechada y el lanzamiento continúa sujeto a staging y aceptación operativa. No cambia el alcance del piloto ni se añade una decisión de producto.
 
 > **Propósito de este documento.** Fuente única de verdad sobre visión, alcance, arquitectura y decisiones de Upward English. Está pensado para que cualquier agente o persona que entre al proyecto pueda trabajar sin releer conversaciones anteriores.
 >

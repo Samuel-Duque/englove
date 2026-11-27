@@ -1,4 +1,6 @@
 import React from 'react';
+import { CircleAlert } from 'lucide-react';
+import styles from './teacher-portal.module.css';
 
 export type ErrorVariant = 'kids' | 'teens' | 'teacher';
 
@@ -8,6 +10,7 @@ export interface ErrorStateProps {
   variant?: ErrorVariant;
   onRetry?: () => void;
   onBack?: () => void;
+  editorial?: boolean;
 }
 
 export function getErrorMessage(code?: string | number, variant: ErrorVariant = 'kids'): string {
@@ -70,10 +73,22 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   variant = 'kids',
   onRetry,
   onBack,
+  editorial = false,
 }) => {
   const displayMessage = message || getErrorMessage(code, variant);
 
+  if (variant === 'teacher' && editorial) {
+    return (
+      <div className={styles.error}>
+        <p role="alert"><CircleAlert size={18} aria-hidden="true" />{displayMessage}</p>
+        {onRetry && <button type="button" className={styles.secondaryButton} onClick={onRetry}>Reintentar</button>}
+        {onBack && <button type="button" className={styles.secondaryButton} onClick={onBack}>Volver</button>}
+      </div>
+    );
+  }
+
   const isKids = variant === 'kids';
+  const isTeens = variant === 'teens';
 
   return (
     <div
@@ -81,19 +96,29 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       aria-live="assertive"
       className={
         isKids
-          ? 'flex flex-col items-center justify-center p-8 text-center bg-amber-50 rounded-3xl border-4 border-amber-200 max-w-lg mx-auto my-8 shadow-lg'
-          : 'flex flex-col items-center justify-center p-6 text-center bg-zinc-50 rounded-xl border border-zinc-200 max-w-md mx-auto my-6'
+          ? 'kids-error flex flex-col items-center justify-center p-8 text-center bg-amber-50 rounded-3xl border-4 border-amber-200 max-w-lg mx-auto my-8 shadow-lg'
+          : isTeens
+            ? 'teens-error flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto my-6'
+            : 'flex flex-col items-center justify-center p-6 text-center bg-zinc-50 rounded-xl border border-zinc-200 max-w-md mx-auto my-6'
       }
     >
-      <div className={isKids ? 'text-5xl mb-4' : 'text-3xl mb-3'} aria-hidden="true">
-        {isKids ? '🌟' : '⚠️'}
-      </div>
+      {isTeens ? (
+        <div className="mb-3" aria-hidden="true">
+          <CircleAlert size={36} />
+        </div>
+      ) : (
+        <div className={isKids ? 'text-5xl mb-4' : 'text-3xl mb-3'} aria-hidden="true">
+          {isKids ? '🌟' : '⚠️'}
+        </div>
+      )}
 
       <h2
         className={
           isKids
-            ? 'text-2xl font-black text-amber-900 mb-2 font-comic'
-            : 'text-xl font-semibold text-zinc-900 mb-2'
+            ? 'text-2xl font-black text-amber-900 mb-2'
+            : isTeens
+              ? 'text-xl font-bold mb-2'
+              : 'text-xl font-semibold text-zinc-900 mb-2'
         }
       >
         {isKids ? '¡Ups!' : 'Atención'}
@@ -103,7 +128,9 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         className={
           isKids
             ? 'text-lg font-medium text-amber-800 mb-6 leading-relaxed'
-            : 'text-sm text-zinc-600 mb-5 leading-normal'
+            : isTeens
+              ? 'text-sm mb-5 leading-normal'
+              : 'text-sm text-zinc-600 mb-5 leading-normal'
         }
       >
         {displayMessage}
@@ -116,8 +143,10 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
             onClick={onRetry}
             className={
               isKids
-                ? 'min-w-[48px] min-h-[48px] px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-md transition-transform active:scale-95 focus:ring-4 focus:ring-amber-300'
-                : 'min-w-[40px] min-h-[40px] px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-sm rounded-lg transition-colors focus:ring-2 focus:ring-zinc-400'
+                ? 'min-w-[48px] min-h-[52px] px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-md transition-transform active:scale-95 focus:ring-4 focus:ring-amber-300'
+                : isTeens
+                  ? 'teens-error-retry min-w-[48px] min-h-[48px] px-5 py-2.5 font-bold text-sm cursor-pointer transition-colors'
+                  : 'min-w-[40px] min-h-[40px] px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-sm rounded-lg transition-colors focus:ring-2 focus:ring-zinc-400'
             }
           >
             Reintentar
@@ -130,7 +159,9 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
             className={
               isKids
                 ? 'min-w-[48px] min-h-[48px] px-6 py-3 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-2xl transition-transform active:scale-95 focus:ring-4 focus:ring-amber-300'
-                : 'min-w-[40px] min-h-[40px] px-4 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-medium text-sm rounded-lg transition-colors focus:ring-2 focus:ring-zinc-400'
+                : isTeens
+                  ? 'teens-error-back min-w-[48px] min-h-[48px] px-5 py-2.5 font-bold text-sm cursor-pointer transition-colors'
+                  : 'min-w-[40px] min-h-[40px] px-4 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-medium text-sm rounded-lg transition-colors focus:ring-2 focus:ring-zinc-400'
             }
           >
             Volver

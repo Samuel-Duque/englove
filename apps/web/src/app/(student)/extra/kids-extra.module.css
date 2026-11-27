@@ -1,0 +1,249 @@
+.kidsFallback {
+  display: none;
+}
+
+:global([data-theme="kids"]) .kidsFallback {
+  display: block;
+}
+
+:global([data-theme="kids"]) .teensFallback {
+  display: none;
+}
+
+.map {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  color: var(--ink-1);
+}
+
+.title,
+.card h2,
+.notice h2 {
+  font-family: var(--font-upward-display), sans-serif;
+  line-height: 1.18;
+}
+
+.title {
+  font-size: clamp(1.65rem, 1.35rem + 1vw, 2rem);
+  font-weight: 800;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: clamp(18px, 4vw, 28px);
+  border: 2.5px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    120deg,
+    var(--surface-hero-start),
+    var(--surface-hero-end)
+  );
+  box-shadow: 4px 4px var(--border-strong);
+}
+
+.hero > div {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.hero p {
+  margin-top: 4px;
+  color: var(--ink-2);
+}
+
+.stamp {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-btn);
+  background: var(--surface-1);
+  color: #872e06;
+}
+
+.level,
+.general {
+  display: inline-flex;
+  padding: 4px 11px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.level {
+  background: var(--surface-soft-yellow);
+  color: #543200;
+}
+
+.general {
+  background: var(--status-ok-bg);
+  color: var(--status-ok-ink);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter {
+  min-width: 96px;
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-1);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filter:hover {
+  background: var(--surface-2);
+}
+
+.filter[aria-pressed="true"] {
+  background: var(--orange);
+  color: white;
+}
+
+.filter[aria-pressed="true"]:hover {
+  background: var(--orange-hover);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.card,
+.skeleton {
+  min-width: 0;
+  min-height: 240px;
+  border-radius: var(--radius-card);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(14px, 3vw, 20px);
+  border: 2.5px solid var(--border-strong);
+  background: var(--surface-1);
+  box-shadow: 4px 4px var(--border-strong);
+  overflow-wrap: anywhere;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed var(--border-dashed);
+  min-height: 48px;
+}
+
+.details {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  font-size: 0.95rem;
+}
+
+.card h2 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+
+.details p,
+.externalNotice {
+  color: var(--ink-2);
+}
+
+.domain {
+  max-width: 100%;
+  padding: 3px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+.actions {
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.externalNotice {
+  font-size: 0.875rem;
+}
+
+.cta:global(.kids-button) {
+  min-height: 52px;
+  box-shadow: 0 4px var(--border-strong);
+}
+
+.cta:global(.kids-button):disabled {
+  box-shadow: none;
+}
+
+.cta svg,
+.offline svg {
+  flex-shrink: 0;
+}
+
+.notice {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: clamp(18px, 5vw, 40px);
+  border: 2px dashed var(--border-dashed);
+  border-radius: var(--radius-card);
+  background: var(--app-bg);
+  text-align: center;
+}
+
+.notice p {
+  max-width: 45ch;
+  color: var(--ink-2);
+}
+
+.notice h2,
+.loadingLabel {
+  font-weight: 800;
+}
+
+.fox {
+  width: 112px;
+  height: 112px;
+}
+
+.offline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-btn);
+  background: var(--surface-soft-orange);
+  color: #872e06;
+}
+
+.skeleton {
+  border: 2px dashed var(--border-soft);
+  background: var(--surface-2);
+}
+
+@media (min-width: 681px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

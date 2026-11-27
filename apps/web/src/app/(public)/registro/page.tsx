@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { AuthLoading } from '../auth-page';
 import { RegistroClient } from './registro-client';
 
 export const metadata: Metadata = {
@@ -10,11 +11,7 @@ export const metadata: Metadata = {
 export default function RegistroPage() {
   return (
     <Suspense
-      fallback={
-        <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 text-center outline-none">
-          <p className="text-zinc-600 text-lg">Cargando formulario de registro…</p>
-        </main>
-      }
+      fallback={<AuthLoading message="Cargando formulario de registro…" />}
     >
       <RegistroClient />
     </Suspense>

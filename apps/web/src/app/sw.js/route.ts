@@ -3,13 +3,13 @@ import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 
+// SEC-03 (Decisión 135, SPEC-09 RF-7): el fallback nunca activa skipWaiting() ni clients.claim()
+// automáticos; solo cede el control tras la confirmación manual SKIP_WAITING de PwaUpdateBanner.
 const DEV_SW_FALLBACK = `// Upward English Service Worker (Development Fallback)
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 `;
 

@@ -348,7 +348,7 @@ export class AuthService {
 
       if (currentLockedUntil && currentLockedUntil <= new Date()) {
         await this.prisma.user.update({
-          where: { id: user.id },
+          where: { id: user.id, organization_id: user.organization_id },
           data: { failed_login_count: 0, locked_until: null },
         });
         currentLockedUntil = null;
@@ -391,7 +391,7 @@ export class AuthService {
               const newFailedCount = baseCount + 1;
               if (newFailedCount >= 10) {
                 await tx.user.update({
-                  where: { id: user.id },
+                  where: { id: user.id, organization_id: user.organization_id },
                   data: {
                     failed_login_count: 10,
                     locked_until: new Date(Date.now() + 10 * 60 * 1000),
@@ -399,7 +399,7 @@ export class AuthService {
                 });
               } else {
                 await tx.user.update({
-                  where: { id: user.id },
+                  where: { id: user.id, organization_id: user.organization_id },
                   data: { failed_login_count: newFailedCount, locked_until: null },
                 });
               }
@@ -407,7 +407,7 @@ export class AuthService {
               const newFailedCount = (user.failed_login_count ?? 0) + 1;
               if (newFailedCount >= 10) {
                 await tx.user.update({
-                  where: { id: user.id },
+                  where: { id: user.id, organization_id: user.organization_id },
                   data: {
                     failed_login_count: 10,
                     locked_until: new Date(Date.now() + 10 * 60 * 1000),
@@ -415,7 +415,7 @@ export class AuthService {
                 });
               } else {
                 await tx.user.update({
-                  where: { id: user.id },
+                  where: { id: user.id, organization_id: user.organization_id },
                   data: { failed_login_count: newFailedCount, locked_until: null },
                 });
               }
@@ -425,7 +425,7 @@ export class AuthService {
           const newFailedCount = (user.failed_login_count ?? 0) + 1;
           if (newFailedCount >= 10) {
             await this.prisma.user.update({
-              where: { id: user.id },
+              where: { id: user.id, organization_id: user.organization_id },
               data: {
                 failed_login_count: 10,
                 locked_until: new Date(Date.now() + 10 * 60 * 1000),
@@ -433,7 +433,7 @@ export class AuthService {
             });
           } else {
             await this.prisma.user.update({
-              where: { id: user.id },
+              where: { id: user.id, organization_id: user.organization_id },
               data: { failed_login_count: newFailedCount, locked_until: null },
             });
           }
@@ -467,7 +467,7 @@ export class AuthService {
       // Password valid and unlocked: reset lock & failure counter to zero
       if (currentFailedCount > 0 || currentLockedUntil !== null) {
         await this.prisma.user.update({
-          where: { id: user.id },
+          where: { id: user.id, organization_id: user.organization_id },
           data: { failed_login_count: 0, locked_until: null },
         });
       }
@@ -1009,7 +1009,7 @@ export class AuthService {
 
         // Update password hash and reset lockout
         await tx.user.update({
-          where: { id: resetToken.user_id },
+          where: { id: resetToken.user_id, organization_id: resetToken.organization_id },
           data: {
             password_hash: newPasswordHash,
             failed_login_count: 0,
@@ -1097,7 +1097,7 @@ export class AuthService {
     await this.prisma.$transaction(async (tx) => {
       // Invalidate existing pending requests for user
       await tx.emailChangeRequest.updateMany({
-        where: { user_id: user.id, used_at: null },
+        where: { organization_id: user.organization_id, user_id: user.id, used_at: null },
         data: { used_at: new Date() },
       });
 

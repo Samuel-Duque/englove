@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, CircleCheck, Info, Users, X } from 'lucide-react';
 import {
   StudentView,
   StudentViewSchema,
@@ -13,9 +14,28 @@ import {
   GroupListResponseSchema,
   Level,
   AgeSegment,
+  ApprovalStatus,
+  formatBogotaDateTime,
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
-import { ConfirmDialog, AccessibleModal } from '../../../components/ui/modal';
+import { ErrorState } from '../../../components/error-state';
+import { EditorialConfirmDialog, TeacherStatusBadge } from '../../../components/teacher-editorial';
+import { AccessibleModal } from '../../../components/ui/modal';
+import styles from './alumnos.module.css';
+import requestStyles from './solicitudes/solicitudes.module.css';
+
+type StudentsTab = 'students' | 'requests' | 'locked';
+
+const tabOrder: readonly StudentsTab[] = ['students', 'requests', 'locked'];
+const skeletonRows = [0, 1, 2, 3, 4, 5] as const;
+const birthDateFormatter = new Intl.DateTimeFormat('es-CO', {
+  dateStyle: 'short',
+  timeZone: 'America/Bogota',
+});
+
+function parseStudentsTab(rawTab: string | null): StudentsTab {
+  return rawTab === 'requests' || rawTab === 'locked' ? rawTab : 'students';
+}
 
 function isLevel(val: string): val is Level {
   return val === Level.A1 || val === Level.A2 || val === Level.B1 || val === Level.B2;
@@ -25,16 +45,60 @@ function isAgeSegment(val: string): val is AgeSegment {
   return val === AgeSegment.kids || val === AgeSegment.teens;
 }
 
+function formatAgeSegment(segment?: AgeSegment): string {
+  if (segment === AgeSegment.kids) return 'Kids';
+  if (segment === AgeSegment.teens) return 'Teens';
+  return 'Sin segmento';
+}
+
+function formatLockRemaining(expiration: number, now: number): string {
+  const seconds = Math.ceil((expiration - now) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainder = String(seconds % 60).padStart(2, '0');
+  return `${minutes}:${remainder} restantes`;
+}
+
+function getQueryErrorMessage(err: unknown): string | null {
+  if (!err) return null;
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error) return err.message;
+  return 'No pudimos cargar los datos.';
+}
+
+function getFriendlyErrorProps(err: unknown, fallbackMessage: string): {
+  code?: string | number;
+  message?: string;
+} {
+  if (err instanceof ApiError) {
+    const code = err.code !== 'ERROR' ? err.code : err.statusCode;
+    const isRawHttpFallback = /^Error \d{3}:/i.test(err.message);
+    return {
+      code,
+      message: isRawHttpFallback ? undefined : err.message,
+    };
+  }
+  return { message: getQueryErrorMessage(err) ?? fallbackMessage };
+}
+
 function StudentsManagementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
-  const rawTab = searchParams.get('tab');
-  const initialTab: 'students' | 'requests' | 'locked' =
-    rawTab === 'requests' || rawTab === 'locked' ? rawTab : 'students';
+  const urlTab = parseStudentsTab(searchParams.get('tab'));
+  const [prevUrlTab, setPrevUrlTab] = useState<StudentsTab>(urlTab);
+  const [activeTab, setActiveTab] = useState<StudentsTab>(urlTab);
 
-  const [activeTab, setActiveTab] = useState<'students' | 'requests' | 'locked'>(initialTab);
+  if (urlTab !== prevUrlTab) {
+    setPrevUrlTab(urlTab);
+    setActiveTab(urlTab);
+  }
+
+  const tabRefs = useRef<Record<StudentsTab, HTMLButtonElement | null>>({
+    students: null,
+    requests: null,
+    locked: null,
+  });
 
   // UI state
   const [actionError, setActionError] = useState<string | null>(null);
@@ -42,7 +106,7 @@ function StudentsManagementContent() {
 
   // Approve Modal state
   const [approvingStudent, setApprovingStudent] = useState<StudentView | null>(null);
-  const [selectedLevel, setSelectedLevel] = useState<Level>(Level.A1);
+  const [selectedLevel, setSelectedLevel] = useState<Level | ''>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [guardianName, setGuardianName] = useState('');
   const [guardianContact, setGuardianContact] = useState('');
@@ -52,14 +116,45 @@ function StudentsManagementContent() {
     student: StudentView | null;
   }>({ isOpen: false, student: null });
 
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+
   // Sync tab with URL
-  const handleTabChange = (tab: 'students' | 'requests' | 'locked') => {
+  const handleTabChange = (tab: StudentsTab) => {
     setActiveTab(tab);
     setActionError(null);
     setSuccess(null);
+    tabRefs.current[tab]?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
     const params = new URLSearchParams(window.location.search);
     params.set('tab', tab);
     router.replace(`/alumnos?${params.toString()}`);
+  };
+
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentTab: StudentsTab,
+  ) => {
+    const currentIndex = tabOrder.indexOf(currentTab);
+    let nextIndex: number | null = null;
+
+    if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % tabOrder.length;
+    } else if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + tabOrder.length) % tabOrder.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = tabOrder.length - 1;
+    }
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = tabOrder[nextIndex];
+    if (nextTab) {
+      tabRefs.current[nextTab]?.focus();
+    }
   };
 
   const studentsQuery = useQuery({
@@ -77,7 +172,7 @@ function StudentsManagementContent() {
       apiFetch<StudentListResponse>('/api/v1/students/requests?limit=100', {
         schema: StudentListResponseSchema,
       }),
-    enabled: activeTab === 'requests',
+    enabled: activeTab === 'students' || activeTab === 'requests',
   });
 
   const lockedQuery = useQuery({
@@ -86,7 +181,7 @@ function StudentsManagementContent() {
       apiFetch<StudentListResponse>('/api/v1/students/locked?limit=100', {
         schema: StudentListResponseSchema,
       }),
-    enabled: activeTab === 'locked',
+    enabled: activeTab === 'students' || activeTab === 'locked',
   });
 
   const groupsQuery = useQuery({
@@ -99,8 +194,25 @@ function StudentsManagementContent() {
 
   const groups = groupsQuery.data?.items || [];
   const students = studentsQuery.data?.items || [];
+  const activeStudents = students.filter(
+    (st) => st.approvalStatus !== ApprovalStatus.pending_approval,
+  );
   const requests = requestsQuery.data?.items || [];
+  const activeGroups = groups.filter((group) => !group.archivedAt);
   const locked = lockedQuery.data?.items || [];
+  const hasVisibleLocks = activeTab === 'locked' && locked.length > 0;
+  const [lockClock, setLockClock] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!hasVisibleLocks) return;
+    const clock = window.setInterval(() => setLockClock(Date.now()), 1000);
+    return () => window.clearInterval(clock);
+  }, [hasVisibleLocks]);
+
+  const requestsCount = Math.max(requestsQuery.data?.total ?? 0, requests.length);
+  const lockedCount = Math.max(lockedQuery.data?.total ?? 0, locked.length);
+
+  const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
 
   const isLoading =
     (activeTab === 'students' && studentsQuery.isLoading) ||
@@ -133,9 +245,10 @@ function StudentsManagementContent() {
       setApprovingStudent(null);
       queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
       queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'reminders'] });
     },
     onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo aprobar al alumno');
+      setApprovalError(err instanceof ApiError ? err.message : 'No se pudo aprobar al alumno.');
     },
   });
 
@@ -144,6 +257,7 @@ function StudentsManagementContent() {
       apiFetch(`/api/v1/students/${studentId}/reject`, { method: 'POST' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher', 'reminders'] });
     },
     onError: (err: unknown) => {
       setActionError(err instanceof ApiError ? err.message : 'No se pudo rechazar la solicitud');
@@ -153,9 +267,7 @@ function StudentsManagementContent() {
   const unlockMutation = useMutation({
     mutationFn: (studentId: string) =>
       apiFetch(`/api/v1/students/${studentId}/unlock`, { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] }),
     onError: (err: unknown) => {
       setActionError(err instanceof ApiError ? err.message : 'No se pudo desbloquear la cuenta');
     },
@@ -164,24 +276,25 @@ function StudentsManagementContent() {
   // Handle Approve button click
   const openApproveModal = (student: StudentView) => {
     setApprovingStudent(student);
-    setSelectedLevel(student.level ?? Level.A1);
+    setSelectedLevel(student.level ?? '');
+    setSelectedGroupId('');
     setGuardianName(student.guardianName ?? '');
     setGuardianContact(student.guardianContact ?? '');
     setAgeSegment(student.ageSegment ?? AgeSegment.kids);
-    if (groups.length > 0 && !selectedGroupId) {
-      setSelectedGroupId(groups[0]?.id ?? '');
-    }
+    setActionError(null);
+    setApprovalError(null);
   };
+
+  const canApprove =
+    Boolean(selectedLevel) &&
+    !groupsQuery.isError &&
+    activeGroups.some((group) => group.id === selectedGroupId);
 
   const handleConfirmApproval = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!approvingStudent) return;
-    if (!selectedGroupId) {
-      setActionError('Debes seleccionar un grupo activo para aprobar al alumno');
-      return;
-    }
+    if (!approvingStudent || !selectedLevel || !canApprove || approveMutation.isPending) return;
 
-    setActionError(null);
+    setApprovalError(null);
     setSuccess(null);
 
     approveMutation.mutate({
@@ -197,6 +310,7 @@ function StudentsManagementContent() {
   const isSubmittingApproval = approveMutation.isPending;
 
   const handleReject = (student: StudentView) => {
+    setActionError(null);
     setRejectConfirmDialog({ isOpen: true, student });
   };
 
@@ -224,165 +338,289 @@ function StudentsManagementContent() {
     });
   };
 
-  const error =
-    actionError ||
-    (studentsQuery.error instanceof ApiError ? studentsQuery.error.message : studentsQuery.error instanceof Error ? studentsQuery.error.message : null) ||
-    (requestsQuery.error instanceof ApiError ? requestsQuery.error.message : requestsQuery.error instanceof Error ? requestsQuery.error.message : null) ||
-    (lockedQuery.error instanceof ApiError ? lockedQuery.error.message : lockedQuery.error instanceof Error ? lockedQuery.error.message : null);
+  const showLockedLoadError = activeTab === 'locked' && lockedQuery.isError && !lockedQuery.data;
+  const lockedRefreshError =
+    activeTab === 'locked' && lockedQuery.data ? getQueryErrorMessage(lockedQuery.error) : null;
+  const bannerError = actionError || lockedRefreshError;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-          Gestión de Alumnos
-        </h1>
-        <p className="text-sm text-zinc-600">
-          Administra estudiantes inscritos, solicitudes de acceso y desbloqueo de cuentas.
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <h1>Alumnos</h1>
+        <p className={styles.subtitle}>
+          Directorio de alumnos activos, solicitudes de registro y cuentas bloqueadas.
         </p>
-      </div>
+      </header>
 
-      {/* Alerts */}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
-        >
-          <span>{error}</span>
-          <button type="button" onClick={() => setActionError(null)} className="text-rose-600 font-bold ml-4">
-            ✕
-          </button>
+      <aside
+        className={styles.callout}
+        aria-label={
+          activeTab === 'locked' ? 'Regla de bloqueo automático' : 'Regla de ingreso de estudiantes'
+        }
+      >
+        <Info size={18} strokeWidth={1.75} className={styles.calloutIcon} aria-hidden="true" />
+        {activeTab === 'locked' ? (
+          <p>
+            Tras <strong>10 intentos fallidos consecutivos</strong>, la cuenta se bloquea durante{' '}
+            <strong>10 minutos</strong>. El desbloqueo manual restablece el acceso de inmediato.
+          </p>
+        ) : (
+          <p>
+            Los estudiantes ingresan mediante auto-registro y aprobación docente en la pestaña{' '}
+            <strong>Solicitudes</strong>. Cada alumno activo pertenece a un único grupo vigente.
+          </p>
+        )}
+      </aside>
+
+      {bannerError && (
+        <div role="alert" className={styles.alertError}>
+          <span>{bannerError}</span>
+          {actionError && (
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className={styles.alertDismiss}
+              aria-label="Cerrar aviso de error"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
       {success && (
-        <div
-          role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
-        >
+        <div role="status" className={styles.alertSuccess}>
           <span>{success}</span>
-          <button type="button" onClick={() => setSuccess(null)} className="text-emerald-600 font-bold ml-4">
-            ✕
+          <button
+            type="button"
+            onClick={() => setSuccess(null)}
+            className={styles.alertDismiss}
+            aria-label="Cerrar aviso"
+          >
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="border-b border-zinc-200">
-        <nav className="-mb-px flex space-x-8" aria-label="Pestañas de alumnos">
+      <div className={styles.tabBar}>
+        <div className={styles.tablist} role="tablist" aria-label="Pestañas de alumnos">
           <button
+            ref={(el) => {
+              tabRefs.current.students = el;
+            }}
+            id="tab-students"
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'students'}
+            tabIndex={activeTab === 'students' ? 0 : -1}
             onClick={() => handleTabChange('students')}
-            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-semibold text-sm transition-colors ${
-              activeTab === 'students'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
+            onKeyDown={(e) => handleTabKeyDown(e, 'students')}
+            className={styles.tab}
           >
-            Alumnos inscritos
+            <span>Alumnos activos</span>
           </button>
 
           <button
+            ref={(el) => {
+              tabRefs.current.requests = el;
+            }}
+            id="tab-requests"
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'requests'}
+            tabIndex={activeTab === 'requests' ? 0 : -1}
             onClick={() => handleTabChange('requests')}
-            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-semibold text-sm transition-colors flex items-center gap-2 ${
-              activeTab === 'requests'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
+            onKeyDown={(e) => handleTabKeyDown(e, 'requests')}
+            className={styles.tab}
           >
             <span>Solicitudes de registro</span>
-            {requests.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
-                {requests.length}
+            {requestsCount > 0 && (
+              <span className={styles.tabCount} data-tone="warm">
+                {requestsCount}
               </span>
             )}
           </button>
 
           <button
+            ref={(el) => {
+              tabRefs.current.locked = el;
+            }}
+            id="tab-locked"
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'locked'}
+            aria-controls={activeTab === 'locked' ? 'panel-locked' : undefined}
+            tabIndex={activeTab === 'locked' ? 0 : -1}
             onClick={() => handleTabChange('locked')}
-            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-semibold text-sm transition-colors flex items-center gap-2 ${
-              activeTab === 'locked'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-            }`}
+            onKeyDown={(e) => handleTabKeyDown(e, 'locked')}
+            className={styles.tab}
           >
             <span>Bloqueados</span>
-            {locked.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
-                {locked.length}
+            {lockedCount > 0 && (
+              <span className={styles.tabCount} data-tone="danger">
+                {lockedCount}
               </span>
             )}
           </button>
-        </nav>
+        </div>
+
+        <Link href="/grupos" className={styles.groupsLink}>
+          <span>Gestionar grupos</span>
+          <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+        </Link>
       </div>
 
-      {/* Tab 1: Alumnos inscritos */}
+      {/* Tab 1: Alumnos activos */}
       {activeTab === 'students' && (
-        <div>
+        <div
+          id="panel-students"
+          role="tabpanel"
+          aria-labelledby="tab-students"
+          className={styles.panel}
+        >
           {isLoading ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">Cargando alumnos…</div>
-          ) : students.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-base font-semibold text-zinc-800">No hay alumnos registrados</p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Los alumnos se registran desde el enlace de registro de tu institución y aparecen en la pestaña de Solicitudes.
+            <div className={styles.skeletonCard} role="status">
+              <span className="sr-only">Cargando alumnos activos…</span>
+              <div className={styles.skeletonHeader} aria-hidden="true" />
+              <div className={styles.skeletonRows} aria-hidden="true">
+                {skeletonRows.map((row) => (
+                  <div key={row} data-skeleton-row="" className={styles.skeletonRow}>
+                    <div className={styles.skeletonBar} />
+                    <div className={styles.skeletonBar} />
+                    <div className={styles.skeletonBar} />
+                    <div className={styles.skeletonBar} />
+                    <div className={styles.skeletonBar} />
+                    <div className={styles.skeletonBar} />
+                    <div className={styles.skeletonBar} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : studentsQuery.isError && !studentsQuery.data ? (
+            <ErrorState
+              variant="teacher"
+              editorial
+              {...getFriendlyErrorProps(
+                studentsQuery.error,
+                'No pudimos cargar el directorio de alumnos.',
+              )}
+              onRetry={() => void studentsQuery.refetch()}
+            />
+          ) : activeStudents.length === 0 ? (
+            <div className={styles.emptyCard}>
+              <span className={styles.emptyIcon} aria-hidden="true">
+                <Users size={22} strokeWidth={1.75} />
+              </span>
+              <h2>Aún no hay alumnos activos</h2>
+              <p>
+                Cuando los estudiantes completen su auto-registro, sus solicitudes aparecerán en{' '}
+                <strong>Solicitudes de registro</strong> para que les asignes nivel y grupo.
               </p>
+              <button
+                type="button"
+                onClick={() => handleTabChange('requests')}
+                className={styles.emptyAction}
+              >
+                <span>Ir a Solicitudes de registro</span>
+                <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+              </button>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Nombre
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Correo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Nivel
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Segmento
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase">
-                      Ficha
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
-                  {students.map((st) => (
-                    <tr key={st.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-zinc-900">
-                        <Link href={`/alumnos/${st.id}`} className="hover:text-blue-600">
-                          {st.name}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                        {st.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-zinc-100 text-zinc-800">
-                          {st.level ?? 'Sin nivel'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600 capitalize">
-                        {st.ageSegment}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold">
-                        <Link
-                          href={`/alumnos/${st.id}`}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          Ver ficha →
-                        </Link>
-                      </td>
+            <div className={styles.tableCard}>
+              <div
+                className={styles.tableWrap}
+                role="region"
+                aria-label="Alumnos activos"
+                tabIndex={0}
+              >
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Nombre</th>
+                      <th scope="col">Correo</th>
+                      <th scope="col">Nivel MCER</th>
+                      <th scope="col">Grupo vigente</th>
+                      <th scope="col">Segmento</th>
+                      <th scope="col">Contacto acudiente</th>
+                      <th scope="col">
+                        <span className="sr-only">Acción</span>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {activeStudents.map((st) => {
+                      const groupName = st.groupId ? groupNameById.get(st.groupId) : undefined;
+                      const hasGuardianInfo = Boolean(st.guardianName || st.guardianContact);
+
+                      return (
+                        <tr key={st.id}>
+                          <th scope="row">
+                            <Link
+                              href={`/alumnos/${encodeURIComponent(st.id)}`}
+                              className={styles.studentNameLink}
+                            >
+                              {st.name}
+                            </Link>
+                          </th>
+                          <td data-label="Correo">
+                            <span className={styles.emailText} title={st.email ?? undefined}>
+                              {st.email ?? 'Sin correo'}
+                            </span>
+                          </td>
+                          <td data-label="Nivel MCER">
+                            <span className={st.level ? styles.levelBadge : styles.segmentBadge}>
+                              {st.level ?? 'Sin nivel'}
+                            </span>
+                          </td>
+                          <td data-label="Grupo vigente">
+                            {st.groupId && groupName ? (
+                              <Link
+                                href={`/grupos/${encodeURIComponent(st.groupId)}`}
+                                className={styles.groupLink}
+                              >
+                                {groupName}
+                              </Link>
+                            ) : (
+                              <span className={styles.mutedText}>Sin grupo</span>
+                            )}
+                          </td>
+                          <td data-label="Segmento">
+                            <span className={styles.segmentBadge}>
+                              {formatAgeSegment(st.ageSegment)}
+                            </span>
+                          </td>
+                          <td data-label="Contacto acudiente">
+                            {hasGuardianInfo ? (
+                              <div className={styles.guardianCell}>
+                                {st.guardianName && (
+                                  <span className={styles.guardianName}>{st.guardianName}</span>
+                                )}
+                                {st.guardianContact && (
+                                  <span className={styles.guardianContact}>
+                                    {st.guardianContact}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className={styles.mutedText}>Sin registrar</span>
+                            )}
+                          </td>
+                          <td className={styles.actionCell}>
+                            <Link
+                              href={`/alumnos/${encodeURIComponent(st.id)}`}
+                              className={styles.detailLink}
+                              aria-label={`Ver ficha de ${st.name}`}
+                            >
+                              <span>Ver ficha</span>
+                              <ArrowRight size={15} strokeWidth={1.75} aria-hidden="true" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -390,69 +628,100 @@ function StudentsManagementContent() {
 
       {/* Tab 2: Solicitudes de registro */}
       {activeTab === 'requests' && (
-        <div>
+        <div
+          id="panel-requests"
+          role="tabpanel"
+          aria-labelledby="tab-requests"
+          className={styles.panel}
+        >
           {isLoading ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">Cargando solicitudes…</div>
+            <p className={requestStyles.loading} role="status">Cargando solicitudes…</p>
+          ) : requestsQuery.isError ? (
+            <ErrorState
+              variant="teacher"
+              editorial
+              {...getFriendlyErrorProps(requestsQuery.error, 'No pudimos cargar las solicitudes.')}
+              onRetry={() => void requestsQuery.refetch()}
+            />
           ) : requests.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-base font-semibold text-zinc-800">
-                No tienes solicitudes pendientes
-              </p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Aquí aparecerán los nuevos registros de alumnos para que les asignes nivel y grupo.
-              </p>
+            <div className={styles.emptyCard}>
+              <span className={requestStyles.emptyIcon} aria-hidden="true">
+                <CircleCheck size={22} strokeWidth={1.75} />
+              </span>
+              <h2>No hay solicitudes pendientes de aprobación.</h2>
+              <p>Los nuevos registros aparecerán aquí para que les asignes nivel y grupo.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Alumno
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Correo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Nacimiento / Segmento
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
-                  {requests.map((req) => (
-                    <tr key={req.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-zinc-900">
-                        {req.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                        {req.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                        {req.birthDate} ({req.ageSegment})
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => openApproveModal(req)}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700"
-                        >
-                          Aprobar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(req)}
-                          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-rose-600 hover:bg-rose-50"
-                        >
-                          Rechazar
-                        </button>
-                      </td>
+            <div className={styles.tableCard}>
+              <div
+                className={`${styles.tableWrap} ${requestStyles.tableWrap}`}
+                role="region"
+                aria-label="Solicitudes pendientes"
+                tabIndex={0}
+              >
+                <table className={`${styles.table} ${requestStyles.table}`} role="table">
+                  <thead role="rowgroup">
+                    <tr role="row">
+                      <th scope="col" role="columnheader">Alumno</th>
+                      <th scope="col" role="columnheader">Correo</th>
+                      <th scope="col" role="columnheader">Nacimiento y segmento</th>
+                      <th scope="col" role="columnheader">Contacto del acudiente</th>
+                      <th scope="col" role="columnheader">Estado</th>
+                      <th scope="col" role="columnheader">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody role="rowgroup">
+                    {requests.map((req) => (
+                      <tr key={req.id} role="row">
+                        <th scope="row" role="rowheader">{req.name}</th>
+                        <td role="cell" data-label="Correo">{req.email ?? 'Sin correo'}</td>
+                        <td role="cell" data-label="Nacimiento y segmento">
+                          <div className={requestStyles.cellDetails}>
+                            {req.birthDate && (
+                              <time dateTime={req.birthDate}>
+                                {birthDateFormatter.format(new Date(`${req.birthDate}T12:00:00-05:00`))}
+                              </time>
+                            )}
+                            <span>{formatAgeSegment(req.ageSegment)}</span>
+                          </div>
+                        </td>
+                        <td role="cell" data-label="Contacto del acudiente">
+                          <div className={requestStyles.cellDetails}>
+                            {req.guardianName && <strong>{req.guardianName}</strong>}
+                            {req.guardianContact && <span>{req.guardianContact}</span>}
+                            {!req.guardianName && !req.guardianContact && 'Sin registrar'}
+                          </div>
+                        </td>
+                        <td role="cell" data-label="Estado">
+                          <TeacherStatusBadge kind="studentPendingApproval" />
+                        </td>
+                        <td role="cell" className={styles.actionCell}>
+                          <div className={requestStyles.rowActions}>
+                            <button
+                              type="button"
+                              onClick={() => openApproveModal(req)}
+                              className={requestStyles.primary}
+                              disabled={rejectMutation.isPending}
+                              aria-label={`Aprobar a ${req.name}`}
+                            >
+                              Aprobar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReject(req)}
+                              className={requestStyles.reject}
+                              disabled={rejectMutation.isPending}
+                              aria-label={`Rechazar solicitud de ${req.name}`}
+                            >
+                              Rechazar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -460,189 +729,217 @@ function StudentsManagementContent() {
 
       {/* Tab 3: Bloqueados */}
       {activeTab === 'locked' && (
-        <div>
+        <div
+          id="panel-locked"
+          role="tabpanel"
+          aria-labelledby="tab-locked"
+          className={styles.panel}
+        >
           {isLoading ? (
-            <div className="py-12 text-center text-zinc-500 text-sm">Cargando bloqueados…</div>
+            <div className={styles.emptyCard} role="status">
+              <p>Cargando cuentas bloqueadas…</p>
+            </div>
+          ) : showLockedLoadError ? (
+            <ErrorState
+              variant="teacher"
+              editorial
+              {...getFriendlyErrorProps(lockedQuery.error, 'No pudimos cargar las cuentas bloqueadas.')}
+              onRetry={() => void lockedQuery.refetch()}
+            />
           ) : locked.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-base font-semibold text-zinc-800">
-                No hay alumnos bloqueados
-              </p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Las cuentas temporalmente bloqueadas por intentos fallidos aparecerán aquí para desbloqueo inmediato.
-              </p>
+            <div className={styles.emptyCard}>
+              <span className={styles.lockedEmptyIcon} aria-hidden="true">
+                <CircleCheck size={22} strokeWidth={1.75} />
+              </span>
+              <h2>No hay cuentas bloqueadas en este momento.</h2>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead className="bg-zinc-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Alumno
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Correo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      Bloqueado hasta
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase">
-                      Acción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
-                  {locked.map((st) => (
-                    <tr key={st.id} className="hover:bg-zinc-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-zinc-900">
-                        {st.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                        {st.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-rose-600 font-medium">
-                        {st.lockedUntil ? new Date(st.lockedUntil).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota' }) : 'Bloqueado'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => handleUnlock(st)}
-                          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-white hover:bg-zinc-800"
-                        >
-                          Desbloquear en 1 clic
-                        </button>
-                      </td>
+            <div className={styles.tableCard}>
+              <div className={styles.tableWrap}>
+                <table className={`${styles.table} ${styles.lockedTable}`} role="table">
+                  <caption className="sr-only">Cuentas bloqueadas · Hora de Colombia</caption>
+                  <thead role="rowgroup">
+                    <tr role="row">
+                      <th role="columnheader" scope="col">
+                        Alumno
+                      </th>
+                      <th role="columnheader" scope="col">
+                        Estado
+                      </th>
+                      <th role="columnheader" scope="col">
+                        Bloqueada hasta
+                      </th>
+                      <th role="columnheader" scope="col">
+                        Acción
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody role="rowgroup">
+                    {locked.map((student) => {
+                      const expiration = Date.parse(student.lockedUntil ?? '');
+                      const hasExpiration = Number.isFinite(expiration);
+                      const expired = hasExpiration && expiration <= lockClock;
+                      const isUnlocking =
+                        unlockMutation.isPending && unlockMutation.variables === student.id;
+                      const unlockLabel = isUnlocking ? 'Desbloqueando…' : 'Desbloquear cuenta';
+
+                      return (
+                        <tr key={student.id} role="row">
+                          <th role="rowheader" scope="row">
+                            <span>{student.name}</span>
+                            <span className={styles.lockedEmail}>{student.email}</span>
+                          </th>
+                          <td role="cell" data-label="Estado">
+                            {expired ? 'Plazo cumplido' : <TeacherStatusBadge kind="studentLocked" />}
+                          </td>
+                          <td role="cell" data-label="Bloqueada hasta">
+                            {hasExpiration ? (
+                              <div className={styles.lockedExpiration}>
+                                <time dateTime={student.lockedUntil ?? undefined}>
+                                  {formatBogotaDateTime(new Date(expiration))}
+                                </time>
+                                {!expired && (
+                                  <span>{formatLockRemaining(expiration, lockClock)}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span>Hora no disponible</span>
+                            )}
+                          </td>
+                          <td role="cell" className={styles.actionCell}>
+                            <button
+                              type="button"
+                              onClick={() => handleUnlock(student)}
+                              disabled={unlockMutation.isPending}
+                              className={styles.unlockButton}
+                              aria-label={`${unlockLabel} (${student.name})`}
+                            >
+                              {unlockLabel}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Approval Modal */}
       <AccessibleModal
         isOpen={Boolean(approvingStudent)}
         onClose={() => setApprovingStudent(null)}
         title={`Aprobar alumno: ${approvingStudent?.name ?? ''}`}
-        maxWidthClass="max-w-lg"
+        maxWidthClass="max-w-[540px]"
+        dialogClassName={requestStyles.dialog}
+        dismissible={!isSubmittingApproval}
       >
-        {groups.length === 0 ? (
-          <div className="py-4 text-center space-y-3">
-            <p className="text-sm text-amber-800 bg-amber-50 p-4 rounded-lg border border-amber-200">
-              No tienes ningún grupo activo. Debes crear un grupo antes de poder aprobar alumnos.
-            </p>
-            <Link
-              href="/grupos"
-              className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-            >
-              Ir a Crear Grupo
-            </Link>
+        {groupsQuery.isError ? (
+          <ErrorState
+            variant="teacher"
+            editorial
+            {...getFriendlyErrorProps(groupsQuery.error, 'No pudimos cargar los grupos activos.')}
+            onRetry={() => void groupsQuery.refetch()}
+          />
+        ) : groupsQuery.isPending ? (
+          <p role="status">Cargando grupos activos…</p>
+        ) : activeGroups.length === 0 ? (
+          <div className={requestStyles.noGroups}>
+            <p>Debes crear un grupo activo antes de poder aprobar la solicitud.</p>
+            <Link href="/grupos" className={requestStyles.primary}>Gestionar grupos</Link>
           </div>
         ) : (
-          <form onSubmit={handleConfirmApproval} className="space-y-4">
-            {/* Level */}
-            <div>
-              <label htmlFor="approve-level" className="block text-xs font-semibold text-zinc-700 mb-1">
-                Nivel pedagógico inicial *
+          <form onSubmit={handleConfirmApproval} className={requestStyles.form}>
+            <div className={requestStyles.formGrid}>
+              <label htmlFor="approve-level">
+                Nivel MCER
+                <select
+                  id="approve-level"
+                  required
+                  value={selectedLevel}
+                  onChange={(e) => {
+                    if (isLevel(e.target.value)) setSelectedLevel(e.target.value);
+                  }}
+                >
+                  <option value="" disabled>Selecciona un nivel</option>
+                  <option value={Level.A1}>A1</option>
+                  <option value={Level.A2}>A2</option>
+                  <option value={Level.B1}>B1</option>
+                  <option value={Level.B2}>B2</option>
+                </select>
               </label>
-              <select
-                id="approve-level"
-                value={selectedLevel}
-                onChange={(e) => {
-                  if (isLevel(e.target.value)) setSelectedLevel(e.target.value);
-                }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
-              >
-                <option value={Level.A1}>A1</option>
-                <option value={Level.A2}>A2</option>
-                <option value={Level.B1}>B1</option>
-                <option value={Level.B2}>B2</option>
-              </select>
+              <label htmlFor="approve-segment">
+                Segmento pedagógico
+                <select
+                  id="approve-segment"
+                  value={ageSegment}
+                  onChange={(e) => {
+                    if (isAgeSegment(e.target.value)) setAgeSegment(e.target.value);
+                  }}
+                >
+                  <option value={AgeSegment.kids}>Kids (7 a 10 años)</option>
+                  <option value={AgeSegment.teens}>Teens (11 a 14 años)</option>
+                </select>
+              </label>
             </div>
 
-            {/* Group (Strictly 1 active group per student, Decision 73) */}
-            <div>
-              <label htmlFor="approve-group" className="block text-xs font-semibold text-zinc-700 mb-1">
-                Grupo asignado * (Un solo grupo vigente por alumno)
-              </label>
+            <label htmlFor="approve-group">
+              Grupo inicial
               <select
                 id="approve-group"
                 required
                 value={selectedGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
               >
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.activeStudentCount} miembros)
-                  </option>
+                <option value="" disabled>Selecciona un grupo activo</option>
+                {activeGroups.map((group) => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
                 ))}
               </select>
-            </div>
+            </label>
 
-            {/* Informacion del acudiente */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="approve-guardian" className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Nombre del acudiente (opcional)
-                </label>
+            <div className={requestStyles.formGrid}>
+              <label htmlFor="approve-guardian">
+                Nombre del acudiente (opcional)
                 <input
                   id="approve-guardian"
                   type="text"
                   maxLength={200}
                   value={guardianName}
                   onChange={(e) => setGuardianName(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
                 />
-              </div>
-
-              <div>
-                <label htmlFor="approve-contact" className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Contacto del acudiente (opcional)
-                </label>
+              </label>
+              <label htmlFor="approve-contact">
+                Contacto del acudiente (opcional)
                 <input
                   id="approve-contact"
                   type="text"
                   maxLength={200}
                   value={guardianContact}
                   onChange={(e) => setGuardianContact(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
                 />
-              </div>
-            </div>
-
-            {/* Pedagogical Segment correction */}
-            <div>
-              <label htmlFor="approve-segment" className="block text-xs font-semibold text-zinc-700 mb-1">
-                Segmento pedagógico
               </label>
-              <select
-                id="approve-segment"
-                value={ageSegment}
-                onChange={(e) => {
-                  if (isAgeSegment(e.target.value)) setAgeSegment(e.target.value);
-                }}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
-              >
-                <option value={AgeSegment.kids}>Kids (7 a 10 años)</option>
-                <option value={AgeSegment.teens}>Teens (11 a 14 años)</option>
-              </select>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+            <p className={requestStyles.note}>Al aprobar la solicitud, se enviará un correo de bienvenida al alumno.</p>
+            {approvalError && (
+              <p role="alert" className={styles.alertError}>{approvalError}</p>
+            )}
+            <div className={requestStyles.dialogActions}>
               <button
                 type="button"
-                onClick={() => setApprovingStudent(null)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                onClick={() => { if (!isSubmittingApproval) setApprovingStudent(null); }}
+                aria-disabled={isSubmittingApproval || undefined}
+                className={requestStyles.secondary}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                disabled={isSubmittingApproval || !selectedGroupId}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                aria-disabled={isSubmittingApproval || !canApprove}
+                className={requestStyles.primary}
               >
                 {isSubmittingApproval ? 'Aprobando…' : 'Confirmar aprobación'}
               </button>
@@ -650,11 +947,11 @@ function StudentsManagementContent() {
           </form>
         )}
       </AccessibleModal>
-      <ConfirmDialog
+      <EditorialConfirmDialog
         isOpen={rejectConfirmDialog.isOpen}
         title="Rechazar solicitud"
-        message={`¿Estás segura de rechazar la solicitud de "${rejectConfirmDialog.student?.name ?? ''}"? Esta acción borrará el registro y no se puede deshacer.`}
-        isDestructive={true}
+        message={`Se eliminará la solicitud de ${rejectConfirmDialog.student?.name ?? ''} sin activar su cuenta. Esta acción es definitiva.`}
+        isDestructive
         confirmText="Rechazar solicitud"
         onConfirm={handleConfirmReject}
         onCancel={() => setRejectConfirmDialog({ isOpen: false, student: null })}
@@ -665,7 +962,13 @@ function StudentsManagementContent() {
 
 export function AlumnosClient() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando gestión de alumnos…</div>}>
+    <Suspense
+      fallback={
+        <div role="status" className="py-12 text-center text-sm text-[#5E3E2C]">
+          Cargando gestión de alumnos…
+        </div>
+      }
+    >
       <StudentsManagementContent />
     </Suspense>
   );

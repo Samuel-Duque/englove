@@ -10,11 +10,103 @@ import {
   ProgressEventType,
   MediaAssetStatus,
 } from '@prisma/client';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import * as argon2 from 'argon2';
 import { seedMinimal } from './seed';
 import { getPrisma } from './client';
 
+/**
+ * Clip AAC-LC en contenedor MP4 (+faststart) de 1,0 s codificado con silencio mono a 8 kHz (913 B),
+ * verificado con ffprobe para evitar NoSuchKey al reproducir la entrega sembrada en MinIO local.
+ */
+const MINIMAL_VALID_MP4_AUDIO_B64 = [
+  'AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAzJtb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAB9AAAAfQAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC',
+  'AAACXXRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAfQAAAAAAAAAAAAAAAAQEAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAH0AAAAQAAAEAAAAAAdVtZGlh',
+  'AAAAIG1kaGQAAAAAAAAAAAAAAAAAAB9AAAAjQFXEAAAAAAAtaGRscgAAAAAAAAAAc291bgAAAAAAAAAAAAAAAFNvdW5kSGFuZGxlcgAAAAGAbWluZgAAABBzbWhkAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAFEc3Ri',
+  'bAAAAH5zdHNkAAAAAAAAAAEAAABubXA0YQAAAAAAAAABAAAAAAAAAAAAAQAQAAAAAB9AAAAAAAA2ZXNkcwAAAAADgICAJQABAASAgIAXQBUAAAAAAD6AAAABaQWAgIAFFYhW5QAGgICAAQIAAAAUYnRydAAAAAAAAD6AAAABaQAAACBzdHRzAAAAAAAAAAIA',
+  'AAAIAAAEAAAAAAEAAANAAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAAJAAAAAQAAADhzdHN6AAAAAAAAAAAAAAAJAAAAEwAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAAFHN0Y28AAAAAAAAAAQAAA14AAAAac2dwZAEAAAByb2xsAAAAAgAAAAH/',
+  '/wAAABxzYmdwAAAAAHJvbGwAAAABAAAACQAAAAEAAABhdWR0YQAAAFltZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAACxpbHN0AAAAJKl0b28AAAAcZGF0YQAAAAEAAAAATGF2ZjYzLjEuMTAyAAAACGZyZWUAAAA7bWRhdNwA',
+  'TGF2YzYzLjEuMTAyAAIwQA4BGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAHARggBw==',
+].join('');
+
+export const SEEDED_SPEAKING_CONVERTED_KEY = 'synthetic/audio-sample_converted.mp4';
+
+export function buildMinimalValidMp4Audio(): Buffer {
+  return Buffer.from(MINIMAL_VALID_MP4_AUDIO_B64, 'base64');
+}
+
+/**
+ * SEC-02: el seed de desarrollo crea cuentas con contraseña conocida y activa flags; jamás debe
+ * correr en producción, y en staging exige autorización explícita (ALLOW_SEED_DEV=true).
+ */
+export function assertSeedDevAllowed(env: NodeJS.ProcessEnv = process.env): void {
+  const appEnv = env.APP_ENV?.trim().toLowerCase();
+  const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
+  if (appEnv === 'production' || nodeEnv === 'production') {
+    throw new Error('SEC-02: seed-dev cannot be executed in production environment');
+  }
+  if ((appEnv === 'staging' || nodeEnv === 'staging') && env.ALLOW_SEED_DEV !== 'true') {
+    throw new Error(
+      'SEC-02: seed-dev in staging requires explicit ALLOW_SEED_DEV=true authorization',
+    );
+  }
+}
+
+export async function seedSampleSpeakingAudioToMinio(
+  env: NodeJS.ProcessEnv = process.env,
+  key: string = SEEDED_SPEAKING_CONVERTED_KEY,
+): Promise<{ uploaded: boolean }> {
+  const endpointRaw = env.R2_ENDPOINT?.trim();
+  if (!endpointRaw) {
+    return { uploaded: false };
+  }
+
+  let parsedEndpoint: URL;
+  try {
+    parsedEndpoint = new URL(endpointRaw);
+    if (
+      (parsedEndpoint.protocol !== 'http:' && parsedEndpoint.protocol !== 'https:') ||
+      parsedEndpoint.hostname.toLowerCase().endsWith('.r2.cloudflarestorage.com')
+    ) {
+      return { uploaded: false };
+    }
+  } catch {
+    return { uploaded: false };
+  }
+
+  const bucket = env.R2_BUCKET_NAME?.trim() || 'upward-english-dev';
+  const s3Client = new S3Client({
+    endpoint: parsedEndpoint.href,
+    region: 'auto',
+    forcePathStyle: true,
+    // guardrails-ignore G-A09: reintentos de transporte del SDK S3 en seed local, no campo retirado
+    maxAttempts: 1,
+    credentials: {
+      accessKeyId: env.R2_ACCESS_KEY_ID || 'minioadmin',
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY || 'minioadmin',
+    },
+  });
+
+  try {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buildMinimalValidMp4Audio(),
+        ContentType: 'audio/mp4',
+      }),
+      { abortSignal: AbortSignal.timeout(3000) },
+    );
+    return { uploaded: true };
+  } catch {
+    return { uploaded: false };
+  } finally {
+    s3Client.destroy();
+  }
+}
+
 export async function seedDev() {
+  assertSeedDevAllowed();
   const prisma = getPrisma();
   const { org, teacher } = await seedMinimal();
 
@@ -753,23 +845,31 @@ export async function seedDev() {
     },
   });
 
-  // Media asset for speaking attempt (metadata only, no real upload to R2)
+  // SEC-02: Media asset para entrega oral sembrada + subida de clip AAC/MP4 mínimo válido a MinIO local si R2_ENDPOINT está disponible
   await prisma.mediaAsset.upsert({
     where: { id: '50000000-0000-4000-8000-000000000001' },
-    update: {},
+    update: {
+      converted_key: SEEDED_SPEAKING_CONVERTED_KEY,
+      status: MediaAssetStatus.ready,
+      transcode_attempts: 0,
+      transcode_failed_at: null,
+      retention_until: null,
+      deleted_at: null,
+    },
     create: {
       id: '50000000-0000-4000-8000-000000000001',
       organization_id: org.id,
       attempt_id: pendingAttempt.id,
       student_id: secondStudent.id,
       key: 'synthetic/audio-sample.webm',
-      converted_key: 'synthetic/audio-sample_converted.mp4',
+      converted_key: SEEDED_SPEAKING_CONVERTED_KEY,
       mime_type: 'audio/webm;codecs=opus',
       duration_seconds: 45,
       size_bytes: BigInt(512000),
       status: MediaAssetStatus.ready,
     },
   });
+  await seedSampleSpeakingAudioToMinio(process.env, SEEDED_SPEAKING_CONVERTED_KEY);
 
   // 3. Abandoned attempt
   await prisma.attempt.upsert({

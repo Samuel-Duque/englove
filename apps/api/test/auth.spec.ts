@@ -550,7 +550,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       // User was locked
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: studentUserId },
+          where: { id: studentUserId, organization_id: orgId },
           data: expect.objectContaining({
             failed_login_count: 10,
             locked_until: expect.any(Date),
@@ -692,7 +692,7 @@ describe('SPEC-02: Identidad y Sesión — Pruebas de integración y unitarias (
       expect(result.user.email).toBe('laura@school.edu');
       // Verify expired lock was reset
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: teacherId },
+        where: { id: teacherId, organization_id: orgId },
         data: { failed_login_count: 0, locked_until: null },
       });
     });

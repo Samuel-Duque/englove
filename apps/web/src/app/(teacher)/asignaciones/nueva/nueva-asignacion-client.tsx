@@ -4,11 +4,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { CircleAlert, Clock, Info, X } from 'lucide-react';
 import {
   ActivityListResponse,
   ActivityListResponseSchema,
   ActivityType,
   ActivityStatus,
+  CreateAssignmentInput,
   Level,
   GroupListResponse,
   GroupListResponseSchema,
@@ -17,15 +19,68 @@ import {
   formatBogotaDateTime,
   getExtendedDueAt,
 } from '@upward-english/shared';
+import { ErrorState } from '../../../../components/error-state';
 import { apiFetch, ApiError } from '../../../../lib/api';
+import styles from './nueva-asignacion.module.css';
 
 const typeLabels: Record<ActivityType, string> = {
-  [ActivityType.fill_blank]: 'Rellenar huecos',
+  [ActivityType.fill_blank]: 'Completar espacios',
   [ActivityType.open_question]: 'Pregunta abierta',
   [ActivityType.speaking]: 'Expresión oral (Speaking)',
   [ActivityType.game]: 'Microjuego',
   [ActivityType.exam]: 'Examen',
 };
+
+interface FieldErrors {
+  activity?: string;
+  groups?: string;
+  opensAt?: string;
+  dueAt?: string;
+}
+
+// Convert datetime-local (Bogota wall-clock time) to ISO-8601 string with -05:00 offset
+function getIsoBogota(val: string): string {
+  if (!val) return '';
+  const parts = val.split(':');
+  if (parts.length === 2) {
+    return `${val}:00-05:00`;
+  }
+  return `${val}-05:00`;
+}
+
+function formatBogotaInputPreview(val: string): string | null {
+  if (!val) return null;
+  const iso = getIsoBogota(val);
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  try {
+    return formatBogotaDateTime(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function computeDefaultBogotaWindow(): { opensAt: string; dueAt: string } {
+  const now = new Date();
+  const bogotaNow = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+  const tomorrow = new Date(bogotaNow);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const nextWeek = new Date(bogotaNow);
+  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+
+  const y1 = tomorrow.getUTCFullYear();
+  const m1 = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+  const d1 = String(tomorrow.getUTCDate()).padStart(2, '0');
+
+  const y2 = nextWeek.getUTCFullYear();
+  const m2 = String(nextWeek.getUTCMonth() + 1).padStart(2, '0');
+  const d2 = String(nextWeek.getUTCDate()).padStart(2, '0');
+
+  return {
+    opensAt: `${y1}-${m1}-${d1}T08:00`,
+    dueAt: `${y2}-${m2}-${d2}T18:00`,
+  };
+}
 
 export function NuevaAsignacionClient() {
   const router = useRouter();
@@ -33,18 +88,19 @@ export function NuevaAsignacionClient() {
 
   const activitiesQuery = useQuery({
     queryKey: ['teacher', 'activities', 'published'],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<ActivityListResponse>(
         `/api/v1/activities?status=${ActivityStatus.published}&limit=100`,
-        { schema: ActivityListResponseSchema },
+        { schema: ActivityListResponseSchema, signal },
       ),
   });
 
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'active'],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<GroupListResponse>('/api/v1/groups?archived=false&limit=100', {
         schema: GroupListResponseSchema,
+        signal,
       }),
   });
 
@@ -69,53 +125,43 @@ export function NuevaAsignacionClient() {
   // Form selection state
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [opensAtInput, setOpensAtInput] = useState<string>('');
-  const [dueAtInput, setDueAtInput] = useState<string>('');
+  const [opensAtInput, setOpensAtInput] = useState<string>(() => computeDefaultBogotaWindow().opensAt);
+  const [dueAtInput, setDueAtInput] = useState<string>(() => computeDefaultBogotaWindow().dueAt);
 
   // Filters for activity selector
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // Submit & Error states
+  // Submit, field validation & focus management
   const [formError, setFormError] = useState<string | null>(null);
+  const [errorFocusSeq, setErrorFocusSeq] = useState<number>(0);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [opensEdited, setOpensEdited] = useState<boolean>(false);
+  const [dueEdited, setDueEdited] = useState<boolean>(false);
+  const [politeAnnouncement, setPoliteAnnouncement] = useState<string>('');
   const errorAlertRef = useRef<HTMLDivElement | null>(null);
 
   const showError = (msg: string) => {
     setFormError(msg);
-    setTimeout(() => {
-      errorAlertRef.current?.focus();
-    }, 50);
+    setErrorFocusSeq((n) => n + 1);
   };
 
   useEffect(() => {
-    // Default dates: opens tomorrow at 08:00, due in 7 days at 18:00 (Bogota time)
-    const now = new Date();
-    const bogotaNow = new Date(now.getTime() - 5 * 60 * 60 * 1000);
-    const tomorrow = new Date(bogotaNow);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const nextWeek = new Date(bogotaNow);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-
-    const y1 = tomorrow.getUTCFullYear();
-    const m1 = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-    const d1 = String(tomorrow.getUTCDate()).padStart(2, '0');
-    setOpensAtInput(`${y1}-${m1}-${d1}T08:00`);
-
-    const y2 = nextWeek.getUTCFullYear();
-    const m2 = String(nextWeek.getUTCMonth() + 1).padStart(2, '0');
-    const d2 = String(nextWeek.getUTCDate()).padStart(2, '0');
-    setDueAtInput(`${y2}-${m2}-${d2}T18:00`);
-  }, []);
+    if (errorFocusSeq > 0 && formError) {
+      errorAlertRef.current?.focus();
+      errorAlertRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [errorFocusSeq, formError]);
 
   const createMutation = useMutation({
-    mutationFn: (body: unknown) =>
+    mutationFn: (body: CreateAssignmentInput) =>
       apiFetch<CreateAssignmentResponse>('/api/v1/assignments', {
         method: 'POST',
         body: JSON.stringify(body),
         schema: CreateAssignmentResponseSchema,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
       const count = selectedGroupIds.length;
       const msg =
         count === 1
@@ -126,12 +172,19 @@ export function NuevaAsignacionClient() {
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
         if (err.code === 'ASSIGNMENT_ALREADY_ACTIVE') {
+          void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
           showError(
             'La actividad ya tiene una asignación activa en uno de los grupos seleccionados',
           );
+        } else if (err.code === 'GAME_ASSIGNMENT_NOT_ALLOWED') {
+          showError(
+            'Los microjuegos están abiertos a todos los alumnos y no se asignan a grupos',
+          );
         } else if (err.code === 'ACTIVITY_NOT_ASSIGNABLE') {
+          void activitiesQuery.refetch();
           showError('Solo puedes asignar actividades publicadas');
         } else if (err.code === 'GROUP_ARCHIVED') {
+          void groupsQuery.refetch();
           showError('Uno de los grupos fue archivado. Elige un grupo activo');
         } else if (err.statusCode === 403) {
           showError('No tienes acceso a esta sección');
@@ -157,7 +210,7 @@ export function NuevaAsignacionClient() {
 
   const isSubmitting = createMutation.isPending;
 
-  // Filter activities
+  // Filter assignable activities
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
       if (levelFilter !== 'all' && act.level !== levelFilter) return false;
@@ -174,12 +227,18 @@ export function NuevaAsignacionClient() {
     return groups.filter((g) => selectedGroupIds.includes(g.id));
   }, [groups, selectedGroupIds]);
 
+  const handleActivitySelect = (activityId: string) => {
+    setSelectedActivityId(activityId);
+    setFieldErrors((prev) => ({ ...prev, activity: undefined }));
+  };
+
   const handleGroupToggle = (groupId: string) => {
     setSelectedGroupIds((prev) =>
       prev.includes(groupId)
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId],
     );
+    setFieldErrors((prev) => ({ ...prev, groups: undefined }));
   };
 
   const handleSelectAllGroups = () => {
@@ -187,62 +246,121 @@ export function NuevaAsignacionClient() {
       setSelectedGroupIds([]);
     } else {
       setSelectedGroupIds(groups.map((g) => g.id));
+      setFieldErrors((prev) => ({ ...prev, groups: undefined }));
     }
   };
 
-  // Convert datetime-local (Bogota time) to ISO-8601 string with -05:00 offset
-  const getIsoBogota = (val: string): string => {
-    if (!val) return '';
-    const parts = val.split(':');
-    if (parts.length === 2) {
-      return `${val}:00-05:00`;
-    }
-    return `${val}-05:00`;
-  };
+  const opensAtPreview = useMemo(
+    () => formatBogotaInputPreview(opensAtInput),
+    [opensAtInput],
+  );
+  const dueAtPreview = useMemo(
+    () => formatBogotaInputPreview(dueAtInput),
+    [dueAtInput],
+  );
 
   const extendedDueAtText = useMemo(() => {
     if (!dueAtInput) return null;
     const iso = getIsoBogota(dueAtInput);
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return null;
     try {
-      const ext = getExtendedDueAt(iso);
+      const ext = getExtendedDueAt(parsed);
       return formatBogotaDateTime(ext);
     } catch {
       return null;
     }
   }, [dueAtInput]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateDatePairOnBlur = (target: 'opensAt' | 'dueAt') => {
+    const edited = target === 'opensAt' ? opensEdited : dueEdited;
+    if (!edited) return;
+
+    const currentVal = target === 'opensAt' ? opensAtInput : dueAtInput;
+    if (!currentVal) {
+      const msg = 'Revisa la fecha y la hora';
+      setFieldErrors((prev) => ({ ...prev, [target]: msg }));
+      setPoliteAnnouncement(
+        `${target === 'opensAt' ? 'Apertura' : 'Cierre para empezar'}: ${msg}`,
+      );
+      return;
+    }
+
+    if (opensAtInput && dueAtInput) {
+      const opensDate = new Date(getIsoBogota(opensAtInput));
+      const dueDate = new Date(getIsoBogota(dueAtInput));
+      if (Number.isNaN(opensDate.getTime()) || Number.isNaN(dueDate.getTime())) {
+        const msg = 'Revisa la fecha y la hora';
+        setFieldErrors((prev) => ({ ...prev, [target]: msg }));
+        setPoliteAnnouncement(
+          `${target === 'opensAt' ? 'Apertura' : 'Cierre para empezar'}: ${msg}`,
+        );
+        return;
+      }
+      if (opensDate.getTime() >= dueDate.getTime()) {
+        const msg = 'La apertura debe ser anterior al cierre';
+        setFieldErrors((prev) => ({ ...prev, dueAt: msg }));
+        setPoliteAnnouncement(`Cierre para empezar: ${msg}`);
+      } else {
+        setFieldErrors((prev) => ({ ...prev, opensAt: undefined, dueAt: undefined }));
+        setPoliteAnnouncement('');
+      }
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
     setFormError(null);
 
     if (!selectedActivityId) {
-      showError('Por favor selecciona una actividad');
+      const msg = 'Por favor selecciona una actividad';
+      setFieldErrors({ activity: msg });
+      showError(msg);
       return;
     }
 
     if (selectedGroupIds.length === 0) {
-      showError('Por favor selecciona al menos un grupo');
+      const msg = 'Por favor selecciona al menos un grupo';
+      setFieldErrors({ groups: msg });
+      showError(msg);
       return;
     }
 
     if (!opensAtInput || !dueAtInput) {
-      showError('Revisa la fecha y la hora');
+      const msg = 'Revisa la fecha y la hora';
+      setFieldErrors({
+        opensAt: !opensAtInput ? msg : undefined,
+        dueAt: !dueAtInput ? msg : undefined,
+      });
+      showError(msg);
       return;
     }
 
     const opensAtIso = getIsoBogota(opensAtInput);
     const dueAtIso = getIsoBogota(dueAtInput);
-
     const opensDate = new Date(opensAtIso);
     const dueDate = new Date(dueAtIso);
 
-    if (opensDate.getTime() >= dueDate.getTime()) {
-      showError('La apertura debe ser anterior al cierre');
+    if (Number.isNaN(opensDate.getTime()) || Number.isNaN(dueDate.getTime())) {
+      const msg = 'Revisa la fecha y la hora';
+      setFieldErrors({
+        opensAt: Number.isNaN(opensDate.getTime()) ? msg : undefined,
+        dueAt: Number.isNaN(dueDate.getTime()) ? msg : undefined,
+      });
+      showError(msg);
       return;
     }
 
+    if (opensDate.getTime() >= dueDate.getTime()) {
+      const msg = 'La apertura debe ser anterior al cierre';
+      setFieldErrors({ dueAt: msg });
+      showError(msg);
+      return;
+    }
+
+    setFieldErrors({});
     createMutation.mutate({
       activityId: selectedActivityId,
       groupIds: selectedGroupIds,
@@ -253,95 +371,112 @@ export function NuevaAsignacionClient() {
 
   if (isLoading) {
     return (
-      <div className="py-16 text-center text-zinc-500 text-sm">
-        Cargando opciones…
+      <div className={styles.page} role="status" aria-live="polite">
+        <div className={styles.loadingWrap}>
+          <p className={styles.loadingText}>Cargando actividades y grupos…</p>
+          <div className={styles.skeletonBlock} />
+          <div className={styles.skeletonBlock} />
+        </div>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div
-        role="alert"
-        className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-800 max-w-xl mx-auto mt-8"
-      >
-        <p className="font-medium">{loadError}</p>
-        <button
-          type="button"
-          onClick={() => {
+      <div className={styles.page}>
+        <ErrorState
+          variant="teacher"
+          editorial
+          message={loadError}
+          onRetry={() => {
             void activitiesQuery.refetch();
             void groupsQuery.refetch();
           }}
-          className="mt-3 inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
-        >
-          Reintentar
-        </button>
+        />
       </div>
     );
   }
 
-  // Empty state: no published activities
   if (activities.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center max-w-xl mx-auto mt-8">
-        <h2 className="text-base font-semibold text-zinc-900">
-          Publica una actividad para poder asignarla
-        </h2>
-        <p className="text-xs text-zinc-500 mt-2">
-          Solo las actividades con estado publicada pueden asignarse a los estudiantes.
-        </p>
-        <div className="mt-4">
-          <Link
-            href="/actividades"
-            className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-          >
-            Ir al catálogo de actividades
-          </Link>
-        </div>
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Nueva asignación</h1>
+        </header>
+        <section className={styles.emptyCard} aria-labelledby="empty-activities-heading">
+          <h2 id="empty-activities-heading">
+            Publica una actividad para poder asignarla
+          </h2>
+          <p>
+            Solo las actividades publicadas de tipo Completar espacios, Pregunta abierta,
+            Speaking o Examen pueden asignarse. Los microjuegos publicados quedan abiertos
+            24/7 en el portal del estudiante sin requerir asignación.
+          </p>
+          <div className={styles.emptyActions}>
+            <Link href="/actividades/nueva" className={styles.submitButton}>
+              Crear actividad
+            </Link>
+            <Link href="/actividades" className={styles.cancelButton}>
+              Ir al catálogo de actividades
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }
 
-  // Empty state: no active groups
   if (groups.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center max-w-xl mx-auto mt-8">
-        <h2 className="text-base font-semibold text-zinc-900">
-          Crea un grupo activo para poder asignar
-        </h2>
-        <p className="text-xs text-zinc-500 mt-2">
-          Necesitas al menos un grupo activo de estudiantes para poder asignar una actividad.
-        </p>
-        <div className="mt-4">
-          <Link
-            href="/grupos"
-            className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-          >
-            Ir a gestión de grupos
-          </Link>
-        </div>
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Nueva asignación</h1>
+        </header>
+        <section className={styles.emptyCard} aria-labelledby="empty-groups-heading">
+          <h2 id="empty-groups-heading">
+            Crea un grupo activo para poder asignar
+          </h2>
+          <p>
+            Necesitas al menos un grupo activo de estudiantes para poder programar una
+            asignación.
+          </p>
+          <div className={styles.emptyActions}>
+            <Link href="/grupos" className={styles.submitButton}>
+              Ir a gestión de grupos
+            </Link>
+            <Link href="/asignaciones" className={styles.cancelButton}>
+              Volver a asignaciones
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/asignaciones" className="hover:text-zinc-900">
-          Asignaciones
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-800 font-medium">Nueva asignación</span>
-      </div>
+  const allGroupsSelected = selectedGroupIds.length === groups.length;
 
-      <div className="border-b border-zinc-200 pb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <h1 id="new-assignment-title" className={styles.title}>
           Nueva asignación
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Selecciona una actividad publicada, uno o varios grupos y define las fechas de apertura y cierre.
+        <p className={styles.subtitle}>
+          Selecciona una actividad publicada, uno o varios grupos y define la ventana en
+          hora de Colombia.
         </p>
+      </header>
+
+      <aside className={styles.callout} aria-label="Regla de microjuegos">
+        <Info size={18} strokeWidth={1.75} className={styles.calloutIcon} aria-hidden="true" />
+        <p className={styles.calloutText}>
+          Solo aparecen los 4 tipos evaluables (Completar espacios, Pregunta abierta,
+          Expresión oral y Examen). Los <strong>microjuegos</strong> no aparecen aquí
+          porque al publicarse quedan abiertos 24/7 para práctica autónoma.
+        </p>
+      </aside>
+
+      <div className="sr-only" aria-live="polite">
+        {politeAnnouncement}
       </div>
 
       {formError && (
@@ -350,272 +485,406 @@ export function NuevaAsignacionClient() {
           tabIndex={-1}
           role="alert"
           aria-live="assertive"
-          className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-rose-500"
+          className={styles.errorAlert}
         >
-          <span>{formError}</span>
+          <div className={styles.errorAlertBody}>
+            <CircleAlert
+              size={18}
+              strokeWidth={1.75}
+              className={styles.errorAlertIcon}
+              aria-hidden="true"
+            />
+            <span>{formError}</span>
+          </div>
           <button
             type="button"
             onClick={() => setFormError(null)}
-            className="text-rose-600 font-bold ml-4"
+            className={styles.errorDismiss}
+            aria-label="Cerrar alerta de error"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Step 1: Select Activity */}
-        <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-zinc-900">
-                1. Selecciona la actividad
-              </h2>
-              <p className="text-xs text-zinc-500">
-                Solo se muestran actividades publicadas.
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-labelledby="new-assignment-title"
+        className={styles.form}
+      >
+        {/* Bloque 1: Selección de actividad */}
+        <section className={styles.stepCard} aria-labelledby="step-activity-heading">
+          <fieldset
+            className={styles.fieldset}
+            aria-describedby={fieldErrors.activity ? 'activity-field-error' : undefined}
+          >
+            <legend className={styles.stepLegend}>
+              <div className={styles.stepHeader}>
+                <div className={styles.stepHeadingWrap}>
+                  <div className={styles.stepHeadingRow}>
+                    <span className={styles.stepNumber} aria-hidden="true">
+                      1
+                    </span>
+                    <h2 id="step-activity-heading" className={styles.stepTitle}>
+                      Selecciona la actividad
+                    </h2>
+                  </div>
+                  <p className={styles.stepHint}>
+                    Solo se muestran actividades publicadas asignables.
+                  </p>
+                </div>
+                <span className={styles.countPill}>
+                  {filteredActivities.length} disponible
+                  {filteredActivities.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            </legend>
+
+            <div className={styles.filterBar} role="group" aria-label="Filtrar actividades">
+              <div className={styles.field}>
+                <label htmlFor="new-assignment-filter-level" className={styles.fieldLabel}>
+                  Nivel MCER
+                </label>
+                <select
+                  id="new-assignment-filter-level"
+                  name="levelFilter"
+                  value={levelFilter}
+                  onChange={(e) => setLevelFilter(e.target.value)}
+                  className={styles.control}
+                >
+                  <option value="all">Todos los niveles</option>
+                  <option value={Level.A1}>Nivel A1</option>
+                  <option value={Level.A2}>Nivel A2</option>
+                  <option value={Level.B1}>Nivel B1</option>
+                  <option value={Level.B2}>Nivel B2</option>
+                </select>
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="new-assignment-filter-type" className={styles.fieldLabel}>
+                  Tipo de actividad
+                </label>
+                <select
+                  id="new-assignment-filter-type"
+                  name="typeFilter"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className={styles.control}
+                >
+                  <option value="all">Todos los tipos asignables</option>
+                  <option value={ActivityType.fill_blank}>Completar espacios</option>
+                  <option value={ActivityType.open_question}>Pregunta abierta</option>
+                  <option value={ActivityType.speaking}>Expresión oral (Speaking)</option>
+                  <option value={ActivityType.exam}>Examen</option>
+                </select>
+              </div>
+            </div>
+
+            {filteredActivities.length === 0 ? (
+              <div className={styles.filteredEmpty}>
+                <p>No hay actividades publicadas que coincidan con estos filtros.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLevelFilter('all');
+                    setTypeFilter('all');
+                  }}
+                  className={styles.toggleAllButton}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            ) : (
+              <div
+                role="region"
+                aria-label="Lista de actividades publicadas asignables"
+                tabIndex={0}
+                className={styles.activityListRegion}
+              >
+                {filteredActivities.map((act) => {
+                  const isSelected = act.id === selectedActivityId;
+                  return (
+                    <label
+                      key={act.id}
+                      data-selected={isSelected ? 'true' : 'false'}
+                      className={styles.activityOption}
+                    >
+                      <input
+                        type="radio"
+                        name="activity"
+                        value={act.id}
+                        checked={isSelected}
+                        onChange={() => handleActivitySelect(act.id)}
+                        className={styles.nativeChoice}
+                      />
+                      <span className={styles.optionContent}>
+                        <span lang="en" className={styles.optionTitle}>
+                          {act.title}
+                        </span>
+                        <span className={styles.optionMeta}>
+                          <span className={styles.levelPill}>Nivel {act.level}</span>
+                          <span>{typeLabels[act.type]}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>v{act.version}</span>
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {fieldErrors.activity && (
+              <p id="activity-field-error" className={styles.fieldError}>
+                {fieldErrors.activity}
               </p>
-            </div>
+            )}
+          </fieldset>
+        </section>
 
-            {/* Activity Filters */}
-            <div className="flex items-center gap-2">
-              <select
-                id="new-assignment-filter-level"
-                name="new-assignment-filter-level"
-                aria-label="Filtrar por nivel"
-                value={levelFilter}
-                onChange={(e) => setLevelFilter(e.target.value)}
-                className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Todos los niveles</option>
-                <option value={Level.A1}>Nivel A1</option>
-                <option value={Level.A2}>Nivel A2</option>
-                <option value={Level.B1}>Nivel B1</option>
-                <option value={Level.B2}>Nivel B2</option>
-              </select>
+        {/* Bloque 2: Selección multigrupo */}
+        <section className={styles.stepCard} aria-labelledby="step-groups-heading">
+          <fieldset
+            className={styles.fieldset}
+            aria-describedby={fieldErrors.groups ? 'groups-field-error' : undefined}
+          >
+            <legend className={styles.stepLegend}>
+              <div className={styles.stepHeader}>
+                <div className={styles.stepHeadingWrap}>
+                  <div className={styles.stepHeadingRow}>
+                    <span className={styles.stepNumber} aria-hidden="true">
+                      2
+                    </span>
+                    <h2 id="step-groups-heading" className={styles.stepTitle}>
+                      Selecciona los grupos destinatarios
+                    </h2>
+                  </div>
+                  <p className={styles.stepHint}>
+                    Puedes asignar la actividad a uno o varios grupos activos en una sola
+                    operación.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSelectAllGroups}
+                  className={styles.toggleAllButton}
+                >
+                  {allGroupsSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                </button>
+              </div>
+            </legend>
 
-              <select
-                id="new-assignment-filter-type"
-                name="new-assignment-filter-type"
-                aria-label="Filtrar por tipo"
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Todos los tipos</option>
-                <option value={ActivityType.fill_blank}>Rellenar huecos</option>
-                <option value={ActivityType.open_question}>Pregunta abierta</option>
-                <option value={ActivityType.speaking}>Speaking</option>
-                <option value={ActivityType.exam}>Examen</option>
-              </select>
-            </div>
-          </div>
-
-          {filteredActivities.length === 0 ? (
-            <p className="text-xs text-zinc-500 italic py-4">
-              No hay actividades publicadas que coincidan con los filtros.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 max-h-60 overflow-y-auto p-1">
-              {filteredActivities.map((act) => {
-                const isSelected = act.id === selectedActivityId;
+            <div className={styles.groupsGrid}>
+              {groups.map((group) => {
+                const isChecked = selectedGroupIds.includes(group.id);
                 return (
                   <label
-                    key={act.id}
-                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'border-blue-600 bg-blue-50/50 ring-1 ring-blue-600'
-                        : 'border-zinc-200 hover:bg-zinc-50'
-                    }`}
+                    key={group.id}
+                    data-selected={isChecked ? 'true' : 'false'}
+                    className={styles.groupOption}
                   >
                     <input
-                      type="radio"
-                      name="activity"
-                      value={act.id}
-                      checked={isSelected}
-                      onChange={() => setSelectedActivityId(act.id)}
-                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300"
+                      type="checkbox"
+                      name="groupIds"
+                      value={group.id}
+                      checked={isChecked}
+                      onChange={() => handleGroupToggle(group.id)}
+                      className={styles.nativeChoice}
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900 truncate">
-                        {act.title}
-                      </p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        {typeLabels[act.type]} · Nivel {act.level} · v{act.version}
-                      </p>
-                    </div>
+                    <span className={styles.optionContent}>
+                      <span className={styles.optionTitle}>{group.name}</span>
+                      <span className={styles.optionMeta}>
+                        {group.activeStudentCount} alumno
+                        {group.activeStudentCount !== 1 ? 's' : ''} activo
+                        {group.activeStudentCount !== 1 ? 's' : ''}
+                      </span>
+                    </span>
                   </label>
                 );
               })}
             </div>
-          )}
+
+            {fieldErrors.groups && (
+              <p id="groups-field-error" className={styles.fieldError}>
+                {fieldErrors.groups}
+              </p>
+            )}
+          </fieldset>
         </section>
 
-        {/* Step 2: Multi-Group Selection */}
-        <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-zinc-900">
-                2. Selecciona los grupos destinatarios
-              </h2>
-              <p className="text-xs text-zinc-500">
-                Puedes asignar a uno o varios grupos activos a la vez.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSelectAllGroups}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
-            >
-              {selectedGroupIds.length === groups.length
-                ? 'Deseleccionar todos'
-                : 'Seleccionar todos'}
-            </button>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-3 p-1">
-            {groups.map((group) => {
-              const isChecked = selectedGroupIds.includes(group.id);
-              return (
-                <label
-                  key={group.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                    isChecked
-                      ? 'border-blue-600 bg-blue-50/50 ring-1 ring-blue-600'
-                      : 'border-zinc-200 hover:bg-zinc-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    value={group.id}
-                    checked={isChecked}
-                    onChange={() => handleGroupToggle(group.id)}
-                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-zinc-300"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-zinc-900 truncate">
-                      {group.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {group.activeStudentCount} alumno{group.activeStudentCount !== 1 ? 's' : ''}
-                    </p>
+        {/* Bloque 3: Ventana temporal */}
+        <section className={styles.stepCard} aria-labelledby="step-window-heading">
+          <fieldset className={styles.fieldset}>
+            <legend className={styles.stepLegend}>
+              <div className={styles.stepHeader}>
+                <div className={styles.stepHeadingWrap}>
+                  <div className={styles.stepHeadingRow}>
+                    <span className={styles.stepNumber} aria-hidden="true">
+                      3
+                    </span>
+                    <h2 id="step-window-heading" className={styles.stepTitle}>
+                      Ventana temporal
+                    </h2>
                   </div>
+                  <p className={styles.stepHint}>
+                    Define desde cuándo los estudiantes ven la actividad y el límite para
+                    iniciarla.
+                  </p>
+                </div>
+                <span className={styles.timezoneBadge}>
+                  <Clock size={14} strokeWidth={1.75} aria-hidden="true" />
+                  Hora de Colombia (America/Bogota)
+                </span>
+              </div>
+            </legend>
+
+            <div className={styles.datesGrid}>
+              <div className={styles.field}>
+                <label htmlFor="opens-at" className={styles.fieldLabel}>
+                  Apertura
                 </label>
-              );
-            })}
-          </div>
-        </section>
+                <input
+                  id="opens-at"
+                  name="opensAt"
+                  type="datetime-local"
+                  required
+                  value={opensAtInput}
+                  aria-invalid={fieldErrors.opensAt ? 'true' : 'false'}
+                  aria-describedby={
+                    fieldErrors.opensAt
+                      ? 'opens-at-help opens-at-error'
+                      : 'opens-at-help'
+                  }
+                  onChange={(e) => {
+                    setOpensAtInput(e.target.value);
+                    setOpensEdited(true);
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      opensAt: undefined,
+                      dueAt:
+                        prev.dueAt === 'La apertura debe ser anterior al cierre'
+                          ? undefined
+                          : prev.dueAt,
+                    }));
+                  }}
+                  onBlur={() => validateDatePairOnBlur('opensAt')}
+                  className={styles.control}
+                />
+                <p id="opens-at-help" className={styles.fieldHelp}>
+                  Los alumnos verán la actividad disponible desde esta fecha y hora.
+                </p>
+                {fieldErrors.opensAt && (
+                  <p id="opens-at-error" className={styles.fieldError}>
+                    {fieldErrors.opensAt}
+                  </p>
+                )}
+              </div>
 
-        {/* Step 3: Dates & Policy */}
-        <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <div>
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-zinc-900">
-                3. Fechas y plazos
-              </h2>
-              <span className="text-xs font-semibold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md">
-                Hora de Colombia (America/Bogota)
-              </span>
+              <div className={styles.field}>
+                <label htmlFor="due-at" className={styles.fieldLabel}>
+                  Cierre para empezar
+                </label>
+                <input
+                  id="due-at"
+                  name="dueAt"
+                  type="datetime-local"
+                  required
+                  value={dueAtInput}
+                  aria-invalid={fieldErrors.dueAt ? 'true' : 'false'}
+                  aria-describedby={
+                    fieldErrors.dueAt ? 'due-at-help due-at-error' : 'due-at-help'
+                  }
+                  onChange={(e) => {
+                    setDueAtInput(e.target.value);
+                    setDueEdited(true);
+                    setFieldErrors((prev) => ({ ...prev, dueAt: undefined }));
+                  }}
+                  onBlur={() => validateDatePairOnBlur('dueAt')}
+                  className={styles.control}
+                />
+                <p id="due-at-help" className={styles.fieldHelp}>
+                  Límite en hora Colombia para iniciar el primer intento.
+                </p>
+                {fieldErrors.dueAt && (
+                  <p id="due-at-error" className={styles.fieldError}>
+                    {fieldErrors.dueAt}
+                  </p>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
-              Establece el momento a partir del cual los alumnos pueden ver la actividad y el límite para iniciarla.
-            </p>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="opens-at"
-                className="block text-xs font-semibold text-zinc-700"
-              >
-                Apertura
-              </label>
-              <input
-                id="opens-at"
-                type="datetime-local"
-                value={opensAtInput}
-                onChange={(e) => setOpensAtInput(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-[11px] text-zinc-400 mt-1 block">
-                Los alumnos verán la actividad disponible desde esta fecha y hora.
-              </span>
-            </div>
-
-            <div>
-              <label
-                htmlFor="due-at"
-                className="block text-xs font-semibold text-zinc-700"
-              >
-                Cierre para empezar
-              </label>
-              <input
-                id="due-at"
-                type="datetime-local"
-                value={dueAtInput}
-                onChange={(e) => setDueAtInput(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {/* Mandatory text next to closure (SPEC-04 RF-7, §7) */}
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 mt-2 leading-relaxed">
-                <span className="font-semibold">Regla de entrega:</span> los alumnos pueden empezar hasta esta hora; quien haya empezado tendrá hasta 24 horas más para terminar.
+            <div className={styles.toleranceBox}>
+              <p>
+                <strong>Regla de entrega:</strong> los alumnos pueden empezar hasta esta
+                hora; quien haya empezado tendrá hasta 24 horas más para terminar.
               </p>
+              {extendedDueAtText && (
+                <p className={styles.tolerancePreview}>
+                  Última hora para terminar si empezó a tiempo: {extendedDueAtText} (hora
+                  Colombia)
+                </p>
+              )}
             </div>
-          </div>
+          </fieldset>
         </section>
 
-        {/* Step 4: Summary Before Saving */}
-        <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 space-y-3">
-          <h2 className="text-sm font-bold text-zinc-900">
+        {/* Resumen previo a guardar */}
+        <section className={styles.summaryCard} aria-labelledby="summary-heading">
+          <h2 id="summary-heading" className={styles.summaryTitle}>
             Resumen previo a guardar
           </h2>
-          <div className="text-xs text-zinc-700 space-y-1.5">
-            <div>
-              <span className="font-semibold">Actividad:</span>{' '}
-              {selectedActivity
-                ? `${selectedActivity.title} (Nivel ${selectedActivity.level}, v${selectedActivity.version})`
-                : 'Ninguna seleccionada'}
+          <dl className={styles.summaryList}>
+            <div className={styles.summaryRow}>
+              <dt>Actividad</dt>
+              <dd>
+                {selectedActivity ? (
+                  <>
+                    <span lang="en">{selectedActivity.title}</span> (Nivel{' '}
+                    {selectedActivity.level}, {typeLabels[selectedActivity.type]}, v
+                    {selectedActivity.version})
+                  </>
+                ) : (
+                  'Ninguna seleccionada'
+                )}
+              </dd>
             </div>
-            <div>
-              <span className="font-semibold">Grupos seleccionados ({selectedGroups.length}):</span>{' '}
-              {selectedGroups.length > 0
-                ? selectedGroups.map((g) => g.name).join(', ')
-                : 'Ninguno seleccionado'}
+            <div className={styles.summaryRow}>
+              <dt>Grupos seleccionados ({selectedGroups.length})</dt>
+              <dd>
+                {selectedGroups.length > 0
+                  ? selectedGroups.map((g) => g.name).join(', ')
+                  : 'Ninguno seleccionado'}
+              </dd>
             </div>
-            <div>
-              <span className="font-semibold">Apertura:</span>{' '}
-              {opensAtInput
-                ? formatBogotaDateTime(getIsoBogota(opensAtInput))
-                : '—'}
+            <div className={styles.summaryRow}>
+              <dt>Apertura (Colombia)</dt>
+              <dd>{opensAtPreview ?? '—'}</dd>
             </div>
-            <div>
-              <span className="font-semibold">Cierre para empezar:</span>{' '}
-              {dueAtInput
-                ? formatBogotaDateTime(getIsoBogota(dueAtInput))
-                : '—'}
+            <div className={styles.summaryRow}>
+              <dt>Cierre para empezar (Colombia)</dt>
+              <dd>{dueAtPreview ?? '—'}</dd>
             </div>
             {extendedDueAtText && (
-              <div className="pt-2 border-t border-zinc-200 font-medium text-blue-900">
-                Última hora para terminar si empezó a tiempo:{' '}
-                <span className="font-bold">{extendedDueAtText}</span>
+              <div className={`${styles.summaryRow} ${styles.summaryHighlight}`}>
+                <dt>Última hora para terminar si empezó a tiempo</dt>
+                <dd>{extendedDueAtText}</dd>
               </div>
             )}
-          </div>
+          </dl>
         </section>
 
-        {/* Submit Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200">
-          <Link
-            href="/asignaciones"
-            className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
-          >
+        {/* Pie de acciones */}
+        <div className={styles.actionsFooter}>
+          <Link href="/asignaciones" className={styles.cancelButton}>
             Cancelar
           </Link>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+            className={styles.submitButton}
           >
-            {isSubmitting ? 'Guardando…' : 'Crear asignación'}
+            {isSubmitting ? 'Guardando…' : 'Programar asignación'}
           </button>
         </div>
       </form>

@@ -9,6 +9,8 @@ import {
   TimedChoiceSolutionSchema,
 } from '@upward-english/shared';
 import { soundManager } from '../../../lib/sound';
+import kidsStyles from './kids-game.module.css';
+import teensStyles from './teens-game.module.css';
 
 export function TimedChoiceGame({
   config,
@@ -37,6 +39,11 @@ export function TimedChoiceGame({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const soundEnabledRef = useRef(soundEnabled);
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
 
   const currentQuestion = questions[currentIndex];
   const expectedOptionId = currentQuestion && solution?.choices ? solution.choices[currentQuestion.id] : null;
@@ -86,7 +93,7 @@ export function TimedChoiceGame({
     setIsTimedOut(true);
     setIsWaitingFeedback(true);
     setLiveStatus('Se agotó el tiempo para esta pregunta.');
-    soundManager.play('miss', soundEnabled);
+    soundManager.play('miss', soundEnabledRef.current);
 
     const nextChoices = { ...choices, [currentQuestion.id]: null };
     setChoices(nextChoices);
@@ -109,11 +116,13 @@ export function TimedChoiceGame({
     const isCorrect = expectedOptionId ? expectedOptionId === optionId : false;
     const opt = currentQuestion.options.find((o) => o.id === optionId);
     setLiveStatus(
-      isCorrect
+      !expectedOptionId
+        ? `Seleccionaste: ${opt?.text ?? ''}`
+        : isCorrect
         ? `¡Correcto! Seleccionaste: ${opt?.text ?? ''}`
         : `Incorrecto. Seleccionaste: ${opt?.text ?? ''}`
     );
-    soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
+    if (expectedOptionId) soundManager.play(isCorrect ? 'hit' : 'miss', soundEnabled);
 
     const nextChoices = { ...choices, [currentQuestion.id]: optionId };
     setChoices(nextChoices);
@@ -133,29 +142,34 @@ export function TimedChoiceGame({
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      soundManager.play('complete', soundEnabled);
+      soundManager.play('complete', soundEnabledRef.current);
       onComplete?.({ choices: finalChoices });
     }
   };
 
   const isKids = theme === 'kids';
+  const isTeens = theme === 'teens';
+  const styles = isTeens ? teensStyles : kidsStyles;
 
   if (!currentQuestion) {
     return (
-      <div className="p-8 text-center text-zinc-500 font-semibold">
+      <div className={`p-8 text-center font-semibold ${isTeens ? 'text-[#5E3E2C]' : 'text-zinc-500'}`}>
         No hay preguntas disponibles en este microjuego.
       </div>
     );
   }
 
   const progressPercent = ((currentIndex + 1) / questions.length) * 100;
+  const isUrgent = secondsLeft <= timeLimitSeconds / 4;
 
   return (
     <div
-      className={`w-full max-w-2xl mx-auto p-4 sm:p-6 rounded-3xl ${
+      className={`${styles.board} w-full max-w-2xl mx-auto p-4 sm:p-6 rounded-3xl ${
         isKids
           ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+          : isTeens
+            ? ''
+            : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
       }`}
     >
       {previewMode && (
@@ -170,15 +184,21 @@ export function TimedChoiceGame({
       </div>
 
       {/* Progress & Countdown Header */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div data-urgent={isUrgent} className="flex items-center justify-between gap-3 mb-6">
         <div>
-          <span className="text-xs font-black uppercase tracking-wider text-amber-800">
+          <span
+            className={`${styles.label} text-xs font-black uppercase tracking-wider ${
+              isTeens ? '' : 'text-amber-800'
+            }`}
+          >
             Pregunta {currentIndex + 1} de {questions.length}
           </span>
-          <div className="w-32 sm:w-44 h-2 bg-amber-200/60 rounded-full mt-1 overflow-hidden">
+          <div className={`${styles.track} w-32 sm:w-44 h-2 bg-amber-200/60 rounded-full mt-1 overflow-hidden`}>
             <div
-              className="h-full bg-amber-500 rounded-full transition-all"
-              style={{ width: `${progressPercent}%` }}
+              className={`${styles.progress} h-full bg-amber-500 rounded-full transition-all`}
+              style={{
+                width: `${(isKids || isTeens) && !previewMode ? (secondsLeft / timeLimitSeconds) * 100 : progressPercent}%`,
+              }}
             />
           </div>
         </div>
@@ -186,27 +206,38 @@ export function TimedChoiceGame({
         {/* Timer Badge */}
         <div className="flex items-center gap-2">
           <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border-2 font-mono font-black text-sm transition-colors ${
-              secondsLeft <= 5
-                ? 'border-rose-400 bg-rose-100 text-rose-700 animate-pulse'
-                : isKids
-                  ? 'border-amber-300 bg-white text-amber-950'
-                  : 'border-zinc-700 bg-zinc-800 text-zinc-100'
+            className={`${styles.clock} flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border-2 font-mono font-black text-sm transition-colors ${
+              isTeens
+                ? ''
+                : secondsLeft <= 5
+                  ? 'border-rose-400 bg-rose-100 text-rose-700 animate-pulse'
+                  : isKids
+                    ? 'border-amber-300 bg-white text-amber-950'
+                    : 'border-zinc-700 bg-zinc-800 text-zinc-100'
             }`}
           >
-            <span>⏱️</span>
+            <span aria-hidden="true">{isTeens ? 'Tiempo' : '⏱️'}</span>
             <span>{secondsLeft}s</span>
           </div>
         </div>
       </div>
 
       {/* Question Prompt */}
-      <div className={`mb-6 p-6 rounded-3xl border shadow-xs text-center ${
-        isKids ? 'bg-white border-amber-200/80' : 'bg-zinc-800/90 border-zinc-700'
-      }`}>
-        <h3 className={`text-lg sm:text-xl font-black leading-snug ${
-          isKids ? 'text-zinc-900' : 'text-zinc-100'
-        }`}>
+      <div
+        className={`mb-6 p-6 rounded-3xl border shadow-xs text-center ${
+          isTeens
+            ? styles.promptBox
+            : isKids
+              ? 'bg-white border-amber-200/80'
+              : 'bg-zinc-800/90 border-zinc-700'
+        }`}
+      >
+        <h3
+          lang="en"
+          className={`${styles.prompt} text-lg sm:text-xl font-black leading-snug ${
+            isTeens ? '' : isKids ? 'text-zinc-900' : 'text-zinc-100'
+          }`}
+        >
           {currentQuestion.prompt}
         </h3>
       </div>
@@ -217,15 +248,19 @@ export function TimedChoiceGame({
           const isSelected = selectedOptionId === opt.id;
           const isExpected = expectedOptionId === opt.id;
 
-          let btnStyle = isKids
-            ? 'border-amber-200 bg-white text-zinc-900 hover:border-amber-400 hover:bg-amber-50'
-            : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-zinc-500';
+          let btnStyle = isTeens
+            ? ''
+            : isKids
+              ? 'border-amber-200 bg-white text-zinc-900 hover:border-amber-400 hover:bg-amber-50'
+              : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-zinc-500';
 
-          if (isWaitingFeedback) {
+          if (isWaitingFeedback && !isTeens) {
             if (isSelected) {
-              btnStyle = isExpected
-                ? 'border-emerald-500 bg-emerald-100 text-emerald-950 ring-4 ring-emerald-300 scale-102 font-black'
-                : 'border-rose-500 bg-rose-100 text-rose-950 ring-4 ring-rose-300 scale-102 font-black';
+              btnStyle = !expectedOptionId
+                ? btnStyle
+                : isExpected
+                  ? 'border-emerald-500 bg-emerald-100 text-emerald-950 ring-4 ring-emerald-300 scale-102 font-black'
+                  : 'border-rose-500 bg-rose-100 text-rose-950 ring-4 ring-rose-300 scale-102 font-black';
             } else if (isExpected && (isSelected || isTimedOut)) {
               btnStyle = 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-300 font-black';
             }
@@ -241,19 +276,42 @@ export function TimedChoiceGame({
                   handleSelectOption(opt.id);
                 }
               }}
-              className={`w-full min-h-14 p-4 rounded-2xl border-2 font-bold text-base flex items-center justify-between text-left transition-all touch-manipulation select-none active:scale-98 shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                isWaitingFeedback ? 'cursor-default' : 'cursor-pointer'
-              } ${btnStyle}`}
-            >
-              <span>{opt.text}</span>
-              <span className="text-xs font-black" aria-hidden="true">
-                {isWaitingFeedback && isSelected
-                  ? isExpected
-                    ? '✅ Correcto'
-                    : '❌ Incorrecto'
+              data-state={
+                isWaitingFeedback && isSelected
+                  ? expectedOptionId
+                    ? isExpected
+                      ? 'correct'
+                      : 'incorrect'
+                    : 'selected'
                   : isWaitingFeedback && isExpected && isTimedOut
-                    ? '👈 Correcta'
-                    : '👉'}
+                    ? 'correct'
+                    : undefined
+              }
+              className={`${styles.piece} ${isTeens ? styles.option : ''} w-full min-h-14 p-4 rounded-2xl border-2 font-bold text-base flex items-center justify-between text-left transition-all touch-manipulation select-none active:scale-98 shadow-xs ${
+                isTeens ? '' : 'focus:outline-none focus:ring-2 focus:ring-amber-500'
+              } ${isWaitingFeedback ? 'cursor-default' : 'cursor-pointer'} ${btnStyle}`}
+            >
+              <span lang="en">{opt.text}</span>
+              <span className="text-xs font-black" aria-hidden="true">
+                {isTeens
+                  ? isWaitingFeedback && isSelected
+                    ? !expectedOptionId
+                      ? 'Seleccionada'
+                      : isExpected
+                        ? 'Correcto'
+                        : 'Incorrecto'
+                    : isWaitingFeedback && isExpected && isTimedOut
+                      ? 'Correcta'
+                      : 'Elegir'
+                  : isWaitingFeedback && isSelected
+                    ? !expectedOptionId
+                      ? '✓ Seleccionada'
+                      : isExpected
+                        ? '✅ Correcto'
+                        : '❌ Incorrecto'
+                    : isWaitingFeedback && isExpected && isTimedOut
+                      ? '👈 Correcta'
+                      : '👉'}
               </span>
             </button>
           );
@@ -261,7 +319,11 @@ export function TimedChoiceGame({
       </div>
 
       {isTimedOut && (
-        <p className="text-center text-xs font-bold text-rose-600 animate-bounce">
+        <p
+          className={`text-center text-xs font-bold ${
+            isTeens ? 'text-[#831712]' : 'text-rose-600 animate-bounce'
+          }`}
+        >
           ¡Se acabó el tiempo para esta pregunta!
         </p>
       )}

@@ -16,6 +16,8 @@ import { clearSharedFeatureFlags } from "../../../lib/feature-flags-client";
 import { purgeOtherUsersEntries } from "../../../lib/offline-queue";
 import { getQueryClient } from "../../../lib/query-client";
 import type { SessionView } from "@upward-english/shared";
+import { AuthAlert, AuthHeading, AuthLoading, AuthPage } from "../auth-page";
+import styles from "../auth-page.module.css";
 
 function isSafeNextDestination(next: string | null | undefined): boolean {
   if (
@@ -41,7 +43,13 @@ function isSafeNextDestination(next: string | null | undefined): boolean {
   return !isPublicAuthRoute;
 }
 
-export function LoginClient() {
+export interface DemoAccount {
+  label: string;
+  email: string;
+  password: string;
+}
+
+export function LoginClient({ demoAccounts }: { demoAccounts: readonly DemoAccount[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams?.get("next");
@@ -125,6 +133,8 @@ export function LoginClient() {
         },
         body: JSON.stringify({ email: emailVal, password: passwordVal }),
         credentials: "include",
+      }).catch(() => {
+        throw new Error("No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.");
       });
 
       if (!res.ok) {
@@ -172,169 +182,96 @@ export function LoginClient() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginMutation.isPending) return;
     setErrorMessage(null);
     loginMutation.mutate({ emailVal: email, passwordVal: password });
   };
 
   if (isCheckingSession) {
-    return (
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="flex min-h-screen items-center justify-center p-6 text-center outline-none"
-      >
-        <p className="text-zinc-600 text-lg">Comprobando tu sesión…</p>
-      </main>
-    );
+    return <AuthLoading message="Comprobando tu sesión…" />;
   }
 
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      className="flex min-h-screen items-center justify-center p-6 bg-zinc-50 outline-none"
-    >
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight">
-            Upward English
-          </h1>
-          <p className="text-sm text-zinc-600 mt-2">
-            Aprende inglés jugando con tu profesora y compañeros.
-          </p>
+    <AuthPage variant="login">
+      <AuthHeading
+        title="Inicia sesión"
+        description="Aprende inglés jugando con tu profesora y compañeros."
+      />
+
+      {errorMessage && <AuthAlert message={errorMessage} />}
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div>
+          <label htmlFor="email-input" className={styles.label}>Correo electrónico</label>
+          <input
+            id="email-input"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={styles.input}
+            placeholder="tu-correo@ejemplo.com"
+          />
         </div>
 
-        {errorMessage && (
-          <div
-            role="alert"
-            className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium"
-          >
-            {errorMessage}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="email-input"
-              className="block text-sm font-medium text-zinc-700 mb-1"
-            >
-              Correo electrónico
-            </label>
-            <input
-              id="email-input"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[48px]"
-              placeholder="tu-correo@ejemplo.com"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label
-                htmlFor="password-input"
-                className="block text-sm font-medium text-zinc-700"
-              >
-                Contraseña
-              </label>
-              <Link
-                href="/recuperar-contrasena"
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
-            <input
-              id="password-input"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[48px]"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loginMutation.isPending}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-          >
-            {loginMutation.isPending ? "Entrando…" : "Entrar"}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-sm text-zinc-600">
-          ¿No tienes una cuenta de estudiante?{" "}
-          <Link
-            href="/registro"
-            className="text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Regístrate aquí
-          </Link>
+        <div>
+          <label htmlFor="password-input" className={styles.label}>Contraseña</label>
+          <input
+            id="password-input"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={styles.input}
+            placeholder="••••••••"
+          />
         </div>
 
-        {/* Development Quick Credentials Picker (P2-02, T2.1) */}
-        {(process.env.NEXT_PUBLIC_APP_ENV === "local" ||
-          process.env.APP_ENV === "local") && (
-          <div className="mt-8 pt-6 border-t border-zinc-200">
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-              Credenciales de prueba (Dev)
-            </p>
-            <div className="grid grid-cols-1 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("profesora@upwardenglish.org");
-                  setPassword("UpwardEnglish2026!");
-                  setErrorMessage(null);
-                }}
-                className="p-2 text-left rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 transition cursor-pointer"
-              >
-                <div className="font-bold">👩‍🏫 Docente Principal</div>
-                <div className="text-[11px] text-blue-700 truncate">
-                  profesora@upwardenglish.org
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("lucas.kids@upwardenglish.org");
-                  setPassword("Estudiante2026!");
-                  setErrorMessage(null);
-                }}
-                className="p-2 text-left rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition cursor-pointer"
-              >
-                <div className="font-bold">👦 Alumno (Kids)</div>
-                <div className="text-[11px] text-amber-700 truncate">
-                  lucas.kids@upwardenglish.org
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("camila.teens@upwardenglish.org");
-                  setPassword("Estudiante2026!");
-                  setErrorMessage(null);
-                }}
-                className="p-2 text-left rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 transition cursor-pointer"
-              >
-                <div className="font-bold">🧑 Alumna (Teens)</div>
-                <div className="text-[11px] text-purple-700 truncate">
-                  camila.teens@upwardenglish.org
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
+        <Link href="/recuperar-contrasena" className={`${styles.link} ${styles.recovery}`}>
+          ¿Olvidaste tu contraseña?
+        </Link>
+
+        <button
+          type="submit"
+          disabled={loginMutation.isPending}
+          aria-busy={loginMutation.isPending}
+          className={styles.primary}
+        >
+          {loginMutation.isPending ? "Entrando…" : "Entrar"}
+        </button>
+      </form>
+
+      <div className={styles.footer}>
+        ¿No tienes una cuenta de estudiante?
+        <Link href="/registro" className={styles.link}>Regístrate aquí</Link>
       </div>
-    </main>
+
+      {demoAccounts.length > 0 && (
+        <div className={styles.dev}>
+          <p className="font-bold">Credenciales de prueba (Dev)</p>
+          <div className={styles.devOptions}>
+            {demoAccounts.map(({ label, email, password }) => (
+              <button
+                key={email}
+                type="button"
+                onClick={() => {
+                  setEmail(email);
+                  setPassword(password);
+                  setErrorMessage(null);
+                }}
+                className={styles.devButton}
+              >
+                <div className="font-bold">{label}</div>
+                <div>{email}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </AuthPage>
   );
 }

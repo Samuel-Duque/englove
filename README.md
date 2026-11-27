@@ -310,7 +310,16 @@ pnpm test
 pnpm guardrails
 ```
 
-- **Evidencia fechada:** [auditoría del 12 de noviembre](./planning/auditoria-general-2026-11-12.md) y [estado de su remediación](./planning/remediacion-auditoria-2026-11-12.md). Los conteos pertenecen al snapshot y las ejecuciones de cada informe.
+Playwright tiene dos proyectos. `mocked-ci` solo necesita el frontend. Para `fullstack`, inicia PostgreSQL y MinIO, migra y siembra una base local de pruebas con `pnpm db:migrate` y `pnpm seed:dev`, y arranca una instancia nueva de la API con `pnpm --filter @upward-english/api dev`.
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3000 pnpm test:e2e --project=mocked-ci
+pnpm test:e2e --project=fullstack
+```
+
+Ejecuta `mocked-ci` con el puerto web libre para que Playwright arranque el servidor con ese origen. En PowerShell, establece `$env:NEXT_PUBLIC_API_URL` antes de ejecutar el comando y elimina la variable antes de cambiar de proyecto. Ambos proyectos arrancan en Chromium headless con `SLOWMO=0`. Las cuentas sembradas pueden sustituirse con `UPWARD_SMOKE_EMAIL` y `UPWARD_SMOKE_PASSWORD`, o con los pares `UPWARD_SMOKE_KIDS_*` y `UPWARD_SMOKE_TEENS_*`.
+
+- **Evidencia fechada:** [auditoría integral vigente](./planning/auditoria-integral-estado-actual.md) (los informes de auditoría y remediación previos permanecen en el historial de Git). Los conteos pertenecen al snapshot y las ejecuciones de cada informe.
 - `packages/shared` verifica esquemas y contratos; `apps/api`, controladores, guards, servicios y flujos PostgreSQL; `apps/web`, helpers y componentes reales. Playwright cubre navegador con parte de la API simulada; no sustituye pruebas integrales contra staging.
 - CI exige PostgreSQL disponible y falla ante errores E2E. Para exigir PostgreSQL también en local: `REQUIRE_POSTGRES_TESTS=1`; nunca apuntar fixtures o migraciones de test a una base con datos reales.
 - **Verificación de guardrails (`pnpm guardrails`):** Script auditor (`check-guardrails.mjs`) que analiza estáticamente el código para prevenir desviaciones críticas de arquitectura:

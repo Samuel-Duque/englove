@@ -11,6 +11,10 @@ overrides:
   'js-yaml@>=5.0.0 <5.4.1': '5.4.1'
   'fast-uri@>=3.0.0 <3.1.9': '3.1.9'
   'minimatch@>=7.0.0 <11.0.1': '11.0.1'
+  # CI-BLOCK-01 (auditoría 2026-11-26): GHSA-7589-6fvf-x4pw vía prisma > @prisma/config (fija effect 3.20.0)
+  # y GHSA-g7r4-m6w7-qqqr en esbuild transitivo de tsup.
+  'effect@<=3.22.0': '3.22.5'
+  'esbuild@>=0.27.3 <0.28.1': '>=0.28.1'
 
 allowBuilds:
   '@prisma/engines': true

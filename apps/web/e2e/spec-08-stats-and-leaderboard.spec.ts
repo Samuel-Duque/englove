@@ -1,22 +1,10 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderboard (ENG-145)', () => {
   test.beforeEach(async ({ context, page }) => {
     // 1. Simular sesión de profesora
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: 'mock-teacher-token',
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: 'mock-teacher-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, 'mock-teacher-token');
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({

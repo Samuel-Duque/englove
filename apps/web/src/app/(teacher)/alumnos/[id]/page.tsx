@@ -1,10 +1,13 @@
-import React, { Suspense } from 'react';
-import type { Metadata } from 'next';
-import { AlumnoDetailClient } from './alumno-detail-client';
+import React, { Suspense } from "react";
+import type { Metadata } from "next";
+import {
+  AlumnoDetailClient,
+  StudentDetailSkeleton,
+} from "./alumno-detail-client";
 
 export const metadata: Metadata = {
-  title: 'Ficha del Alumno',
-  description: 'Detalle, historial académico y gestión del estudiante.',
+  title: "Ficha del Alumno",
+  description: "Detalle, historial académico y gestión del estudiante.",
 };
 
 export default async function StudentDetailPage({
@@ -15,7 +18,7 @@ export default async function StudentDetailPage({
   const unwrappedParams = await params;
 
   return (
-    <Suspense fallback={<div className="py-12 text-center text-zinc-500 text-sm">Cargando ficha del alumno…</div>}>
+    <Suspense fallback={<StudentDetailSkeleton />}>
       <AlumnoDetailClient id={unwrappedParams.id} />
     </Suspense>
   );

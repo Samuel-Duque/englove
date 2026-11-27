@@ -4,7 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
+import { Check } from 'lucide-react';
 import { getAuthErrorMessage } from '../../../../lib/auth-errors';
+import { AuthAlert, AuthHeading, AuthPage } from '../../auth-page';
+import styles from '../../auth-page.module.css';
 
 export function ResetPasswordForm() {
   const params = useParams();
@@ -69,6 +72,7 @@ export function ResetPasswordForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (resetPasswordMutation.isPending) return;
     setErrorMessage(null);
 
     // Local validation check
@@ -88,102 +92,89 @@ export function ResetPasswordForm() {
 
   if (successMessage) {
     return (
-      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 outline-none">
-        <div className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl shadow-sm p-8 text-center">
-          <div className="w-12 h-12 bg-green-100 text-green-700 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-            ✓
-          </div>
-          <h1 className="text-2xl font-bold text-zinc-900 mb-2">Contraseña actualizada</h1>
-          <p className="text-sm text-zinc-600 mb-6">{successMessage}</p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Iniciar sesión
-          </Link>
+      <AuthPage variant="success">
+        <div className={styles.successMark} aria-hidden="true">
+          <Check size={28} strokeWidth={2.5} />
         </div>
-      </main>
+        <h1 className={styles.title}>Contraseña actualizada</h1>
+        <p className={styles.subtitle}>{successMessage}</p>
+        <Link href="/login" className={styles.primary}>
+          Iniciar sesión
+        </Link>
+      </AuthPage>
     );
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 outline-none">
-      <div className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-zinc-900 mb-2 text-center">Crear nueva contraseña</h1>
-        <p className="text-sm text-zinc-600 mb-6 text-center">
-          Ingresa y confirma tu nueva contraseña de acceso.
-        </p>
+    <AuthPage variant="login">
+      <AuthHeading
+        title="Crear nueva contraseña"
+        description="Ingresa y confirma tu nueva contraseña de acceso."
+      />
 
-        {errorMessage && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg"
-          >
-            {errorMessage}
-          </div>
-        )}
+      {errorMessage && <AuthAlert message={errorMessage} />}
 
-        {isTokenInvalid ? (
-          <div className="mt-4 text-center">
-            <Link
-              href="/recuperar-contrasena"
-              className="inline-flex items-center justify-center w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Solicitar un nuevo enlace
-            </Link>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+      {isTokenInvalid ? (
+        <Link href="/recuperar-contrasena" className={styles.primary}>
+          Solicitar un nuevo enlace
+        </Link>
+      ) : (
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.fields}>
             <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-zinc-700 mb-1">
+              <label htmlFor="newPassword" className={styles.label}>
                 Nueva contraseña
               </label>
               <input
                 id="newPassword"
+                name="newPassword"
                 type="password"
                 required
                 autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+                className={styles.input}
+                placeholder="••••••••"
               />
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className={styles.help}>
                 Usa entre 8 y 16 caracteres, sin espacios.
               </p>
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-700 mb-1">
+              <label htmlFor="confirmPassword" className={styles.label}>
                 Confirmar contraseña
               </label>
               <input
                 id="confirmPassword"
+                name="confirmPassword"
                 type="password"
                 required
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+                className={styles.input}
+                placeholder="••••••••"
               />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={resetPasswordMutation.isPending}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {resetPasswordMutation.isPending ? 'Guardando…' : 'Guardar contraseña'}
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={resetPasswordMutation.isPending}
+            aria-busy={resetPasswordMutation.isPending}
+            className={styles.primary}
+          >
+            {resetPasswordMutation.isPending ? 'Guardando…' : 'Guardar contraseña'}
+          </button>
+        </form>
+      )}
 
-        <div className="mt-6 text-center text-sm text-zinc-600">
-          <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-            Volver a iniciar sesión
-          </Link>
-        </div>
+      <div className={styles.footer}>
+        <Link href="/login" className={styles.link}>
+          Volver a iniciar sesión
+        </Link>
       </div>
-    </main>
+    </AuthPage>
   );
 }

@@ -1,9 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Playwright E2E configuration for @upward-english/web (ENG-145).
- * Tests run against real Chromium browser with API routes mocked at network level.
- */
+const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000';
+const localSpecs = '**/*-local.spec.ts';
+const fullstackTag = /@fullstack\b/;
+const desktopChrome = devices['Desktop Chrome'];
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -12,22 +13,30 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    headless: process.env.CI ? true : process.env.HEADLESS === 'true',
-    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000',
+    ...desktopChrome,
+    headless: process.env.HEADED === '1' ? false : true,
+    baseURL,
     trace: 'on-first-retry',
     launchOptions: {
-      slowMo: process.env.SLOWMO ? parseInt(process.env.SLOWMO, 10) : 50,
+      slowMo: process.env.SLOWMO ? Number(process.env.SLOWMO) : 0,
     },
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'mocked-ci',
+      testIgnore: localSpecs,
+      grepInvert: fullstackTag,
+    },
+    {
+      name: 'fullstack',
+      workers: 1,
+      // grep incluye el nombre del archivo y los tags de cada prueba.
+      grep: [/-local\.spec\.ts /, fullstackTag],
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
+    command: `pnpm dev --port ${new URL(baseURL).port || '3000'}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

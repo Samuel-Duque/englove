@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, BookOpen, BookmarkCheck, Check, FileText, Mic, RotateCcw, Square, Star, Trophy, Volume2, VolumeX, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -25,15 +26,26 @@ import {
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../../lib/api';
 import { GameRenderer } from '../../../../components/activities/GameRenderer';
+import gameStyles from '../../../../components/activities/games/kids-game.module.css';
+import { ListenButton } from '../../../../components/listen-button';
+import { ErrorState } from '../../../../components/error-state';
 import { CorrectionFeedback } from '../../../../components/activities/CorrectionFeedback';
 import { fireCelebrationConfetti } from '../../../../lib/confetti';
 import { uploadAudioBlob } from '../../../../lib/audio-upload';
 import { renderBadgeIcon } from '../../../../lib/badges';
 import { setActiveAttemptState } from '../../../../lib/pwa-manager';
-import { speak } from '../../../../lib/speech';
 import { formatBlankPrompt, formatBlankPromptForSpeech } from '../../../../lib/blank-prompt';
 import { enqueueEvent, enqueueUpload, triggerFlush, openOfflineDb, getPendingAttemptAnswers, getOfflineUserId } from '../../../../lib/offline-queue';
 import { fetchSharedProfile, requestSharedRefresh, getSharedSession } from '../../../../lib/auth-session';
+
+import { ActivityLoading } from './activity-loading';
+import styles from './actividad.module.css';
+import teensStyles from './actividad-teens.module.css';
+
+function formatClock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  return minutes + ':' + (seconds % 60).toString().padStart(2, '0');
+}
 
 function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
@@ -84,25 +96,28 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const [completion, setCompletion] = useState<CompletionView | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [theme, setTheme] = useState<'kids' | 'teens'>('kids');
+  const [theme, setTheme] = useState<'kids' | 'teens'>(() => {
+    return typeof document !== 'undefined' &&
+      document.querySelector('[data-theme="teens"]') !== null
+      ? 'teens'
+      : 'kids';
+  });
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     return (typeof window !== 'undefined' && getSharedSession()?.user?.id) || '';
   });
-  const [hasTtsSupport, setHasTtsSupport] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'local' | 'error'>('idle');
 
-  // Check TTS support (RF-22)
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const checkVoices = () => {
-        const voices = window.speechSynthesis.getVoices();
-        setHasTtsSupport(voices.length > 0 || !('onvoiceschanged' in window.speechSynthesis));
-      };
-      checkVoices();
-      if ('onvoiceschanged' in window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = checkVoices;
-      }
-    }
+    const update = () => setIsOnline(navigator.onLine);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
   }, []);
 
   // Speaking state
@@ -110,6 +125,18 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
+  const [audioPreview, setAudioPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!recordedAudioBlob) {
+      setAudioPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(recordedAudioBlob);
+    setAudioPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [recordedAudioBlob]);
+
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -121,6 +148,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const recordingDurationRef = useRef<number>(0);
   const stopRecordingRef = useRef<() => void>(() => {});
   const pendingEventsRef = useRef<Set<Promise<unknown>>>(new Set());
+  const saveFailedRef = useRef(false);
   const initializedAttemptRef = useRef<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -145,11 +173,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     userId: string,
     durationSec: number = 0,
     uploadedMediaId: string | null = null,
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     const effectiveUserId = userId?.trim() || getOfflineUserId() || '';
     if (!effectiveUserId) {
       console.warn('[actividad-runner] Attempted to save local recording without valid userId');
-      return;
+      return false;
     }
     try {
       await enqueueUpload({
@@ -162,8 +190,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           attemptToken: runtime?.attemptToken ?? undefined,
           isDraft: true,
       });
+      return true;
     } catch {
-      // Ignore
+      return false;
     }
   };
 
@@ -225,6 +254,12 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
   };
 
+  const { data: shellProfile } = useQuery({
+    queryKey: ['student', 'profile', 'shell'],
+    queryFn: () => fetchSharedProfile(),
+    retry: false,
+  });
+
   // Load Attempt Runtime via useQuery (QA-04, T6.2)
   const {
     data: attemptData,
@@ -246,7 +281,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       const restoredData = data.activity.type === ActivityType.game
         ? { ...data, answers: { ...data.answers, ...pendingAnswers } }
         : data;
-      return { data: restoredData, profile, savedRec };
+      return { data: restoredData, profile, savedRec, hasPendingAnswers: Object.keys(pendingAnswers).length > 0 };
     },
     staleTime: 0,
     retry: false,
@@ -255,14 +290,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   });
 
   const runtime = attemptData?.data ?? null;
-  const error =
-    queryError instanceof ApiError
-      ? queryError.message
-      : queryError instanceof Error
-        ? queryError.message
-        : queryError
-          ? 'No se pudo cargar la actividad'
-          : null;
+  const maxRecordingSeconds = getNumberProp(runtime?.activity.config, 'maxDurationSeconds') ?? 120;
+  const minRecordingSeconds = getNumberProp(runtime?.activity.config, 'minDurationSeconds') ?? 2;
 
   useEffect(() => {
     if (!attemptData || (attemptData.data.activity.type === ActivityType.game && isFetching) || initializedAttemptRef.current === attemptId) {
@@ -270,7 +299,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     }
 
     initializedAttemptRef.current = attemptId;
-    const { data, profile, savedRec } = attemptData;
+    const { data, profile, savedRec, hasPendingAnswers } = attemptData;
     const resolvedUserId = profile?.user?.id || getSharedSession()?.user?.id || '';
     if (resolvedUserId) {
       setCurrentUserId(resolvedUserId);
@@ -280,6 +309,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     setSoundEnabled(ageSegment === 'kids'); // soundEnabled starts true for kids, false for teens (RF-9)
     setAnswers((prev) => (Object.keys(prev).length === 0 ? data.answers || {} : prev));
     if (data.mediaId) setMediaId(data.mediaId);
+    if (hasPendingAnswers) setSaveStatus('local');
     if (data.attempt.status === AttemptStatus.in_progress) {
       setActiveAttemptState(true); // RF-9: defer update notices during active attempt
     }
@@ -303,6 +333,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setMediaId(savedRec.mediaId);
       const restoredSec =
         savedRec.durationMs > 0 ? Math.round(savedRec.durationMs / 1000) : 5;
+      if (!savedRec.mediaId) setSaveStatus('local');
       recordingDurationRef.current = Math.max(2, restoredSec);
       setRecordingSeconds(Math.max(2, restoredSec));
     }
@@ -319,6 +350,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           : `evt-${Date.now()}-${Math.random()}`;
 
       // 1. Guardar primero en IndexedDB (RF-10) y vaciar con la cola automática (RF-11); at/createdAt nunca viaja a la API (Decisión 37)
+      setSaveStatus('saving');
       const promise = enqueueEvent({
         userId: currentUserId,
         attemptId,
@@ -329,12 +361,16 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       })
         .then(() => {})
         .catch((err) => {
+          saveFailedRef.current = true;
           console.warn('[OfflineQueue] Fallback no fatal al encolar evento:', err);
         });
 
       pendingEventsRef.current.add(promise);
       promise.finally(() => {
         pendingEventsRef.current.delete(promise);
+        if (pendingEventsRef.current.size === 0) {
+          setSaveStatus(saveFailedRef.current ? 'error' : 'local');
+        }
       });
       return promise;
     },
@@ -347,13 +383,6 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       return updated;
     });
     sendEvent(itemId, value);
-  };
-
-  // Text-To-Speech for Kids prompts (RF-22)
-  const speakText = (text: string) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      speak(text);
-    }
   };
 
   const stopRecording = useCallback(() => {
@@ -398,6 +427,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setUploadError(null);
       setMediaId(null);
       setRecordedAudioBlob(null);
+      setSaveStatus('idle');
       audioChunksRef.current = [];
       if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setUploadError('El acceso al micrófono requiere una conexión segura HTTPS o localhost.');
@@ -420,14 +450,18 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         const mimeType = mediaRecorder.mimeType || preferredMime || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         setRecordedAudioBlob(audioBlob);
-        void saveLocalRecording(attemptId, audioBlob, currentUserId, recordingDurationRef.current);
+        setSaveStatus('saving');
+        void saveLocalRecording(attemptId, audioBlob, currentUserId, recordingDurationRef.current)
+          .then((saved) => setSaveStatus(saved ? 'local' : 'error'));
 
         // Stop all audio tracks
         stream.getTracks().forEach((track) => track.stop());
 
         // Subir y confirmar automáticamente si hay conexión (P1-03, QA-05, T4.3)
         const isOnline = typeof navigator === 'undefined' || navigator.onLine;
-        if (isOnline && runtime?.attemptToken) {
+        if (recordingDurationRef.current < minRecordingSeconds) {
+          setUploadError('Graba al menos ' + minRecordingSeconds + ' segundos.');
+        } else if (isOnline && runtime?.attemptToken) {
           void uploadAudioRecording(audioBlob);
         }
       };
@@ -437,7 +471,6 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       setRecordingSeconds(0);
       recordingDurationRef.current = 0;
 
-      const maxSec = getNumberProp(runtime?.activity?.config, 'maxDurationSeconds') ?? 120;
       let elapsed = 0;
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -446,7 +479,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         elapsed += 1;
         recordingDurationRef.current = elapsed;
         setRecordingSeconds(elapsed);
-        if (elapsed >= maxSec) {
+        if (elapsed >= maxRecordingSeconds) {
           stopRecordingRef.current();
         }
       }, 1000);
@@ -480,10 +513,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     if (!uploadUserId || uploadUserId !== getOfflineUserId()) return null;
     const blobToUpload = blobOverride ?? recordedAudioBlob;
     if (!blobToUpload) return mediaId;
-    const minSec =
-      getNumberProp(runtime?.activity?.config, 'minDurationSeconds') ?? 2;
-    if (recordingDurationRef.current < minSec) {
-      setUploadError(`Graba al menos ${minSec} segundos`);
+    if (recordingDurationRef.current < minRecordingSeconds) {
+      setUploadError(`Graba al menos ${minRecordingSeconds} segundos`);
       return null;
     }
 
@@ -524,7 +555,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
       return uploadedMediaId;
     } catch {
       setUploadProgress(null);
-      setUploadError('No pudimos enviar tu grabación. Sigue guardada en este dispositivo.');
+      setUploadError('No pudimos enviar tu grabación. Intenta enviarla otra vez.');
       return null;
     } finally {
       setIsUploadingAudio(false);
@@ -532,6 +563,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   };
 
   const completeAttemptMutation = useMutation({
+    // IndexedDB owns offline delivery. The HTTP mutation must fail instead of pausing.
+    networkMode: 'always',
     mutationFn: async ({
       completeBody,
       attemptToken,
@@ -584,7 +617,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
       // Trigger celebration confetti when student scores >= 3.0 (RF-9, ENG-086)
       if (compData.attempt.score !== null && compData.attempt.score !== undefined && compData.attempt.score >= 3.0) {
-        fireCelebrationConfetti({ theme });
+        fireCelebrationConfetti({ theme: effectiveTheme });
       }
 
       // Clean local storage upon confirmed completion (RF-13, RF-28)
@@ -663,6 +696,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         console.warn('[OfflineQueue] Flush previo a entrega no fatal:', flushErr);
       }
 
+      if (!navigator.onLine) throw new TypeError('Network request failed');
+
       if (runtime.activity.type === ActivityType.speaking) {
         if (!recordedAudioBlob && !mediaId) {
           setUploadError('Debes grabar un audio antes de entregar la actividad.');
@@ -670,10 +705,6 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
           return;
         }
         if (recordedAudioBlob && !mediaId) {
-          const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-          if (isCurrentlyOffline) {
-            throw new TypeError('Network request failed');
-          }
           finalMediaId = await uploadAudioRecording();
           if (!finalMediaId) {
             const isOfflineNow =
@@ -710,36 +741,40 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
             ? crypto.randomUUID()
             : `evt-comp-${Date.now()}`;
         const effectiveUid = currentUserId || (typeof window !== 'undefined' ? getSharedSession()?.user?.id : '') || '';
-        await enqueueEvent({
-          userId: effectiveUid,
-          attemptId,
-          clientEventId: compEventId,
-          eventType: 'completed',
-          payload: {
-            ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}),
-            answers: effectiveAnswers,
-          },
-          attemptToken: attemptToken || '',
-        });
+        try {
+          if (recordedAudioBlob) {
+            const effectiveDurationMs = Math.max(
+              2000,
+              (recordingDurationRef.current || recordingSeconds || 2) * 1000,
+            );
+            await enqueueUpload({
+              userId: effectiveUid,
+              attemptId,
+              blob: recordedAudioBlob,
+              mimeType: recordedAudioBlob.type || 'audio/webm',
+              durationMs: effectiveDurationMs,
+              mediaId: finalMediaId || mediaId || null,
+              attemptToken: attemptToken || undefined,
+            });
+          }
 
-        if (recordedAudioBlob) {
-          const effectiveDurationMs = Math.max(
-            2000,
-            (recordingDurationRef.current || recordingSeconds || 2) * 1000,
-          );
-          await enqueueUpload({
+          await enqueueEvent({
             userId: effectiveUid,
             attemptId,
-            blob: recordedAudioBlob,
-            mimeType: recordedAudioBlob.type || 'audio/webm',
-            durationMs: effectiveDurationMs,
-            mediaId: finalMediaId || mediaId || null,
-            attemptToken: attemptToken || undefined,
+            clientEventId: compEventId,
+            eventType: 'completed',
+            payload: {
+              ...(finalMediaId ? { mediaId: finalMediaId } : mediaId ? { mediaId } : {}),
+              answers: effectiveAnswers,
+            },
+            attemptToken: attemptToken || '',
           });
-        }
 
-        setIsOfflineSaved(true);
-        setActiveAttemptState(false);
+          setIsOfflineSaved(true);
+          setActiveAttemptState(false);
+        } catch {
+          setRunnerAlert('No pudimos guardar la entrega. Mantén esta página abierta e inténtalo de nuevo.');
+        }
       } else {
         setRunnerAlert(errMsg || 'No se pudo completar la entrega');
       }
@@ -754,32 +789,64 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
     playAgainMutation.mutate(activity.id);
   };
 
+  const effectiveTheme = attemptData?.profile?.student?.ageSegment ?? shellProfile?.student?.ageSegment ?? theme;
+  const isLoadingWithKidsShell = effectiveTheme === 'kids';
+
   if (isLoading || (runtime?.activity.type === ActivityType.game && isFetching)) {
-    return (
-      <div className="py-20 text-center">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
-        <p className="mt-3 text-sm font-semibold opacity-70">Cargando actividad…</p>
-      </div>
-    );
+    return <ActivityLoading />;
   }
 
   if (!runtime) {
+    if (isLoadingWithKidsShell) {
+      return (
+        <div className={styles.notebook}>
+          <div className={styles.unavailable}>
+            <ErrorState
+              variant="kids"
+              code={queryError instanceof ApiError ? queryError.code || queryError.statusCode : undefined}
+              message={queryError instanceof ApiError ? undefined : 'No pudimos abrir tu actividad.'}
+            />
+            <Link href="/inicio" className={styles.primary}>Volver al inicio</Link>
+          </div>
+        </div>
+      );
+    }
     return (
-      <div className="py-12 max-w-lg mx-auto text-center bg-white p-8 rounded-2xl border border-rose-200 shadow-sm">
-        <span className="text-4xl">⚠️</span>
-        <h2 className="text-lg font-bold text-rose-900 mt-3">No pudimos abrir la actividad</h2>
-        <p className="text-sm text-rose-700 mt-1">{error || 'Intento no disponible'}</p>
-        <Link
-          href="/inicio"
-          className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600"
-        >
-          Volver al Inicio
-        </Link>
+      <div className={teensStyles.study}>
+        <div className={teensStyles.unavailable}>
+          <ErrorState
+            variant="teens"
+            code={queryError instanceof ApiError ? queryError.code || queryError.statusCode : undefined}
+            message={queryError instanceof ApiError ? undefined : 'No pudimos abrir la actividad.'}
+          />
+          <Link href="/inicio" className={teensStyles.primary}>
+            Volver a inicio
+          </Link>
+        </div>
       </div>
     );
   }
 
   const { activity, attempt } = runtime;
+  const isKids = effectiveTheme === 'kids';
+  const isGame = activity.type === ActivityType.game;
+  const returnHref = isGame ? '/juegos' : '/inicio';
+  const isServerSynced = isOnline && Boolean(
+    mediaId || (saveStatus === 'idle' && Object.keys(runtime.answers).length > 0 && !attemptData?.hasPendingAnswers),
+  );
+  const saveMessage = isServerSynced
+    ? isKids
+      ? 'Sincronizado con el servidor'
+      : 'Respuesta guardada en el servidor'
+    : saveStatus === 'local'
+      ? 'Guardado en este dispositivo'
+      : saveStatus === 'saving'
+        ? 'Guardando…'
+        : saveStatus === 'error'
+          ? 'El guardado local falló'
+          : isOnline
+            ? null
+            : 'Sin conexión';
   const isFinished =
     completion !== null ||
     isOfflineSaved ||
@@ -788,35 +855,51 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   // Render Offline Delivery Receipt (RF-12, §7)
   if (isOfflineSaved) {
-    const isKids = theme === 'kids';
-    return (
-      <div className="max-w-2xl mx-auto py-8">
-        <div className="rounded-3xl border border-amber-200 bg-white p-8 sm:p-10 text-center shadow-lg">
-          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
-            💾
+    if (isKids) {
+      return (
+        <div className={styles.receipt}>
+          <div className={styles.offlineReceipt}>
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
+              <BookmarkCheck size={42} aria-hidden="true" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-amber-950 mb-3">
+              Guardado en este dispositivo
+            </h1>
+            <p className="text-sm text-zinc-600 max-w-md mx-auto mb-8">
+              Tu trabajo se enviará automáticamente cuando vuelva la conexión.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
+              <Link href={returnHref} className={styles.primary}>
+                {isGame ? 'Volver a juegos' : 'Ir a Mis Misiones'}
+              </Link>
+              <Link href="/progreso" className={styles.secondary}>
+                Ver Mi Progreso
+              </Link>
+            </div>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-amber-950 mb-3">
-            {isKids
-              ? '¡Listo! Tu trabajo quedó guardado y se enviará solo cuando vuelva el internet.'
-              : 'Guardado en este dispositivo. Se enviará cuando vuelva la conexión.'}
-          </h2>
-          <p className="text-sm text-zinc-600 max-w-md mx-auto mb-8">
-            {isKids
-              ? 'No te preocupes por tu progreso: tus respuestas están seguras en esta tablet.'
-              : 'Las respuestas se sincronizarán automáticamente con el servidor al restablecerse la red.'}
+        </div>
+      );
+    }
+
+    return (
+      <div className={teensStyles.receipt}>
+        <div className={teensStyles.offlineReceipt}>
+          <div className={teensStyles.receiptIconOffline} aria-hidden="true">
+            <BookmarkCheck size={34} />
+          </div>
+          <span className={teensStyles.localStatus} role="status">
+            Guardado en este dispositivo
+          </span>
+          <h1>Guardado en este dispositivo. Se enviará cuando vuelva la conexión.</h1>
+          <p className={teensStyles.receiptLead}>
+            Tus respuestas quedaron guardadas de forma segura y se sincronizarán automáticamente con el servidor al recuperar la red.
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-3">
-            <Link
-              href="/inicio"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ir a Mis Misiones
+          <div className={teensStyles.receiptActions}>
+            <Link href={returnHref} className={teensStyles.primary}>
+              {isGame ? 'Volver a juegos' : 'Volver a inicio'}
             </Link>
-            <Link
-              href="/progreso"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ver Mi Progreso
+            <Link href="/progreso" className={teensStyles.secondary}>
+              Ver mi progreso
             </Link>
           </div>
         </div>
@@ -826,120 +909,229 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
   // Render Completion Modal/Card
   if (completion) {
-    const isGame = activity.type === ActivityType.game;
     const score = completion.attempt.score;
     const starsCount = completion.attempt.stars ?? scoreToGameStars(score);
 
+    if (isKids) {
+      return (
+        <div className={styles.receipt}>
+          <div className={styles.onlineReceipt}>
+            <div aria-hidden="true" className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
+              {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
+                ? '📝'
+                : starsCount >= 2
+                  ? '🏆'
+                  : '⭐'}
+            </div>
+
+            <p className={styles.serverStatus} role="status">Sincronizado con el servidor</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-amber-950">
+              {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
+                ? '¡Actividad entregada con éxito!'
+                : isGame
+                  ? '¡Partida completada!'
+                  : '¡Misión completada!'}
+            </h1>
+
+            {isGame ? (
+              <div className="mt-4">
+                <div className="flex justify-center gap-1.5 text-3xl my-2" role="img" aria-label={starsCount + " de 3 estrellas"}>
+                  {[1, 2, 3].map((starIdx) => (
+                    <span
+                      key={starIdx}
+                      className={starIdx <= starsCount ? gameStyles.star : gameStyles.emptyStar}
+                      aria-hidden="true"
+                    >
+                      {starIdx > starsCount ? '☆' : '★'}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-base sm:text-lg font-bold text-amber-900 mt-2 max-w-md mx-auto">
+                  {completion.attempt.motivationMessage ||
+                    getGameMotivationMessage(score ?? 0, AgeSegment.kids)}
+                </p>
+              </div>
+            ) : score !== null && score !== undefined ? (
+              <div className="mt-4">
+                <div className="flex justify-center gap-1.5 text-3xl my-2" role="img" aria-label={starsCount + " de 3 estrellas"}>
+                  {[1, 2, 3].map((starIdx) => (
+                    <span
+                      key={starIdx}
+                      className={starIdx <= starsCount ? 'text-amber-400 drop-shadow-sm' : 'text-zinc-200'}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <p className="text-2xl font-extrabold text-amber-900 mt-1 tabular-nums">
+                  Nota: {score.toFixed(1).replace('.', ',')} / 5,0
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-zinc-600 max-w-md mx-auto">
+                Tu respuesta ha quedado registrada. Tu profesora la revisará y calificará en los próximos días.
+              </p>
+            )}
+
+            {/* Retroalimentación de corrección en intentos evaluados (T4.2, P2-04) */}
+            {completion.correction && Object.keys(completion.correction).length > 0 && (
+              <div className={"mt-4 p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-left max-w-md mx-auto " + styles.correction}>
+                <h2 className="text-sm font-bold text-amber-800 mb-2">
+                  Retroalimentación de respuestas
+                </h2>
+                <div className="space-y-1.5 text-xs">
+                  <CorrectionFeedback correction={completion.correction} />
+                </div>
+              </div>
+            )}
+
+            {/* New Badges Awarded */}
+            {completion.newBadges && completion.newBadges.length > 0 && (
+              <div className="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-left">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2">
+                  ¡Nueva insignia desbloqueada! 🎉
+                </p>
+                {completion.newBadges.map((b) => (
+                  <div key={b.id} className="flex items-center gap-3">
+                    <span className="text-3xl">{renderBadgeIcon(b.icon)}</span>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-amber-950">{b.name}</h4>
+                      <p className="text-xs text-amber-800">{b.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+              {activity.type === ActivityType.game && (
+                <button
+                  type="button"
+                  onClick={handlePlayAgain}
+                  disabled={playAgainMutation.isPending}
+                  className={styles.primary}
+                >
+                  🎮 {playAgainMutation.isPending ? 'Iniciando…' : 'Jugar de nuevo'}
+                </button>
+              )}
+              <Link href={returnHref} className={styles.primary}>
+                {isGame ? 'Volver a juegos' : 'Ir a Mis Misiones'}
+              </Link>
+              <Link href="/progreso" className={styles.secondary}>
+                Ver Mi Progreso
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="max-w-2xl mx-auto py-8">
-        <div className="rounded-3xl border border-amber-200 bg-white p-8 sm:p-10 text-center shadow-lg">
-          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-100 text-4xl shadow-inner mb-4">
-            {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
-              ? '📝'
-              : starsCount >= 2
-                ? '🏆'
-                : '⭐'}
+      <div className={teensStyles.receipt}>
+        <div className={teensStyles.onlineReceipt}>
+          <div aria-hidden="true" className={teensStyles.receiptIcon}>
+            {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking ? (
+              <FileText size={32} />
+            ) : starsCount >= 2 ? (
+              <Trophy size={32} />
+            ) : (
+              <Star size={32} />
+            )}
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-black text-amber-950">
+          <p className={teensStyles.serverStatus} role="status">
+            Respuesta guardada en el servidor
+          </p>
+          <h1>
             {activity.type === ActivityType.open_question || activity.type === ActivityType.speaking
               ? '¡Actividad entregada con éxito!'
               : isGame
                 ? '¡Partida completada!'
-                : '¡Misión completada!'}
-          </h2>
+                : '¡Actividad completada!'}
+          </h1>
 
           {isGame ? (
-            <div className="mt-4">
-              <div className="flex justify-center gap-1.5 text-3xl my-2">
+            <div className="space-y-2">
+              <div className={teensStyles.starsRow} role="img" aria-label={starsCount + ' de 3 estrellas'}>
                 {[1, 2, 3].map((starIdx) => (
                   <span
                     key={starIdx}
-                    className={starIdx <= starsCount ? 'text-amber-400 drop-shadow-sm' : 'text-zinc-200'}
+                    className={starIdx <= starsCount ? teensStyles.starFilled : teensStyles.starEmpty}
+                    aria-hidden="true"
                   >
-                    ★
+                    {starIdx <= starsCount ? '★' : '☆'}
                   </span>
                 ))}
               </div>
-              <p className="text-base sm:text-lg font-bold text-amber-900 mt-2 max-w-md mx-auto">
+              <p className={teensStyles.motivation}>
                 {completion.attempt.motivationMessage ||
-                  getGameMotivationMessage(score ?? 0, theme === 'teens' ? AgeSegment.teens : AgeSegment.kids)}
+                  getGameMotivationMessage(score ?? 0, AgeSegment.teens)}
               </p>
             </div>
           ) : score !== null && score !== undefined ? (
-            <div className="mt-4">
-              <div className="flex justify-center gap-1.5 text-3xl my-2">
+            <div className="space-y-2">
+              <div className={teensStyles.starsRow} role="img" aria-label={starsCount + ' de 3 estrellas'}>
                 {[1, 2, 3].map((starIdx) => (
                   <span
                     key={starIdx}
-                    className={starIdx <= starsCount ? 'text-amber-400 drop-shadow-sm' : 'text-zinc-200'}
+                    className={starIdx <= starsCount ? teensStyles.starFilled : teensStyles.starEmpty}
+                    aria-hidden="true"
                   >
-                    ★
+                    {starIdx <= starsCount ? '★' : '☆'}
                   </span>
                 ))}
               </div>
-              <p className="text-2xl font-extrabold text-amber-900 mt-1">
+              <p className={teensStyles.scoreValue}>
                 Nota: {score.toFixed(1).replace('.', ',')} / 5,0
               </p>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-zinc-600 max-w-md mx-auto">
+            <p className={teensStyles.receiptLead}>
               Tu respuesta ha quedado registrada. Tu profesora la revisará y calificará en los próximos días.
             </p>
           )}
 
-          {/* Retroalimentación de corrección en intentos evaluados (T4.2, P2-04) */}
           {completion.correction && Object.keys(completion.correction).length > 0 && (
-            <div className="mt-4 p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-left max-w-md mx-auto">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2">
-                Retroalimentación de respuestas:
-              </h4>
-              <div className="space-y-1.5 text-xs">
+            <div className={teensStyles.correction}>
+              <h2>Retroalimentación de respuestas</h2>
+              <div className={teensStyles.correctionList}>
                 <CorrectionFeedback correction={completion.correction} />
               </div>
             </div>
           )}
 
-          {/* New Badges Awarded */}
           {completion.newBadges && completion.newBadges.length > 0 && (
-            <div className="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-left">
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2">
-                ¡Nueva insignia desbloqueada! 🎉
-              </p>
+            <div className={teensStyles.badgesPanel}>
+              <p className={teensStyles.badgesHeading}>Nueva insignia desbloqueada</p>
               {completion.newBadges.map((b) => (
-                <div key={b.id} className="flex items-center gap-3">
-                  <span className="text-3xl">{renderBadgeIcon(b.icon)}</span>
+                <div key={b.id} className={teensStyles.badgeRow}>
+                  <span className={teensStyles.badgeIcon} aria-hidden="true">{renderBadgeIcon(b.icon)}</span>
                   <div>
-                    <h4 className="text-sm font-extrabold text-amber-950">{b.name}</h4>
-                    <p className="text-xs text-amber-800">{b.description}</p>
+                    <h4 className={teensStyles.badgeName}>{b.name}</h4>
+                    <p className={teensStyles.badgeDesc}>{b.description}</p>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+          <div className={teensStyles.receiptActions}>
             {activity.type === ActivityType.game && (
               <button
                 type="button"
                 onClick={handlePlayAgain}
-                disabled={isSubmitting}
-                className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                disabled={playAgainMutation.isPending}
+                className={teensStyles.yellow}
               >
-                🎮 {isSubmitting ? 'Iniciando…' : 'Jugar de nuevo'}
+                <RotateCcw size={18} aria-hidden="true" />
+                <span>{playAgainMutation.isPending ? 'Iniciando…' : 'Jugar de nuevo'}</span>
               </button>
             )}
-            <Link
-              href="/inicio"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-extrabold px-6 py-3 text-base shadow-sm transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ir a Mis Misiones
+            <Link href={returnHref} className={teensStyles.primary}>
+              {isGame ? 'Volver a juegos' : 'Volver a inicio'}
             </Link>
-            <Link
-              href="/progreso"
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] rounded-2xl border border-amber-300 bg-amber-100/60 hover:bg-amber-100 text-amber-950 font-bold px-6 py-3 text-base transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-            >
-              Ver Mi Progreso
+            <Link href="/progreso" className={teensStyles.secondary}>
+              Ver mi progreso
             </Link>
           </div>
         </div>
@@ -963,37 +1155,72 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
   const openQInstructions = parsedOpenQ.success ? parsedOpenQ.data.instructions : undefined;
 
   return (
-    <div className="max-w-3xl mx-auto py-6 space-y-6">
+    <div className={isKids ? styles.notebook : teensStyles.study}>
       {runnerAlert && (
         <div
           role="alert"
-          className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 flex items-center justify-between text-sm font-semibold shadow-xs"
+          className={isKids ? styles.alert : teensStyles.alert}
         >
-          <span>⚠️ {runnerAlert}</span>
+          <span>{isKids ? `⚠️ ${runnerAlert}` : runnerAlert}</span>
           <button
             type="button"
             onClick={() => setRunnerAlert(null)}
-            className="font-bold text-rose-600 hover:text-rose-800 ml-4 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-lg p-1"
+            className={
+              isKids
+                ? 'font-bold text-rose-600 hover:text-rose-800 ml-4 min-h-12 min-w-12 shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-lg p-1'
+                : teensStyles.alertClose
+            }
             aria-label="Cerrar aviso"
           >
-            ✕
+            {isKids ? '✕' : <X size={18} aria-hidden="true" />}
           </button>
         </div>
       )}
 
       {/* Activity Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-amber-200/80 shadow-xs">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800">
+      <header data-game={isGame || undefined} className={isKids ? styles.header : teensStyles.header}>
+        {isKids ? (
+          <div className={styles.notebookBar}>
+            <Link href={returnHref} className={styles.back}>
+              <ArrowLeft size={20} aria-hidden="true" /> Volver a mi ruta
+            </Link>
+            <span className={styles.notebookLabel}><BookOpen size={18} aria-hidden="true" /> Cuaderno de campo</span>
+          </div>
+        ) : (
+          <div className={teensStyles.topBar}>
+            <Link href={returnHref} className={teensStyles.back}>
+              <ArrowLeft size={18} aria-hidden="true" />
+              <span>{isGame ? 'Volver a juegos' : 'Volver a inicio'}</span>
+            </Link>
+            {saveMessage && (
+              <span
+                role="status"
+                className={
+                  isServerSynced
+                    ? teensStyles.serverStatus
+                    : saveStatus === 'error'
+                      ? teensStyles.errorStatus
+                      : saveStatus === 'saving'
+                        ? teensStyles.savingStatus
+                        : teensStyles.localStatus
+                }
+              >
+                {saveMessage}
+              </span>
+            )}
+          </div>
+        )}
+        <div className={isKids ? 'min-w-0' : teensStyles.headerMain}>
+          <div className={isKids ? 'flex flex-wrap items-center gap-2 mb-1' : teensStyles.metaRow}>
+            <span className={isKids ? 'px-2 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800' : teensStyles.metaPill}>
               Nivel {activity.level}
             </span>
-            <span className="text-xs font-semibold text-zinc-500">
+            <span className={isKids ? 'text-xs font-semibold text-zinc-500' : teensStyles.metaPill}>
               Intento #{attempt.attemptNumber}
             </span>
             {attempt.status === 'in_progress' && attempt.completeUntil && (
-              <span className="text-xs font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <span>⏳</span>
+              <span className={isKids ? 'text-xs font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1' : teensStyles.deadlinePill}>
+                {isKids && <span aria-hidden="true">⏳</span>}
                 <span>
                   Termina antes de:{' '}
                   {new Date(attempt.completeUntil).toLocaleDateString('es-CO', {
@@ -1002,75 +1229,85 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     hour: 'numeric',
                     minute: '2-digit',
                     hour12: true,
+                    timeZone: 'America/Bogota',
                   })}
                 </span>
               </span>
             )}
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-amber-950">{activity.title}</h1>
+          <h1 lang="en" className={isKids ? 'text-xl sm:text-2xl font-black text-amber-950' : undefined}>{activity.title}</h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          {activity.type === ActivityType.game && (
-            <button
-              type="button"
-              onClick={() => setSoundEnabled((prev) => !prev)}
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
-              aria-label={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
-            >
-              <span>{soundEnabled ? '🔊' : '🔇'}</span>
-              <span>{soundEnabled ? 'Sonido sí' : 'Sonido no'}</span>
-            </button>
-          )}
+        {(activity.type === ActivityType.game || isKids) && (
+          <div className={isKids ? 'flex flex-wrap items-center gap-2' : teensStyles.headerActions}>
+            {activity.type === ActivityType.game && (
+              <button
+                type="button"
+                onClick={() => setSoundEnabled((prev) => !prev)}
+                className={
+                  isKids
+                    ? `${gameStyles.externalControl} inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2`
+                    : teensStyles.soundToggle
+                }
+                aria-pressed={soundEnabled}
+                title={soundEnabled ? 'Silenciar efectos de sonido' : 'Activar efectos de sonido'}
+              >
+                {isKids ? (
+                  <>
+                    <span aria-hidden="true">{soundEnabled ? '🔊' : '🔇'}</span>
+                    <span>{soundEnabled ? 'Sonido sí' : 'Sonido no'}</span>
+                  </>
+                ) : (
+                  <>
+                    {soundEnabled ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
+                    <span>{soundEnabled ? 'Sonido: Activado' : 'Sonido: Silenciado'}</span>
+                  </>
+                )}
+              </button>
+            )}
 
-          {hasTtsSupport && (
-            <button
-              type="button"
-              onClick={() => speakText(activity.title)}
-              className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              title="Escuchar título"
-              aria-label="Escuchar título"
-            >
-              <span>🗣️</span>
-              <span>Escuchar</span>
-            </button>
-          )}
-        </div>
-      </div>
+            {isKids && <ListenButton text={activity.title} />}
+          </div>
+        )}
+        {isKids && (
+          <div className={styles.statusLine} role="status">
+            {saveMessage && (
+              <span className={isServerSynced ? styles.serverStatus : styles.localStatus}>
+                {saveMessage}
+              </span>
+            )}
+          </div>
+        )}
+      </header>
 
       {/* Runner Body by Activity Type */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-amber-200/80 shadow-sm space-y-6">
+      <div className={isKids
+        ? isGame ? 'min-w-0' : styles.body
+        : isGame ? 'min-w-0' : teensStyles.body}>
         {/* Fill in the Blank Type */}
         {activity.type === ActivityType.fill_blank && fbConfig?.items && (
           <div className="space-y-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+            <p className={isKids ? 'text-xs font-bold uppercase tracking-wider text-amber-800' : teensStyles.sectionLead}>
               Completa los espacios en blanco con la palabra correcta:
             </p>
             {fbConfig.items.map((item, itemIdx) => (
               <div
                 key={item.id}
-                className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3"
+                data-question=""
+                className={isKids ? 'p-5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3' : teensStyles.questionCard}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-amber-800">Pregunta {itemIdx + 1}</span>
-                  {hasTtsSupport && (
-                    <button
-                      type="button"
-                      onClick={() => speakText(formatBlankPromptForSpeech(item.prompt))}
-                      className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                      aria-label={`Escuchar pregunta ${itemIdx + 1}`}
-                    >
-                      <span aria-hidden="true">🔊</span> Escuchar
-                    </button>
+                <div className={isKids ? 'flex items-center justify-between' : teensStyles.questionMeta}>
+                  <span className={isKids ? 'text-xs font-extrabold text-amber-800' : undefined}>Pregunta {itemIdx + 1}</span>
+                  {isKids && (
+                    <ListenButton text={formatBlankPromptForSpeech(item.prompt)} />
                   )}
                 </div>
-                <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
+                <p lang="en" className={isKids ? 'text-base sm:text-lg font-medium text-amber-950 leading-relaxed' : teensStyles.promptText}>
                   {formatBlankPrompt(item.prompt, item.blanks)}
                 </p>
 
                 {/* Blank inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className={isKids ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2' : teensStyles.blanksGrid}>
                   {item.blanks.map((blank, blankIdx) => {
                     const itemAnswers = getStringRecord(answers[item.id]);
                     const rawBlankVal = itemAnswers[blank.id] || answers[blank.id];
@@ -1078,8 +1315,8 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                     const blankInputId = `blank-${item.id}-${blank.id || blankIdx}`;
                     const blankLabel = `Espacio ${blankIdx + 1}`;
                     return (
-                      <div key={blank.id || `blank-${blankIdx}`} className="space-y-1">
-                        <label htmlFor={blankInputId} className="text-xs font-bold text-zinc-600 block">
+                      <div key={blank.id || `blank-${blankIdx}`} className={isKids ? 'space-y-1' : teensStyles.fieldGroup}>
+                        <label htmlFor={blankInputId} className={isKids ? 'text-xs font-bold text-zinc-600 block' : teensStyles.fieldLabel}>
                           Espacio {blankIdx + 1}:
                         </label>
                         {blank.options && blank.options.length > 0 ? (
@@ -1092,7 +1329,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                               const updatedItem = { ...itemAnswers, [blank.id]: e.target.value };
                               handleAnswerChange(item.id, updatedItem);
                             }}
-                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
+                            className={isKids ? 'w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]' : teensStyles.select}
                           >
                             <option value="">-- Elige una opción --</option>
                             {blank.options.map((opt) => (
@@ -1113,7 +1350,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                               handleAnswerChange(item.id, updatedItem);
                             }}
                             placeholder="Escribe tu respuesta…"
-                            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
+                            className={isKids ? 'w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]' : teensStyles.input}
                           />
                         )}
                       </div>
@@ -1128,7 +1365,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         {/* Exam Type */}
         {activity.type === ActivityType.exam && examConfig?.items && (
           <div className="space-y-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+            <p className={isKids ? 'text-xs font-bold uppercase tracking-wider text-amber-800' : teensStyles.sectionLead}>
               Examen — Responde cada una de las oraciones:
             </p>
             {examConfig.items.map((item, itemIdx) => {
@@ -1136,33 +1373,27 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               return (
                 <div
                   key={item.id}
-                  className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3"
+                  data-question=""
+                  className={isKids ? 'p-5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3' : teensStyles.questionCard}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-amber-800">
+                  <div className={isKids ? 'flex items-center justify-between' : teensStyles.questionMeta}>
+                    <span className={isKids ? 'text-xs font-extrabold text-amber-800' : undefined}>
                       Ítem #{itemIdx + 1} (Peso: {item.weight})
                     </span>
-                    {hasTtsSupport && (
-                      <button
-                        type="button"
-                        onClick={() => speakText(formatBlankPromptForSpeech(item.prompt))}
-                        className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                        aria-label={`Escuchar ítem ${itemIdx + 1}`}
-                      >
-                        <span aria-hidden="true">🔊</span> Escuchar
-                      </button>
+                    {isKids && (
+                      <ListenButton text={formatBlankPromptForSpeech(item.prompt)} />
                     )}
                   </div>
-                  <p className="text-base sm:text-lg font-medium text-amber-950 leading-relaxed">
+                  <p lang="en" className={isKids ? 'text-base sm:text-lg font-medium text-amber-950 leading-relaxed' : teensStyles.promptText}>
                     {formatBlankPrompt(item.prompt, item.blanks)}
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className={isKids ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2' : teensStyles.blanksGrid}>
                     {item.blanks.map((b, bIdx) => {
                       const examInputId = `exam-blank-${item.id}-${b.id || bIdx}`;
                       const examLabel = `Espacio ${bIdx + 1} del ítem ${itemIdx + 1}`;
                       return (
-                        <div key={b.id || `blank-${bIdx}`} className="space-y-1">
-                          <label htmlFor={examInputId} className="text-xs font-bold text-zinc-600 block">
+                        <div key={b.id || `blank-${bIdx}`} className={isKids ? 'space-y-1' : teensStyles.fieldGroup}>
+                          <label htmlFor={examInputId} className={isKids ? 'text-xs font-bold text-zinc-600 block' : teensStyles.fieldLabel}>
                             Espacio {bIdx + 1}:
                           </label>
                           {b.options && b.options.length > 0 ? (
@@ -1175,7 +1406,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                                 const updatedItem = { ...itemAnswers, [b.id]: e.target.value };
                                 handleAnswerChange(item.id, updatedItem);
                               }}
-                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
+                              className={isKids ? 'w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]' : teensStyles.select}
                             >
                               <option value="">-- Elige una opción --</option>
                               {b.options.map((opt) => (
@@ -1196,7 +1427,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                                 handleAnswerChange(item.id, updatedItem);
                               }}
                               placeholder="Tu respuesta…"
-                              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]"
+                              className={isKids ? 'w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-h-[48px]' : teensStyles.input}
                             />
                           )}
                         </div>
@@ -1213,11 +1444,11 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         {activity.type === ActivityType.open_question && (
           <div className="space-y-6">
             {openQInstructions && (
-              <div className="p-4 rounded-2xl bg-amber-100/70 border border-amber-300 text-amber-950">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block mb-1">
+              <div className={isKids ? 'p-4 rounded-2xl bg-amber-100/70 border border-amber-300 text-amber-950' : teensStyles.instructionsBox}>
+                <span className={isKids ? 'text-xs font-bold uppercase tracking-wider text-amber-800 block mb-1' : teensStyles.instructionsLabel}>
                   Instrucciones generales
                 </span>
-                <p className="text-sm font-medium">{openQInstructions}</p>
+                <p className={isKids ? 'text-sm font-medium' : teensStyles.instructionsText}>{openQInstructions}</p>
               </div>
             )}
 
@@ -1232,25 +1463,29 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               const maxLen = item.maxLength || 2000;
 
               return (
-                <div key={item.id} className="space-y-3 p-5 rounded-2xl bg-white border border-amber-200 shadow-xs">
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div
+                  key={item.id}
+                  data-question=""
+                  className={isKids ? 'space-y-3 p-5 rounded-2xl bg-white border border-amber-200 shadow-xs' : teensStyles.questionCard}
+                >
+                  <div
+                    data-prompt=""
+                    className={
+                      isKids
+                        ? 'p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'
+                        : 'flex flex-col gap-2'
+                    }
+                  >
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-1">
+                      <h2 className={isKids ? 'text-xs font-bold uppercase tracking-wider text-amber-800 mb-1' : teensStyles.questionMeta}>
                         {!isSingleItem ? `Pregunta ${idx + 1}` : 'Pregunta abierta'}
-                      </h3>
-                      <p className="text-base font-semibold leading-relaxed">
+                      </h2>
+                      <p lang={item.prompt ? 'en' : undefined} className={isKids ? 'text-base font-semibold leading-relaxed' : teensStyles.promptText}>
                         {item.prompt || 'Escribe tu respuesta a continuación en inglés:'}
                       </p>
                     </div>
-                    {hasTtsSupport && (
-                      <button
-                        type="button"
-                        onClick={() => speakText(item.prompt || 'Escribe tu respuesta a continuación en inglés:')}
-                        className="inline-flex items-center justify-center min-h-[48px] min-w-[48px] text-xs font-bold text-amber-700 hover:text-amber-900 gap-1 rounded-xl px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 shrink-0 cursor-pointer"
-                        aria-label={`Escuchar consigna ${idx + 1}`}
-                      >
-                        <span aria-hidden="true">🔊</span> Escuchar
-                      </button>
+                    {isKids && (
+                      <ListenButton text={item.prompt || 'Escribe tu respuesta a continuación en inglés:'} />
                     )}
                   </div>
 
@@ -1259,7 +1494,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                       id={`open-question-answer-${item.id}`}
                       aria-label={`Tu respuesta en inglés para pregunta ${idx + 1}`}
                       disabled={isFinished}
-                      rows={!isSingleItem ? 4 : 6}
+                      rows={isKids ? 5 : !isSingleItem ? 4 : 6}
                       maxLength={maxLen}
                       value={itemAnswer}
                       onChange={(e) => {
@@ -1270,9 +1505,9 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                         }
                       }}
                       placeholder="Escribe aquí tu respuesta detallada…"
-                      className="w-full rounded-2xl border border-amber-300 p-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
+                      className={isKids ? 'w-full rounded-2xl border border-amber-300 p-4 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed' : teensStyles.textarea}
                     />
-                    <div className="flex justify-end text-[11px] font-semibold text-zinc-400">
+                    <div className={isKids ? 'flex justify-end text-[11px] font-semibold text-zinc-400' : teensStyles.counter}>
                       <span>{itemAnswer.length} / {maxLen} caracteres</span>
                     </div>
                   </div>
@@ -1285,84 +1520,119 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
         {/* Speaking Type */}
         {activity.type === ActivityType.speaking && (
           <div className="space-y-6">
-            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                Instrucción de pronunciación / Speaking
-              </h3>
-              <p className="text-lg font-bold">
-                {speakingConfig?.prompt || 'Graba tu voz leyendo la oración en voz alta.'}
-              </p>
-              {hasTtsSupport && (
-                <button
-                  type="button"
-                  onClick={() => speakText(speakingConfig?.prompt || '')}
-                  className="mt-2 text-xs font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-xl inline-flex items-center justify-center min-h-[48px] min-w-[48px] gap-1.5 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
-                  aria-label="Escuchar modelo"
-                >
-                  <span aria-hidden="true">🔊</span> Escuchar modelo
-                </button>
+            <div
+              data-question=""
+              data-speaking-prompt=""
+              className={isKids ? 'p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 space-y-2' : teensStyles.questionCard}
+            >
+              <div>
+                <h2 className={isKids ? 'text-xs font-bold uppercase tracking-wider text-amber-800' : teensStyles.questionMeta}>
+                  {isKids ? 'Lee en voz alta' : 'Speaking · Lee en voz alta'}
+                </h2>
+                <p lang={speakingConfig?.prompt ? 'en' : undefined} className={isKids ? 'text-lg font-bold' : teensStyles.promptText}>
+                  {speakingConfig?.prompt || 'Graba tu voz leyendo la oración en voz alta.'}
+                </p>
+              </div>
+              {isKids && (
+                <ListenButton text={speakingConfig?.prompt || ''} />
               )}
             </div>
 
             {/* Recorder Controls */}
             {!isFinished && (
-              <div className="p-6 rounded-3xl border border-amber-200 bg-amber-50/40 text-center space-y-4">
-                <div className="flex justify-center items-center gap-3">
+              <div className={isKids ? styles.recorder : teensStyles.recorder}>
+                <div className={isKids ? 'flex justify-center items-center gap-3' : teensStyles.recorderMeta}>
                   <span
-                    className={`inline-block h-4 w-4 rounded-full ${
-                      isRecording ? 'bg-rose-500 animate-pulse' : 'bg-zinc-300'
-                    }`}
+                    className={
+                      isKids
+                        ? `inline-block h-4 w-4 rounded-full ${isRecording ? 'bg-rose-500 animate-pulse' : 'bg-zinc-300'}`
+                        : `${teensStyles.recordDot} ${isRecording ? teensStyles.recordDotActive : ''}`
+                    }
+                    aria-hidden="true"
                   />
-                  <span className="text-xl font-mono font-bold text-amber-950">
-                    {Math.floor(recordingSeconds / 60)
-                      .toString()
-                      .padStart(2, '0')}
-                    :
-                    {(recordingSeconds % 60).toString().padStart(2, '0')}
+                  {!isKids && (
+                    <div className={teensStyles.waveBars} data-recording={isRecording ? 'true' : 'false'} aria-hidden="true">
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  )}
+                  <span className={isKids ? styles.clock : teensStyles.clock}>
+                    {formatClock(recordingSeconds)} / {formatClock(maxRecordingSeconds)}
                   </span>
-                  <span className="text-xs text-zinc-500">(máx 2:00 min)</span>
                 </div>
+                <p className={isKids ? 'text-sm' : teensStyles.recorderHint}>Graba al menos {minRecordingSeconds} segundos.</p>
 
-                <div className="flex justify-center gap-3">
+                <div className="flex justify-center gap-3 w-full">
                   {!isRecording ? (
                     <button
                       type="button"
                       onClick={startRecording}
-                      disabled={isUploadingAudio}
-                      className="rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer disabled:opacity-50"
+                      disabled={isUploadingAudio || isSubmitting}
+                      data-record=""
+                      className={
+                        isKids
+                          ? 'rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer disabled:opacity-50'
+                          : teensStyles.recordBtn
+                      }
                     >
-                      <span>🎙️</span>
-                      <span>{recordedAudioBlob ? 'Volver a grabar' : 'Empezar a grabar'}</span>
+                      <Mic size={20} aria-hidden="true" />
+                      <span>{recordedAudioBlob ? 'Volver a grabar' : 'Grabar audio'}</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={stopRecording}
-                      className="rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+                      data-record="stop"
+                      className={
+                        isKids
+                          ? 'rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-6 py-3 text-sm shadow-md flex items-center justify-center min-h-[48px] min-w-[48px] gap-2 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer'
+                          : teensStyles.stopBtn
+                      }
                     >
-                      <span>⏹️</span>
+                      <Square size={18} aria-hidden="true" />
                       <span>Detener grabación</span>
                     </button>
                   )}
                 </div>
 
                 {recordedAudioBlob && !isRecording && (
-                  <div className="pt-2 flex flex-col items-center gap-1">
-                    <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-900">
-                      <span>✅</span>
-                      <span>Grabación lista para enviar ({recordingDurationRef.current > 0 ? `${recordingDurationRef.current}s` : (recordingSeconds > 0 ? `${recordingSeconds}s` : 'guardada')})</span>
-                    </div>
+                  <div className={isKids ? 'pt-2 flex flex-col items-center gap-1' : teensStyles.previewBox}>
+                    {recordingSeconds >= minRecordingSeconds && (
+                      <div className={isKids ? 'inline-flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-900' : teensStyles.readyPill}>
+                        <Check size={16} aria-hidden="true" />
+                        <span>Grabación lista para enviar ({recordingSeconds} s)</span>
+                      </div>
+                    )}
+                    {audioPreview && (
+                      <audio
+                        className={isKids ? styles.preview : teensStyles.preview}
+                        controls
+                        src={audioPreview}
+                        aria-label="Escuchar tu grabación"
+                      />
+                    )}
                   </div>
                 )}
 
                 {uploadError && (
-                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2 text-center max-w-sm mx-auto">
-                    <p className="font-bold">{uploadError}</p>
+                  <div className={isKids ? 'p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2 text-center max-w-sm mx-auto' : teensStyles.uploadAlert}>
+                    <p className="font-bold" role="alert">{uploadError}</p>
                     <button
                       type="button"
                       onClick={() => void uploadAudioRecording()}
-                      disabled={isUploadingAudio}
-                      className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 min-h-[48px] min-w-[48px] shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+                      disabled={isUploadingAudio || !isOnline || !recordedAudioBlob || recordingSeconds < minRecordingSeconds}
+                      data-retry=""
+                      className={
+                        isKids
+                          ? 'rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 min-h-[48px] min-w-[48px] shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer'
+                          : teensStyles.primary
+                      }
                     >
                       {isUploadingAudio ? 'Reintentando…' : 'Reintentar envío'}
                     </button>
@@ -1370,7 +1640,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
                 )}
 
                 {uploadProgress && (
-                  <p className="text-xs font-semibold text-amber-700 animate-pulse">
+                  <p role="status" className={isKids ? 'text-sm font-semibold text-amber-900' : teensStyles.uploadStatus}>
                     {uploadProgress}
                   </p>
                 )}
@@ -1390,7 +1660,7 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
               }
             }}
             soundEnabled={soundEnabled}
-            theme={theme}
+            theme={effectiveTheme}
             onComplete={(finalAnswers) => {
               handleCompleteAttempt(finalAnswers);
             }}
@@ -1399,19 +1669,19 @@ export function ActividadRunner({ attemptId }: ActividadRunnerProps) {
 
         {/* Submit Button for standard activities (Microgames provide their own dedicated submit action) */}
         {!isFinished && activity.type !== ActivityType.game && (
-          <div className="pt-4 border-t border-amber-200/60 flex justify-end">
+          <div className={isKids ? styles.footer : teensStyles.footer}>
             <button
               type="button"
               disabled={
                 isSubmitting ||
                 isUploadingAudio ||
                 (activity.type === ActivityType.speaking &&
-                  (!recordedAudioBlob || (!mediaId && (typeof navigator === 'undefined' || navigator.onLine))))
+                  (isRecording || (!mediaId && (!recordedAudioBlob || recordingSeconds < minRecordingSeconds))))
               }
               onClick={() => handleCompleteAttempt()}
-              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-8 py-3.5 text-base shadow-md transition-all disabled:opacity-50 min-h-[48px] min-w-[48px] focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 cursor-pointer"
+              className={isKids ? styles.primary : teensStyles.primary}
             >
-              {isSubmitting ? 'Entregando actividad…' : 'Entregar actividad ✨'}
+              {isSubmitting ? 'Entregando actividad…' : 'Entregar actividad'}
             </button>
           </div>
         )}

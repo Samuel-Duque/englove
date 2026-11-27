@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-145)', () => {
@@ -6,20 +7,7 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
     context,
   }) => {
     // 1. Simular sesión de profesora
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: 'mock-teacher-token',
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: 'mock-teacher-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, 'mock-teacher-token');
 
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({
@@ -224,8 +212,14 @@ test.describe('SPEC-07: Revisión Docente y Feedback de Alumno (ENG-094 / ENG-14
       });
     });
 
-    await page.click('button:has-text("Guardar Revisión y Retroalimentación")');
-    await expect(page.locator('text=¡Calificación y retroalimentación guardadas exitosamente!')).toBeVisible();
+    const [savedReview] = await Promise.all([
+      page.waitForResponse((res) =>
+        new URL(res.url()).pathname === '/api/v1/attempts/att-rev-1/review' &&
+        res.request().method() === 'POST',
+      ),
+      page.getByRole('button', { name: 'Guardar Revisión y Retroalimentación' }).click(),
+    ]);
+    expect(savedReview.status()).toBe(200);
 
     // 8. Cambiar a pestaña Calificados y comprobar inmutabilidad de la nota
     await page.click('button[role="tab"]:has-text("Calificados")');

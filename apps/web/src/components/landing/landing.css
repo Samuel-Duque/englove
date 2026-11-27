@@ -1,0 +1,1094 @@
+/* ==========================================================================
+   UPWARD ENGLISH — SCOPED LANDING PAGE STYLES (.upward-landing)
+   Portado fielmente desde design-proposals/landing-page-proposal.html y
+   design-proposals/landing-page-diseno.md sin fugar variables hacia /login,
+   /inicio o los portales internos.
+   ========================================================================== */
+
+html:has(.upward-landing) {
+  color-scheme: light;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+.upward-landing {
+  /* ========================================================================
+     0. DESIGN TOKENS (UPWARD ENGLISH BRAND FAMILY)
+     ======================================================================== */
+  --font-display: var(--font-upward-display, 'Bricolage Grotesque'), system-ui, -apple-system, sans-serif;
+  --font-body: var(--font-upward-body, 'Nunito'), system-ui, -apple-system, sans-serif;
+  --font-ui: var(--font-upward-ui, 'Plus Jakarta Sans'), system-ui, -apple-system, sans-serif;
+
+  --app-bg: #FFF9EC;
+  --surface-1: #FFFFFF;
+  --surface-2: #FFF2D6;
+  --surface-warm: #FFE7B8;
+  --surface-cream: #FCF5E6;
+
+  --bark-bg: linear-gradient(135deg, #2B150A 0%, #3E2011 100%);
+  --bark-ink: #FFF9EC;
+  --bark-muted: #F2DFC6;
+
+  --ink-1: #2B150A;
+  --ink-2: #61361F;
+
+  --orange: #C6470B;
+  --orange-hover: #A53906;
+  --orange-soft: #FDECE2;
+  --red: #B9251D;
+  --red-hover: #991D16;
+  --red-soft: #FDE8E6;
+  --yellow: #FFCA3A;
+  --yellow-hover: #FFD65C;
+  --yellow-soft: #FFF2C2;
+
+  --ok-bg: #E6F5EA;
+  --ok-ink: #166534;
+  --warn-bg: #FEF3C7;
+  --warn-ink: #78350F;
+
+  --border-soft: #E5CBA8;
+  --border-input: #9A7B5C;
+  --border-strong: #4A2511;
+
+  --shadow-card: 0 4px 16px rgba(43, 21, 10, 0.07);
+  --shadow-playful: 3px 3px 0 #4A2511;
+  --shadow-cta: 0 3px 0 #4A2511;
+
+  --radius-card: 22px;
+  --radius-btn: 14px;
+  --radius-pill: 999px;
+  --focus-light: #1D4ED8;
+  --focus-dark: #FFCA3A;
+
+  min-height: 100vh;
+  background: var(--app-bg);
+  color: var(--ink-1);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: clip;
+}
+
+/* ==========================================================================
+   1. BASE RESET & ACCESSIBILITY (WCAG 2.2 AA)
+   ========================================================================== */
+.upward-landing *,
+.upward-landing *::before,
+.upward-landing *::after {
+  box-sizing: border-box;
+}
+
+.upward-landing img,
+.upward-landing svg {
+  display: block;
+  max-width: 100%;
+}
+
+.upward-landing button,
+.upward-landing a,
+.upward-landing input,
+.upward-landing select {
+  font: inherit;
+  color: inherit;
+}
+
+.upward-landing button {
+  cursor: pointer;
+}
+
+.upward-landing [hidden] {
+  display: none !important;
+}
+
+.upward-landing .visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+.upward-landing :where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-light) !important;
+  outline-offset: 2px !important;
+  scroll-margin-top: 96px;
+}
+
+.upward-landing :where(.cta-banner, .site-footer) :where(a, button, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-dark) !important;
+  outline-offset: 2px !important;
+}
+
+.upward-landing .container {
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+/* ==========================================================================
+   2. PUBLIC STICKY HEADER + COLLAPSIBLE MOBILE MENU
+   ========================================================================== */
+.upward-landing .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: rgba(255, 249, 236, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1.5px solid var(--border-soft);
+}
+
+.upward-landing section[id],
+.upward-landing footer[id] {
+  scroll-margin-top: 84px;
+}
+
+.upward-landing .site-header__inner {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.upward-landing .brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+  min-height: 48px;
+  min-width: 48px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.upward-landing .brand-emblem {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--yellow);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: 2px 2px 0 var(--border-strong);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.upward-landing .brand-name {
+  font-family: var(--font-display);
+  font-size: 1.22rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink-1);
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.upward-landing .header-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.upward-landing .header-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.45rem 0.78rem;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--ink-2);
+  font-weight: 800;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.upward-landing .header-nav a:hover {
+  background: var(--surface-2);
+  color: var(--ink-1);
+}
+
+.upward-landing .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.upward-landing .menu-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  box-shadow: 2px 2px 0 var(--border-strong);
+}
+
+.upward-landing .mobile-menu-panel {
+  background: var(--surface-1);
+  border-top: 1.5px solid var(--border-soft);
+  padding: 0.85rem 1.25rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.upward-landing .mobile-menu-panel a:not(.btn) {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0.5rem 0.85rem;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 800;
+  color: var(--ink-1);
+  background: var(--app-bg);
+}
+
+.upward-landing .mobile-menu-panel a:not(.btn):hover {
+  background: var(--surface-2);
+}
+
+.upward-landing .mobile-menu-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+}
+
+@media (min-width: 681px) {
+  .upward-landing .mobile-menu-panel {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   3. SHARED BUTTONS (>= 48px), PILLS, CARDS, SECTIONS
+   ========================================================================== */
+.upward-landing .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0.65rem 1.2rem;
+  border-radius: var(--radius-btn);
+  border: 1.5px solid var(--border-strong);
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1.2;
+  box-shadow: var(--shadow-cta);
+  transition: background-color 140ms ease, transform 100ms ease;
+}
+
+.upward-landing .btn:active {
+  transform: translateY(1px);
+}
+
+.upward-landing .btn--lg {
+  min-height: 54px;
+  padding: 0.78rem 1.45rem;
+  font-size: 0.98rem;
+}
+
+.upward-landing .btn--orange {
+  background: var(--orange);
+  color: #FFFFFF;
+}
+
+.upward-landing .btn--orange:hover {
+  background: var(--orange-hover);
+}
+
+.upward-landing .btn--red {
+  background: var(--red);
+  color: #FFFFFF;
+}
+
+.upward-landing .btn--red:hover {
+  background: var(--red-hover);
+}
+
+.upward-landing .btn--yellow {
+  background: var(--yellow);
+  color: var(--ink-1);
+}
+
+.upward-landing .btn--yellow:hover {
+  background: var(--yellow-hover);
+}
+
+.upward-landing .btn--surface {
+  background: var(--surface-1);
+  color: var(--ink-1);
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 0 var(--border-strong);
+}
+
+.upward-landing .btn--surface:hover {
+  background: var(--surface-2);
+}
+
+.upward-landing .btn--dark-ghost {
+  background: rgba(255, 249, 236, 0.12);
+  color: #FFF9EC;
+  border-color: rgba(255, 202, 58, 0.6);
+  box-shadow: none;
+}
+
+.upward-landing .btn--dark-ghost:hover {
+  background: rgba(255, 249, 236, 0.22);
+}
+
+.upward-landing .section {
+  padding: 3.5rem 0;
+}
+
+.upward-landing .section--warm {
+  background: var(--surface-2);
+  border-top: 1.5px solid var(--border-soft);
+  border-bottom: 1.5px solid var(--border-soft);
+}
+
+.upward-landing .section-header {
+  max-width: 64ch;
+  margin-bottom: 2rem;
+}
+
+.upward-landing .section-header--center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.upward-landing .kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--yellow-soft);
+  border: 1.5px solid #D9B450;
+  color: var(--ink-1);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.upward-landing .section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 2.8vw, 2.3rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--ink-1);
+}
+
+.upward-landing .section-lead {
+  margin: 0.65rem 0 0;
+  font-size: 1.02rem;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.upward-landing .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.26rem 0.72rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.upward-landing .pill--ok {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.upward-landing .pill--orange {
+  background: var(--orange-soft);
+  color: #8A2E05;
+}
+
+.upward-landing .pill--gold {
+  background: var(--yellow-soft);
+  color: var(--ink-1);
+  border: 1px solid #DFC16E;
+}
+
+.upward-landing .pill--red {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+/* ==========================================================================
+   4. HERO SECTION
+   ========================================================================== */
+.upward-landing .hero {
+  padding: 2.6rem 0 3.2rem;
+  background:
+    radial-gradient(circle at 82% 24%, rgba(255, 202, 58, 0.24) 0%, transparent 48%),
+    var(--app-bg);
+}
+
+.upward-landing .hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.18fr);
+  gap: 2.25rem;
+  align-items: center;
+}
+
+.upward-landing .hero-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.05rem, 3.6vw, 3.05rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  color: var(--ink-1);
+}
+
+.upward-landing .hero-copy {
+  margin: 1rem 0 1.45rem;
+  font-size: 1.06rem;
+  color: var(--ink-2);
+  max-width: 50ch;
+  line-height: 1.62;
+}
+
+.upward-landing .hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.upward-landing .hero-visual {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.upward-landing .art-frame {
+  background: var(--surface-1);
+  border: 2px solid var(--border-strong);
+  border-radius: 24px;
+  padding: 0.55rem;
+  box-shadow: 5px 5px 0 var(--border-strong);
+  overflow: hidden;
+}
+
+.upward-landing .art-frame--hero {
+  padding: 0.65rem;
+  height: 100%;
+}
+
+.upward-landing .art-frame img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 17px;
+  background: var(--surface-2);
+}
+
+.upward-landing .art-frame--hero img {
+  height: 100%;
+  min-height: 360px;
+  aspect-ratio: 16 / 10;
+}
+
+.upward-landing .art-frame--feature img {
+  aspect-ratio: 1200 / 896;
+}
+
+/* ==========================================================================
+   5. SECTION 2: ¿QUÉ HACE ESPECIAL A UPWARD ENGLISH? (3 PILLARS)
+   ========================================================================== */
+.upward-landing .pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+
+.upward-landing .pillar-card {
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  padding: 1.4rem;
+  box-shadow: var(--shadow-playful);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.upward-landing .pillar-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  font-size: 1.45rem;
+}
+
+.upward-landing .pillar-icon--yellow {
+  background: var(--yellow);
+}
+
+.upward-landing .pillar-icon--orange {
+  background: var(--orange-soft);
+}
+
+.upward-landing .pillar-icon--green {
+  background: var(--ok-bg);
+}
+
+.upward-landing .pillar-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink-1);
+}
+
+.upward-landing .pillar-text {
+  margin: 0;
+  font-size: 0.94rem;
+  color: var(--ink-2);
+}
+
+/* ==========================================================================
+   6. SECTION 3: APRENDER JUGANDO (BENEFICIOS) & EDUCACIÓN PERSONALIZADA
+   ========================================================================== */
+.upward-landing .split-showcase {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 1.75rem;
+  align-items: center;
+}
+
+.upward-landing .benefits-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.upward-landing .benefit-card {
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 1.05rem 1.2rem;
+  box-shadow: 3px 3px 0 var(--border-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.upward-landing .benefit-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--yellow-soft);
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.upward-landing .benefit-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--ink-1);
+}
+
+.upward-landing .benefit-desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-2);
+}
+
+.upward-landing .personal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.upward-landing .personal-postcard {
+  background: var(--app-bg);
+  border: 2px solid var(--border-strong);
+  border-radius: 22px;
+  padding: 1.5rem;
+  box-shadow: 5px 5px 0 var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.upward-landing .postcard-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.upward-landing .postcard-head__title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink-1);
+}
+
+.upward-landing .postcard-head__sub {
+  font-size: 0.84rem;
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+.upward-landing .teacher-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--orange);
+  color: #FFFFFF;
+  border: 1.5px solid var(--border-strong);
+  font-family: var(--font-display);
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.upward-landing .postcard-quote {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-soft);
+  border-left: 4px solid var(--orange);
+  border-radius: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink-1);
+  line-height: 1.55;
+}
+
+.upward-landing .sticker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.upward-landing .sticker-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--yellow-soft);
+  border: 1.5px solid var(--border-strong);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.upward-landing .personal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.upward-landing .personal-item {
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 1.1rem;
+  box-shadow: 3px 3px 0 var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.upward-landing .personal-item h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.04rem;
+  font-weight: 800;
+  color: var(--ink-1);
+}
+
+.upward-landing .personal-item p {
+  margin: 0;
+  font-size: 0.89rem;
+  color: var(--ink-2);
+}
+
+/* ==========================================================================
+   7. 3 PASOS + TRANQUILIDAD PARA FAMILIAS (#como-funciona)
+   ========================================================================== */
+.upward-landing .steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.upward-landing .step-item {
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 3px 3px 0 var(--border-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.upward-landing .step-num {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--yellow);
+  border: 1.5px solid var(--border-strong);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--ink-1);
+}
+
+.upward-landing .step-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.upward-landing .step-desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-2);
+}
+
+.upward-landing .trust-strip {
+  margin-top: 2rem;
+  background: var(--surface-1);
+  border: 1.5px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.upward-landing .trust-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.upward-landing .trust-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   8. FINAL CTA BANNER & FULL FOOTER
+   ========================================================================== */
+.upward-landing .cta-banner {
+  background: var(--bark-bg);
+  color: var(--bark-ink);
+  border-radius: 26px;
+  border: 2px solid var(--border-strong);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(43, 21, 10, 0.22);
+}
+
+.upward-landing .cta-banner h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  font-weight: 800;
+  color: #FFF9EC;
+}
+
+.upward-landing .cta-banner p {
+  margin: 0.65rem auto 1.45rem;
+  max-width: 54ch;
+  color: var(--bark-muted);
+  font-size: 1rem;
+}
+
+.upward-landing .cta-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.upward-landing .site-footer {
+  background: #231209;
+  color: #F6E9D8;
+  border-top: 3px solid var(--yellow);
+  padding: 3rem 0 1.75rem;
+  font-family: var(--font-ui);
+}
+
+.upward-landing .footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 214, 153, 0.16);
+}
+
+.upward-landing .footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.upward-landing .footer-brand__title {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #FFF9EC;
+}
+
+.upward-landing .footer-brand__motto {
+  font-size: 0.76rem;
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+.upward-landing .footer-heading {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--yellow);
+}
+
+.upward-landing .footer-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.upward-landing .footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0.25rem 0;
+  color: #F3E4D2;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+
+.upward-landing .footer-link:hover {
+  color: var(--yellow);
+  text-decoration: underline;
+}
+
+.upward-landing .footer-note {
+  margin: 0.4rem 0;
+  font-size: 0.86rem;
+  color: #E3CEB4;
+  line-height: 1.55;
+}
+
+.upward-landing .footer-note--item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+}
+
+.upward-landing .footer-bottom {
+  padding-top: 1.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  color: #DFC7A9;
+}
+
+/* ==========================================================================
+   9. RESPONSIVE (TABLET <= 960px & MOBILE <= 680px)
+   ========================================================================== */
+@media (max-width: 960px) {
+  .upward-landing .site-header__inner {
+    padding: 0.55rem 0.85rem;
+    gap: 0.45rem;
+  }
+
+  .upward-landing .header-nav a {
+    padding: 0.4rem 0.48rem;
+    font-size: 0.82rem;
+  }
+
+  .upward-landing .header-actions .btn {
+    padding: 0.5rem 0.82rem;
+    font-size: 0.84rem;
+  }
+
+  .upward-landing .brand-name {
+    font-size: 1.05rem;
+  }
+
+  .upward-landing .hero-grid,
+  .upward-landing .split-showcase,
+  .upward-landing .personal-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upward-landing .art-frame--hero img {
+    min-height: 0;
+    aspect-ratio: 1376 / 768;
+  }
+
+  .upward-landing .pillars-grid,
+  .upward-landing .trust-strip,
+  .upward-landing .footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .upward-landing .site-header {
+    top: 0;
+  }
+
+  .upward-landing section[id],
+  .upward-landing footer[id] {
+    scroll-margin-top: 84px;
+  }
+
+  .upward-landing .header-nav,
+  .upward-landing .header-actions {
+    display: none;
+  }
+
+  .upward-landing .menu-toggle-btn {
+    display: inline-flex;
+  }
+
+  .upward-landing .site-header__inner {
+    padding: 0.5rem 0.85rem;
+  }
+
+  .upward-landing .container {
+    padding: 0 0.9rem;
+  }
+
+  .upward-landing .hero {
+    padding: 1.6rem 0 2.2rem;
+  }
+
+  .upward-landing .section {
+    padding: 2.3rem 0;
+  }
+
+  .upward-landing .pillars-grid,
+  .upward-landing .personal-layout,
+  .upward-landing .personal-grid,
+  .upward-landing .trust-strip,
+  .upward-landing .footer-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upward-landing .cta-banner {
+    padding: 1.85rem 1.25rem;
+  }
+}
+
+/* ==========================================================================
+   10. REDUCED MOTION & FORCED COLORS (WCAG 2.2 AA)
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  html:has(.upward-landing) {
+    scroll-behavior: auto;
+  }
+
+  .upward-landing *,
+  .upward-landing *::before,
+  .upward-landing *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .upward-landing .btn:active {
+    transform: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .upward-landing .art-frame,
+  .upward-landing .pillar-card,
+  .upward-landing .benefit-card,
+  .upward-landing .personal-postcard,
+  .upward-landing .personal-item,
+  .upward-landing .step-item,
+  .upward-landing .cta-banner,
+  .upward-landing .btn {
+    border: 2px solid CanvasText !important;
+    box-shadow: none !important;
+  }
+
+  .upward-landing :where(a, button, input):focus-visible {
+    outline: 3px solid Highlight !important;
+  }
+}

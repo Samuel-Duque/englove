@@ -678,6 +678,12 @@ Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 | --- | --- | --- |
 | 146 | **Nombre definitivo del producto: «Upward English»:** se adopta **Upward English** como nombre definitivo del producto y plataforma (en reemplazo del nombre provisional anterior) en contexto, especificaciones, documentación, manifiesto PWA, paquetes `@upward-english/*`, prefijos `upward_english_*` y dominios `upwardenglish.*`. Cierra el pendiente de CONTEXT §15, el riesgo de `planning/pbp-development.md` (Etapa 11), el pendiente de `planning/taskboard.md` y la pregunta Q-05 de SPEC-09. | Decidido por el líder del proyecto |
 
+### Ronda 20 — 2026-11-26 (dominio definitivo `.app`)
+
+| # | Decisión | Estado |
+| --- | --- | --- |
+| 147 | **Dominio definitivo `upwardenglish.app`:** al encontrarse registrado `upwardenglish.org` por terceros, se registra y adopta `upwardenglish.app` como dominio raíz del proyecto (`app-staging.upwardenglish.app`, `api-staging.upwardenglish.app`, `app.upwardenglish.app`, `api.upwardenglish.app`, `COOKIE_DOMAIN=.upwardenglish.app` y `MAIL_FROM` bajo `@upwardenglish.app`). Precisa la Decisión 146. | Decidido por el líder del proyecto |
+
 Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abrir una ronda nueva con fecha) y actualizar la sección afectada de este documento en el mismo cambio.
 
 ---

@@ -330,7 +330,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
     it('despacha a listForTeacher cuando el rol autenticado es teacher', async () => {
       const teacherUser: AuthenticatedUser = {
         id: teacherUserId,
-        email: 'profe@upwardenglish.org',
+        email: 'profe@upwardenglish.app',
         role: Role.teacher,
         organizationId: orgId,
         sessionId: 'sid-1',
@@ -344,7 +344,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
     it('despacha a listForStudent cuando el rol autenticado es student', async () => {
       const studentUser: AuthenticatedUser = {
         id: studentUserId,
-        email: 'alumno@upwardenglish.org',
+        email: 'alumno@upwardenglish.app',
         role: Role.student,
         organizationId: orgId,
         sessionId: 'sid-2',
@@ -358,7 +358,7 @@ describe('SPEC-10: ResourcesService and ResourcesController (ENG-120, RF-1 a RF-
     it('llama a create, reorder, update y delete con los argumentos esperados', async () => {
       const teacherUser: AuthenticatedUser = {
         id: teacherUserId,
-        email: 'profe@upwardenglish.org',
+        email: 'profe@upwardenglish.app',
         role: Role.teacher,
         organizationId: orgId,
         sessionId: 'sid-1',

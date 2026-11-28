@@ -4,9 +4,9 @@ Tu tarea inmediata es proteger `master` y `develop`, revisar el [PR #2](https://
 
 ## Cerrar el PR y proteger las ramas
 
-- [ ] **Proteger `master` y `develop` (`ENG-001`).** Desde una cuenta administradora, entra a **Settings → Rules → Rulesets** y crea un ruleset activo para ambas ramas. Exige PR con una aprobación, rama al día y los tres checks de la tabla. Bloquea el borrado y los *force pushes*. Puedes aplicar la regla directamente o delegar esa configuración a `Sebastian-Tunjuelo`, que tiene permiso de escritura.
-- [ ] **Revisar el PR #2.** La revisión automática señaló que el detalle de asignaciones calcula entregas con una página de hasta 100 revisiones, lo que puede mostrar un conteo incompleto para asignaciones antiguas. Si afecta la aceptación de `UI-2`, pide una corrección antes de aprobar. Si puede esperar, registra el hallazgo con responsable y criterio de aceptación. [Conversación del PR](https://github.com/Samuel-Duque/englove/pull/2)
-- [ ] **Confirmar la aprobación y la integración.** Con revisión y checks en verde para el último commit, el equipo puede fusionar `UI-2` en `develop`. Revisa por separado los cambios locales que aún no están en el PR antes de elegir el commit que irá a staging.
+- [x] **Proteger `master` y `develop` (`ENG-001`).** Desde una cuenta administradora, entra a **Settings → Rules → Rulesets** y crea un ruleset activo para ambas ramas. Exige PR con una aprobación, rama al día y los tres checks de la tabla. Bloquea el borrado y los *force pushes*. Puedes aplicar la regla directamente o delegar esa configuración a `Sebastian-Tunjuelo`, que tiene permiso de escritura.
+- [x] **Revisar el PR #2.** La revisión automática señaló que el detalle de asignaciones calcula entregas con una página de hasta 100 revisiones, lo que puede mostrar un conteo incompleto para asignaciones antiguas. Si afecta la aceptación de `UI-2`, pide una corrección antes de aprobar. Si puede esperar, registra el hallazgo con responsable y criterio de aceptación. [Conversación del PR](https://github.com/Samuel-Duque/englove/pull/2)
+- [x] **Confirmar la aprobación y la integración.** Con revisión y checks en verde para el último commit, el equipo puede fusionar `UI-2` en `develop`. Revisa por separado los cambios locales que aún no están en el PR antes de elegir el commit que irá a staging.
 
 | Job | Nombre que muestra GitHub |
 | --- | --- |
@@ -20,7 +20,7 @@ La corrida del PR sobre `b756390` pasó los tres jobs. Playwright `mocked-ci` pa
 
 Confirma qué recursos existen y designa un responsable por servicio. El entorno usa datos de prueba y credenciales propias.
 
-- [ ] **Dominio y hosting (`ENG-003`).** Confirma el control de `upwardenglish.org`. Configura `app-staging.upwardenglish.org` para el Worker de Cloudflare y `api-staging.upwardenglish.org` para Render. Crea o verifica el servicio Docker de la API en Render, con una instancia y despliegue automático desactivado.
+- [ ] **Dominio y hosting (`ENG-003`).** Confirma el control de `upwardenglish.app`. Configura `app-staging.upwardenglish.app` para el Worker de Cloudflare y `api-staging.upwardenglish.app` para Render. Crea o verifica el servicio Docker de la API en Render, con una instancia y despliegue automático desactivado.
 - [ ] **Base de datos y archivos (`ENG-004`).** Prepara un proyecto Neon de staging con conexión *pooler* para la API y conexión directa para migraciones. Crea el bucket privado `upward-english-staging` en R2 con credenciales de alcance limitado y CORS para el origen web de staging.
 - [ ] **Correo.** Verifica el dominio remitente en Resend y configura las credenciales en la API de staging. Prueba el envío a cuentas de prueba.
 - [ ] **Despliegue en GitHub.** Crea el environment `staging` y restringe quién puede publicar. Carga los secretos en la configuración de cada servicio y comparte con el equipo qué quedó listo. [Guía de despliegue](despliegue-staging.md)

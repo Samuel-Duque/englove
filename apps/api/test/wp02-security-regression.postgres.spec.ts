@@ -660,7 +660,7 @@ describe.skipIf(!isPostgresAvailable)('WP-02 / Fase F2: Seguridad, Identidad, Se
     const prodConfigService = new ConfigService({
       JWT_SECRET: jwtSecret,
       APP_ENV: 'staging',
-      WEB_BASE_URL: 'https://staging.upwardenglish.org',
+      WEB_BASE_URL: 'https://staging.upwardenglish.app',
       COOKIE_PREFIX: 'upward_english_staging_',
     });
 

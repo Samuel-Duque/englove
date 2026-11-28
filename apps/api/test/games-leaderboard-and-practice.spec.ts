@@ -351,7 +351,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
         approval_status: ApprovalStatus.approved,
         level: Level.A1,
         created_at: new Date('2026-10-01T00:00:00Z'),
-        user: { name: 'Alice', email: 'alice@upwardenglish.org', is_active: true },
+        user: { name: 'Alice', email: 'alice@upwardenglish.app', is_active: true },
         memberships: [{ group: { id: groupId, name: 'Grupo A' } }],
       });
 
@@ -1027,7 +1027,7 @@ describe('SPEC-11 / RF-12 & Remediations: Games Leaderboard, Autonomous Practice
         approval_status: ApprovalStatus.approved,
         level: Level.A1,
         created_at: new Date('2026-10-01T00:00:00Z'),
-        user: { name: 'Alice', email: 'alice@upwardenglish.org', is_active: true },
+        user: { name: 'Alice', email: 'alice@upwardenglish.app', is_active: true },
         memberships: [{ group: { id: groupId, name: 'Grupo A' } }],
       });
 

@@ -6,7 +6,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
   const teacherPayload = Buffer.from(
     JSON.stringify({
       sub: '22222222-2222-4222-8222-222222222222',
-      email: 'profesora@upwardenglish.org',
+      email: 'profesora@upwardenglish.app',
       role: 'teacher',
       org: '11111111-1111-4111-8111-111111111111',
       sid: 'sid-teacher-1',
@@ -17,7 +17,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
   const studentPayload = Buffer.from(
     JSON.stringify({
       sub: '33333333-3333-4333-8333-333333333333',
-      email: 'alumno@upwardenglish.org',
+      email: 'alumno@upwardenglish.app',
       role: 'student',
       org: '11111111-1111-4111-8111-111111111111',
       sid: 'sid-student-1',
@@ -38,7 +38,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
             accessToken: teacherToken,
             user: {
               id: '22222222-2222-4222-8222-222222222222',
-              email: 'profesora@upwardenglish.org',
+              email: 'profesora@upwardenglish.app',
               role: 'teacher',
               organizationId: '11111111-1111-4111-8111-111111111111',
               name: 'Profesora Principal',
@@ -253,7 +253,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
             accessToken: studentToken,
             user: {
               id: '33333333-3333-4333-8333-333333333333',
-              email: 'alumno@upwardenglish.org',
+              email: 'alumno@upwardenglish.app',
               role: 'student',
               organizationId: '11111111-1111-4111-8111-111111111111',
               name: 'Lucas Diaz',
@@ -268,7 +268,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
           json: {
             user: {
               id: '33333333-3333-4333-8333-333333333333',
-              email: 'alumno@upwardenglish.org',
+              email: 'alumno@upwardenglish.app',
               name: 'Lucas Diaz',
               role: 'student',
             },
@@ -424,7 +424,7 @@ test.describe('SPEC-10: Contenido Extra — E2E y Accesibilidad (ENG-120, ENG-12
           json: {
             user: {
               id: '33333333-3333-4333-8333-333333333333',
-              email: 'teens@upwardenglish.org',
+              email: 'teens@upwardenglish.app',
               name: 'Camila Torres',
               role: 'student',
             },

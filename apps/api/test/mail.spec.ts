@@ -68,7 +68,7 @@ describe('RF-16: log privado, error SDK y resumen skipped', () => {
     const mockConfig = {
       get: vi.fn((key: string, defaultVal?: unknown) => {
         if (key === 'APP_ENV') return 'local';
-        if (key === 'MAIL_FROM') return 'notificaciones@upwardenglish.org';
+        if (key === 'MAIL_FROM') return 'notificaciones@upwardenglish.app';
         return defaultVal;
       }),
     } as unknown as ConfigService;
@@ -98,7 +98,7 @@ describe('RF-16: log privado, error SDK y resumen skipped', () => {
 
     const result = await mailService.sendMail({
       template: 'teacher-pending-summary',
-      to: 'teacher@upwardenglish.org',
+      to: 'teacher@upwardenglish.app',
       variables: {
         pendingRequests: 0,
         ungradedActivities: 0,

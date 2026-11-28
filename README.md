@@ -290,12 +290,12 @@ El script `pnpm seed:dev` provee las siguientes cuentas listas para probar los d
 
 | Rol / Tipo             | Correo electrónico                   | Contraseña           | Segmento / Nivel    | Propósito de prueba                                             |
 | ---------------------- | ------------------------------------ | -------------------- | ------------------- | --------------------------------------------------------------- |
-| **Profesora**          | `profesora@upwardenglish.org`        | `UpwardEnglish2026!` | Docente / Admin     | Creación de actividades, asignaciones, revisión y panel docente |
-| **Alumno (Kids)**      | `lucas.kids@upwardenglish.org`       | `Estudiante2026!`    | Kids (7–10) · A1    | Experiencia visual lúdica, intentos resueltos y pendientes      |
-| **Alumno (Kids)**      | `sofia.kids@upwardenglish.org`       | `Estudiante2026!`    | Kids (7–10) · A1    | Pruebas de asignaciones y actividades de completar              |
-| **Alumno (Teens)**     | `camila.teens@upwardenglish.org`     | `Estudiante2026!`    | Teens (11–14+) · B1 | Interfaz sobria, microjuegos y actividades avanzadas            |
-| **Alumno (Teens)**     | `daniel.teens@upwardenglish.org`     | `Estudiante2026!`    | Teens (11–14+) · A2 | Ejercicios de audio, feedback recibido y rachas                 |
-| **Registro Pendiente** | `emiliano.pending@upwardenglish.org` | `Estudiante2026!`    | Kids · Pendiente    | Verificación del flujo de aprobación docente de nuevos alumnos  |
+| **Profesora**          | `profesora@upwardenglish.app`        | `UpwardEnglish2026!` | Docente / Admin     | Creación de actividades, asignaciones, revisión y panel docente |
+| **Alumno (Kids)**      | `lucas.kids@upwardenglish.app`       | `Estudiante2026!`    | Kids (7–10) · A1    | Experiencia visual lúdica, intentos resueltos y pendientes      |
+| **Alumno (Kids)**      | `sofia.kids@upwardenglish.app`       | `Estudiante2026!`    | Kids (7–10) · A1    | Pruebas de asignaciones y actividades de completar              |
+| **Alumno (Teens)**     | `camila.teens@upwardenglish.app`     | `Estudiante2026!`    | Teens (11–14+) · B1 | Interfaz sobria, microjuegos y actividades avanzadas            |
+| **Alumno (Teens)**     | `daniel.teens@upwardenglish.app`     | `Estudiante2026!`    | Teens (11–14+) · A2 | Ejercicios de audio, feedback recibido y rachas                 |
+| **Registro Pendiente** | `emiliano.pending@upwardenglish.app` | `Estudiante2026!`    | Kids · Pendiente    | Verificación del flujo de aprobación docente de nuevos alumnos  |
 
 ---
 

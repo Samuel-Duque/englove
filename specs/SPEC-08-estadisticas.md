@@ -2,12 +2,12 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Implementada |
+| Estado | Verificada |
 | Etapa | 8 — Estadísticas y leaderboard |
 | Tareas | ENG-100, ENG-101, ENG-102, ENG-103, ENG-104 |
 | Referencias | `.agents/CONTEXT.md` §5.1, §5.3, §5.4, §12.8, §14 (Decisiones 20, 23, 25, 34, 41, 61, 66, 71, 73, 74, 76, 79, 98, 100, 104, 110–115); `planning/architecture-overview.md` §6, §7.8, §9.3, §9.4; `planning/pbp-development.md` (Etapa 8); `specs/SPEC-01-scaffold.md` a `specs/SPEC-07-revision-y-feedback.md` |
 | Aprobada por / fecha | Líder del proyecto / 2026-10-27; corrección NEG-01 autorizada al solicitar corregir los hallazgos el 2026-11-12 |
-| Verificada por / fecha | Histórica: 2026-10-28 y 2026-11-08. Re-verificación de NEG-01 pendiente de CI |
+| Verificada por / fecha | Líder del proyecto / 2026-11-26 (re-verificación NEG-01 en CI: https://github.com/Samuel-Duque/englove/actions/runs/45916697327). Histórica: 2026-10-28 y 2026-11-08 |
 
 ## 1. Contexto y objetivo
 
@@ -451,3 +451,4 @@ No quedan preguntas abiertas bloqueantes. Las cuatro preguntas iniciales (`Q-01`
 | 2026-11-08 | Líder del proyecto / Agente IA | Alineación de RF-1, RF-2, RF-4, RF-5, RF-6, RF-8, RF-9, RF-10 y RF-12 con la Decisión 137 (Etapa 12): exclusión de microjuegos de la nota académica, métricas de práctica autónoma («Práctica en juegos»), ranking privado de juegos (`GET /api/v1/stats/games-leaderboard`), omisión idempotente del cron de recordatorios cuando no hay pendientes y ajuste en el presupuesto de latencia; paso por revisión y re-verificación (`Estado: Verificada`). |
 | 2026-11-09 | Líder del proyecto / Agente IA | Alineación técnica con Etapa 12 y auditoría QA (WP-06): incorporación explícita de QA-06 (exclusión total de implausible_duration en métricas de games-leaderboard), confirmación de exclusión de microjuegos de notas académicas y de scoreSeries |
 | 2026-11-12 | Líder del proyecto / Agente IA | Corrección NEG-01 solicitada en conversación: paso por revisión y aprobación de la alineación con las decisiones 83/132. Umbral por organización, efectivo aun con juegos deshabilitados, sin cambiar estrellas. Re-verificación pendiente; evidencia histórica preservada. |
+| 2026-11-26 | Líder del proyecto / Agente IA | Re-verificación en CI de la enmienda NEG-01 sobre `develop` tras fusionar el PR #2 ([corrida 45916697327](https://github.com/Samuel-Duque/englove/actions/runs/45916697327)). Evidencia histórica preservada (`Estado: Verificada`). |

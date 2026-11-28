@@ -12,17 +12,17 @@ export const metadata: Metadata = {
 const demoAccounts: readonly DemoAccount[] = [
   {
     label: '👩‍🏫 Docente Principal',
-    email: 'profesora@upwardenglish.org',
+    email: 'profesora@upwardenglish.app',
     password: 'UpwardEnglish2026!',
   },
   {
     label: '👦 Alumno (Kids)',
-    email: 'lucas.kids@upwardenglish.org',
+    email: 'lucas.kids@upwardenglish.app',
     password: 'Estudiante2026!',
   },
   {
     label: '🧑 Alumna (Teens)',
-    email: 'camila.teens@upwardenglish.org',
+    email: 'camila.teens@upwardenglish.app',
     password: 'Estudiante2026!',
   },
 ];

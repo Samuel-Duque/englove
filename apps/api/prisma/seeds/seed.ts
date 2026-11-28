@@ -14,7 +14,7 @@ export async function seedMinimal() {
   const prisma = getPrisma();
   const orgSlug = process.env.PILOT_ORG_SLUG || 'pilot';
   const orgName = process.env.PILOT_ORG_NAME || 'Academia Upward English Piloto';
-  const teacherEmail = process.env.PILOT_TEACHER_EMAIL || 'profesora@upwardenglish.org';
+  const teacherEmail = process.env.PILOT_TEACHER_EMAIL || 'profesora@upwardenglish.app';
   const teacherPassword = explicitPassword || 'UpwardEnglish2026!';
 
   // Organization

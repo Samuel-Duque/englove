@@ -1,0 +1,222 @@
+.loading {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--ink-secondary, #5e3e2c);
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--status-ok-bg, #e6f5ea);
+  color: var(--status-ok-ink, #166534);
+}
+
+.tableWrap:focus-visible {
+  outline: 3px solid var(--focus-ring, #1d4ed8);
+  outline-offset: -3px;
+}
+
+.table {
+  table-layout: fixed;
+}
+
+.table thead th,
+.table tbody :is(th, td) {
+  padding: 0.625rem 0.75rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.table thead th:last-child {
+  width: 11rem;
+}
+
+.table tbody tr {
+  background: var(--surface-card, #fff);
+}
+
+.cellDetails {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--ink-secondary, #5e3e2c);
+}
+
+.rowActions,
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.primary,
+.secondary,
+.reject {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.primary {
+  background: var(--accent-primary, #c6470b);
+  color: #fff;
+}
+
+.primary:hover {
+  background: var(--accent-primary-hover, #a53906);
+}
+
+.secondary {
+  color: var(--ink-primary, #2b150a);
+  background: var(--surface-card, #fff);
+  border-color: var(--border-control, #9a7b5c);
+}
+
+.secondary:hover {
+  background: var(--surface-subtle, #f6efe4);
+}
+
+.reject {
+  background: var(--surface-card, #fff);
+  color: var(--accent-danger-ink, #831712);
+  border-color: var(--accent-danger, #b9251d);
+}
+
+.reject:hover {
+  background: var(--accent-danger-soft, #fdece9);
+}
+
+:is(.primary, .secondary, .reject):is(:disabled, [aria-disabled='true']) {
+  background: var(--surface-subtle, #f6efe4);
+  border-color: var(--border-hairline, #e4d5c3);
+  color: var(--ink-secondary, #5e3e2c);
+  cursor: default;
+}
+
+.dialog[role='dialog'] {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  border-color: var(--border-strong, #cbb499);
+  border-radius: 14px;
+  color: var(--ink-primary, #2b150a);
+  box-shadow: 0 6px 20px rgb(43 21 10 / 8%);
+}
+
+.dialog h2 {
+  color: inherit;
+}
+
+.dialog button[aria-label='Cerrar modal'] {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  color: var(--ink-secondary, #5e3e2c);
+}
+
+.form,
+.formGrid {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.formGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form label {
+  display: grid;
+  align-content: start;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-secondary, #5e3e2c);
+}
+
+.form :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border-control, #9a7b5c);
+  border-radius: 8px;
+  background: var(--surface-card, #fff);
+  color: var(--ink-primary, #2b150a);
+  font-weight: 500;
+}
+
+:is(.primary, .secondary, .reject, .dialog :is(button, input, select, a)):focus-visible {
+  outline: 3px solid var(--focus-ring, #1d4ed8);
+  outline-offset: 2px;
+}
+
+.note,
+.noGroups {
+  padding: 0.875rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.note {
+  background: var(--surface-callout, #fff6e3);
+}
+
+.noGroups {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  background: var(--accent-warm-soft, #fff1c2);
+  color: var(--accent-warm-ink, #543200);
+}
+
+@container (width < 640px) {
+  .table tbody th {
+    padding: 0 0 0.5rem;
+  }
+
+  .table tbody td {
+    padding: 0.125rem 0;
+  }
+
+  .rowActions {
+    width: 100%;
+  }
+
+  .rowActions button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  :is(.primary, .secondary, .reject, .dialog button[aria-label='Cerrar modal'], .form input, .form select) {
+    min-height: 48px;
+  }
+
+  .form :is(input, select) {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dialog[role='dialog'] {
+    padding: 1rem;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dialogActions button {
+    flex: 1 1 auto;
+  }
+}

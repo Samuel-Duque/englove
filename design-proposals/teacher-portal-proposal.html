@@ -1,0 +1,3963 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upward English — Panel Docente (Propuesta de Diseño)</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect x='1.5' y='1.5' width='33' height='33' rx='9' fill='%23FFCA3A' stroke='%234A2511' stroke-width='2.5'/%3E%3Cpath d='M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z' fill='%23C6470B' stroke='%232B150A' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpath d='M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z' fill='%23B9251D' stroke='%232B150A' stroke-width='1.9' stroke-linejoin='round'/%3E%3Cpath d='M18 10.6L20.3 13.6L18 16.6L15.7 13.6Z' fill='%23FFFDF5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       0. DESIGN TOKENS ON :root (INHERITED BY <dialog> & ALL VIEWS)
+       ========================================================================== */
+    :root {
+      --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+      --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+      /* Formalized Upward English warm palette */
+      --bg-canvas: #FCF9F2;
+      --bg-surface: #FFFFFF;
+      --bg-subtle: #F6EFE4;
+      --bg-subtle-hover: #EFE5D5;
+      --bg-callout: #FFF6E3;
+
+      --ink-primary: #2B150A;
+      --ink-secondary: #5C3D2E;
+      --ink-muted: #61361F;
+
+      --border-hairline: #E4D5C3;
+      --border-divider: #CBB499;
+      --border-input: #9A7B5C;
+      --border-brand: #4A2511;
+
+      /* Brand accents (executive restraint, WCAG AA verified) */
+      --accent-orange: #C6470B;
+      --accent-orange-hover: #A53906;
+      --accent-orange-soft: #FDECE2;
+      --accent-red: #B9251D;
+      --accent-red-hover: #991D16;
+      --accent-red-soft: #FDE8E6;
+      --accent-gold: #FFCA3A;
+      --accent-gold-soft: #FFF2C2;
+
+      /* Semantic states */
+      --status-ok-bg: #E6F5EA;
+      --status-ok-ink: #166534;
+      --status-warn-bg: #FEF3C7;
+      --status-warn-ink: #78350F;
+      --status-danger-bg: #FEE2E2;
+      --status-danger-ink: #991B1B;
+      --status-neutral-bg: #F3ECE2;
+      --status-neutral-ink: #4A2E1F;
+
+      /* Refined elevation (no comic offset shadows) */
+      --shadow-xs: 0 1px 2px rgba(43, 21, 10, 0.08);
+      --shadow-sm: 0 1px 3px rgba(43, 21, 10, 0.06);
+      --shadow-md: 0 6px 20px rgba(43, 21, 10, 0.05);
+      --shadow-dialog: 0 24px 64px rgba(43, 21, 10, 0.28);
+
+      /* Geometry */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-pill: 999px;
+
+      /* Focus & layout metrics */
+      --focus-ring: #1D4ED8;
+      --sidebar-width: 256px;
+      --studio-bar-h: 46px;
+    }
+
+    /* ==========================================================================
+       1. BASE RESET & ACCESSIBILITY (WCAG 2.2 AA)
+       ========================================================================== */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { color-scheme: light; -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #1B1310;
+      color: var(--ink-primary);
+      font-family: var(--font-body);
+      font-size: 0.9375rem;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    button, input, select, textarea, a { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    [hidden] { display: none !important; }
+
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      white-space: nowrap !important;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 1000;
+      background: var(--ink-primary);
+      color: #FFF9EC;
+      padding: 0.7rem 1.15rem;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+      scroll-margin-top: 76px;
+      scroll-margin-bottom: 48px;
+    }
+
+    /* ==========================================================================
+       2. STUDIO PRESENTATION BAR (PREVIEW CONTROLS ONLY)
+       ========================================================================== */
+    .studio-bar {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: #1B1310;
+      color: #F7EFE7;
+      border-bottom: 1px solid rgba(255, 214, 153, 0.16);
+      padding: 0.35rem 0.75rem;
+    }
+    .studio-bar__inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.35rem;
+    }
+    .studio-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: #FFD27D;
+      white-space: nowrap;
+    }
+    .studio-brand__mark {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: var(--accent-gold);
+      border: 1.5px solid var(--border-brand);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .studio-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.32rem;
+    }
+    .studio-group {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 0.12rem;
+      gap: 0.12rem;
+    }
+    .studio-btn {
+      border: 0;
+      background: transparent;
+      color: #E7D6C7;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.28rem 0.46rem;
+      min-height: 30px;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: background-color 140ms ease, color 140ms ease;
+    }
+    .studio-btn:hover { background: rgba(255, 255, 255, 0.12); color: #FFFFFF; }
+    .studio-btn[aria-pressed="true"] { background: var(--accent-orange); color: #FFFFFF; }
+    .studio-btn--gold {
+      border: 1px solid rgba(255, 202, 58, 0.42);
+      background: rgba(255, 202, 58, 0.12);
+      color: #FFE494;
+      border-radius: 8px;
+    }
+    .studio-btn--gold:hover { background: rgba(255, 202, 58, 0.22); color: #FFF8DC; }
+    .studio-btn:focus-visible { outline: 3px solid #FFD23F; outline-offset: 2px; }
+
+    .studio-restore-btn {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 260;
+      border: 1.5px solid #FFCA3A;
+      background: #1B1310;
+      color: #FFF7D6;
+      padding: 0.6rem 1rem;
+      min-height: 44px;
+      border-radius: var(--radius-pill);
+      font-size: 0.8125rem;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    /* ==========================================================================
+       3. VIEWPORT STAGE (1440px / 1280px / 820px) & APP SHELL
+       ========================================================================== */
+    .stage {
+      min-height: calc(100vh - var(--studio-bar-h));
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      background: var(--bg-canvas);
+      transition: padding 200ms ease;
+    }
+    .stage[data-device="laptop"] {
+      padding: 0.75rem 0.75rem 1.25rem;
+      background: #221814;
+      align-items: flex-start;
+    }
+    .stage[data-device="tablet"] {
+      padding: 1.15rem 1rem 2rem;
+      background: #221814;
+      align-items: flex-start;
+    }
+
+    .viewport-shell {
+      width: 100%;
+      max-width: 100%;
+      min-height: calc(100vh - var(--studio-bar-h));
+      background: var(--bg-canvas);
+      color: var(--ink-primary);
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      overflow-x: clip;
+      position: relative;
+    }
+    .stage[data-device="desktop"] .viewport-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      box-shadow: 0 0 0 1px var(--border-hairline);
+    }
+    .stage[data-device="laptop"] .viewport-shell {
+      max-width: 1280px;
+      min-height: calc(100vh - var(--studio-bar-h) - 2rem);
+      border-radius: 14px;
+      border: 1px solid #4A372F;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+    .stage[data-device="tablet"] .viewport-shell {
+      max-width: 820px;
+      min-height: 900px;
+      border-radius: 22px;
+      border: 6px solid #3A2A23;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+    }
+
+    /* ==========================================================================
+       4. SIDEBAR & RESPONSIVE TOP NAVIGATION
+       ========================================================================== */
+    .sidebar {
+      background: var(--bg-subtle);
+      border-right: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1rem 0.85rem 0.9rem;
+      gap: 0.85rem;
+      position: sticky;
+      top: var(--studio-bar-h);
+      align-self: start;
+      height: calc(100vh - var(--studio-bar-h));
+      overflow-y: auto;
+    }
+    .stage[data-device="laptop"] .sidebar {
+      height: calc(100vh - var(--studio-bar-h) - 2rem);
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.25rem 0.35rem 0.85rem;
+      border-bottom: 1px solid var(--border-hairline);
+      text-decoration: none;
+      border-radius: var(--radius-sm);
+    }
+    .brand-emblem {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: var(--accent-gold);
+      border: 1.5px solid var(--border-brand);
+      box-shadow: 0 1px 2px rgba(43, 21, 10, 0.12);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      gap: 0.15rem;
+    }
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 1.12rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--ink-primary);
+      white-space: nowrap;
+    }
+    .brand-context-pill {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.1rem 0.5rem;
+      border-radius: var(--radius-pill);
+      background: var(--accent-gold-soft);
+      color: var(--ink-primary);
+      border: 1px solid #DFC484;
+      line-height: 1.3;
+    }
+
+    .nav-list {
+      list-style: none;
+      margin: 0.75rem 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.22rem;
+    }
+    .nav-item-btn {
+      width: 100%;
+      min-height: 42px;
+      padding: 0.55rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-size: 0.875rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      text-align: left;
+      transition: background-color 140ms ease, color 140ms ease;
+    }
+    .nav-item-btn:hover {
+      background: var(--bg-subtle-hover);
+      color: var(--ink-primary);
+    }
+    .nav-item-btn[aria-current="page"] {
+      background: var(--accent-orange);
+      color: #FFFFFF;
+      font-weight: 700;
+      box-shadow: var(--shadow-xs);
+    }
+    .nav-item-main {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 0;
+    }
+    .nav-item-main svg { flex-shrink: 0; }
+    .nav-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.1rem 0.48rem;
+      border-radius: var(--radius-pill);
+      line-height: 1.35;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .nav-badge--urgent {
+      background: var(--accent-red);
+      color: #FFFFFF;
+    }
+    .nav-item-btn[aria-current="page"] .nav-badge--urgent {
+      background: #FFFFFF;
+      color: var(--accent-red);
+    }
+    .nav-badge--neutral {
+      background: #E5D6C3;
+      color: var(--ink-primary);
+    }
+    .nav-item-btn[aria-current="page"] .nav-badge--neutral {
+      background: rgba(255, 255, 255, 0.22);
+      color: #FFFFFF;
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--border-hairline);
+      padding-top: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .teacher-card {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.35rem 0.4rem;
+    }
+    .teacher-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--ink-primary);
+      color: #FFF9EC;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.88rem;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .teacher-info { min-width: 0; }
+    .teacher-name {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .teacher-org {
+      font-size: 0.74rem;
+      color: var(--ink-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .logout-btn {
+      width: 100%;
+      min-height: 38px;
+      padding: 0.45rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-input);
+      background: var(--bg-surface);
+      color: var(--ink-primary);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      transition: background-color 140ms ease, border-color 140ms ease;
+    }
+    .logout-btn:hover { background: var(--bg-callout); border-color: var(--border-brand); }
+
+    /* Tablet mode sidebar collapses into sleek top navigation */
+    .stage[data-device="tablet"] .sidebar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      height: auto;
+      min-height: auto;
+      overflow-y: visible;
+      border-right: 0;
+      border-bottom: 1px solid var(--border-hairline);
+      padding: 0.75rem 1.15rem;
+      gap: 0.65rem;
+    }
+    .stage[data-device="tablet"] .sidebar-top {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .stage[data-device="tablet"] .sidebar-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .stage[data-device="tablet"] .brand-lockup {
+      border-bottom: 0;
+      padding: 0;
+    }
+    .stage[data-device="tablet"] .nav-list {
+      margin-top: 0;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+    .stage[data-device="tablet"] .nav-item-btn {
+      width: auto;
+      min-height: 38px;
+      padding: 0.4rem 0.68rem;
+      font-size: 0.8rem;
+    }
+    .stage[data-device="tablet"] .sidebar-footer {
+      border-top: 1px solid var(--border-hairline);
+      padding-top: 0.55rem;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .stage[data-device="tablet"] .logout-btn { width: auto; }
+
+    /* ==========================================================================
+       5. MAIN WORKSPACE & TYPOGRAPHY
+       ========================================================================== */
+    .workspace {
+      min-width: 0;
+      padding: 1.75rem 2.25rem 3rem;
+      max-width: 1180px;
+      width: 100%;
+    }
+    .stage[data-device="laptop"] .workspace { padding: 1.5rem 1.75rem 2.5rem; }
+    .stage[data-device="tablet"] .workspace { padding: 1.25rem 1.25rem 2.25rem; }
+
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 1.15rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .page-header__text { min-width: 0; max-width: 66ch; }
+    .page-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1.72rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.18;
+      color: var(--ink-primary);
+    }
+    .page-subtitle {
+      margin: 0.32rem 0 0;
+      font-size: 0.9rem;
+      color: var(--ink-secondary);
+      line-height: 1.5;
+    }
+    .page-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .section-heading {
+      margin: 0 0 0.75rem;
+      font-family: var(--font-display);
+      font-size: 1.12rem;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      color: var(--ink-primary);
+    }
+
+    /* ==========================================================================
+       6. SHARED UI PRIMITIVES (BUTTONS, CARDS, PILLS, TABLES, CALLOUTS)
+       ========================================================================== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      min-height: 40px;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: 0.875rem;
+      font-weight: 600;
+      line-height: 1.2;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+    .btn--sm { min-height: 34px; padding: 0.35rem 0.72rem; font-size: 0.8125rem; }
+    .btn--primary {
+      background: var(--accent-orange);
+      color: #FFFFFF;
+      border-color: var(--accent-orange);
+      box-shadow: var(--shadow-xs);
+    }
+    .btn--primary:hover { background: var(--accent-orange-hover); border-color: var(--accent-orange-hover); }
+    .btn--secondary {
+      background: var(--bg-surface);
+      color: var(--ink-primary);
+      border-color: var(--border-input);
+    }
+    .btn--secondary:hover { background: var(--bg-subtle); border-color: var(--border-brand); }
+    .btn--danger {
+      background: var(--accent-red);
+      color: #FFFFFF;
+      border-color: var(--accent-red);
+    }
+    .btn--danger:hover { background: var(--accent-red-hover); border-color: var(--accent-red-hover); }
+    .btn--danger-outline {
+      background: var(--bg-surface);
+      color: var(--accent-red);
+      border-color: #E3A7A3;
+    }
+    .btn--danger-outline:hover { background: var(--accent-red-soft); border-color: var(--accent-red); }
+    .btn--ghost {
+      background: transparent;
+      color: var(--ink-secondary);
+      border-color: transparent;
+    }
+    .btn--ghost:hover { background: var(--bg-subtle); color: var(--ink-primary); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+    .card--padded { padding: 1.25rem; }
+    .card__head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .card__title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1.04rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+    .card__sub {
+      margin: 0.15rem 0 0;
+      font-size: 0.8125rem;
+      color: var(--ink-secondary);
+    }
+
+    .callout {
+      background: var(--bg-callout);
+      border: 1px solid #E8D0A3;
+      border-left: 3px solid var(--accent-orange);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem 1rem;
+      font-size: 0.85rem;
+      color: var(--ink-primary);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+    }
+    .callout--privacy {
+      background: #FDF7EE;
+      border-color: #DEC8AD;
+      border-left-color: var(--border-brand);
+    }
+    .callout--danger {
+      background: #FEF5F4;
+      border-color: #EABBB7;
+      border-left-color: var(--accent-red);
+    }
+    .callout svg { flex-shrink: 0; margin-top: 0.12rem; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.18rem 0.6rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.75rem;
+      font-weight: 700;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    .pill--ok { background: var(--status-ok-bg); color: var(--status-ok-ink); }
+    .pill--warn { background: var(--status-warn-bg); color: var(--status-warn-ink); }
+    .pill--danger { background: var(--status-danger-bg); color: var(--status-danger-ink); }
+    .pill--neutral { background: var(--status-neutral-bg); color: var(--status-neutral-ink); }
+    .pill--gold { background: var(--accent-gold-soft); color: var(--ink-primary); border: 1px solid #E5C97B; }
+    .pill--orange { background: var(--accent-orange-soft); color: #8A2E05; }
+
+    .polling-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.38rem 0.78rem;
+      border-radius: var(--radius-pill);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-hairline);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--ink-secondary);
+    }
+    .polling-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--status-ok-ink);
+      flex-shrink: 0;
+    }
+
+    /* Tables */
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    table.data-table th {
+      text-align: left;
+      padding: 0.72rem 1rem;
+      background: var(--bg-subtle);
+      color: var(--ink-secondary);
+      font-size: 0.78rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-hairline);
+      white-space: nowrap;
+    }
+    table.data-table td {
+      padding: 0.82rem 1rem;
+      border-bottom: 1px solid #EFE5D8;
+      vertical-align: middle;
+      color: var(--ink-primary);
+    }
+    table.data-table tbody tr:last-child td { border-bottom: 0; }
+    table.data-table tbody tr:hover { background: #FDFBF7; }
+    .cell-main { font-weight: 600; color: var(--ink-primary); }
+    .cell-sub { font-size: 0.78rem; color: var(--ink-secondary); margin-top: 0.1rem; }
+
+    /* Form Controls */
+    .field { display: flex; flex-direction: column; gap: 0.32rem; }
+    .field label,
+    .field-label {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+    .field-hint {
+      font-size: 0.76rem;
+      color: var(--ink-secondary);
+      margin: 0;
+    }
+    .input, .select, .textarea {
+      width: 100%;
+      min-height: 40px;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-input);
+      background: var(--bg-surface);
+      color: var(--ink-primary);
+      font-size: 0.875rem;
+      transition: border-color 140ms ease;
+    }
+    .input:hover, .select:hover, .textarea:hover { border-color: #A48668; }
+    .input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--accent-red); }
+    .textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
+    .field-error {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent-red);
+      margin: 0;
+    }
+
+    /* Sub-tabs (ARIA tablist) */
+    .tablist {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      border-bottom: 1px solid var(--border-hairline);
+      margin-bottom: 1.25rem;
+    }
+    .tab-btn {
+      position: relative;
+      min-height: 42px;
+      padding: 0.55rem 0.95rem;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-size: 0.875rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: color 140ms ease, border-color 140ms ease;
+    }
+    .tab-btn:hover { color: var(--ink-primary); }
+    .tab-btn[aria-selected="true"] {
+      color: var(--accent-orange);
+      border-bottom-color: var(--accent-orange);
+      font-weight: 700;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.75rem;
+      padding: 0.95rem 1.15rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      margin-bottom: 1.15rem;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.28rem;
+      min-width: 150px;
+    }
+    .filter-group label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--ink-secondary);
+    }
+
+    /* Progress bar */
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 130px;
+    }
+    .progress-track {
+      flex: 1;
+      height: 7px;
+      border-radius: var(--radius-pill);
+      background: #EDE2D3;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: var(--radius-pill);
+      background: var(--accent-orange);
+    }
+    .progress-fill--ok { background: var(--status-ok-ink); }
+    .progress-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+      font-variant-numeric: tabular-nums;
+      min-width: 34px;
+      text-align: right;
+    }
+
+    /* ==========================================================================
+       7. SCREEN 1: INICIO / RESUMEN
+       ========================================================================== */
+    .reminder-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .reminder-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 1.15rem 1.25rem;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+    .reminder-card--urgent {
+      border-left: 3px solid var(--accent-red);
+    }
+    .reminder-card--pending {
+      border-left: 3px solid var(--accent-orange);
+    }
+    .reminder-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .reminder-count {
+      font-family: var(--font-display);
+      font-size: 1.85rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--ink-primary);
+      font-variant-numeric: tabular-nums;
+    }
+    .reminder-title {
+      margin: 0.3rem 0 0.2rem;
+      font-weight: 700;
+      font-size: 0.96rem;
+      color: var(--ink-primary);
+    }
+    .reminder-desc {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--ink-secondary);
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+    .metric-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 0.95rem 1.05rem;
+    }
+    .metric-label { font-size: 0.78rem; font-weight: 600; color: var(--ink-secondary); }
+    .metric-value {
+      margin-top: 0.25rem;
+      font-family: var(--font-display);
+      font-size: 1.48rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+    }
+    .metric-note { margin-top: 0.2rem; font-size: 0.75rem; color: var(--ink-secondary); }
+
+    /* ==========================================================================
+       8. SCREEN 2: ACTIVIDADES + MULTI-SENTENCE BLANKS CREATOR PANEL
+       ========================================================================== */
+    .builder-drawer {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      padding: 1.35rem;
+      margin-bottom: 1.25rem;
+    }
+    .builder-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+    .sentence-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.55rem;
+    }
+    .preview-box {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+    }
+    .preview-sentence {
+      margin: 0 0 0.65rem;
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+    .preview-sentence:last-child { margin-bottom: 0; }
+    .blank-slot {
+      display: inline-block;
+      min-width: 78px;
+      padding: 0.05rem 0.5rem;
+      margin: 0 0.15rem;
+      border-bottom: 2px solid var(--accent-orange);
+      background: var(--accent-gold-soft);
+      color: var(--ink-primary);
+      font-weight: 700;
+      border-radius: 4px 4px 0 0;
+      text-align: center;
+    }
+
+    /* ==========================================================================
+       9. SCREEN 4: REVISIÓN Y FEEDBACK (SIGNATURE SPLIT-PANE WORKSPACE)
+       ========================================================================== */
+    .split-review {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .review-queue {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .queue-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .queue-tab {
+      min-height: 44px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-size: 0.84rem;
+      font-weight: 600;
+      padding: 0.6rem 0.75rem;
+    }
+    .queue-tab[aria-selected="true"] {
+      background: var(--bg-surface);
+      color: var(--ink-primary);
+      border-bottom-color: var(--accent-orange);
+      font-weight: 700;
+    }
+    .queue-list {
+      list-style: none;
+      margin: 0;
+      padding: 0.45rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-height: 620px;
+      overflow-y: auto;
+    }
+    .queue-item-btn {
+      width: 100%;
+      text-align: left;
+      padding: 0.8rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: background-color 140ms ease, border-color 140ms ease;
+    }
+    .queue-item-btn:hover { background: var(--bg-canvas); border-color: var(--border-hairline); }
+    .queue-item-btn[aria-current="true"] {
+      background: var(--bg-callout);
+      border-color: var(--accent-orange);
+    }
+    .queue-item-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+    }
+    .queue-student { font-weight: 700; font-size: 0.9rem; color: var(--ink-primary); }
+    .queue-activity { font-size: 0.8125rem; color: var(--ink-secondary); }
+    .queue-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.74rem;
+      color: var(--ink-muted);
+    }
+
+    .review-inspector {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      padding: 1.4rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .inspector-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.85rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .inspector-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1.24rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+    .inspector-meta {
+      margin: 0.25rem 0 0;
+      font-size: 0.83rem;
+      color: var(--ink-secondary);
+    }
+
+    /* Audio Player Simulation (Speaking) */
+    .audio-card {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.15rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .audio-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .play-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 0;
+      background: var(--accent-orange);
+      color: #FFFFFF;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      transition: background-color 140ms ease;
+    }
+    .play-btn:hover { background: var(--accent-orange-hover); }
+    .waveform {
+      flex: 1;
+      min-width: 180px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .wave-bar {
+      flex: 1;
+      border-radius: 3px;
+      background: #D7C2AA;
+      transition: background-color 140ms ease;
+    }
+    .wave-bar.is-played { background: var(--accent-orange); }
+    .audio-time {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .audio-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.65rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--border-hairline);
+      font-size: 0.78rem;
+      color: var(--ink-secondary);
+    }
+
+    .response-card {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.15rem;
+    }
+    .response-prompt {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--ink-secondary);
+      margin: 0 0 0.45rem;
+    }
+    .response-body {
+      margin: 0;
+      font-size: 0.9375rem;
+      color: var(--ink-primary);
+      line-height: 1.65;
+    }
+
+    /* Sticker Picker (Max 3 of 6) */
+    .sticker-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+    .sticker-btn {
+      min-height: 44px;
+      padding: 0.48rem 0.65rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-input);
+      background: var(--bg-surface);
+      color: var(--ink-primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      text-align: left;
+      transition: background-color 140ms ease, border-color 140ms ease;
+    }
+    .sticker-btn:hover { background: var(--bg-subtle); }
+    .sticker-btn[aria-pressed="true"] {
+      background: var(--accent-gold-soft);
+      border-color: var(--accent-orange);
+      box-shadow: inset 0 0 0 1px var(--accent-orange);
+      font-weight: 700;
+    }
+    .sticker-emoji { font-size: 1.1rem; flex-shrink: 0; }
+
+    .retry-box {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 0.9rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+      cursor: pointer;
+    }
+    .checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-orange);
+    }
+
+    /* ==========================================================================
+       10. SCREEN 6: ESTADÍSTICAS (SVG CHART + RANKINGS PRIVADOS)
+       ========================================================================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+      gap: 1.15rem;
+      margin-bottom: 1.25rem;
+    }
+    .chart-shell {
+      padding: 1.25rem;
+    }
+    .chart-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .rankings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.15rem;
+    }
+    .rank-num {
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: var(--bg-subtle);
+      color: var(--ink-primary);
+    }
+    .rank-num--top {
+      background: var(--accent-gold-soft);
+      border: 1px solid #DCBA5E;
+    }
+
+    /* ==========================================================================
+       11. SCREEN 7: CONTENIDO EXTRA (FLAG SWITCH + REORDER)
+       ========================================================================== */
+    .flag-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .switch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      min-height: 42px;
+      padding: 0.45rem 0.9rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-input);
+      background: var(--bg-subtle);
+      color: var(--ink-primary);
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+    .switch-track {
+      width: 40px;
+      height: 22px;
+      border-radius: var(--radius-pill);
+      background: #B9A48E;
+      position: relative;
+      transition: background-color 140ms ease;
+    }
+    .switch-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      transition: transform 140ms ease;
+    }
+    .switch-btn[aria-checked="true"] .switch-track { background: var(--status-ok-ink); }
+    .switch-btn[aria-checked="true"] .switch-thumb { transform: translateX(18px); }
+
+    .resource-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .resource-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+      padding: 0.95rem 1.25rem;
+      border-bottom: 1px solid #EFE5D8;
+    }
+    .resource-row:last-child { border-bottom: 0; }
+    .resource-info { min-width: 0; flex: 1; }
+    .resource-url {
+      display: inline-block;
+      font-size: 0.78rem;
+      color: var(--accent-orange);
+      text-decoration: underline;
+      word-break: break-all;
+      margin-top: 0.18rem;
+    }
+
+    /* ==========================================================================
+       12. DIALOGS & TOAST
+       ========================================================================== */
+    dialog.modal {
+      border: 1px solid var(--border-brand);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      width: min(94vw, 680px);
+      background: var(--bg-surface);
+      color: var(--ink-primary);
+      box-shadow: var(--shadow-dialog);
+      font-family: var(--font-body);
+    }
+    dialog.modal--wide { width: min(94vw, 860px); }
+    dialog.modal::backdrop {
+      background: rgba(27, 19, 16, 0.58);
+      backdrop-filter: blur(2px);
+    }
+    .modal__head {
+      padding: 1.1rem 1.35rem;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .modal__title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1.16rem;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+    .modal__body {
+      padding: 1.25rem 1.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .modal__foot {
+      padding: 0.95rem 1.35rem;
+      background: var(--bg-canvas);
+      border-top: 1px solid var(--border-hairline);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.6rem;
+    }
+
+    /* Visual Bridge Comparison Grid inside Dialog */
+    .bridge-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.9rem;
+    }
+    .bridge-card {
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .bridge-card--kids {
+      background: #FFF9EC;
+      border: 2px solid #4A2511;
+      box-shadow: 3px 3px 0 #4A2511;
+    }
+    .bridge-card--teacher {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      box-shadow: var(--shadow-sm);
+    }
+    .swatch-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .swatch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #FFFFFF;
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-pill);
+      padding: 0.2rem 0.5rem;
+    }
+    .swatch-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(43, 21, 10, 0.28);
+      flex-shrink: 0;
+    }
+
+    .toast {
+      position: fixed;
+      right: 1.25rem;
+      bottom: 1.25rem;
+      z-index: 300;
+      background: var(--ink-primary);
+      color: #FFF9EC;
+      border: 1px solid var(--accent-gold);
+      border-radius: var(--radius-md);
+      padding: 0.8rem 1.15rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 12px 32px rgba(27, 19, 16, 0.35);
+      max-width: min(92vw, 440px);
+    }
+
+    /* ==========================================================================
+       13. RESPONSIVE BREAKPOINTS (TABLET 820px & SMALLER REAL VIEWPORTS)
+       ========================================================================== */
+    .stage[data-device="tablet"] .reminder-grid,
+    .stage[data-device="tablet"] .builder-grid,
+    .stage[data-device="tablet"] .split-review,
+    .stage[data-device="tablet"] .stats-grid,
+    .stage[data-device="tablet"] .rankings-grid,
+    .stage[data-device="tablet"] .bridge-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .stage[data-device="tablet"] .summary-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .stage[data-device="tablet"] .sticker-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 1024px) {
+      .viewport-shell {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        height: auto;
+        min-height: auto;
+        overflow-y: visible;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-hairline);
+        padding: 0.75rem 1.15rem;
+      }
+      .brand-lockup { border-bottom: 0; padding: 0; }
+      .nav-list { margin-top: 0.5rem; flex-direction: row; flex-wrap: wrap; gap: 0.3rem; }
+      .nav-item-btn { width: auto; min-height: 38px; padding: 0.4rem 0.68rem; font-size: 0.8rem; }
+      .sidebar-footer { flex-direction: row; align-items: center; justify-content: space-between; padding-top: 0.55rem; }
+      .logout-btn { width: auto; }
+      .split-review, .stats-grid, .rankings-grid, .builder-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    @media (max-width: 680px) {
+      .workspace { padding: 1.1rem 0.9rem 2.25rem; }
+      .reminder-grid, .summary-strip, .sticker-grid, .bridge-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    /* ==========================================================================
+       14. REDUCED MOTION & FORCED COLORS (WCAG 2.2 AA)
+       ========================================================================== */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    @media (forced-colors: active) {
+      .card, .reminder-card, .metric-box, .btn, .nav-item-btn[aria-current="page"], .callout, .review-queue, .review-inspector, dialog.modal {
+        border: 2px solid CanvasText !important;
+        box-shadow: none !important;
+      }
+      :where(a, button, input, select, textarea):focus-visible {
+        outline: 3px solid Highlight !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link visually-hidden">Ir al contenido principal</a>
+
+  <!-- STUDIO BAR (PREVIEW CONTROLS ONLY) -->
+  <aside class="studio-bar" id="studio-bar" aria-label="Controles de presentación del prototipo Panel Docente">
+    <div class="studio-bar__inner">
+      <div class="studio-brand">
+        <span class="studio-brand__mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 36 36" fill="none">
+            <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M18 10.6L20.3 13.6L18 16.6L15.7 13.6Z" fill="#FFFDF5"/>
+          </svg>
+        </span>
+        <span>Upward · Docente</span>
+      </div>
+
+      <div class="studio-controls">
+        <div class="studio-group" role="group" aria-label="Atajos de pantallas docentes">
+          <button type="button" class="studio-btn" data-set-screen="inicio" aria-pressed="true">Inicio</button>
+          <button type="button" class="studio-btn" data-set-screen="actividades" aria-pressed="false">Actividades</button>
+          <button type="button" class="studio-btn" data-set-screen="asignaciones" aria-pressed="false">Asignaciones</button>
+          <button type="button" class="studio-btn" data-set-screen="revision" aria-pressed="false">Revisión</button>
+          <button type="button" class="studio-btn" data-set-screen="alumnos" aria-pressed="false">Alumnos</button>
+          <button type="button" class="studio-btn" data-set-screen="estadisticas" aria-pressed="false">Estadísticas</button>
+          <button type="button" class="studio-btn" data-set-screen="contenido-extra" aria-pressed="false">Extra</button>
+        </div>
+
+        <div class="studio-group" role="group" aria-label="Selector de resolución">
+          <button type="button" class="studio-btn" data-set-device="desktop" aria-pressed="true">Escritorio 1440px</button>
+          <button type="button" class="studio-btn" data-set-device="laptop" aria-pressed="false">Portátil 1280px</button>
+          <button type="button" class="studio-btn" data-set-device="tablet" aria-pressed="false">Tablet 820px</button>
+        </div>
+
+        <button type="button" class="studio-btn studio-btn--gold" id="open-bridge-btn">Puente visual Kids ↔ Docente</button>
+        <button type="button" class="studio-btn" id="hide-studio-btn">Ocultar barra</button>
+      </div>
+    </div>
+  </aside>
+
+  <button type="button" class="studio-restore-btn" id="restore-studio-btn" hidden>Mostrar controles</button>
+
+  <!-- STAGE -->
+  <div class="stage" id="stage" data-device="desktop">
+    <div class="viewport-shell" id="viewport-shell">
+
+      <!-- SIDEBAR NAVIGATION -->
+      <header class="sidebar">
+        <div class="sidebar-top">
+          <div class="sidebar-head-row">
+            <a href="#main-content" class="brand-lockup" data-nav-screen="inicio">
+              <span class="brand-emblem" aria-hidden="true">
+                <!-- EXACT UPWARD ENGLISH BRAND EMBLEM: BRÚJULA ASCENDENTE UPWARD -->
+                <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+                  <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                  <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                  <path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/>
+                </svg>
+              </span>
+              <span class="brand-meta">
+                <span class="brand-title">Upward English</span>
+                <span class="brand-context-pill">Panel Docente</span>
+              </span>
+            </a>
+          </div>
+
+          <nav aria-label="Navegación principal del panel docente">
+            <ul class="nav-list">
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="inicio" aria-current="page">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6.5h-5V21H4a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>
+                    <span>Inicio</span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="actividades">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18V6A1.5 1.5 0 0 1 5 4.5Z" stroke="currentColor" stroke-width="1.9"/><path d="M8 9h8M8 13h8M8 16.5h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                    <span>Actividades</span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="asignaciones">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2" stroke="currentColor" stroke-width="1.9"/><path d="M8 3v4M16 3v4M3.5 10h17" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                    <span>Asignaciones</span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="revision">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 6.5A2 2 0 0 1 6.5 4.5h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3v-3h0a2 2 0 0 1-2-2v-8Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9 10.5l2 2 4-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Revisión y feedback</span>
+                  </span>
+                  <span class="nav-badge nav-badge--urgent" id="nav-badge-pending">3</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="alumnos">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2" stroke="currentColor" stroke-width="1.9"/><path d="M3.5 19c.6-3 2.7-4.5 5.5-4.5s4.9 1.5 5.5 4.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="16.5" cy="9.5" r="2.3" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 14.5c2 0 3.5 1.1 4 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    <span>Alumnos y grupos</span>
+                  </span>
+                  <span class="nav-badge nav-badge--neutral" id="nav-badge-requests">2</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="estadisticas">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19.5h16M7 16V11M12 16V7M17 16V9.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                    <span>Estadísticas</span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="nav-item-btn" data-nav-screen="contenido-extra">
+                  <span class="nav-item-main">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.5 13.5l3-3M8.5 15.5l-1.8 1.8a2.8 2.8 0 0 1-4-4l2.3-2.3a2.8 2.8 0 0 1 4 0M15.5 8.5l1.8-1.8a2.8 2.8 0 0 1 4 4L19 13a2.8 2.8 0 0 1-4 0" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                    <span>Contenido extra</span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="teacher-card">
+            <span class="teacher-avatar" aria-hidden="true">CR</span>
+            <div class="teacher-info">
+              <div class="teacher-name">Prof. Camila Rojas</div>
+              <div class="teacher-org">Upward English · Sede Norte</div>
+            </div>
+          </div>
+          <button type="button" class="logout-btn" id="logout-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10M15 16l4-4-4-4M19 12H9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- MAIN WORKSPACE -->
+      <main class="workspace" id="main-content" tabindex="-1">
+
+        <!-- ====================================================================
+             SCREEN 1: INICIO / RESUMEN (/contenidos)
+             ==================================================================== -->
+        <section id="screen-inicio" data-screen="inicio" aria-labelledby="h1-inicio">
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-inicio">Buen día, Prof. Camila</h1>
+              <p class="page-subtitle">Resumen operativo de tus grupos activos, solicitudes de acceso y entregas pendientes de revisión.</p>
+            </div>
+            <div class="page-actions">
+              <span class="polling-badge" id="polling-status">
+                <span class="polling-dot" aria-hidden="true"></span>
+                <span>Actualización automática cada 30 s · sin WebSockets</span>
+              </span>
+              <button type="button" class="btn btn--primary" id="inicio-new-activity-btn">+ Nueva actividad</button>
+            </div>
+          </div>
+
+          <section class="reminder-grid" aria-label="Recordatorios prioritarios">
+            <article class="reminder-card reminder-card--urgent">
+              <div>
+                <div class="reminder-top">
+                  <span class="reminder-count" id="home-pending-count">3</span>
+                  <span class="pill pill--danger">Prioridad docente</span>
+                </div>
+                <h2 class="reminder-title">Entregas sin calificar (&gt;3 días)</h2>
+                <p class="reminder-desc">Incluye grabaciones de Speaking y respuestas abiertas pendientes de calificación manual en escala 0,0–5,0.</p>
+              </div>
+              <div>
+                <button type="button" class="btn btn--danger btn--sm" data-nav-screen="revision">Abrir cola de revisión</button>
+              </div>
+            </article>
+
+            <article class="reminder-card reminder-card--pending">
+              <div>
+                <div class="reminder-top">
+                  <span class="reminder-count" id="home-requests-count">2</span>
+                  <span class="pill pill--warn">Aprobación requerida</span>
+                </div>
+                <h2 class="reminder-title">Solicitudes de registro pendientes</h2>
+                <p class="reminder-desc">Estudiantes en estado pendiente que requieren asignación de nivel MCER y un grupo activo único.</p>
+              </div>
+              <div>
+                <button type="button" class="btn btn--secondary btn--sm" id="home-goto-requests-btn">Revisar solicitudes</button>
+              </div>
+            </article>
+          </section>
+
+          <div class="summary-strip">
+            <div class="metric-box">
+              <div class="metric-label">Grupos activos</div>
+              <div class="metric-value">4</div>
+              <div class="metric-note">Niveles A1, A2, B1 y B2</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Estudiantes aprobados</div>
+              <div class="metric-value" id="home-students-count">34</div>
+              <div class="metric-note">1 cuenta bloqueada por intentos</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Promedio académico (30 d)</div>
+              <div class="metric-value">4,2</div>
+              <div class="metric-note">Escala 0,0–5,0 · excluye microjuegos</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Tasa de cumplimiento</div>
+              <div class="metric-value">87%</div>
+              <div class="metric-note">Asignaciones vigentes esta semana</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Resumen de grupos activos</h2>
+                <p class="card__sub">Rendimiento académico consolidado y estado de revisiones por grupo.</p>
+              </div>
+              <button type="button" class="btn btn--secondary btn--sm" data-nav-screen="estadisticas">Ver estadísticas detalladas</button>
+            </div>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Resumen de grupos activos">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Grupo</th>
+                    <th scope="col">Nivel MCER</th>
+                    <th scope="col">Estudiantes</th>
+                    <th scope="col">Promedio (0,0–5,0)</th>
+                    <th scope="col">Cumplimiento</th>
+                    <th scope="col">Por revisar</th>
+                    <th scope="col">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class="cell-main">A1 Exploradores Mañana</div>
+                      <div class="cell-sub">Segmento Kids (7–10 años)</div>
+                    </td>
+                    <td><span class="pill pill--gold">A1</span></td>
+                    <td class="tabular">10</td>
+                    <td class="tabular"><strong>4,4</strong></td>
+                    <td>
+                      <div class="progress-row">
+                        <div class="progress-track"><div class="progress-fill progress-fill--ok" style="width:92%"></div></div>
+                        <span class="progress-label">92%</span>
+                      </div>
+                    </td>
+                    <td><span class="pill pill--danger tabular">2 pendientes</span></td>
+                    <td><button type="button" class="btn btn--ghost btn--sm" data-nav-screen="revision">Revisar</button></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="cell-main">A2 Viajeros Tarde</div>
+                      <div class="cell-sub">Segmento Kids (9–11 años)</div>
+                    </td>
+                    <td><span class="pill pill--gold">A2</span></td>
+                    <td class="tabular">9</td>
+                    <td class="tabular"><strong>4,1</strong></td>
+                    <td>
+                      <div class="progress-row">
+                        <div class="progress-track"><div class="progress-fill" style="width:85%"></div></div>
+                        <span class="progress-label">85%</span>
+                      </div>
+                    </td>
+                    <td><span class="pill pill--danger tabular">1 pendiente</span></td>
+                    <td><button type="button" class="btn btn--ghost btn--sm" data-nav-screen="revision">Revisar</button></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="cell-main">B1 Conversación Sábados</div>
+                      <div class="cell-sub">Segmento Teens (11–13 años)</div>
+                    </td>
+                    <td><span class="pill pill--gold">B1</span></td>
+                    <td class="tabular">8</td>
+                    <td class="tabular"><strong>4,0</strong></td>
+                    <td>
+                      <div class="progress-row">
+                        <div class="progress-track"><div class="progress-fill" style="width:81%"></div></div>
+                        <span class="progress-label">81%</span>
+                      </div>
+                    </td>
+                    <td><span class="pill pill--ok">Al día</span></td>
+                    <td><button type="button" class="btn btn--ghost btn--sm" data-nav-screen="asignaciones">Asignar</button></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="cell-main">B2 Preparación Académica</div>
+                      <div class="cell-sub">Segmento Teens (12–14 años)</div>
+                    </td>
+                    <td><span class="pill pill--gold">B2</span></td>
+                    <td class="tabular">7</td>
+                    <td class="tabular"><strong>4,3</strong></td>
+                    <td>
+                      <div class="progress-row">
+                        <div class="progress-track"><div class="progress-fill progress-fill--ok" style="width:90%"></div></div>
+                        <span class="progress-label">90%</span>
+                      </div>
+                    </td>
+                    <td><span class="pill pill--ok">Al día</span></td>
+                    <td><button type="button" class="btn btn--ghost btn--sm" data-nav-screen="estadisticas">Analizar</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
+             SCREEN 2: ACTIVIDADES (/actividades)
+             ==================================================================== -->
+        <section id="screen-actividades" data-screen="actividades" aria-labelledby="h1-actividades" hidden>
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-actividades">Catálogo de actividades</h1>
+              <p class="page-subtitle">Crea, filtra y publica actividades por nivel MCER (A1–B2) y tipo pedagógico. Los borradores pueden editarse antes de publicarse.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn--primary" id="toggle-builder-btn">+ Crear actividad rápida</button>
+            </div>
+          </div>
+
+          <!-- Interactive Multi-Sentence Fill-in-the-Blanks Creator Panel (<10 min onboarding UX) -->
+          <section class="builder-drawer" id="activity-builder-panel" aria-labelledby="builder-heading" hidden>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.75rem;">
+              <div>
+                <h2 class="card__title" id="builder-heading">Editor multi-oración · Completar espacios</h2>
+                <p class="card__sub">Escribe cada oración con respuestas entre dobles llaves, por ejemplo <code>{{is}}</code>. Diseñado para publicar en menos de 10 minutos.</p>
+              </div>
+              <button type="button" class="btn btn--ghost btn--sm" id="close-builder-btn">Cerrar editor</button>
+            </div>
+
+            <div class="builder-grid">
+              <form id="builder-form" class="field" style="gap:0.85rem;">
+                <div style="display:grid; grid-template-columns:minmax(0,1fr) 120px; gap:0.75rem;">
+                  <div class="field">
+                    <label for="builder-title">Título de la actividad</label>
+                    <input id="builder-title" class="input" type="text" value="Daily routines — Present Simple" required>
+                  </div>
+                  <div class="field">
+                    <label for="builder-level">Nivel MCER</label>
+                    <select id="builder-level" class="select">
+                      <option value="A1" selected>A1</option>
+                      <option value="A2">A2</option>
+                      <option value="B1">B1</option>
+                      <option value="B2">B2</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <span class="field-label">Oraciones con huecos (<code>{{respuesta}}</code>)</span>
+                  <div id="builder-sentences-list">
+                    <div class="sentence-row">
+                      <input type="text" class="input builder-sentence-input" aria-label="Oración 1" value="She {{wakes}} up at seven o'clock every morning.">
+                      <button type="button" class="btn btn--ghost btn--sm remove-sentence-btn">Quitar</button>
+                    </div>
+                    <div class="sentence-row">
+                      <input type="text" class="input builder-sentence-input" aria-label="Oración 2" value="They {{walk}} to school with their {{friends}}.">
+                      <button type="button" class="btn btn--ghost btn--sm remove-sentence-btn">Quitar</button>
+                    </div>
+                  </div>
+                  <div>
+                    <button type="button" class="btn btn--secondary btn--sm" id="add-sentence-btn">+ Agregar oración</button>
+                  </div>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:0.6rem;">
+                  <button type="submit" class="btn btn--primary">Guardar en catálogo como borrador</button>
+                  <button type="button" class="btn btn--secondary" id="publish-builder-btn">Guardar y publicar</button>
+                </div>
+              </form>
+
+              <div class="preview-box" aria-live="polite">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.7rem;">
+                  <strong style="font-size:0.84rem;">Vista previa del estudiante</strong>
+                  <span class="pill pill--ok">Calificación automática</span>
+                </div>
+                <div id="builder-preview-content"></div>
+                <p class="field-hint" style="margin-top:0.85rem;">Validado en servidor con Zod · puntuación calculada automáticamente en escala 0,0–5,0.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar" role="region" aria-label="Filtros de actividades">
+            <div class="filter-group">
+              <label for="filter-act-level">Nivel MCER</label>
+              <select id="filter-act-level" class="select">
+                <option value="all">Todos los niveles</option>
+                <option value="A1">A1</option>
+                <option value="A2">A2</option>
+                <option value="B1">B1</option>
+                <option value="B2">B2</option>
+              </select>
+            </div>
+            <div class="filter-group" style="min-width:200px;">
+              <label for="filter-act-type">Tipo de actividad</label>
+              <select id="filter-act-type" class="select">
+                <option value="all">Todos los tipos (5)</option>
+                <option value="fill_blank">Completar espacios</option>
+                <option value="open_question">Pregunta abierta</option>
+                <option value="speaking">Speaking</option>
+                <option value="game">Microjuego</option>
+                <option value="exam">Examen</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filter-act-status">Estado</label>
+              <select id="filter-act-status" class="select">
+                <option value="all">Todos</option>
+                <option value="published">Publicada</option>
+                <option value="draft">Borrador</option>
+                <option value="archived">Archivada</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn--ghost btn--sm" id="reset-act-filters-btn">Limpiar filtros</button>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Actividades registradas</h2>
+                <p class="card__sub" id="activities-count-label">Mostrando 8 de 8 actividades</p>
+              </div>
+            </div>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Actividades registradas">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Actividad</th>
+                    <th scope="col">Tipo y mecánica</th>
+                    <th scope="col">Nivel</th>
+                    <th scope="col">Calificación</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="activities-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
+             SCREEN 3: ASIGNACIONES (/asignaciones)
+             ==================================================================== -->
+        <section id="screen-asignaciones" data-screen="asignaciones" aria-labelledby="h1-asignaciones" hidden>
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-asignaciones">Asignaciones por grupo</h1>
+              <p class="page-subtitle">Programa actividades evaluables con fechas de apertura y cierre en zona horaria <strong>America/Bogota</strong>.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn--primary" id="open-new-assignment-btn">+ Nueva asignación</button>
+            </div>
+          </div>
+
+          <div class="callout" style="margin-bottom:1.25rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke="#C6470B" stroke-width="1.9"/><path d="M12 8v5M12 16.2h.01" stroke="#C6470B" stroke-width="2" stroke-linecap="round"/></svg>
+            <div>
+              <strong>Solo los 4 tipos evaluables se asignan a grupos:</strong> Completar espacios, Pregunta abierta, Speaking y Examen.
+              Los <strong>microjuegos</strong> publicados viven abiertos 24/7 en el portal del alumno sin requerir asignación y no alteran el promedio académico.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Calendario de asignaciones vigentes</h2>
+                <p class="card__sub">Cancelar una asignación cierra nuevas entregas pero conserva todos los intentos y notas previas.</p>
+              </div>
+            </div>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Calendario de asignaciones vigentes">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Actividad y tipo</th>
+                    <th scope="col">Grupo</th>
+                    <th scope="col">Apertura · Cierre (America/Bogota)</th>
+                    <th scope="col">Avance de entregas</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="assignments-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
+             SCREEN 4: REVISIÓN Y FEEDBACK (/revision) — SIGNATURE SPLIT-PANE
+             ==================================================================== -->
+        <section id="screen-revision" data-screen="revision" aria-labelledby="h1-revision" hidden>
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-revision">Revisión y feedback</h1>
+              <p class="page-subtitle">Espacio de evaluación manual para entregas de Speaking y Pregunta abierta, e historial de actividades autocalificadas.</p>
+            </div>
+            <div class="page-actions">
+              <span class="polling-badge">
+                <span class="polling-dot" aria-hidden="true"></span>
+                <span>Cola sincronizada cada 30 s</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="split-review">
+            <!-- LEFT QUEUE -->
+            <div class="review-queue">
+              <div class="queue-tabs" role="tablist" aria-label="Estado de revisiones">
+                <button type="button" class="queue-tab" role="tab" id="rev-tab-pending" aria-selected="true" aria-controls="rev-list-panel" data-rev-tab="pending">
+                  Pendientes (<span id="rev-pending-tab-count">3</span>)
+                </button>
+                <button type="button" class="queue-tab" role="tab" id="rev-tab-graded" aria-selected="false" aria-controls="rev-list-panel" data-rev-tab="graded">
+                  Calificados (<span id="rev-graded-tab-count">2</span>)
+                </button>
+              </div>
+              <div id="rev-list-panel" role="tabpanel" aria-labelledby="rev-tab-pending">
+                <ul class="queue-list" id="review-queue-list"></ul>
+              </div>
+            </div>
+
+            <!-- RIGHT INSPECTOR -->
+            <div class="review-inspector" id="review-inspector" aria-live="polite">
+              <!-- Populated dynamically by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
+             SCREEN 5: ALUMNOS Y GRUPOS (/alumnos)
+             ==================================================================== -->
+        <section id="screen-alumnos" data-screen="alumnos" aria-labelledby="h1-alumnos" hidden>
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-alumnos">Alumnos y grupos</h1>
+              <p class="page-subtitle">Gestiona el directorio estudiantil, aprueba solicitudes de registro, desbloquea cuentas y organiza los grupos activos.</p>
+            </div>
+          </div>
+
+          <div class="tablist" role="tablist" aria-label="Secciones de gestión de alumnos">
+            <button type="button" class="tab-btn" role="tab" id="stu-tab-active" aria-selected="true" aria-controls="stu-panel-active" data-stu-tab="active">
+              <span>Alumnos activos (<span id="stu-count-active">5</span>)</span>
+            </button>
+            <button type="button" class="tab-btn" role="tab" id="stu-tab-requests" aria-selected="false" aria-controls="stu-panel-requests" data-stu-tab="requests">
+              <span>Solicitudes (<span id="stu-count-requests">2</span>)</span>
+            </button>
+            <button type="button" class="tab-btn" role="tab" id="stu-tab-locked" aria-selected="false" aria-controls="stu-panel-locked" data-stu-tab="locked">
+              <span>Bloqueados (<span id="stu-count-locked">1</span>)</span>
+            </button>
+            <button type="button" class="tab-btn" role="tab" id="stu-tab-groups" aria-selected="false" aria-controls="stu-panel-groups" data-stu-tab="groups">
+              <span>Grupos (4)</span>
+            </button>
+          </div>
+
+          <!-- Sub-panel: Alumnos activos -->
+          <div id="stu-panel-active" role="tabpanel" aria-labelledby="stu-tab-active">
+            <div class="callout" style="margin-bottom:1rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke="#C6470B" stroke-width="1.9"/><path d="M12 8v5M12 16.2h.01" stroke="#C6470B" stroke-width="2" stroke-linecap="round"/></svg>
+              <div>
+                Cada estudiante pertenece a <strong>un único grupo activo</strong>. El contacto del acudiente es un dato informativo editable únicamente por la profesora (sin portal ni cuenta de acudiente).
+              </div>
+            </div>
+            <div class="card">
+              <div class="table-wrap" tabindex="0" role="region" aria-label="Alumnos activos">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Estudiante</th>
+                      <th scope="col">Nivel</th>
+                      <th scope="col">Grupo activo único</th>
+                      <th scope="col">Contacto acudiente (solo docente)</th>
+                      <th scope="col">Acciones administrativas</th>
+                    </tr>
+                  </thead>
+                  <tbody id="active-students-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel: Solicitudes -->
+          <div id="stu-panel-requests" role="tabpanel" aria-labelledby="stu-tab-requests" hidden>
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Solicitudes pendientes de aprobación</h2>
+                  <p class="card__sub">Asigna nivel MCER, segmento visual y grupo activo antes de aprobar el ingreso del estudiante.</p>
+                </div>
+              </div>
+              <div class="table-wrap" tabindex="0" role="region" aria-label="Solicitudes pendientes de aprobación">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Solicitante</th>
+                      <th scope="col">Fecha de registro</th>
+                      <th scope="col">Nivel MCER</th>
+                      <th scope="col">Grupo a asignar</th>
+                      <th scope="col">Decisión</th>
+                    </tr>
+                  </thead>
+                  <tbody id="requests-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel: Bloqueados -->
+          <div id="stu-panel-locked" role="tabpanel" aria-labelledby="stu-tab-locked" hidden>
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Cuentas bloqueadas temporalmente</h2>
+                  <p class="card__sub">Bloqueo automático tras 10 intentos fallidos de inicio de sesión durante 10 minutos. Puedes desbloquear de inmediato.</p>
+                </div>
+              </div>
+              <div class="table-wrap" tabindex="0" role="region" aria-label="Cuentas bloqueadas temporalmente">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Estudiante</th>
+                      <th scope="col">Grupo</th>
+                      <th scope="col">Motivo del bloqueo</th>
+                      <th scope="col">Desbloqueo automático</th>
+                      <th scope="col">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="locked-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel: Grupos -->
+          <div id="stu-panel-groups" role="tabpanel" aria-labelledby="stu-tab-groups" hidden>
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Grupos activos de la organización</h2>
+                  <p class="card__sub">Organización por nivel MCER y horario de clase.</p>
+                </div>
+              </div>
+              <div class="table-wrap" tabindex="0" role="region" aria-label="Grupos activos de la organización">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Nombre del grupo</th>
+                      <th scope="col">Nivel</th>
+                      <th scope="col">Horario</th>
+                      <th scope="col">Estudiantes activos</th>
+                      <th scope="col">Asignaciones abiertas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td class="cell-main">A1 Exploradores Mañana</td><td><span class="pill pill--gold">A1</span></td><td>Mar y Jue · 08:30</td><td class="tabular">10</td><td class="tabular">2</td></tr>
+                    <tr><td class="cell-main">A2 Viajeros Tarde</td><td><span class="pill pill--gold">A2</span></td><td>Lun y Mié · 15:30</td><td class="tabular">9</td><td class="tabular">2</td></tr>
+                    <tr><td class="cell-main">B1 Conversación Sábados</td><td><span class="pill pill--gold">B1</span></td><td>Sábados · 09:00</td><td class="tabular">8</td><td class="tabular">1</td></tr>
+                    <tr><td class="cell-main">B2 Preparación Académica</td><td><span class="pill pill--gold">B2</span></td><td>Vie · 16:00</td><td class="tabular">7</td><td class="tabular">1</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
+             SCREEN 6: ESTADÍSTICAS (/estadisticas)
+             ==================================================================== -->
+        <section id="screen-estadisticas" data-screen="estadisticas" aria-labelledby="h1-estadisticas" hidden>
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-estadisticas">Estadísticas y desempeño</h1>
+              <p class="page-subtitle">Análisis de evolución académica (0,0–5,0), constancia en práctica lúdica y rankings privados de la profesora.</p>
+            </div>
+            <div class="page-actions">
+              <label for="stats-period-select" class="visually-hidden">Periodo de análisis</label>
+              <select id="stats-period-select" class="select" style="width:auto; min-width:155px;">
+                <option value="30d" selected>Últimos 30 días</option>
+                <option value="7d">Últimos 7 días</option>
+                <option value="90d">Últimos 90 días</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="tablist" role="tablist" aria-label="Vistas de estadísticas">
+            <button type="button" class="tab-btn" role="tab" id="stats-tab-perf" aria-selected="true" aria-controls="stats-panel-perf" data-stats-tab="perf">
+              Rendimiento y constancia
+            </button>
+            <button type="button" class="tab-btn" role="tab" id="stats-tab-games" aria-selected="false" aria-controls="stats-panel-games" data-stats-tab="games">
+              Práctica en juegos
+            </button>
+            <button type="button" class="tab-btn" role="tab" id="stats-tab-rankings" aria-selected="false" aria-controls="stats-panel-rankings" data-stats-tab="rankings">
+              Rankings privados
+            </button>
+          </div>
+
+          <!-- Sub-panel 1: Rendimiento y constancia -->
+          <div id="stats-panel-perf" role="tabpanel" aria-labelledby="stats-tab-perf">
+            <div class="stats-grid">
+              <div class="card chart-shell">
+                <div style="display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:0.6rem; margin-bottom:0.85rem;">
+                  <div>
+                    <h2 class="card__title">Tendencia de promedio académico (0,0–5,0)</h2>
+                    <p class="card__sub">Calculado exclusivamente sobre actividades evaluables; excluye microjuegos.</p>
+                  </div>
+                  <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                    <span class="pill pill--ok tabular" id="trend-30d-pill">trend30d: ↑ +0,3</span>
+                    <span class="pill pill--neutral tabular" id="trend-7d-pill">trend7d: ↑ +0,1</span>
+                  </div>
+                </div>
+                <svg class="chart-svg" viewBox="0 0 560 215" role="img" aria-label="Gráfica de tendencia del promedio académico en escala de 0,0 a 5,0 durante las últimas 6 semanas, subiendo de 3,8 a 4,3">
+                  <!-- Horizontal gridlines -->
+                  <line x1="42" y1="22" x2="540" y2="22" stroke="#EDE2D3" stroke-width="1"/>
+                  <line x1="42" y1="62" x2="540" y2="62" stroke="#EDE2D3" stroke-width="1"/>
+                  <line x1="42" y1="102" x2="540" y2="102" stroke="#EDE2D3" stroke-width="1"/>
+                  <line x1="42" y1="142" x2="540" y2="142" stroke="#EDE2D3" stroke-width="1"/>
+                  <line x1="42" y1="182" x2="540" y2="182" stroke="#CBB499" stroke-width="1.2"/>
+                  <!-- Y axis labels -->
+                  <text x="34" y="26" text-anchor="end" font-size="11" fill="#5C3D2E" font-weight="600">5,0</text>
+                  <text x="34" y="66" text-anchor="end" font-size="11" fill="#5C3D2E" font-weight="600">4,0</text>
+                  <text x="34" y="106" text-anchor="end" font-size="11" fill="#5C3D2E" font-weight="600">3,0</text>
+                  <text x="34" y="146" text-anchor="end" font-size="11" fill="#5C3D2E" font-weight="600">2,0</text>
+                  <text x="34" y="186" text-anchor="end" font-size="11" fill="#5C3D2E" font-weight="600">1,0</text>
+                  <!-- Soft area fill -->
+                  <path d="M68,70 L158,64 L248,68 L338,56 L428,52 L518,48 L518,182 L68,182 Z" fill="rgba(198,71,11,0.09)"/>
+                  <!-- Trend line -->
+                  <polyline points="68,70 158,64 248,68 338,56 428,52 518,48" fill="none" stroke="#C6470B" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <!-- Data nodes + labels -->
+                  <g fill="#FFFFFF" stroke="#C6470B" stroke-width="2.5">
+                    <circle cx="68" cy="70" r="4.5"/>
+                    <circle cx="158" cy="64" r="4.5"/>
+                    <circle cx="248" cy="68" r="4.5"/>
+                    <circle cx="338" cy="56" r="4.5"/>
+                    <circle cx="428" cy="52" r="4.5"/>
+                    <circle cx="518" cy="48" r="5"/>
+                  </g>
+                  <g font-size="11" font-weight="700" fill="#2B150A" text-anchor="middle">
+                    <text x="68" y="57">3,8</text>
+                    <text x="158" y="51">3,9</text>
+                    <text x="248" y="55">3,8</text>
+                    <text x="338" y="43">4,1</text>
+                    <text x="428" y="39">4,2</text>
+                    <text x="518" y="35">4,3</text>
+                  </g>
+                  <!-- X axis labels -->
+                  <g font-size="11" fill="#5C3D2E" text-anchor="middle">
+                    <text x="68" y="201">Sem 1</text>
+                    <text x="158" y="201">Sem 2</text>
+                    <text x="248" y="201">Sem 3</text>
+                    <text x="338" y="201">Sem 4</text>
+                    <text x="428" y="201">Sem 5</text>
+                    <text x="518" y="201">Actual</text>
+                  </g>
+                </svg>
+              </div>
+
+              <div class="card card--padded" style="display:flex; flex-direction:column; justify-content:space-between; gap:1rem;">
+                <div>
+                  <h2 class="card__title">Constancia por grupo</h2>
+                  <p class="card__sub">Rachas semanales activas y tasa de cumplimiento en el periodo.</p>
+                </div>
+                <div class="table-wrap" tabindex="0" role="region" aria-label="Constancia por grupo">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Grupo</th>
+                        <th scope="col">Cumplimiento</th>
+                        <th scope="col">Racha media (sem.)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td class="cell-main">A1 Exploradores</td><td class="tabular">92%</td><td class="tabular">6,4 sem.</td></tr>
+                      <tr><td class="cell-main">A2 Viajeros</td><td class="tabular">85%</td><td class="tabular">5,1 sem.</td></tr>
+                      <tr><td class="cell-main">B1 Conversación</td><td class="tabular">81%</td><td class="tabular">4,3 sem.</td></tr>
+                      <tr><td class="cell-main">B2 Preparación</td><td class="tabular">90%</td><td class="tabular">7,2 sem.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Offline sync late submissions -->
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Entregas que no llegaron a tiempo (offline_sync)</h2>
+                  <p class="card__sub">Intentos guardados sin conexión cuya sincronización llegó al servidor después de la fecha límite.</p>
+                </div>
+                <span class="pill pill--warn tabular">2 registros en 30 d</span>
+              </div>
+              <div class="table-wrap" tabindex="0" role="region" aria-label="Entregas fuera de plazo por sincronización sin conexión">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Estudiante</th>
+                      <th scope="col">Grupo</th>
+                      <th scope="col">Actividad</th>
+                      <th scope="col">Cierre oficial</th>
+                      <th scope="col">Recepción servidor</th>
+                      <th scope="col">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="cell-main">Mateo Morales</td>
+                      <td>A2 Viajeros Tarde</td>
+                      <td>Past Simple — Travel Journal</td>
+                      <td class="tabular">18 nov · 20:00</td>
+                      <td class="tabular">19 nov · 07:42 (+11h 42m)</td>
+                      <td><span class="pill pill--warn">Fuera de plazo (offline_sync)</span></td>
+                    </tr>
+                    <tr>
+                      <td class="cell-main">Sofía Delgado</td>
+                      <td>A1 Exploradores Mañana</td>
+                      <td>My Favorite Animal (Speaking)</td>
+                      <td class="tabular">14 nov · 18:00</td>
+                      <td class="tabular">14 nov · 19:15 (+1h 15m)</td>
+                      <td><span class="pill pill--warn">Fuera de plazo (offline_sync)</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel 2: Práctica en juegos -->
+          <div id="stats-panel-games" role="tabpanel" aria-labelledby="stats-tab-games" hidden>
+            <div class="callout" style="margin-bottom:1rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke="#C6470B" stroke-width="1.9"/><path d="M12 8v5M12 16.2h.01" stroke="#C6470B" stroke-width="2" stroke-linecap="round"/></svg>
+              <div>
+                Los microjuegos registran constancia, tiempo de práctica y estrellas de práctica (<strong>★</strong>). Nunca afectan la calificación escolar 0,0–5,0.
+              </div>
+            </div>
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Registro de práctica autónoma en microjuegos</h2>
+                  <p class="card__sub">Cuándo, cuánto tiempo practicó cada estudiante y su evolución en estrellas.</p>
+                </div>
+              </div>
+              <div class="table-wrap" tabindex="0" role="region" aria-label="Registro de práctica autónoma en microjuegos">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Estudiante</th>
+                      <th scope="col">Grupo</th>
+                      <th scope="col">Última práctica</th>
+                      <th scope="col">Tiempo acumulado (30 d)</th>
+                      <th scope="col">Mecánica favorita</th>
+                      <th scope="col">Evolución de estrellas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="cell-main">Lucía Fernández</td>
+                      <td>A1 Exploradores Mañana</td>
+                      <td class="tabular">Hoy · 16:20</td>
+                      <td class="tabular"><strong>1h 45m</strong> (14 sesiones)</td>
+                      <td><span class="pill pill--neutral">Emparejar</span></td>
+                      <td class="tabular"><span class="pill pill--gold">★ 42 (+11 este mes)</span></td>
+                    </tr>
+                    <tr>
+                      <td class="cell-main">Valentina Gómez</td>
+                      <td>A2 Viajeros Tarde</td>
+                      <td class="tabular">Ayer · 18:05</td>
+                      <td class="tabular"><strong>1h 22m</strong> (11 sesiones)</td>
+                      <td><span class="pill pill--neutral">Ordenar palabras</span></td>
+                      <td class="tabular"><span class="pill pill--gold">★ 36 (+9 este mes)</span></td>
+                    </tr>
+                    <tr>
+                      <td class="cell-main">Samuel Pardo</td>
+                      <td>B1 Conversación Sábados</td>
+                      <td class="tabular">21 nov · 19:40</td>
+                      <td class="tabular"><strong>58 min</strong> (8 sesiones)</td>
+                      <td><span class="pill pill--neutral">Elección rápida</span></td>
+                      <td class="tabular"><span class="pill pill--gold">★ 29 (+7 este mes)</span></td>
+                    </tr>
+                    <tr>
+                      <td class="cell-main">Mariana Castro</td>
+                      <td>B2 Preparación Académica</td>
+                      <td class="tabular">20 nov · 17:12</td>
+                      <td class="tabular"><strong>46 min</strong> (6 sesiones)</td>
+                      <td><span class="pill pill--neutral">Memoria</span></td>
+                      <td class="tabular"><span class="pill pill--gold">★ 24 (+5 este mes)</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-panel 3: Rankings privados -->
+          <div id="stats-panel-rankings" role="tabpanel" aria-labelledby="stats-tab-rankings" hidden>
+            <div class="callout callout--privacy" style="margin-bottom:1.15rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2" stroke="#4A2511" stroke-width="1.9"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" stroke="#4A2511" stroke-width="1.9" stroke-linecap="round"/></svg>
+              <div>
+                <strong>Solo visible para la profesora · nunca para estudiantes.</strong>
+                Ambos rankings son herramientas privadas de diagnóstico docente y no existen en el portal estudiantil.
+              </div>
+            </div>
+
+            <div class="rankings-grid">
+              <div class="card">
+                <div class="card__head">
+                  <div>
+                    <h2 class="card__title">Leaderboard privado de notas</h2>
+                    <p class="card__sub">Promedio en actividades evaluables (escala 0,0–5,0).</p>
+                  </div>
+                  <span class="pill pill--neutral">Privado docente</span>
+                </div>
+                <div class="table-wrap" tabindex="0" role="region" aria-label="Leaderboard privado de notas">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Estudiante</th>
+                        <th scope="col">Nivel</th>
+                        <th scope="col">Promedio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td><span class="rank-num rank-num--top tabular">1</span></td><td class="cell-main">Mariana Castro</td><td>B2</td><td class="tabular"><strong>4,8</strong></td></tr>
+                      <tr><td><span class="rank-num rank-num--top tabular">2</span></td><td class="cell-main">Lucía Fernández</td><td>A1</td><td class="tabular"><strong>4,7</strong></td></tr>
+                      <tr><td><span class="rank-num rank-num--top tabular">3</span></td><td class="cell-main">Valentina Gómez</td><td>A2</td><td class="tabular"><strong>4,5</strong></td></tr>
+                      <tr><td><span class="rank-num tabular">4</span></td><td class="cell-main">Samuel Pardo</td><td>B1</td><td class="tabular"><strong>4,2</strong></td></tr>
+                      <tr><td><span class="rank-num tabular">5</span></td><td class="cell-main">Mateo Morales</td><td>A2</td><td class="tabular"><strong>3,9</strong></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card__head">
+                  <div>
+                    <h2 class="card__title">Ranking privado de juegos</h2>
+                    <p class="card__sub">Ordenado por puntos de práctica en microjuegos (sin nota).</p>
+                  </div>
+                  <span class="pill pill--gold">Solo práctica</span>
+                </div>
+                <div class="table-wrap" tabindex="0" role="region" aria-label="Ranking privado de juegos">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Estudiante</th>
+                        <th scope="col">Estrellas</th>
+                        <th scope="col">Puntos juego</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td><span class="rank-num rank-num--top tabular">1</span></td><td class="cell-main">Lucía Fernández</td><td class="tabular">★ 42</td><td class="tabular"><strong>1.480 pts</strong></td></tr>
+                      <tr><td><span class="rank-num rank-num--top tabular">2</span></td><td class="cell-main">Valentina Gómez</td><td class="tabular">★ 36</td><td class="tabular"><strong>1.290 pts</strong></td></tr>
+                      <tr><td><span class="rank-num rank-num--top tabular">3</span></td><td class="cell-main">Samuel Pardo</td><td class="tabular">★ 29</td><td class="tabular"><strong>985 pts</strong></td></tr>
+                      <tr><td><span class="rank-num tabular">4</span></td><td class="cell-main">Mariana Castro</td><td class="tabular">★ 24</td><td class="tabular"><strong>840 pts</strong></td></tr>
+                      <tr><td><span class="rank-num tabular">5</span></td><td class="cell-main">Mateo Morales</td><td class="tabular">★ 18</td><td class="tabular"><strong>620 pts</strong></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ====================================================================
+             SCREEN 7: CONTENIDO EXTRA (/contenido-extra)
+             ==================================================================== -->
+        <section id="screen-contenido-extra" data-screen="contenido-extra" aria-labelledby="h1-extra" hidden>
+          <div class="page-header">
+            <div class="page-header__text">
+              <h1 class="page-title" id="h1-extra">Contenido extra</h1>
+              <p class="page-subtitle">Curaduría de enlaces externos seguros (solo HTTPS, sin iframes) organizados para todos los alumnos o por nivel MCER.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn--primary" id="open-new-resource-btn">+ Agregar recurso</button>
+            </div>
+          </div>
+
+          <div class="flag-banner">
+            <div>
+              <div style="display:flex; align-items:center; gap:0.55rem; flex-wrap:wrap;">
+                <h2 class="card__title">Visibilidad en el portal estudiantil (<code>extra_content</code>)</h2>
+                <span class="pill pill--ok" id="extra-flag-pill">Activa para alumnos</span>
+              </div>
+              <p class="card__sub" id="extra-flag-desc">Los estudiantes pueden ver la pestaña «Extra». Puedes agregar, editar y reordenar recursos incluso si la desactivas temporalmente.</p>
+            </div>
+            <button type="button" class="switch-btn" role="switch" id="extra-flag-switch" aria-checked="true">
+              <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+              <span id="extra-flag-label">Activada</span>
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Recursos curados</h2>
+                <p class="card__sub">Orden determinista mediante botones «Subir» y «Bajar» (accesible sin arrastre). Solo enlaces HTTPS directos.</p>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                <label for="extra-level-filter" class="visually-hidden">Filtrar por audiencia</label>
+                <select id="extra-level-filter" class="select" style="width:auto; min-height:34px; padding:0.25rem 0.65rem;">
+                  <option value="all">Todos</option>
+                  <option value="general">Para todos</option>
+                  <option value="A1">Nivel A1</option>
+                  <option value="A2">Nivel A2</option>
+                  <option value="B1">Nivel B1</option>
+                  <option value="B2">Nivel B2</option>
+                </select>
+                <span class="pill pill--neutral tabular" id="extra-counter-pill">5 / 200</span>
+              </div>
+            </div>
+            <ul class="resource-list" id="extra-resource-list"></ul>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 1: PUENTE VISUAL KIDS <-> DOCENTE
+       ========================================================================== -->
+  <dialog class="modal modal--wide" id="bridge-dialog" aria-labelledby="bridge-dialog-title">
+    <div class="modal__head">
+      <h2 class="modal__title" id="bridge-dialog-title">Puente visual Upward English · Kids ↔ Panel Docente</h2>
+      <button type="button" class="btn btn--secondary btn--sm" data-close-dialog>Cerrar</button>
+    </div>
+    <div class="modal__body">
+      <p style="margin:0; font-size:0.88rem; color:var(--ink-secondary);">
+        Misma marca, misma «Brújula Ascendente Upward» y mismo ADN cromático cálido, modulados según el contexto de uso: exploración lúdica para niños vs. serenidad editorial y precisión tabular para la profesora.
+      </p>
+
+      <div class="bridge-grid">
+        <div class="bridge-card bridge-card--kids">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            <span style="width:42px; height:42px; border-radius:12px; background:#FFCA3A; border:2px solid #4A2511; box-shadow:2px 2px 0 #4A2511; display:grid; place-items:center;">
+              <svg width="28" height="28" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+                <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/>
+              </svg>
+            </span>
+            <div>
+              <strong style="font-family:var(--font-display); font-size:1rem;">Portal Kids · Zorro Explorador</strong>
+              <div style="font-size:0.78rem; color:#61361F;">Bricolage Grotesque + Nunito</div>
+            </div>
+          </div>
+          <ul style="margin:0; padding-left:1.1rem; font-size:0.8125rem; color:#2B150A; display:grid; gap:0.25rem;">
+            <li>Lienzo <code>#FFF9EC</code> con textura sutil de puntos y detalles tipo pasaporte.</li>
+            <li>Bordes expresivos <code>2px–2.5px #4A2511</code> y sombras sólidas <code>4px–5px</code>.</li>
+            <li>Mascota Zorro Explorador, sellos de logro y botones táctiles grandes (48–56px).</li>
+          </ul>
+        </div>
+
+        <div class="bridge-card bridge-card--teacher">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            <span class="brand-emblem">
+              <svg width="26" height="26" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+                <path d="M8 26L18 17L28 26L24.5 29.5L18 23.6L11.5 29.5Z" fill="#C6470B" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M18 5.5L27.5 17.5H21.5V22.5L18 19.8L14.5 22.5V17.5H8.5Z" fill="#B9251D" stroke="#2B150A" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M18 10.4L20.5 13.6L18 16.8L15.5 13.6Z" fill="#FFFDF5"/>
+              </svg>
+            </span>
+            <div>
+              <strong style="font-family:var(--font-display); font-size:1rem;">Panel Docente · Editorial Académico</strong>
+              <div style="font-size:0.78rem; color:#5C3D2E;">Bricolage Grotesque + Plus Jakarta Sans (tabular-nums)</div>
+            </div>
+          </div>
+          <ul style="margin:0; padding-left:1.1rem; font-size:0.8125rem; color:#2B150A; display:grid; gap:0.25rem;">
+            <li>Lienzo limpio <code>#FCF9F2</code>, superficies <code>#FFFFFF</code> y panel lateral <code>#F6EFE4</code>.</li>
+            <li>Filetes finos <code>1px #E4D5C3</code> y elevación discreta <code>0 1px 3px</code>.</li>
+            <li>Sin ilustraciones caricaturescas; foco en tablas, rúbricas 0,0–5,0 y audio Speaking.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.8rem; font-weight:700; margin-bottom:0.45rem;">Paleta compartida Upward English</div>
+        <div class="swatch-row">
+          <span class="swatch"><span class="swatch-dot" style="background:#FCF9F2"></span>Lienzo #FCF9F2</span>
+          <span class="swatch"><span class="swatch-dot" style="background:#F6EFE4"></span>Piedra #F6EFE4</span>
+          <span class="swatch"><span class="swatch-dot" style="background:#2B150A"></span>Tinta #2B150A</span>
+          <span class="swatch"><span class="swatch-dot" style="background:#C6470B"></span>Naranja Zorro #C6470B</span>
+          <span class="swatch"><span class="swatch-dot" style="background:#B9251D"></span>Rojo Brújula #B9251D</span>
+          <span class="swatch"><span class="swatch-dot" style="background:#FFCA3A"></span>Amarillo #FFCA3A</span>
+          <span class="swatch"><span class="swatch-dot" style="background:#166534"></span>Aprobado #166534</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn--primary" data-close-dialog>Entendido</button>
+    </div>
+  </dialog>
+
+  <!-- ==========================================================================
+       MODAL 2: CANCELAR ASIGNACIÓN (PRESERVA INTENTOS)
+       ========================================================================== -->
+  <dialog class="modal" id="cancel-assignment-dialog" aria-labelledby="cancel-asg-title">
+    <div class="modal__head">
+      <h2 class="modal__title" id="cancel-asg-title">Cancelar asignación</h2>
+      <button type="button" class="btn btn--secondary btn--sm" data-close-dialog>Cerrar</button>
+    </div>
+    <div class="modal__body">
+      <p style="margin:0;" id="cancel-asg-text">¿Deseas cancelar esta asignación?</p>
+      <div class="callout">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke="#C6470B" stroke-width="1.9"/><path d="M12 8v5M12 16.2h.01" stroke="#C6470B" stroke-width="2" stroke-linecap="round"/></svg>
+        <div>
+          <strong>Se conservan los intentos previos:</strong> los estudiantes que ya enviaron su respuesta mantendrán su historial y calificación. Solo se bloquean nuevos intentos.
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn--secondary" data-close-dialog>Mantener vigente</button>
+      <button type="button" class="btn btn--danger" id="confirm-cancel-asg-btn">Confirmar cancelación</button>
+    </div>
+  </dialog>
+
+  <!-- ==========================================================================
+       MODAL 3: CAMBIAR GRUPO DE ESTUDIANTE (ADVERTENCIA DE REINTENTO PERDIDO)
+       ========================================================================== -->
+  <dialog class="modal" id="change-group-dialog" aria-labelledby="change-grp-title">
+    <div class="modal__head">
+      <h2 class="modal__title" id="change-grp-title">Cambiar grupo activo del estudiante</h2>
+      <button type="button" class="btn btn--secondary btn--sm" data-close-dialog>Cerrar</button>
+    </div>
+    <form id="change-group-form">
+      <div class="modal__body">
+        <p style="margin:0; font-size:0.9rem;" id="change-grp-student-label"></p>
+        <div class="field">
+          <label for="change-grp-select">Nuevo grupo activo único</label>
+          <select id="change-grp-select" class="select">
+            <option value="A1 Exploradores Mañana">A1 Exploradores Mañana</option>
+            <option value="A2 Viajeros Tarde">A2 Viajeros Tarde</option>
+            <option value="B1 Conversación Sábados">B1 Conversación Sábados</option>
+            <option value="B2 Preparación Académica">B2 Preparación Académica</option>
+          </select>
+        </div>
+        <div class="callout callout--danger">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4L3 19.5h18L12 4Z" stroke="#B9251D" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 10v4.2M12 17h.01" stroke="#B9251D" stroke-width="2" stroke-linecap="round"/></svg>
+          <div>
+            <strong>Advertencia de reintentos pendientes:</strong> si el estudiante tiene un nuevo intento habilitado en una asignación de su grupo anterior, ese permiso de reintento se perderá al trasladarlo.
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn--secondary" data-close-dialog>Cancelar</button>
+        <button type="submit" class="btn btn--primary">Confirmar cambio de grupo</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ==========================================================================
+       MODAL 4: CAMBIO ADMINISTRATIVO DE CORREO (AuditLog)
+       ========================================================================== -->
+  <dialog class="modal" id="change-email-dialog" aria-labelledby="change-email-title">
+    <div class="modal__head">
+      <h2 class="modal__title" id="change-email-title">Cambio administrativo de correo electrónico</h2>
+      <button type="button" class="btn btn--secondary btn--sm" data-close-dialog>Cerrar</button>
+    </div>
+    <form id="change-email-form">
+      <div class="modal__body">
+        <p style="margin:0; font-size:0.9rem;" id="change-email-student-label"></p>
+        <div class="field">
+          <label for="change-email-input">Nuevo correo electrónico</label>
+          <input id="change-email-input" class="input" type="email" required placeholder="estudiante@ejemplo.com">
+        </div>
+        <div class="callout callout--privacy">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2" stroke="#4A2511" stroke-width="1.9"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" stroke="#4A2511" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <div>
+            Esta operación se registra en el <strong>AuditLog</strong> de la organización con identificador de docente y fecha del servidor (sin exponer datos personales en logs técnicos).
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn--secondary" data-close-dialog>Cancelar</button>
+        <button type="submit" class="btn btn--primary">Actualizar correo y auditar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ==========================================================================
+       MODAL 5: NUEVO RECURSO DE CONTENIDO EXTRA (HTTPS)
+       ========================================================================== -->
+  <dialog class="modal" id="new-resource-dialog" aria-labelledby="new-res-title">
+    <div class="modal__head">
+      <h2 class="modal__title" id="new-res-title">Agregar recurso externo</h2>
+      <button type="button" class="btn btn--secondary btn--sm" data-close-dialog>Cerrar</button>
+    </div>
+    <form id="new-resource-form">
+      <div class="modal__body">
+        <div class="field">
+          <label for="res-title-input">Título del recurso</label>
+          <input id="res-title-input" class="input" type="text" required placeholder="Ej. British Council — Listening A2">
+        </div>
+        <div class="field">
+          <label for="res-url-input">Enlace HTTPS (sin iframes)</label>
+          <input id="res-url-input" class="input" type="url" required placeholder="https://learnenglishkids.britishcouncil.org/">
+          <p class="field-error" id="res-url-error" hidden>El enlace debe comenzar por https:// y ser una URL válida.</p>
+        </div>
+        <div class="field">
+          <label for="res-level-select">Audiencia</label>
+          <select id="res-level-select" class="select">
+            <option value="general">Para todos los niveles</option>
+            <option value="A1">Nivel A1</option>
+            <option value="A2">Nivel A2</option>
+            <option value="B1">Nivel B1</option>
+            <option value="B2">Nivel B2</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn--secondary" data-close-dialog>Cancelar</button>
+        <button type="submit" class="btn btn--primary">Guardar recurso</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- LIVE TOAST -->
+  <div class="toast" id="app-toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ======================================================================
+         1. STATE & REALISTIC UPWARD ENGLISH DATA
+         ====================================================================== */
+      const STICKERS = [
+        { code: 'great_job', label: '¡Excelente trabajo!', emoji: '🌟' },
+        { code: 'good_pronunciation', label: '¡Muy buena pronunciación!', emoji: '🎙️' },
+        { code: 'creative_answer', label: '¡Respuesta muy creativa!', emoji: '💡' },
+        { code: 'grammar_star', label: '¡Estrella de la gramática!', emoji: '📚' },
+        { code: 'super_effort', label: '¡Súper esfuerzo!', emoji: '🚀' },
+        { code: 'keep_practicing', label: '¡Sigue practicando!', emoji: '💪' },
+      ];
+
+      const TYPE_LABELS = {
+        fill_blank: 'Completar espacios',
+        open_question: 'Pregunta abierta',
+        speaking: 'Speaking',
+        game: 'Microjuego',
+        exam: 'Examen',
+      };
+
+      const STATUS_META = {
+        published: { label: 'Publicada', cls: 'pill--ok' },
+        draft: { label: 'Borrador', cls: 'pill--neutral' },
+        archived: { label: 'Archivada', cls: 'pill--warn' },
+      };
+
+      const state = {
+        screen: 'inicio',
+        device: 'desktop',
+        activities: [
+          { id: 'act-1', title: 'My Weekend Routine (Audio)', type: 'speaking', mechanic: null, level: 'A1', grading: 'Manual docente', status: 'published' },
+          { id: 'act-2', title: 'Describing My Town', type: 'open_question', mechanic: null, level: 'A2', grading: 'Manual docente', status: 'published' },
+          { id: 'act-3', title: 'Present Simple — Everyday Verbs', type: 'fill_blank', mechanic: null, level: 'A1', grading: 'Automática', status: 'published' },
+          { id: 'act-4', title: 'Animal Habitats Match', type: 'game', mechanic: 'Emparejar (match)', level: 'A1', grading: 'Solo práctica (24/7)', status: 'published' },
+          { id: 'act-5', title: 'Sentence Builder — Past Simple', type: 'game', mechanic: 'Ordenar palabras', level: 'A2', grading: 'Solo práctica (24/7)', status: 'published' },
+          { id: 'act-6', title: 'Mid-Term Assessment Unit 3', type: 'exam', mechanic: null, level: 'B1', grading: 'Automática', status: 'published' },
+          { id: 'act-7', title: 'Irregular Verbs Memory Sprint', type: 'game', mechanic: 'Memoria (memory)', level: 'B1', grading: 'Solo práctica (24/7)', status: 'draft' },
+          { id: 'act-8', title: 'Academic Connectors Review', type: 'fill_blank', mechanic: null, level: 'B2', grading: 'Automática', status: 'archived' },
+        ],
+        assignments: [
+          { id: 'asg-1', activity: 'My Weekend Routine (Audio)', type: 'speaking', group: 'A1 Exploradores Mañana', openAt: '16 nov · 08:00', dueAt: '24 nov · 20:00', done: 9, total: 10, status: 'active' },
+          { id: 'asg-2', activity: 'Describing My Town', type: 'open_question', group: 'A2 Viajeros Tarde', openAt: '17 nov · 14:00', dueAt: '25 nov · 20:00', done: 7, total: 9, status: 'active' },
+          { id: 'asg-3', activity: 'Present Simple — Everyday Verbs', type: 'fill_blank', group: 'A1 Exploradores Mañana', openAt: '14 nov · 08:00', dueAt: '22 nov · 20:00', done: 10, total: 10, status: 'active' },
+          { id: 'asg-4', activity: 'Mid-Term Assessment Unit 3', type: 'exam', group: 'B1 Conversación Sábados', openAt: '18 nov · 09:00', dueAt: '26 nov · 18:00', done: 6, total: 8, status: 'active' },
+        ],
+        reviewTab: 'pending',
+        selectedReviewId: 'rev-1',
+        audioPlaying: false,
+        audioProgress: 0,
+        audioSpeed: 1,
+        audioTimer: null,
+        reviews: [
+          {
+            id: 'rev-1',
+            status: 'pending',
+            student: 'Lucía Fernández',
+            group: 'A1 Exploradores Mañana',
+            level: 'A1',
+            activity: 'My Weekend Routine (Audio)',
+            type: 'speaking',
+            submittedAt: '19 nov · 16:42 (America/Bogota)',
+            overdueDays: 4,
+            prompt: 'Cuéntanos en inglés 3 cosas que haces el fin de semana con tu familia (30–60 s).',
+            durationSec: 42,
+            retentionUntil: '19 dic 2026',
+            score: null,
+            comment: '',
+            stickers: [],
+            allowRetry: false,
+            retryExtendUntil: '',
+          },
+          {
+            id: 'rev-2',
+            status: 'pending',
+            student: 'Mateo Morales',
+            group: 'A2 Viajeros Tarde',
+            level: 'A2',
+            activity: 'Describing My Town',
+            type: 'open_question',
+            submittedAt: '19 nov · 19:10 (America/Bogota)',
+            overdueDays: 4,
+            prompt: 'Write a short paragraph (40–70 words) describing your favorite place in your neighborhood and why you like it.',
+            textAnswer: 'My favorite place in my neighborhood is the small park near the library. On Saturday mornings I ride my bicycle there with my cousin and we eat mangoes under the big tree. I like it because it is quiet and many dogs play on the grass.',
+            score: null,
+            comment: '',
+            stickers: [],
+            allowRetry: false,
+            retryExtendUntil: '',
+          },
+          {
+            id: 'rev-3',
+            status: 'pending',
+            student: 'Sofía Delgado',
+            group: 'A1 Exploradores Mañana',
+            level: 'A1',
+            activity: 'My Weekend Routine (Audio)',
+            type: 'speaking',
+            submittedAt: '20 nov · 11:15 (America/Bogota)',
+            overdueDays: 3,
+            prompt: 'Cuéntanos en inglés 3 cosas que haces el fin de semana con tu familia (30–60 s).',
+            durationSec: 36,
+            retentionUntil: '20 dic 2026',
+            score: null,
+            comment: '',
+            stickers: [],
+            allowRetry: false,
+            retryExtendUntil: '',
+          },
+          {
+            id: 'rev-4',
+            status: 'graded',
+            student: 'Valentina Gómez',
+            group: 'A2 Viajeros Tarde',
+            level: 'A2',
+            activity: 'Present Simple — Everyday Verbs',
+            type: 'fill_blank',
+            submittedAt: '21 nov · 17:04 (America/Bogota)',
+            overdueDays: 0,
+            autoSummary: '9 de 10 huecos correctos · calificación automática del servidor.',
+            score: 4.5,
+            comment: 'Excelente precisión con la tercera persona del singular. Revisa la ortografía de "studies".',
+            stickers: ['great_job', 'grammar_star'],
+            allowRetry: false,
+            retryExtendUntil: '',
+          },
+          {
+            id: 'rev-5',
+            status: 'graded',
+            student: 'Samuel Pardo',
+            group: 'B1 Conversación Sábados',
+            level: 'B1',
+            activity: 'Mid-Term Assessment Unit 3',
+            type: 'exam',
+            submittedAt: '22 nov · 10:30 (America/Bogota)',
+            overdueDays: 0,
+            autoSummary: '17 de 20 reactivos correctos · calificación automática del servidor.',
+            score: 4.3,
+            comment: 'Muy buen dominio de conectores temporales y lectura comprensiva.',
+            stickers: ['super_effort'],
+            allowRetry: false,
+            retryExtendUntil: '',
+          },
+        ],
+        students: [
+          { id: 'st-1', name: 'Lucía Fernández', email: 'lucia.fernandez@demo.upward.edu', level: 'A1', group: 'A1 Exploradores Mañana', guardian: 'Ana Fernández · +57 310 555 0142' },
+          { id: 'st-2', name: 'Sofía Delgado', email: 'sofia.delgado@demo.upward.edu', level: 'A1', group: 'A1 Exploradores Mañana', guardian: 'Carlos Delgado · +57 312 555 0198' },
+          { id: 'st-3', name: 'Valentina Gómez', email: 'valentina.gomez@demo.upward.edu', level: 'A2', group: 'A2 Viajeros Tarde', guardian: 'Marta Gómez · +57 300 555 0121' },
+          { id: 'st-4', name: 'Samuel Pardo', email: 'samuel.pardo@demo.upward.edu', level: 'B1', group: 'B1 Conversación Sábados', guardian: 'Diego Pardo · +57 315 555 0173' },
+          { id: 'st-5', name: 'Mariana Castro', email: 'mariana.castro@demo.upward.edu', level: 'B2', group: 'B2 Preparación Académica', guardian: 'Paula Castro · +57 318 555 0109' },
+        ],
+        requests: [
+          { id: 'req-1', name: 'Nicolás Herrera', email: 'nicolas.herrera@correo.example', date: '22 nov · 18:14', level: 'A1', group: 'A1 Exploradores Mañana' },
+          { id: 'req-2', name: 'Isabella Quintero', email: 'isabella.quintero@correo.example', date: '23 nov · 09:05', level: 'A2', group: 'A2 Viajeros Tarde' },
+        ],
+        locked: [
+          { id: 'lk-1', name: 'Tomás Mejía', email: 'tomas.mejia@demo.upward.edu', group: 'A2 Viajeros Tarde', reason: '10 intentos fallidos consecutivos', unlocksAt: 'En 7 min (10 min máx.)' },
+        ],
+        extraEnabled: true,
+        resources: [
+          { id: 'res-1', title: 'Cambridge English — Young Learners Wordlist', url: 'https://www.cambridgeenglish.org/exams-and-tests/starters/', level: 'A1' },
+          { id: 'res-2', title: 'British Council — Short Stories for Kids', url: 'https://learnenglishkids.britishcouncil.org/listen-watch/short-stories', level: 'general' },
+          { id: 'res-3', title: 'BBC Learning English — 6 Minute Grammar', url: 'https://www.bbc.co.uk/learningenglish/english/basic-grammar', level: 'A2' },
+          { id: 'res-4', title: 'Oxford Learner’s Dictionaries — Pronunciation Guide', url: 'https://www.oxfordlearnersdictionaries.com/', level: 'general' },
+          { id: 'res-5', title: 'Cambridge B1 Preliminary Reading Practice', url: 'https://www.cambridgeenglish.org/exams-and-tests/preliminary/', level: 'B1' },
+        ],
+        pendingCancelAssignmentId: null,
+        pendingStudentActionId: null,
+      };
+
+      /* ======================================================================
+         2. HELPERS: TOAST, NAVIGATION, DIALOGS
+         ====================================================================== */
+      let toastTimeout = null;
+      const toastEl = document.getElementById('app-toast');
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.hidden = false;
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => { toastEl.hidden = true; }, 3800);
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function setScreen(screenId, opts) {
+        stopAudio();
+        state.screen = screenId;
+        document.querySelectorAll('[data-screen]').forEach((sec) => {
+          sec.hidden = sec.dataset.screen !== screenId;
+        });
+        document.querySelectorAll('[data-nav-screen]').forEach((btn) => {
+          if (btn.classList.contains('nav-item-btn')) {
+            if (btn.dataset.navScreen === screenId) btn.setAttribute('aria-current', 'page');
+            else btn.removeAttribute('aria-current');
+          }
+        });
+        document.querySelectorAll('[data-set-screen]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(btn.dataset.setScreen === screenId));
+        });
+        if (!opts || !opts.skipScroll) {
+          window.scrollTo({ top: 0, behavior: 'auto' });
+        }
+      }
+
+      function setDevice(device) {
+        state.device = device;
+        document.getElementById('stage').dataset.device = device;
+        document.querySelectorAll('[data-set-device]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', String(btn.dataset.setDevice === device));
+        });
+      }
+
+      function updateGlobalCounters() {
+        const pendingCount = state.reviews.filter((r) => r.status === 'pending').length;
+        const gradedCount = state.reviews.filter((r) => r.status === 'graded').length;
+        const reqCount = state.requests.length;
+
+        const navPending = document.getElementById('nav-badge-pending');
+        navPending.textContent = String(pendingCount);
+        navPending.hidden = pendingCount === 0;
+
+        const navReq = document.getElementById('nav-badge-requests');
+        navReq.textContent = String(reqCount);
+        navReq.hidden = reqCount === 0;
+
+        document.getElementById('home-pending-count').textContent = String(pendingCount);
+        document.getElementById('home-requests-count').textContent = String(reqCount);
+        document.getElementById('rev-pending-tab-count').textContent = String(pendingCount);
+        document.getElementById('rev-graded-tab-count').textContent = String(gradedCount);
+        document.getElementById('stu-count-active').textContent = String(state.students.length);
+        document.getElementById('stu-count-requests').textContent = String(reqCount);
+        document.getElementById('stu-count-locked').textContent = String(state.locked.length);
+      }
+
+      /* ======================================================================
+         3. STUDIO BAR & NAVIGATION EVENTS
+         ====================================================================== */
+      document.querySelectorAll('[data-set-screen]').forEach((btn) => {
+        btn.addEventListener('click', () => setScreen(btn.dataset.setScreen));
+      });
+      document.querySelectorAll('[data-nav-screen]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          setScreen(btn.dataset.navScreen);
+        });
+      });
+      document.querySelectorAll('[data-set-device]').forEach((btn) => {
+        btn.addEventListener('click', () => setDevice(btn.dataset.setDevice));
+      });
+
+      const studioBar = document.getElementById('studio-bar');
+      const restoreStudioBtn = document.getElementById('restore-studio-btn');
+      document.getElementById('hide-studio-btn').addEventListener('click', () => {
+        studioBar.hidden = true;
+        restoreStudioBtn.hidden = false;
+        document.documentElement.style.setProperty('--studio-bar-h', '0px');
+        restoreStudioBtn.focus();
+      });
+      restoreStudioBtn.addEventListener('click', () => {
+        studioBar.hidden = false;
+        restoreStudioBtn.hidden = true;
+        syncStudioBarHeight();
+      });
+      function syncStudioBarHeight() {
+        const h = studioBar.hidden ? 0 : Math.ceil(studioBar.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--studio-bar-h', `${h}px`);
+      }
+      window.addEventListener('resize', syncStudioBarHeight);
+      requestAnimationFrame(syncStudioBarHeight);
+
+      document.getElementById('open-bridge-btn').addEventListener('click', () => {
+        document.getElementById('bridge-dialog').showModal();
+      });
+
+      document.querySelectorAll('[data-close-dialog]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const dlg = btn.closest('dialog');
+          if (dlg) dlg.close();
+        });
+      });
+
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        showToast('Sesión cerrada · caché local e IndexedDB limpiadas de forma segura.');
+      });
+
+      document.getElementById('inicio-new-activity-btn').addEventListener('click', () => {
+        setScreen('actividades');
+        document.getElementById('activity-builder-panel').hidden = false;
+        renderBuilderPreview();
+        document.getElementById('builder-title').focus();
+      });
+
+      document.getElementById('home-goto-requests-btn').addEventListener('click', () => {
+        setScreen('alumnos');
+        activateStudentTab('requests');
+      });
+
+      /* ======================================================================
+         4. SCREEN 2: ACTIVIDADES & MULTI-SENTENCE BLANKS BUILDER
+         ====================================================================== */
+      function renderActivities() {
+        const level = document.getElementById('filter-act-level').value;
+        const type = document.getElementById('filter-act-type').value;
+        const status = document.getElementById('filter-act-status').value;
+
+        const filtered = state.activities.filter((a) => {
+          if (level !== 'all' && a.level !== level) return false;
+          if (type !== 'all' && a.type !== type) return false;
+          if (status !== 'all' && a.status !== status) return false;
+          return true;
+        });
+
+        document.getElementById('activities-count-label').textContent =
+          `Mostrando ${filtered.length} de ${state.activities.length} actividades`;
+
+        const tbody = document.getElementById('activities-tbody');
+        if (filtered.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--ink-secondary);">No hay actividades que coincidan con los filtros seleccionados.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = filtered.map((a) => {
+          const st = STATUS_META[a.status];
+          const typeBadge = a.type === 'game'
+            ? `<span class="pill pill--gold">${escapeHtml(TYPE_LABELS[a.type])}</span><div class="cell-sub">${escapeHtml(a.mechanic)}</div>`
+            : `<span class="pill pill--neutral">${escapeHtml(TYPE_LABELS[a.type])}</span>`;
+
+          const actionBtn = a.status === 'draft'
+            ? `<button type="button" class="btn btn--primary btn--sm" data-publish-act="${a.id}">Publicar</button>`
+            : a.type === 'game'
+              ? `<span class="cell-sub">Abierto 24/7</span>`
+              : `<button type="button" class="btn btn--secondary btn--sm" data-nav-assign="${a.id}">Asignar</button>`;
+
+          return `
+            <tr>
+              <td><div class="cell-main">${escapeHtml(a.title)}</div></td>
+              <td>${typeBadge}</td>
+              <td><span class="pill pill--gold">${escapeHtml(a.level)}</span></td>
+              <td class="cell-sub">${escapeHtml(a.grading)}</td>
+              <td><span class="pill ${st.cls}">${st.label}</span></td>
+              <td>${actionBtn}</td>
+            </tr>
+          `;
+        }).join('');
+
+        tbody.querySelectorAll('[data-publish-act]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const act = state.activities.find((x) => x.id === btn.dataset.publishAct);
+            if (act) {
+              act.status = 'published';
+              renderActivities();
+              showToast(`Actividad «${act.title}» publicada en el catálogo.`);
+            }
+          });
+        });
+
+        tbody.querySelectorAll('[data-nav-assign]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            setScreen('asignaciones');
+            showToast('Selecciona el grupo y las fechas en America/Bogota para asignar la actividad.');
+          });
+        });
+      }
+
+      ['filter-act-level', 'filter-act-type', 'filter-act-status'].forEach((id) => {
+        document.getElementById(id).addEventListener('change', renderActivities);
+      });
+      document.getElementById('reset-act-filters-btn').addEventListener('click', () => {
+        document.getElementById('filter-act-level').value = 'all';
+        document.getElementById('filter-act-type').value = 'all';
+        document.getElementById('filter-act-status').value = 'all';
+        renderActivities();
+      });
+
+      const builderPanel = document.getElementById('activity-builder-panel');
+      document.getElementById('toggle-builder-btn').addEventListener('click', () => {
+        builderPanel.hidden = !builderPanel.hidden;
+        if (!builderPanel.hidden) renderBuilderPreview();
+      });
+      document.getElementById('close-builder-btn').addEventListener('click', () => {
+        builderPanel.hidden = true;
+      });
+
+      function renderBuilderPreview() {
+        const inputs = Array.from(document.querySelectorAll('.builder-sentence-input'));
+        const container = document.getElementById('builder-preview-content');
+        container.innerHTML = inputs.map((inp, idx) => {
+          const safe = escapeHtml(inp.value || '');
+          const html = safe.replace(/\{\{([^}]+)\}\}/g, '<span class="blank-slot">$1</span>');
+          return `<p class="preview-sentence"><strong class="tabular">${idx + 1}.</strong> ${html || '<em style="color:var(--ink-secondary)">Oración vacía</em>'}</p>`;
+        }).join('');
+      }
+
+      function bindSentenceInputs() {
+        document.querySelectorAll('.builder-sentence-input').forEach((inp) => {
+          inp.oninput = renderBuilderPreview;
+        });
+        document.querySelectorAll('.remove-sentence-btn').forEach((btn) => {
+          btn.onclick = () => {
+            const rows = document.querySelectorAll('.sentence-row');
+            if (rows.length <= 1) {
+              showToast('La actividad debe contener al menos una oración.');
+              return;
+            }
+            btn.closest('.sentence-row').remove();
+            renderBuilderPreview();
+          };
+        });
+      }
+
+      document.getElementById('add-sentence-btn').addEventListener('click', () => {
+        const list = document.getElementById('builder-sentences-list');
+        const nextNum = list.querySelectorAll('.sentence-row').length + 1;
+        const row = document.createElement('div');
+        row.className = 'sentence-row';
+        row.innerHTML = `
+          <input type="text" class="input builder-sentence-input" aria-label="Oración ${nextNum}" value="We {{practice}} English every {{afternoon}}.">
+          <button type="button" class="btn btn--ghost btn--sm remove-sentence-btn">Quitar</button>
+        `;
+        list.appendChild(row);
+        bindSentenceInputs();
+        renderBuilderPreview();
+      });
+
+      function saveBuilderActivity(status) {
+        const title = document.getElementById('builder-title').value.trim();
+        const level = document.getElementById('builder-level').value;
+        if (!title) return;
+        state.activities.unshift({
+          id: 'act-' + Date.now(),
+          title,
+          type: 'fill_blank',
+          mechanic: null,
+          level,
+          grading: 'Automática',
+          status,
+        });
+        builderPanel.hidden = true;
+        renderActivities();
+        showToast(status === 'published'
+          ? `Actividad «${title}» publicada y lista para asignar.`
+          : `Borrador «${title}» guardado en el catálogo.`);
+      }
+
+      document.getElementById('builder-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveBuilderActivity('draft');
+      });
+      document.getElementById('publish-builder-btn').addEventListener('click', () => {
+        saveBuilderActivity('published');
+      });
+
+      /* ======================================================================
+         5. SCREEN 3: ASIGNACIONES
+         ====================================================================== */
+      function renderAssignments() {
+        const tbody = document.getElementById('assignments-tbody');
+        tbody.innerHTML = state.assignments.map((asg) => {
+          const pct = Math.round((asg.done / asg.total) * 100);
+          const isCancelled = asg.status === 'cancelled';
+          return `
+            <tr>
+              <td>
+                <div class="cell-main">${escapeHtml(asg.activity)}</div>
+                <div class="cell-sub">${escapeHtml(TYPE_LABELS[asg.type])}</div>
+              </td>
+              <td>${escapeHtml(asg.group)}</td>
+              <td class="tabular">
+                <div class="cell-main">${escapeHtml(asg.openAt)}</div>
+                <div class="cell-sub">Cierre: ${escapeHtml(asg.dueAt)}</div>
+              </td>
+              <td>
+                <div class="progress-row">
+                  <div class="progress-track"><div class="progress-fill ${pct === 100 ? 'progress-fill--ok' : ''}" style="width:${pct}%"></div></div>
+                  <span class="progress-label">${asg.done}/${asg.total}</span>
+                </div>
+              </td>
+              <td>
+                ${isCancelled
+                  ? '<span class="pill pill--neutral">Cancelada</span>'
+                  : '<span class="pill pill--ok">Activa</span>'}
+              </td>
+              <td>
+                ${isCancelled
+                  ? '<span class="cell-sub">Intentos preservados</span>'
+                  : `<button type="button" class="btn btn--danger-outline btn--sm" data-cancel-asg="${asg.id}">Cancelar asignación</button>`}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        tbody.querySelectorAll('[data-cancel-asg]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const asg = state.assignments.find((x) => x.id === btn.dataset.cancelAsg);
+            if (!asg) return;
+            state.pendingCancelAssignmentId = asg.id;
+            document.getElementById('cancel-asg-text').textContent =
+              `¿Confirmas cancelar «${asg.activity}» para el grupo ${asg.group}?`;
+            document.getElementById('cancel-assignment-dialog').showModal();
+          });
+        });
+      }
+
+      document.getElementById('confirm-cancel-asg-btn').addEventListener('click', () => {
+        const asg = state.assignments.find((x) => x.id === state.pendingCancelAssignmentId);
+        if (asg) {
+          asg.status = 'cancelled';
+          renderAssignments();
+          showToast(`Asignación «${asg.activity}» cancelada. Los intentos anteriores se conservan.`);
+        }
+        document.getElementById('cancel-assignment-dialog').close();
+      });
+
+      document.getElementById('open-new-assignment-btn').addEventListener('click', () => {
+        showToast('Selector de nueva asignación: solo muestra actividades publicadas de los 4 tipos evaluables.');
+      });
+
+      /* ======================================================================
+         6. SCREEN 4: REVISIÓN Y FEEDBACK (SPLIT-PANE + AUDIO + STICKERS)
+         ====================================================================== */
+      function stopAudio() {
+        state.audioPlaying = false;
+        if (state.audioTimer) {
+          clearInterval(state.audioTimer);
+          state.audioTimer = null;
+        }
+      }
+
+      function formatSec(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      }
+
+      function renderReviewQueue() {
+        const list = state.reviews.filter((r) => r.status === state.reviewTab);
+        const ul = document.getElementById('review-queue-list');
+
+        document.querySelectorAll('[data-rev-tab]').forEach((tab) => {
+          const active = tab.dataset.revTab === state.reviewTab;
+          tab.setAttribute('aria-selected', String(active));
+        });
+        document.getElementById('rev-list-panel').setAttribute(
+          'aria-labelledby',
+          state.reviewTab === 'pending' ? 'rev-tab-pending' : 'rev-tab-graded'
+        );
+
+        if (list.length === 0) {
+          ul.innerHTML = '<li style="padding:1.5rem 1rem; text-align:center; color:var(--ink-secondary); font-size:0.86rem;">No hay entregas en esta bandeja.</li>';
+          document.getElementById('review-inspector').innerHTML = `
+            <div style="padding:2rem 1rem; text-align:center;">
+              <h2 class="card__title">Cola de revisión al día</h2>
+              <p class="card__sub" style="margin-top:0.4rem;">Todas las entregas manuales han sido calificadas. Puedes consultar el historial en la pestaña «Calificados».</p>
+            </div>
+          `;
+          return;
+        }
+
+        if (!list.some((r) => r.id === state.selectedReviewId)) {
+          state.selectedReviewId = list[0].id;
+        }
+
+        ul.innerHTML = list.map((r) => {
+          const isSelected = r.id === state.selectedReviewId;
+          const badge = r.status === 'pending'
+            ? `<span class="pill pill--danger tabular">&gt;${r.overdueDays} d</span>`
+            : `<span class="pill pill--ok tabular">${r.score.toFixed(1).replace('.', ',')}</span>`;
+          return `
+            <li>
+              <button type="button" class="queue-item-btn" data-select-rev="${r.id}" ${isSelected ? 'aria-current="true"' : ''}>
+                <span class="queue-item-top">
+                  <span class="queue-student">${escapeHtml(r.student)}</span>
+                  ${badge}
+                </span>
+                <span class="queue-activity">${escapeHtml(r.activity)}</span>
+                <span class="queue-meta">
+                  <span>${escapeHtml(TYPE_LABELS[r.type])}</span>
+                  <span>·</span>
+                  <span>${escapeHtml(r.group)}</span>
+                </span>
+              </button>
+            </li>
+          `;
+        }).join('');
+
+        ul.querySelectorAll('[data-select-rev]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            stopAudio();
+            state.audioProgress = 0;
+            state.selectedReviewId = btn.dataset.selectRev;
+            renderReviewQueue();
+          });
+        });
+
+        renderReviewInspector();
+      }
+
+      function renderReviewInspector() {
+        const rev = state.reviews.find((r) => r.id === state.selectedReviewId);
+        const container = document.getElementById('review-inspector');
+        if (!rev) return;
+
+        const isPending = rev.status === 'pending';
+        const bars = [26, 48, 72, 58, 86, 62, 40, 78, 92, 66, 52, 84, 70, 44, 60, 88, 54, 38, 74, 62, 46, 80, 56, 36];
+
+        let evidenceHtml = '';
+        if (rev.type === 'speaking') {
+          const playedBars = Math.round((state.audioProgress / rev.durationSec) * bars.length);
+          evidenceHtml = `
+            <div class="audio-card">
+              <p class="response-prompt">Consigna de Speaking: ${escapeHtml(rev.prompt)}</p>
+              <div class="audio-controls">
+                <button type="button" class="play-btn" id="audio-play-btn" aria-label="${state.audioPlaying ? 'Pausar grabación' : 'Reproducir grabación'}">
+                  ${state.audioPlaying
+                    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
+                    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5.5v13l11-6.5-11-6.5Z"/></svg>'}
+                </button>
+                <div class="waveform" aria-hidden="true">
+                  ${bars.map((h, i) => `<span class="wave-bar ${i < playedBars ? 'is-played' : ''}" style="height:${h}%"></span>`).join('')}
+                </div>
+                <span class="audio-time" id="audio-time-label">${formatSec(state.audioProgress)} / ${formatSec(rev.durationSec)}</span>
+                <button type="button" class="btn btn--secondary btn--sm tabular" id="audio-speed-btn">${state.audioSpeed}×</button>
+              </div>
+              <div class="audio-footer">
+                <span>Audio almacenado en Cloudflare R2 · retención de 30 días hasta <strong>${escapeHtml(rev.retentionUntil)}</strong> (<code>retention_until</code>).</span>
+                <button type="button" class="btn btn--secondary btn--sm" id="download-audio-btn">Descargar audio</button>
+              </div>
+            </div>
+          `;
+        } else if (rev.type === 'open_question') {
+          evidenceHtml = `
+            <div class="response-card">
+              <p class="response-prompt">Pregunta: ${escapeHtml(rev.prompt)}</p>
+              <p class="response-body">${escapeHtml(rev.textAnswer)}</p>
+            </div>
+          `;
+        } else {
+          evidenceHtml = `
+            <div class="response-card">
+              <p class="response-prompt">Resultado autocalificado (${escapeHtml(TYPE_LABELS[rev.type])})</p>
+              <p class="response-body">${escapeHtml(rev.autoSummary)}</p>
+            </div>
+          `;
+        }
+
+        const scoreVal = rev.score !== null ? rev.score.toFixed(1).replace('.', ',') : '';
+        container.innerHTML = `
+          <div class="inspector-head">
+            <div>
+              <h2 class="inspector-title">${escapeHtml(rev.student)} · ${escapeHtml(rev.activity)}</h2>
+              <p class="inspector-meta">${escapeHtml(rev.group)} · Nivel ${escapeHtml(rev.level)} · Recibido: ${escapeHtml(rev.submittedAt)}</p>
+            </div>
+            <div style="display:flex; gap:0.45rem; align-items:center;">
+              <span class="pill ${isPending ? 'pill--danger' : 'pill--ok'}">${isPending ? 'Pendiente de revisión' : 'Calificado'}</span>
+              <span class="pill pill--neutral">${escapeHtml(TYPE_LABELS[rev.type])}</span>
+            </div>
+          </div>
+
+          ${evidenceHtml}
+
+          <form id="review-grade-form" style="display:flex; flex-direction:column; gap:1rem;">
+            <div style="display:grid; grid-template-columns:200px minmax(0,1fr); gap:1rem; align-items:start;">
+              <div class="field">
+                <label for="rev-score-input">Calificación (0,0 – 5,0)</label>
+                <input
+                  id="rev-score-input"
+                  class="input tabular"
+                  type="text"
+                  inputmode="decimal"
+                  value="${escapeHtml(scoreVal)}"
+                  placeholder="Ej. 4,5"
+                  ${isPending ? 'required' : 'readonly aria-readonly="true"'}
+                  style="${isPending ? '' : 'background:var(--bg-subtle); font-weight:700;'}"
+                >
+                <p class="field-hint">${isPending ? 'Nota inmutable una vez guardada en el servidor.' : 'Nota bloqueada (inmutable tras calificación).'}</p>
+                <p class="field-error" id="rev-score-error" hidden>Ingresa una calificación válida entre 0,0 y 5,0.</p>
+              </div>
+
+              <div class="field">
+                <label for="rev-comment-input">Retroalimentación escrita (obligatoria)</label>
+                <textarea id="rev-comment-input" class="textarea" required placeholder="Destaca un acierto concreto y una recomendación clara para el siguiente intento...">${escapeHtml(rev.comment)}</textarea>
+                <p class="field-error" id="rev-comment-error" hidden>Escribe un comentario pedagógico antes de guardar.</p>
+              </div>
+            </div>
+
+            <div class="field">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                <span class="field-label" id="stickers-group-label">Stickers motivacionales (máximo 3 de 6)</span>
+                <span class="pill pill--gold tabular" id="sticker-count-pill">${rev.stickers.length} / 3 seleccionados</span>
+              </div>
+              <div class="sticker-grid" role="group" aria-labelledby="stickers-group-label">
+                ${STICKERS.map((s) => {
+                  const active = rev.stickers.includes(s.code);
+                  return `
+                    <button type="button" class="sticker-btn" data-sticker="${s.code}" aria-pressed="${active}">
+                      <span class="sticker-emoji" aria-hidden="true">${s.emoji}</span>
+                      <span>${escapeHtml(s.label)}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <div class="retry-box">
+              <label class="checkbox-label">
+                <input type="checkbox" id="rev-retry-checkbox" ${rev.allowRetry ? 'checked' : ''}>
+                <span>Habilitar nuevo intento para este estudiante</span>
+              </label>
+              <div id="retry-extend-wrap" class="field" ${rev.allowRetry ? '' : 'hidden'}>
+                <label for="rev-retry-until">Extender fecha límite opcional (<code>retry_extend_until</code> · America/Bogota)</label>
+                <input id="rev-retry-until" class="input" type="datetime-local" value="${escapeHtml(rev.retryExtendUntil)}" style="max-width:290px;">
+              </div>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.85rem; padding-top:0.35rem;">
+              <p class="field-hint" style="max-width:46ch;">
+                Privacidad en correo: el aviso notifica al estudiante que su revisión está disponible, <strong>sin exponer la nota ni el texto del comentario</strong>.
+              </p>
+              <button type="submit" class="btn btn--primary">
+                ${isPending ? 'Guardar calificación y enviar aviso' : 'Actualizar feedback y permiso'}
+              </button>
+            </div>
+          </form>
+        `;
+
+        // Audio interactions
+        const playBtn = document.getElementById('audio-play-btn');
+        if (playBtn) {
+          playBtn.addEventListener('click', () => {
+            if (state.audioPlaying) {
+              stopAudio();
+              renderReviewInspector();
+            } else {
+              state.audioPlaying = true;
+              if (state.audioProgress >= rev.durationSec) state.audioProgress = 0;
+              renderReviewInspector();
+              state.audioTimer = setInterval(() => {
+                state.audioProgress += state.audioSpeed;
+                if (state.audioProgress >= rev.durationSec) {
+                  state.audioProgress = rev.durationSec;
+                  stopAudio();
+                }
+                const label = document.getElementById('audio-time-label');
+                if (label) label.textContent = `${formatSec(state.audioProgress)} / ${formatSec(rev.durationSec)}`;
+                const waveBars = document.querySelectorAll('.wave-bar');
+                const played = Math.round((state.audioProgress / rev.durationSec) * waveBars.length);
+                waveBars.forEach((b, idx) => b.classList.toggle('is-played', idx < played));
+                if (!state.audioPlaying) renderReviewInspector();
+              }, 1000);
+            }
+          });
+          document.getElementById('audio-speed-btn').addEventListener('click', () => {
+            state.audioSpeed = state.audioSpeed === 1 ? 0.85 : 1;
+            renderReviewInspector();
+          });
+          document.getElementById('download-audio-btn').addEventListener('click', () => {
+            showToast(`Enlace prefirmado temporal generado para descargar el audio de ${rev.student}.`);
+          });
+        }
+
+        // Sticker selection (max 3)
+        container.querySelectorAll('[data-sticker]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const code = btn.dataset.sticker;
+            if (rev.stickers.includes(code)) {
+              rev.stickers = rev.stickers.filter((c) => c !== code);
+            } else {
+              if (rev.stickers.length >= 3) {
+                showToast('Puedes elegir hasta 3 stickers motivacionales por revisión.');
+                return;
+              }
+              rev.stickers = [...rev.stickers, code];
+            }
+            btn.setAttribute('aria-pressed', String(rev.stickers.includes(code)));
+            document.getElementById('sticker-count-pill').textContent = `${rev.stickers.length} / 3 seleccionados`;
+          });
+        });
+
+        // Retry toggle
+        const retryCheck = document.getElementById('rev-retry-checkbox');
+        const retryWrap = document.getElementById('retry-extend-wrap');
+        retryCheck.addEventListener('change', () => {
+          rev.allowRetry = retryCheck.checked;
+          retryWrap.hidden = !retryCheck.checked;
+        });
+
+        // Submit review
+        document.getElementById('review-grade-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const scoreInput = document.getElementById('rev-score-input');
+          const commentInput = document.getElementById('rev-comment-input');
+          const scoreErr = document.getElementById('rev-score-error');
+          const commentErr = document.getElementById('rev-comment-error');
+          scoreErr.hidden = true;
+          commentErr.hidden = true;
+          scoreInput.removeAttribute('aria-invalid');
+          commentInput.removeAttribute('aria-invalid');
+
+          if (isPending) {
+            const raw = scoreInput.value.trim().replace(',', '.');
+            const parsed = Number(raw);
+            if (!/^\d+(?:\.\d+)?$/.test(raw) || Number.isNaN(parsed) || parsed < 0 || parsed > 5) {
+              scoreErr.hidden = false;
+              scoreInput.setAttribute('aria-invalid', 'true');
+              scoreInput.focus();
+              return;
+            }
+            rev.score = Math.round(parsed * 10) / 10;
+          }
+
+          if (!commentInput.value.trim()) {
+            commentErr.hidden = false;
+            commentInput.setAttribute('aria-invalid', 'true');
+            commentInput.focus();
+            return;
+          }
+
+          rev.comment = commentInput.value.trim();
+          rev.retryExtendUntil = document.getElementById('rev-retry-until').value;
+          rev.status = 'graded';
+          stopAudio();
+          updateGlobalCounters();
+          renderReviewQueue();
+          showToast(`Calificación (${rev.score.toFixed(1).replace('.', ',')}) guardada y aviso enviado a ${rev.student} sin exponer la nota.`);
+        });
+      }
+
+      document.querySelectorAll('[data-rev-tab]').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          stopAudio();
+          state.reviewTab = tab.dataset.revTab;
+          renderReviewQueue();
+        });
+      });
+
+      /* ======================================================================
+         7. SCREEN 5: ALUMNOS Y GRUPOS
+         ====================================================================== */
+      function activateStudentTab(tabKey) {
+        const keys = ['active', 'requests', 'locked', 'groups'];
+        keys.forEach((k) => {
+          document.getElementById(`stu-tab-${k}`).setAttribute('aria-selected', String(k === tabKey));
+          document.getElementById(`stu-panel-${k}`).hidden = k !== tabKey;
+        });
+      }
+
+      document.querySelectorAll('[data-stu-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => activateStudentTab(btn.dataset.stuTab));
+      });
+
+      function renderStudentsTables() {
+        // Active students
+        const activeBody = document.getElementById('active-students-tbody');
+        activeBody.innerHTML = state.students.map((st) => `
+          <tr>
+            <td>
+              <div class="cell-main">${escapeHtml(st.name)}</div>
+              <div class="cell-sub">${escapeHtml(st.email)}</div>
+            </td>
+            <td><span class="pill pill--gold">${escapeHtml(st.level)}</span></td>
+            <td>${escapeHtml(st.group)}</td>
+            <td class="cell-sub">${escapeHtml(st.guardian)}</td>
+            <td>
+              <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
+                <button type="button" class="btn btn--secondary btn--sm" data-change-grp="${st.id}">Cambiar grupo</button>
+                <button type="button" class="btn btn--ghost btn--sm" data-recover-pw="${st.id}">Recuperar clave</button>
+                <button type="button" class="btn btn--ghost btn--sm" data-change-email="${st.id}">Cambiar correo</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+
+        activeBody.querySelectorAll('[data-change-grp]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const st = state.students.find((x) => x.id === btn.dataset.changeGrp);
+            if (!st) return;
+            state.pendingStudentActionId = st.id;
+            document.getElementById('change-grp-student-label').textContent =
+              `Estudiante: ${st.name} (grupo actual: ${st.group}).`;
+            document.getElementById('change-grp-select').value = st.group;
+            document.getElementById('change-group-dialog').showModal();
+          });
+        });
+
+        activeBody.querySelectorAll('[data-recover-pw]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const st = state.students.find((x) => x.id === btn.dataset.recoverPw);
+            if (st) showToast(`Correo de recuperación de contraseña enviado a ${st.email}.`);
+          });
+        });
+
+        activeBody.querySelectorAll('[data-change-email]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const st = state.students.find((x) => x.id === btn.dataset.changeEmail);
+            if (!st) return;
+            state.pendingStudentActionId = st.id;
+            document.getElementById('change-email-student-label').textContent =
+              `Estudiante: ${st.name} (correo actual: ${st.email}).`;
+            document.getElementById('change-email-input').value = st.email;
+            document.getElementById('change-email-dialog').showModal();
+          });
+        });
+
+        // Requests
+        const reqBody = document.getElementById('requests-tbody');
+        if (state.requests.length === 0) {
+          reqBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--ink-secondary);">No hay solicitudes pendientes de aprobación.</td></tr>';
+        } else {
+          reqBody.innerHTML = state.requests.map((r) => `
+            <tr>
+              <td>
+                <div class="cell-main">${escapeHtml(r.name)}</div>
+                <div class="cell-sub">${escapeHtml(r.email)}</div>
+              </td>
+              <td class="tabular">${escapeHtml(r.date)}</td>
+              <td>
+                <select class="select" aria-label="Nivel MCER para ${escapeHtml(r.name)}" data-req-level="${r.id}" style="min-height:34px; padding:0.25rem 0.5rem;">
+                  <option value="A1" ${r.level === 'A1' ? 'selected' : ''}>A1</option>
+                  <option value="A2" ${r.level === 'A2' ? 'selected' : ''}>A2</option>
+                  <option value="B1" ${r.level === 'B1' ? 'selected' : ''}>B1</option>
+                  <option value="B2" ${r.level === 'B2' ? 'selected' : ''}>B2</option>
+                </select>
+              </td>
+              <td>
+                <select class="select" aria-label="Grupo para ${escapeHtml(r.name)}" data-req-group="${r.id}" style="min-height:34px; padding:0.25rem 0.5rem;">
+                  <option value="A1 Exploradores Mañana" ${r.group === 'A1 Exploradores Mañana' ? 'selected' : ''}>A1 Exploradores Mañana</option>
+                  <option value="A2 Viajeros Tarde" ${r.group === 'A2 Viajeros Tarde' ? 'selected' : ''}>A2 Viajeros Tarde</option>
+                  <option value="B1 Conversación Sábados" ${r.group === 'B1 Conversación Sábados' ? 'selected' : ''}>B1 Conversación Sábados</option>
+                  <option value="B2 Preparación Académica" ${r.group === 'B2 Preparación Académica' ? 'selected' : ''}>B2 Preparación Académica</option>
+                </select>
+              </td>
+              <td>
+                <div style="display:flex; gap:0.4rem;">
+                  <button type="button" class="btn btn--primary btn--sm" data-approve-req="${r.id}">Aprobar</button>
+                  <button type="button" class="btn btn--danger-outline btn--sm" data-reject-req="${r.id}">Rechazar</button>
+                </div>
+              </td>
+            </tr>
+          `).join('');
+
+          reqBody.querySelectorAll('[data-approve-req]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const id = btn.dataset.approveReq;
+              const req = state.requests.find((x) => x.id === id);
+              if (!req) return;
+              const level = reqBody.querySelector(`[data-req-level="${id}"]`).value;
+              const group = reqBody.querySelector(`[data-req-group="${id}"]`).value;
+              state.students.unshift({
+                id: 'st-' + Date.now(),
+                name: req.name,
+                email: req.email,
+                level,
+                group,
+                guardian: 'Pendiente por registrar',
+              });
+              state.requests = state.requests.filter((x) => x.id !== id);
+              updateGlobalCounters();
+              renderStudentsTables();
+              showToast(`${req.name} aprobado en nivel ${level} (${group}).`);
+            });
+          });
+
+          reqBody.querySelectorAll('[data-reject-req]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const id = btn.dataset.rejectReq;
+              const req = state.requests.find((x) => x.id === id);
+              state.requests = state.requests.filter((x) => x.id !== id);
+              updateGlobalCounters();
+              renderStudentsTables();
+              if (req) showToast(`Solicitud de ${req.name} rechazada.`);
+            });
+          });
+        }
+
+        // Locked accounts
+        const lockedBody = document.getElementById('locked-tbody');
+        if (state.locked.length === 0) {
+          lockedBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--ink-secondary);">No hay cuentas bloqueadas en este momento.</td></tr>';
+        } else {
+          lockedBody.innerHTML = state.locked.map((lk) => `
+            <tr>
+              <td>
+                <div class="cell-main">${escapeHtml(lk.name)}</div>
+                <div class="cell-sub">${escapeHtml(lk.email)}</div>
+              </td>
+              <td>${escapeHtml(lk.group)}</td>
+              <td><span class="pill pill--danger">${escapeHtml(lk.reason)}</span></td>
+              <td class="tabular">${escapeHtml(lk.unlocksAt)}</td>
+              <td><button type="button" class="btn btn--primary btn--sm" data-unlock-id="${lk.id}">Desbloquear</button></td>
+            </tr>
+          `).join('');
+
+          lockedBody.querySelectorAll('[data-unlock-id]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const lk = state.locked.find((x) => x.id === btn.dataset.unlockId);
+              state.locked = state.locked.filter((x) => x.id !== btn.dataset.unlockId);
+              updateGlobalCounters();
+              renderStudentsTables();
+              if (lk) showToast(`Cuenta de ${lk.name} desbloqueada inmediatamente.`);
+            });
+          });
+        }
+      }
+
+      document.getElementById('change-group-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const st = state.students.find((x) => x.id === state.pendingStudentActionId);
+        const newGrp = document.getElementById('change-grp-select').value;
+        if (st) {
+          st.group = newGrp;
+          renderStudentsTables();
+          showToast(`${st.name} trasladado a ${newGrp}.`);
+        }
+        document.getElementById('change-group-dialog').close();
+      });
+
+      document.getElementById('change-email-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const st = state.students.find((x) => x.id === state.pendingStudentActionId);
+        const newEmail = document.getElementById('change-email-input').value.trim();
+        if (st && newEmail) {
+          st.email = newEmail;
+          renderStudentsTables();
+          showToast(`Correo actualizado para ${st.name} y registrado en AuditLog.`);
+        }
+        document.getElementById('change-email-dialog').close();
+      });
+
+      /* ======================================================================
+         8. SCREEN 6: ESTADÍSTICAS TABS & PERIOD
+         ====================================================================== */
+      document.querySelectorAll('[data-stats-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.statsTab;
+          ['perf', 'games', 'rankings'].forEach((k) => {
+            document.getElementById(`stats-tab-${k}`).setAttribute('aria-selected', String(k === target));
+            document.getElementById(`stats-panel-${k}`).hidden = k !== target;
+          });
+        });
+      });
+
+      document.getElementById('stats-period-select').addEventListener('change', (e) => {
+        const val = e.target.value;
+        const t30 = document.getElementById('trend-30d-pill');
+        const t7 = document.getElementById('trend-7d-pill');
+        if (val === '7d') {
+          t30.textContent = 'trend30d: ↑ +0,3';
+          t7.textContent = 'trend7d: ↑ +0,2';
+        } else if (val === '90d') {
+          t30.textContent = 'trend30d: ↑ +0,5';
+          t7.textContent = 'trend7d: ↑ +0,1';
+        } else {
+          t30.textContent = 'trend30d: ↑ +0,3';
+          t7.textContent = 'trend7d: ↑ +0,1';
+        }
+        showToast(`Estadísticas actualizadas para el rango seleccionado (${e.target.options[e.target.selectedIndex].text}).`);
+      });
+
+      /* ======================================================================
+         9. SCREEN 7: CONTENIDO EXTRA (FLAG + DETERMINISTIC REORDER)
+         ====================================================================== */
+      const extraSwitch = document.getElementById('extra-flag-switch');
+      extraSwitch.addEventListener('click', () => {
+        state.extraEnabled = !state.extraEnabled;
+        extraSwitch.setAttribute('aria-checked', String(state.extraEnabled));
+        document.getElementById('extra-flag-label').textContent = state.extraEnabled ? 'Activada' : 'Desactivada';
+        const pill = document.getElementById('extra-flag-pill');
+        pill.textContent = state.extraEnabled ? 'Activa para alumnos' : 'Oculta para alumnos';
+        pill.className = `pill ${state.extraEnabled ? 'pill--ok' : 'pill--neutral'}`;
+        showToast(state.extraEnabled
+          ? 'Sección Contenido extra activada para los estudiantes.'
+          : 'Sección Contenido extra oculta para estudiantes. Sigues pudiendo administrar la lista.');
+      });
+
+      function renderResources() {
+        const filter = document.getElementById('extra-level-filter').value;
+        document.getElementById('extra-counter-pill').textContent = `${state.resources.length} / 200`;
+
+        const visible = state.resources
+          .map((item, fullIndex) => ({ item, fullIndex }))
+          .filter(({ item }) => filter === 'all' || item.level === filter);
+
+        const list = document.getElementById('extra-resource-list');
+        if (visible.length === 0) {
+          list.innerHTML = '<li style="padding:1.5rem; text-align:center; color:var(--ink-secondary);">No hay recursos en este filtro.</li>';
+          return;
+        }
+
+        list.innerHTML = visible.map(({ item, fullIndex }, posInVisible) => {
+          const badge = item.level === 'general'
+            ? '<span class="pill pill--neutral">Para todos</span>'
+            : `<span class="pill pill--gold">Nivel ${escapeHtml(item.level)}</span>`;
+          const isFirst = fullIndex === 0;
+          const isLast = fullIndex === state.resources.length - 1;
+          const canReorder = filter === 'all';
+
+          return `
+            <li class="resource-row">
+              <div class="resource-info">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.45rem;">
+                  <span class="tabular" style="font-size:0.78rem; font-weight:700; color:var(--ink-secondary);">#${posInVisible + 1}</span>
+                  <span class="cell-main">${escapeHtml(item.title)}</span>
+                  ${badge}
+                  <span class="pill pill--ok">HTTPS</span>
+                </div>
+                <a class="resource-url" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.url)}</a>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.35rem; flex-shrink:0;">
+                <button type="button" class="btn btn--secondary btn--sm" data-move-up="${fullIndex}" ${!canReorder || isFirst ? 'disabled' : ''}>Subir</button>
+                <button type="button" class="btn btn--secondary btn--sm" data-move-down="${fullIndex}" ${!canReorder || isLast ? 'disabled' : ''}>Bajar</button>
+              </div>
+            </li>
+          `;
+        }).join('');
+
+        list.querySelectorAll('[data-move-up]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.moveUp);
+            if (idx <= 0) return;
+            const tmp = state.resources[idx - 1];
+            state.resources[idx - 1] = state.resources[idx];
+            state.resources[idx] = tmp;
+            renderResources();
+            showToast(`«${state.resources[idx - 1].title}» movido a la posición #${idx}.`);
+          });
+        });
+
+        list.querySelectorAll('[data-move-down]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.moveDown);
+            if (idx >= state.resources.length - 1) return;
+            const tmp = state.resources[idx + 1];
+            state.resources[idx + 1] = state.resources[idx];
+            state.resources[idx] = tmp;
+            renderResources();
+            showToast(`«${state.resources[idx + 1].title}» movido a la posición #${idx + 2}.`);
+          });
+        });
+      }
+
+      document.getElementById('extra-level-filter').addEventListener('change', renderResources);
+
+      document.getElementById('open-new-resource-btn').addEventListener('click', () => {
+        document.getElementById('res-title-input').value = '';
+        document.getElementById('res-url-input').value = '';
+        document.getElementById('res-url-error').hidden = true;
+        document.getElementById('new-resource-dialog').showModal();
+      });
+
+      document.getElementById('new-resource-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = document.getElementById('res-title-input').value.trim();
+        const url = document.getElementById('res-url-input').value.trim();
+        const level = document.getElementById('res-level-select').value;
+        const urlErr = document.getElementById('res-url-error');
+
+        if (!/^https:\/\/[^\s]+$/i.test(url)) {
+          urlErr.hidden = false;
+          document.getElementById('res-url-input').setAttribute('aria-invalid', 'true');
+          document.getElementById('res-url-input').focus();
+          return;
+        }
+        urlErr.hidden = true;
+        document.getElementById('res-url-input').removeAttribute('aria-invalid');
+        state.resources.push({ id: 'res-' + Date.now(), title, url, level });
+        renderResources();
+        document.getElementById('new-resource-dialog').close();
+        showToast(`Recurso «${title}» agregado (${state.resources.length} / 200).`);
+      });
+
+      /* ======================================================================
+         10. INITIAL RENDER
+         ====================================================================== */
+      bindSentenceInputs();
+      renderBuilderPreview();
+      renderActivities();
+      renderAssignments();
+      renderReviewQueue();
+      renderStudentsTables();
+      renderResources();
+      updateGlobalCounters();
+    })();
+  </script>
+</body>
+</html>

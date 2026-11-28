@@ -1,86 +1,119 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, CheckCircle2, ClipboardList, Info, Plus, X } from 'lucide-react';
 import {
   AssignmentListResponse,
   AssignmentListResponseSchema,
   AssignmentAvailability,
+  AssignmentView,
   GroupListResponse,
   GroupListResponseSchema,
   ActivityType,
   formatBogotaDateTime,
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
+import { ErrorState } from '../../../components/error-state';
+import { TeacherStatusBadge } from '../../../components/teacher-editorial';
+import styles from './asignaciones.module.css';
 
 const typeLabels: Record<ActivityType, string> = {
-  [ActivityType.fill_blank]: 'Rellenar huecos',
+  [ActivityType.fill_blank]: 'Completar espacios',
   [ActivityType.open_question]: 'Pregunta abierta',
   [ActivityType.speaking]: 'Expresión oral (Speaking)',
   [ActivityType.game]: 'Microjuego',
   [ActivityType.exam]: 'Examen',
 };
 
-const availabilityBadges: Record<
+const availabilityBadgeKinds: Record<
   AssignmentAvailability,
-  { label: string; bg: string; text: string }
+  'assignmentOpen' | 'assignmentScheduled' | 'assignmentClosed' | 'assignmentCancelled'
 > = {
-  [AssignmentAvailability.scheduled]: {
-    label: 'Programada',
-    bg: 'bg-blue-50 border-blue-200',
-    text: 'text-blue-700',
-  },
-  [AssignmentAvailability.open]: {
-    label: 'Abierta',
-    bg: 'bg-emerald-50 border-emerald-200',
-    text: 'text-emerald-700',
-  },
-  [AssignmentAvailability.closed]: {
-    label: 'Cerrada',
-    bg: 'bg-zinc-100 border-zinc-200',
-    text: 'text-zinc-600',
-  },
-  [AssignmentAvailability.cancelled]: {
-    label: 'Cancelada',
-    bg: 'bg-rose-50 border-rose-200',
-    text: 'text-rose-700',
-  },
+  [AssignmentAvailability.open]: 'assignmentOpen',
+  [AssignmentAvailability.scheduled]: 'assignmentScheduled',
+  [AssignmentAvailability.closed]: 'assignmentClosed',
+  [AssignmentAvailability.cancelled]: 'assignmentCancelled',
 };
+
+type ComplianceState =
+  | { kind: 'cancelled' }
+  | { kind: 'progress'; completed: number; denominator: number; percent: number; isComplete: boolean }
+  | { kind: 'pendingSummary'; obligated: number }
+  | { kind: 'unavailable' };
+
+function resolveCompliance(
+  assignment: AssignmentView,
+  groupActiveCount: number | undefined,
+): ComplianceState {
+  if (assignment.availability === AssignmentAvailability.cancelled) {
+    return { kind: 'cancelled' };
+  }
+
+  const obligated =
+    assignment.historicalStudentCount ??
+    (typeof assignment.totalAttempts === 'number'
+      ? assignment.totalAttempts
+      : typeof groupActiveCount === 'number'
+        ? groupActiveCount
+        : null);
+
+  if (typeof assignment.submittedAttempts === 'number') {
+    const completed = assignment.submittedAttempts;
+    const denominator = obligated ?? 0;
+    const percent =
+      denominator > 0 ? Math.min(100, Math.round((completed / denominator) * 100)) : 0;
+    const isComplete = denominator > 0 && completed >= denominator;
+    return { kind: 'progress', completed, denominator, percent, isComplete };
+  }
+
+  if (obligated !== null) {
+    return { kind: 'pendingSummary', obligated };
+  }
+
+  return { kind: 'unavailable' };
+}
+
+function getAssignmentsErrorMessage(err: unknown): string | null {
+  if (!err) return null;
+  if (err instanceof ApiError) {
+    if (err.statusCode === 404) {
+      return 'No encontramos esta asignación o alguno de los recursos seleccionados';
+    }
+    if (err.statusCode === 403) {
+      return 'No tienes acceso a esta sección';
+    }
+    if (err.statusCode === 429) {
+      return 'Espera un momento antes de volver a intentarlo';
+    }
+    return err.message || 'No pudimos cargar las asignaciones';
+  }
+  return 'No pudimos cargar las asignaciones';
+}
 
 export function AsignacionesClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const notice = searchParams.get('notice');
-  const initialGroupId = searchParams.get('groupId') || 'all';
-  const initialAvailability = searchParams.get('availability') || 'all';
-
-  const [selectedGroup, setSelectedGroup] = useState<string>(initialGroupId);
-  const [selectedAvailability, setSelectedAvailability] =
-    useState<string>(initialAvailability);
-
-  // Sync state if query params change externally (browser navigation, direct links)
-  useEffect(() => {
-    const g = searchParams.get('groupId') || 'all';
-    const a = searchParams.get('availability') || 'all';
-    setSelectedGroup(g);
-    setSelectedAvailability(a);
-  }, [searchParams]);
+  const selectedGroup = searchParams.get('groupId') || 'all';
+  const selectedAvailability = searchParams.get('availability') || 'all';
 
   // Load all groups (including archived ones for historical filter, SPEC-04 RF-9)
   const groupsQuery = useQuery({
     queryKey: ['teacher', 'groups', 'all'],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<GroupListResponse>('/api/v1/groups?limit=100', {
         schema: GroupListResponseSchema,
+        signal,
       }),
   });
 
   const assignmentsQuery = useQuery({
     queryKey: ['teacher', 'assignments', selectedGroup, selectedAvailability],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       if (selectedGroup !== 'all') {
         params.set('groupId', selectedGroup);
@@ -91,6 +124,7 @@ export function AsignacionesClient() {
       params.set('limit', '100');
       return apiFetch<AssignmentListResponse>(`/api/v1/assignments?${params.toString()}`, {
         schema: AssignmentListResponseSchema,
+        signal,
       });
     },
   });
@@ -99,131 +133,120 @@ export function AsignacionesClient() {
   const assignments = assignmentsQuery.data?.items ?? [];
   const total = assignmentsQuery.data?.total ?? 0;
   const isLoading = assignmentsQuery.isLoading;
+  const error = getAssignmentsErrorMessage(assignmentsQuery.error);
 
-  const getErrorMessage = () => {
-    if (!assignmentsQuery.error) return null;
-    const err = assignmentsQuery.error;
-    if (err instanceof ApiError) {
-      if (err.statusCode === 404) {
-        return 'No encontramos esta asignación o alguno de los recursos seleccionados';
-      } else if (err.statusCode === 403) {
-        return 'No tienes acceso a esta sección';
-      } else if (err.statusCode === 429) {
-        return 'Espera un momento antes de volver a intentarlo';
-      }
-      return err.message || 'No pudimos cargar las asignaciones';
-    }
-    return 'No pudimos cargar las asignaciones';
+  const groupCountById = useMemo(
+    () => new Map(groups.map((g) => [g.id, g.activeStudentCount])),
+    [groups],
+  );
+
+  const replaceParams = (params: URLSearchParams) => {
+    const query = params.toString();
+    router.replace(query ? `/asignaciones?${query}` : '/asignaciones');
   };
-
-  const error = getErrorMessage();
 
   const handleGroupFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
-    setSelectedGroup(val);
     const params = new URLSearchParams(searchParams.toString());
     if (val === 'all') params.delete('groupId');
     else params.set('groupId', val);
-    router.replace(`/asignaciones?${params.toString()}`);
+    replaceParams(params);
   };
 
-  const handleAvailabilityFilterChange = (
-    e: React.ChangeEvent<HTMLSelectElement>,
-  ) => {
+  const handleAvailabilityFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
-    setSelectedAvailability(val);
     const params = new URLSearchParams(searchParams.toString());
     if (val === 'all') params.delete('availability');
     else params.set('availability', val);
-    router.replace(`/asignaciones?${params.toString()}`);
+    replaceParams(params);
+  };
+
+  const handleResetFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('groupId');
+    params.delete('availability');
+    replaceParams(params);
   };
 
   const handleDismissNotice = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('notice');
-    const query = params.toString();
-    router.replace(`/asignaciones${query ? '?' + query : ''}`);
+    replaceParams(params);
   };
 
   const isFiltered = selectedGroup !== 'all' || selectedAvailability !== 'all';
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Success notice banner (SPEC-04 RF-15, §7) */}
+    <div className={styles.page}>
       {notice && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex justify-between items-center shadow-xs"
-        >
-          <span className="font-semibold">{notice}</span>
+        <div role="status" aria-live="polite" className={styles.notice}>
+          <span className={styles.noticeContent}>
+            <CheckCircle2 size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span>{notice}</span>
+          </span>
           <button
             type="button"
             onClick={handleDismissNotice}
-            className="text-emerald-700 hover:text-emerald-900 font-bold ml-4"
+            className={styles.noticeClose}
             aria-label="Cerrar aviso"
           >
-            ✕
+            <X size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            Asignaciones
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Gestiona las actividades asignadas a tus grupos de estudiantes.
+      <header className={styles.header}>
+        <div className={styles.headerText}>
+          <h1 className={styles.title}>Asignaciones</h1>
+          <p className={styles.subtitle}>
+            Gestiona las actividades asignadas a tus grupos y haz seguimiento al cumplimiento.
           </p>
         </div>
-        <div>
-          <Link
-            href="/asignaciones/nueva"
-            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          >
-            + Nueva asignación
-          </Link>
-        </div>
+        <Link href="/asignaciones/nueva" className={styles.primaryCta}>
+          <Plus size={18} strokeWidth={2} aria-hidden="true" />
+          Nueva asignación
+        </Link>
+      </header>
+
+      <div className={styles.callout} role="note" aria-label="Regla sobre microjuegos">
+        <Info size={18} strokeWidth={1.75} className={styles.calloutIcon} aria-hidden="true" />
+        <p>
+          Solo se asignan actividades evaluables (Completar espacios, Pregunta abierta, Speaking y
+          Examen). Los <strong>microjuegos</strong> nunca requieren asignación: al publicarse quedan
+          disponibles 24/7 en el portal del estudiante para práctica autónoma.
+        </p>
       </div>
 
-      {/* Filters Bar */}
-      <div className="flex flex-wrap items-center gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
-        <div className="flex items-center gap-2">
-          <label
-            htmlFor="group-filter"
-            className="text-xs font-semibold text-zinc-700"
-          >
-            Grupo:
+      <section aria-label="Filtros de asignaciones" className={styles.filtersBar}>
+        <div className={styles.filterField}>
+          <label htmlFor="group-filter" className={styles.filterLabel}>
+            Grupo
           </label>
           <select
             id="group-filter"
             value={selectedGroup}
             onChange={handleGroupFilterChange}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={styles.select}
           >
             <option value="all">Todos los grupos</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name} {g.archivedAt ? '(Archivado)' : ''}
+                {g.name}
+                {g.archivedAt ? ' (Archivado)' : ''}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label
-            htmlFor="availability-filter"
-            className="text-xs font-semibold text-zinc-700"
-          >
-            Disponibilidad:
+        <div className={styles.filterField}>
+          <label htmlFor="availability-filter" className={styles.filterLabel}>
+            Disponibilidad
           </label>
           <select
             id="availability-filter"
             value={selectedAvailability}
             onChange={handleAvailabilityFilterChange}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={styles.select}
           >
             <option value="all">Todas</option>
             <option value={AssignmentAvailability.scheduled}>Programadas</option>
@@ -233,132 +256,209 @@ export function AsignacionesClient() {
           </select>
         </div>
 
-        <div className="ml-auto text-xs text-zinc-500 font-medium">
-          {total} asignaci{total === 1 ? 'ón' : 'ones'}
+        <div className={styles.summaryWrap}>
+          <span className={styles.countPill}>
+            {total} asignaci{total === 1 ? 'ón' : 'ones'}
+          </span>
         </div>
-      </div>
+      </section>
 
-      {/* Main Content Area */}
-      {isLoading ? (
-        <div className="py-16 text-center text-zinc-500 text-sm">
-          Cargando asignaciones…
-        </div>
-      ) : error ? (
-        <div
-          role="alert"
-          className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-800"
-        >
-          <p className="font-medium">{error}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void assignmentsQuery.refetch();
-            }}
-            className="mt-3 inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
-          >
-            Reintentar
-          </button>
-        </div>
-      ) : assignments.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 p-12 text-center">
-          <p className="text-base font-semibold text-zinc-800">
-            {isFiltered
-              ? 'No hay asignaciones con estos filtros'
-              : 'Aún no tienes asignaciones'}
-          </p>
-          <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-            {isFiltered
-              ? 'Prueba cambiando los filtros de grupo o disponibilidad para ver más resultados.'
-              : 'Asigna actividades a tus grupos para que los estudiantes comiencen a practicar.'}
-          </p>
-          {!isFiltered && (
-            <div className="mt-4">
-              <Link
-                href="/asignaciones/nueva"
-                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-              >
-                + Nueva asignación
-              </Link>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {assignments.map((assignment) => {
-            const badge =
-              availabilityBadges[assignment.availability] ||
-              availabilityBadges[AssignmentAvailability.open];
-
-            return (
-              <div
-                key={assignment.id}
-                className="flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-5 shadow-sm hover:border-zinc-300 transition-colors"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${badge.bg} ${badge.text}`}
-                    >
-                      {badge.label}
-                    </span>
-                    <span className="text-xs text-zinc-500 font-medium">
-                      v{assignment.activity.version}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h2 className="text-base font-bold text-zinc-900 line-clamp-2">
-                      {assignment.activity.title}
-                    </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {typeLabels[assignment.activity.type]} · Nivel{' '}
-                      {assignment.activity.level}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-zinc-50 border border-zinc-100 p-3 space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between text-zinc-700 font-medium">
-                      <span>Grupo:</span>
-                      <span className="font-semibold text-zinc-900 truncate max-w-[150px]">
-                        {assignment.group.name}
-                        {assignment.group.archivedAt && (
-                          <span className="text-amber-600 ml-1 font-normal">
-                            (Archivado)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-zinc-600">
-                      <span>Apertura:</span>
-                      <span className="font-mono text-[11px]">
-                        {formatBogotaDateTime(assignment.opensAt)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-zinc-600">
-                      <span>Cierre:</span>
-                      <span className="font-mono text-[11px]">
-                        {formatBogotaDateTime(assignment.dueAt)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-zinc-100 mt-4 flex items-center justify-between">
-                  <span className="text-[11px] text-zinc-400">
-                    Hora de Colombia
-                  </span>
-                  <Link
-                    href={`/asignaciones/${assignment.id}`}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    Ver detalles →
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
+      {groupsQuery.isError && (
+        <div role="status" className={styles.inlineWarning}>
+          <Info size={16} strokeWidth={1.75} aria-hidden="true" />
+          <span>No pudimos cargar el filtro de grupos; mostramos las asignaciones disponibles.</span>
         </div>
       )}
+
+      <div className={styles.listSection}>
+        <h2 id="assignments-list-heading" className="sr-only">
+          Listado de asignaciones
+        </h2>
+
+        {isLoading ? (
+          <div role="status" className={styles.skeletonCard}>
+            <span className="sr-only">Cargando asignaciones…</span>
+            <div className={styles.skeletonRow} />
+            <div className={styles.skeletonRow} />
+            <div className={styles.skeletonRow} />
+            <div className={styles.skeletonRow} />
+            <div className={styles.skeletonRow} />
+          </div>
+        ) : error ? (
+          <ErrorState
+            variant="teacher"
+            editorial
+            message={error}
+            onRetry={() => {
+              void assignmentsQuery.refetch();
+            }}
+          />
+        ) : assignments.length === 0 ? (
+          <div className={styles.emptyCard}>
+            <span className={styles.emptyIcon} aria-hidden="true">
+              <ClipboardList size={22} strokeWidth={1.65} />
+            </span>
+            <h3 className={styles.emptyTitle}>
+              {isFiltered
+                ? 'No hay asignaciones con estos filtros'
+                : 'Aún no tienes asignaciones'}
+            </h3>
+            <p className={styles.emptyDescription}>
+              {isFiltered
+                ? 'Prueba cambiando los filtros de grupo o disponibilidad para consultar otros resultados.'
+                : 'Asigna actividades evaluables a tus grupos para que los estudiantes comiencen a practicar.'}
+            </p>
+            <div className={styles.emptyActions}>
+              {isFiltered && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className={styles.secondaryButton}
+                >
+                  Limpiar filtros
+                </button>
+              )}
+              <Link href="/asignaciones/nueva" className={styles.primaryCta}>
+                <Plus size={18} strokeWidth={2} aria-hidden="true" />
+                Nueva asignación
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className={styles.timezoneNote}>
+              Horarios mostrados en hora de Colombia (America/Bogota).
+            </p>
+            <div
+              className={styles.tableWrapper}
+              role="region"
+              aria-labelledby="assignments-list-heading"
+              tabIndex={0}
+            >
+              <table className={styles.table}>
+                <caption className="sr-only">
+                  Asignaciones registradas con grupo, ventana de disponibilidad y cumplimiento
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Actividad</th>
+                    <th scope="col">Grupo</th>
+                    <th scope="col">Apertura</th>
+                    <th scope="col">Cierre</th>
+                    <th scope="col">Disponibilidad</th>
+                    <th scope="col">Cumplimiento</th>
+                    <th scope="col">
+                      <span className="sr-only">Acción</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignments.map((assignment) => {
+                    const badgeKind =
+                      availabilityBadgeKinds[assignment.availability] ?? 'assignmentOpen';
+                    const compliance = resolveCompliance(
+                      assignment,
+                      groupCountById.get(assignment.group.id),
+                    );
+
+                    return (
+                      <tr key={assignment.id}>
+                        <th scope="row" className={styles.activityCell}>
+                          <span lang="en" className={styles.activityTitle}>
+                            {assignment.activity.title}
+                          </span>
+                          <span className={styles.activityMeta}>
+                            {typeLabels[assignment.activity.type]} · Nivel {assignment.activity.level}{' '}
+                            · v{assignment.activity.version}
+                          </span>
+                        </th>
+
+                        <td data-label="Grupo" className={styles.groupCell}>
+                          <span className={styles.groupName}>{assignment.group.name}</span>
+                          {assignment.group.archivedAt && (
+                            <span className={styles.archivedTag}>(Archivado)</span>
+                          )}
+                        </td>
+
+                        <td data-label="Apertura">
+                          <time dateTime={assignment.opensAt} className={styles.dateValue}>
+                            {formatBogotaDateTime(assignment.opensAt)}
+                          </time>
+                        </td>
+
+                        <td data-label="Cierre">
+                          <time dateTime={assignment.dueAt} className={styles.dateValue}>
+                            {formatBogotaDateTime(assignment.dueAt)}
+                          </time>
+                        </td>
+
+                        <td data-label="Disponibilidad">
+                          <TeacherStatusBadge kind={badgeKind} />
+                        </td>
+
+                        <td data-label="Cumplimiento">
+                          {compliance.kind === 'progress' ? (
+                            <div className={styles.complianceStack}>
+                              <div
+                                className={styles.progressTrack}
+                                role="progressbar"
+                                aria-valuenow={compliance.completed}
+                                aria-valuemin={0}
+                                aria-valuemax={compliance.denominator}
+                                aria-label={`Cumplimiento: ${compliance.completed} de ${compliance.denominator} estudiantes`}
+                              >
+                                <div
+                                  className={styles.progressFill}
+                                  data-complete={compliance.isComplete ? 'true' : undefined}
+                                  style={{ width: `${compliance.percent}%` }}
+                                />
+                              </div>
+                              <span className={styles.complianceFraction}>
+                                {compliance.completed} / {compliance.denominator}
+                              </span>
+                            </div>
+                          ) : compliance.kind === 'pendingSummary' ? (
+                            <div className={styles.complianceStack}>
+                              <div className={styles.progressTrack} aria-hidden="true" />
+                              <span className={styles.complianceMuted}>
+                                — / {compliance.obligated}
+                                <span className="sr-only">
+                                  {' '}
+                                  estudiantes en el grupo (detalle de entregas en ficha)
+                                </span>
+                              </span>
+                            </div>
+                          ) : compliance.kind === 'cancelled' ? (
+                            <span
+                              className={styles.complianceMuted}
+                              aria-label="No aplica, asignación cancelada"
+                            >
+                              —
+                            </span>
+                          ) : (
+                            <span className={styles.complianceMuted}>—</span>
+                          )}
+                        </td>
+
+                        <td className={styles.actionCell}>
+                          <Link
+                            href={`/asignaciones/${encodeURIComponent(assignment.id)}`}
+                            className={styles.detailLink}
+                            aria-label={`Ver detalle de asignación: ${assignment.activity.title} para ${assignment.group.name}`}
+                          >
+                            Ver detalle
+                            <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

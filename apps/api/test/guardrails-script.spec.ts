@@ -469,4 +469,19 @@ export function GoodClient() {
       }
     }, 30_000);
   });
+
+  describe('CI-BLOCK-01: Overrides de supply chain en pnpm-workspace.yaml', () => {
+    it('CI-BLOCK-01: fija overrides de effect >= 3.22.1 y esbuild >= 0.28.1 y vitest >= 4.1.12 en los tres paquetes', () => {
+      const workspaceYaml = fs.readFileSync(path.join(repoRoot, 'pnpm-workspace.yaml'), 'utf8');
+      expect(workspaceYaml).toContain("'effect@<=3.22.0': '3.22.5'");
+      expect(workspaceYaml).toContain("'esbuild@>=0.27.3 <0.28.1': '>=0.28.1'");
+
+      for (const pkgRel of ['apps/api/package.json', 'apps/web/package.json', 'packages/shared/package.json']) {
+        const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, pkgRel), 'utf8')) as {
+          devDependencies?: Record<string, string>;
+        };
+        expect(pkg.devDependencies?.vitest).toBe('^4.1.12');
+      }
+    });
+  });
 });

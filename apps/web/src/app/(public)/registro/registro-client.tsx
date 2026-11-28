@@ -2,8 +2,17 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { Check } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { getAuthErrorMessage } from '../../../lib/auth-errors';
+import { AuthAlert, AuthHeading, AuthPage } from '../auth-page';
+import styles from '../auth-page.module.css';
+
+const termsError = 'Debes aceptar los términos y condiciones para continuar';
+
+function focusSuccessTitle(title: HTMLHeadingElement | null) {
+  title?.focus();
+}
 
 export function RegistroClient() {
   const [name, setName] = useState('');
@@ -29,6 +38,8 @@ export function RegistroClient() {
         },
         body: JSON.stringify(payload),
         credentials: 'include',
+      }).catch(() => {
+        throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
       });
 
       if (!res.ok) {
@@ -44,7 +55,7 @@ export function RegistroClient() {
       const message =
         data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
           ? data.message
-          : '¡Solicitud enviada con éxito! Tu cuenta está en revisión. Tu docente la aprobará pronto para que puedas ingresar.';
+          : 'Recibimos tu solicitud.';
       return { message };
     },
     onSuccess: (data) => {
@@ -57,6 +68,7 @@ export function RegistroClient() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (registerMutation.isPending) return;
     setErrorMessage(null);
 
     // Client-side password policy check (RF-8)
@@ -66,7 +78,7 @@ export function RegistroClient() {
     }
 
     if (!acceptTerms) {
-      setErrorMessage('Debes aceptar los términos y condiciones para continuar');
+      setErrorMessage(termsError);
       return;
     }
 
@@ -90,64 +102,52 @@ export function RegistroClient() {
 
   if (successMessage) {
     return (
-      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 bg-zinc-50 outline-none">
-        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-zinc-200 text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-            🎉
-          </div>
-          <h1 className="text-2xl font-bold text-zinc-900 mb-2">Solicitud de registro enviada</h1>
-          <p className="text-sm text-zinc-600 mb-6">{successMessage}</p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px]"
-          >
-            Ir al inicio de sesión
-          </Link>
+      <AuthPage variant="success">
+        <div className={styles.successMark} aria-hidden="true">
+          <Check size={32} strokeWidth={2.5} />
         </div>
-      </main>
+        <h1 ref={focusSuccessTitle} tabIndex={-1} className={styles.title}>
+          Solicitud de registro enviada
+        </h1>
+        <div className={styles.subtitle}>
+          <p>{successMessage}</p>
+          <p>Tu profesora revisará tu solicitud. Podrás iniciar sesión cuando apruebe tu cuenta.</p>
+        </div>
+        <Link href="/login" className={styles.primary}>
+          Ir al inicio de sesión
+        </Link>
+      </AuthPage>
     );
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-6 bg-zinc-50 outline-none">
-      <div className="w-full max-w-lg bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-zinc-900 tracking-tight">Crea tu cuenta</h1>
-          <p className="text-sm text-zinc-600 mt-2">
-            Registro de estudiante para aprender inglés en Upward English.
-          </p>
-        </div>
+    <AuthPage variant="signup">
+      <AuthHeading
+        title="Crea tu cuenta"
+        description="Regístrate para aprender inglés jugando y practicando con tu profesora."
+      />
 
-        {errorMessage && (
-          <div
-            role="alert"
-            className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium"
-          >
-            {errorMessage}
-          </div>
-        )}
+      {errorMessage && <AuthAlert message={errorMessage} />}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <section aria-labelledby="student-details" className={styles.fields}>
+          <h2 id="student-details" className={styles.sectionTitle}>Datos del estudiante</h2>
           <div>
-            <label htmlFor="name-input" className="block text-sm font-medium text-zinc-700 mb-1">
-              Nombre completo del alumno
-            </label>
+            <label htmlFor="name-input" className={styles.label}>Nombre completo del alumno</label>
             <input
               id="name-input"
               name="name"
               type="text"
+              autoComplete="name"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+              className={styles.input}
               placeholder="Ej. Lucas Gómez"
             />
           </div>
-
           <div>
-            <label htmlFor="email-input" className="block text-sm font-medium text-zinc-700 mb-1">
-              Correo electrónico
-            </label>
+            <label htmlFor="email-input" className={styles.label}>Correo electrónico</label>
             <input
               id="email-input"
               name="email"
@@ -156,130 +156,123 @@ export function RegistroClient() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+              className={styles.input}
               placeholder="lucas@ejemplo.com"
             />
           </div>
-
           <div>
-            <label htmlFor="birthdate-input" className="block text-sm font-medium text-zinc-700 mb-1">
-              Fecha de nacimiento
-            </label>
+            <label htmlFor="birthdate-input" className={styles.label}>Fecha de nacimiento</label>
             <input
               id="birthdate-input"
               name="birthDate"
               type="date"
+              autoComplete="bday"
+              aria-describedby="birthdate-help"
               required
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+              className={styles.input}
             />
-            <p className="text-xs text-zinc-500 mt-1">
-              La edad determina el segmento pedagógico (Kids: 7-10 años, Teens: 11-14 años).
+            <p id="birthdate-help" className={styles.help}>
+              Tu fecha de nacimiento ayuda a preparar tu espacio según tu edad.
             </p>
           </div>
-
           <div>
-            <label htmlFor="password-input" className="block text-sm font-medium text-zinc-700 mb-1">
-              Contraseña
-            </label>
+            <label htmlFor="password-input" className={styles.label}>Contraseña</label>
             <input
               id="password-input"
               name="password"
               type="password"
               autoComplete="new-password"
+              aria-describedby="password-help"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
-              placeholder="Entre 8 y 16 caracteres, sin espacios"
+              className={styles.input}
             />
+            <p id="password-help" className={styles.help}>Usa entre 8 y 16 caracteres, sin espacios.</p>
           </div>
+        </section>
 
-          <div className="pt-2 border-t border-zinc-200">
-            <h2 className="text-sm font-semibold text-zinc-800 mb-2">
-              Datos del Acudiente / Tutor (Opcional)
-            </h2>
-            <div className="space-y-3">
-              <div>
-                <label
-                  htmlFor="guardian-name-input"
-                  className="block text-xs font-medium text-zinc-600 mb-1"
-                >
-                  Nombre del acudiente
-                </label>
-                <input
-                  id="guardian-name-input"
-                  name="guardianName"
-                  type="text"
-                  value={guardianName}
-                  onChange={(e) => setGuardianName(e.target.value)}
-                  className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[40px]"
-                  placeholder="Ej. María Gómez"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="guardian-contact-input"
-                  className="block text-xs font-medium text-zinc-600 mb-1"
-                >
-                  Teléfono o correo del acudiente
-                </label>
-                <input
-                  id="guardian-contact-input"
-                  name="guardianContact"
-                  type="text"
-                  value={guardianContact}
-                  onChange={(e) => setGuardianContact(e.target.value)}
-                  className="w-full px-4 py-2 border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[40px]"
-                  placeholder="Ej. 300 123 4567 o maria@ejemplo.com"
-                />
-              </div>
+        <section aria-labelledby="guardian-details" className={styles.guardian}>
+          <h2 id="guardian-details" className={styles.sectionTitle}>
+            Contacto del acudiente (opcional)
+          </h2>
+          <div className={styles.guardianFields}>
+            <div>
+              <label htmlFor="guardian-name-input" className={styles.label}>Nombre del acudiente</label>
+              <input
+                id="guardian-name-input"
+                name="guardianName"
+                type="text"
+                value={guardianName}
+                onChange={(e) => setGuardianName(e.target.value)}
+                className={styles.input}
+                placeholder="Ej. María Gómez"
+              />
+            </div>
+            <div>
+              <label htmlFor="guardian-contact-input" className={styles.label}>Teléfono o correo</label>
+              <input
+                id="guardian-contact-input"
+                name="guardianContact"
+                type="text"
+                value={guardianContact}
+                onChange={(e) => setGuardianContact(e.target.value)}
+                className={styles.input}
+                placeholder="Ej. 300 123 4567"
+              />
             </div>
           </div>
+        </section>
 
-          <div className="pt-2">
-            <label htmlFor="accept-terms-checkbox" className="flex items-start gap-3 cursor-pointer">
+        <section aria-labelledby="signup-confirmation" className={styles.confirmation}>
+          <h2 id="signup-confirmation" className={styles.sectionTitle}>Confirmación</h2>
+          <div className={styles.terms}>
+            <span className={styles.checkboxTarget}>
               <input
                 id="accept-terms-checkbox"
                 name="acceptTerms"
                 type="checkbox"
                 required
+                aria-labelledby="terms-copy"
                 checked={acceptTerms}
-                onChange={(e) => setAcceptTerms(e.target.checked)}
-                className="mt-1 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                onInvalid={() => setErrorMessage(termsError)}
+                onChange={(e) => {
+                  setAcceptTerms(e.target.checked);
+                  if (e.target.checked && errorMessage === termsError) setErrorMessage(null);
+                }}
               />
-              <span className="text-sm text-zinc-600">
-                Acepto los{' '}
-                <Link
-                  href="/terminos"
-                  target="_blank"
-                  className="text-blue-600 hover:text-blue-700 underline font-medium"
-                >
-                  términos y condiciones
-                </Link>{' '}
-                de la plataforma y el tratamiento de datos para fines educativos.
+              <span className={styles.checkboxMark} aria-hidden="true">
+                <Check size={16} strokeWidth={3} />
               </span>
-            </label>
+            </span>
+            <span id="terms-copy" className={styles.termsText}>
+              <label htmlFor="accept-terms-checkbox">Acepto los</label>{' '}
+              <Link href="/terminos" target="_blank" rel="noopener noreferrer" className={styles.link}>
+                términos y condiciones
+              </Link>{' '}
+              <label htmlFor="accept-terms-checkbox">
+                de la plataforma y el tratamiento de datos para fines educativos.
+              </label>
+            </span>
           </div>
+        </section>
 
-          <button
-            type="submit"
-            disabled={registerMutation.isPending}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-base transition-colors min-h-[48px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-          >
-            {registerMutation.isPending ? 'Enviando…' : 'Enviar solicitud'}
-          </button>
-        </form>
+        <button
+          type="submit"
+          disabled={registerMutation.isPending}
+          aria-busy={registerMutation.isPending}
+          className={styles.primary}
+        >
+          {registerMutation.isPending ? 'Enviando…' : 'Enviar solicitud'}
+        </button>
+      </form>
 
-        <div className="mt-6 text-center text-sm text-zinc-600">
-          ¿Ya tienes una cuenta?{' '}
-          <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-            Inicia sesión
-          </Link>
-        </div>
+      <div className={styles.footer}>
+        ¿Ya tienes una cuenta?
+        <Link href="/login" className={styles.link}>Inicia sesión</Link>
       </div>
-    </main>
+    </AuthPage>
   );
 }

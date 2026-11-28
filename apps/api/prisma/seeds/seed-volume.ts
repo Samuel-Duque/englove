@@ -50,7 +50,7 @@ export async function seedVolume() {
     const padded = i.toString().padStart(4, '0');
     const segment = i % 2 === 0 ? AgeSegment.kids : AgeSegment.teens;
     const level = levels[(i - 1) % levels.length]!;
-    const email = `student.vol.${padded}@upwardenglish.org`;
+    const email = `student.vol.${padded}@upwardenglish.app`;
     const groupId = groups[level]!;
 
     const user = await prisma.user.upsert({

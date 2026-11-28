@@ -1,3 +1,5 @@
+import { addSessionCookie } from './session';
+import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)', () => {
@@ -13,20 +15,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     context,
   }) => {
     // 1. Simular cookie de sesión para proxy.ts
-    await context.addCookies([
-      {
-        name: 'upward_english_local_access_token',
-        value: 'mock-student-token',
-        domain: 'localhost',
-        path: '/',
-      },
-      {
-        name: 'upward_english_access_token',
-        value: 'mock-student-token',
-        domain: 'localhost',
-        path: '/',
-      },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     // 2. Mockear endpoints de API a nivel de red
     const sessionPayload1 = {
@@ -278,7 +267,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
 
     // 9. Navegar a /progreso y verificar racha y medallas
     await page.goto('/progreso');
-    await expect(page.locator('text=3 semanas consecutivas')).toBeVisible();
+    await expect(page.getByText('3 semanas activas', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Primera Actividad' })).toBeVisible();
   });
 
@@ -286,10 +275,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     page,
     context,
   }) => {
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     const sessionPayload2 = {
       user: { id: 'std-e2e-open', name: 'Laura Gómez', email: 'laura@upwardenglish.local', role: 'student' },
@@ -368,14 +354,76 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     ).toBeVisible();
   });
 
+  test('Kids conserva una entrega de examen sin conexión y aplaza la actualización durante el intento', async ({
+    page,
+    context,
+  }) => {
+    await addSessionCookie(context, 'mock-student-token');
+    const profile = {
+      user: { id: 'student-exam', name: 'Estudiante de prueba', email: 'exam@upwardenglish.local', role: 'student' },
+      student: { id: 'student-exam', level: 'A1', ageSegment: 'kids', canSwitchInterface: false },
+      organizationId: 'org-e2e',
+    };
+    await page.route('**/api/v1/me', route => route.fulfill({ json: profile }));
+    await page.route('**/api/v1/feature-flags', route => route.fulfill({
+      json: { flags: { games: true, extra_content: true } },
+    }));
+    const itemId = '11111111-1111-4111-8111-111111111111';
+    const blankId = '22222222-2222-4222-8222-222222222222';
+    const optionId = '33333333-3333-4333-8333-333333333333';
+    await page.route('**/api/v1/attempts/att-offline-exam', route => route.fulfill({
+      headers: { 'X-App-Min-Version': '99.0.0', 'Access-Control-Expose-Headers': 'X-App-Min-Version' },
+      json: {
+        attempt: { id: 'att-offline-exam', attemptNumber: 1, status: 'in_progress' },
+        activity: {
+          id: 'act-exam',
+          title: 'My first exam',
+          type: 'exam',
+          level: 'A1',
+          config: {
+            items: [{
+              id: itemId,
+              weight: 100,
+              prompt: 'I {{' + blankId + '}} a student.',
+              blanks: [{
+                id: blankId,
+                options: [
+                  { id: optionId, text: 'am' },
+                  { id: '44444444-4444-4444-8444-444444444444', text: 'are' },
+                ],
+              }],
+            }],
+          },
+        },
+        attemptToken: 'test-attempt-token',
+      },
+    }));
+    await page.route('**/api/v1/attempts/att-offline-exam/complete', route => route.abort('internetdisconnected'));
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/actividad/att-offline-exam');
+    await expect(page.getByRole('heading', { name: 'My first exam' })).toBeVisible();
+    const update = page.getByRole('button', { name: 'Actualizar', exact: true });
+    await expect(update).toHaveCount(0);
+    await context.setOffline(true);
+    const answer = page.getByRole('combobox', { name: 'Espacio 1' });
+    expect((await answer.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    await answer.selectOption({ label: 'am' });
+    await expect(page.getByText('Guardado en este dispositivo', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /Entregar actividad/ }).click();
+    await expect(page.getByRole('heading', { name: 'Guardado en este dispositivo' })).toBeVisible();
+    await expect(page.getByText('Tu trabajo se enviará automáticamente cuando vuelva la conexión.')).toBeVisible();
+    await expect(page.getByText('Sincronizado con el servidor', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Nota:/)).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /estrellas/ })).toHaveCount(0);
+    await expect(update).toBeVisible();
+  });
+
   test('RF-3 & RF-13: Runner de speaking con grabación de audio y subida firmada a R2', async ({
     page,
     context,
   }) => {
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'mock-student-token', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'mock-student-token');
 
     const sessionPayload3 = {
       user: { id: 'std-e2e-spk', name: 'Tomás Speaking', email: 'tomas@upwardenglish.local', role: 'student' },
@@ -383,6 +431,10 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
       organizationId: 'org-e2e',
     };
     await page.route('**/api/v1/me', route => route.fulfill({status: 200, json: sessionPayload3}));
+
+    await page.route('**/api/v1/feature-flags', route => route.fulfill({
+      json: { flags: { games: true, extra_content: true } },
+    }));
 
     await page.route('**/api/v1/auth/session', async (route) => {
       await route.fulfill({
@@ -416,6 +468,7 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
             level: 'A1',
             config: {
               prompt: 'Say hello and say your name and favorite color.',
+              maxDurationSeconds: 300,
             },
           },
           answers: {},
@@ -500,13 +553,23 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     await page.goto('/actividad/att-spk-1');
     await expect(page.locator('h1:has-text("Introduce Yourself in English")')).toBeVisible();
 
-    // Iniciar grabación
-    const recordBtn = page.locator('button:has-text("Empezar a grabar")');
-    await expect(recordBtn).toBeVisible();
+    const recordBtn = page.getByRole('button', { name: 'Grabar audio' });
+    for (const [width, height] of [[320, 720], [390, 844], [800, 1280], [1280, 800]] as const) {
+      await page.setViewportSize({ width, height });
+      await expect(recordBtn).toBeVisible();
+      expect((await recordBtn.boundingBox())?.height).toBeGreaterThanOrEqual(56);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByText('00:00 / 05:00')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Volver a mi ruta' })).toHaveAttribute('href', '/inicio');
+    const accessibility = await new AxeBuilder({ page }).include('main').withTags([
+      'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa',
+    ]).analyze();
+    expect(accessibility.violations).toEqual([]);
     await recordBtn.click();
 
-    // Esperar al menos 2.1 segundos para satisfacer minDurationSeconds (RF-3)
-    await page.waitForTimeout(2100);
+    await expect(page.getByText('00:02 / 05:00')).toBeVisible();
 
     // Detener grabación
     const stopBtn = page.locator('button:has-text("Detener grabación")');
@@ -514,6 +577,9 @@ test.describe('SPEC-05: Portal del Alumno y Ciclo de Intentos (ENG-145 / RF-30)'
     await stopBtn.click();
 
     await expect(page.locator('text=Grabación lista para enviar')).toBeVisible();
+    const preview = page.locator('audio[controls]');
+    await expect(preview).toHaveAttribute('src', /^blob:/);
+    expect((await preview.boundingBox())?.height).toBeGreaterThanOrEqual(48);
 
     // OFF-01: apertura directa, borrador confirmado y recarga no duplican assets.
     await expect(page.locator('button:has-text("Entregar actividad")')).toBeEnabled();

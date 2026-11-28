@@ -5,7 +5,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 
 type ExtensionQueryHook = (params: {
   model: string;
-  args?: { where?: Record<string, unknown>; data?: Record<string, unknown> };
+  args?: { where?: Record<string, unknown>; data?: Record<string, unknown> | Array<Record<string, unknown>> };
   query: (args: unknown) => Promise<unknown>;
 }) => Promise<unknown>;
 
@@ -19,8 +19,10 @@ interface ExtensionDefinition {
       count?: ExtensionQueryHook;
       create?: ExtensionQueryHook;
       createMany?: ExtensionQueryHook;
+      createManyAndReturn?: ExtensionQueryHook;
       update?: ExtensionQueryHook;
       updateMany?: ExtensionQueryHook;
+      updateManyAndReturn?: ExtensionQueryHook;
       delete?: ExtensionQueryHook;
       deleteMany?: ExtensionQueryHook;
       upsert?: (params: {
@@ -247,10 +249,10 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
     await TenantContext.runBypass(async () => {
       const res = await findUniqueHook({
         model: 'User',
-        args: { where: { email: 'profesora@upwardenglish.org' } },
+        args: { where: { email: 'profesora@upwardenglish.app' } },
         query: mockQuery,
       });
-      expect(res).toEqual({ where: { email: 'profesora@upwardenglish.org' } });
+      expect(res).toEqual({ where: { email: 'profesora@upwardenglish.app' } });
 
       const resThrow = await findUniqueOrThrowHook({
         model: 'User',
@@ -440,6 +442,251 @@ describe('ENG-021 / SPEC-02 §8: Tenant Prisma Extension and PrismaService conne
         });
       }),
     ).rejects.toThrow(/Violación de aislamiento tenant en Student: organization_id no puede ser negado/);
+  });
+
+  describe('SEC-TENANT-01: *ManyAndReturn y SQL crudo con TenantContext activo', () => {
+    const otherOrgId = '99999999-9999-9999-9999-999999999999';
+
+    // Forma con la que Prisma entrega $queryRaw/$executeRaw a las extensiones: [strings, ...values].
+    function rawArgs(strings: string[], ...values: unknown[]): unknown {
+      return [strings, ...values];
+    }
+
+    it('SEC-TENANT-01: createManyAndReturn inyecta organization_id y rechaza un tenant discordante', async () => {
+      const hook = extractExtensionDef().query?.$allModels?.createManyAndReturn;
+      expect(hook).toBeDefined();
+      if (!hook) return;
+      const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+      const result = (await TenantContext.run({ organizationId: orgId }, async () =>
+        hook({
+          model: 'ProgressEvent',
+          args: { data: [{ type: 'a' }, { type: 'b' }] },
+          query: mockQuery,
+        }),
+      )) as { data: Array<{ organization_id: string }> };
+      expect(result.data.map((row) => row.organization_id)).toEqual([orgId, orgId]);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          hook({
+            model: 'ProgressEvent',
+            args: { data: [{ type: 'a', organization_id: otherOrgId }] },
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/Violación de aislamiento tenant en ProgressEvent: organization_id discordante/);
+
+      await expect(
+        hook({ model: 'ProgressEvent', args: { data: [{ type: 'a' }] }, query: mockQuery }),
+      ).rejects.toThrow(/Operación multi-tenant rechazada/);
+    });
+
+    it('SEC-TENANT-01: updateManyAndReturn inyecta organization_id y bloquea filtros cross-tenant', async () => {
+      const hook = extractExtensionDef().query?.$allModels?.updateManyAndReturn;
+      expect(hook).toBeDefined();
+      if (!hook) return;
+      const mockQuery = vi.fn().mockImplementation(async (args) => args);
+
+      await TenantContext.run({ organizationId: orgId }, async () =>
+        hook({ model: 'Attempt', args: { where: { status: 'pending' }, data: { flags: [] } }, query: mockQuery }),
+      );
+      expect(mockQuery).toHaveBeenCalledWith({
+        where: { status: 'pending', organization_id: orgId },
+        data: { flags: [] },
+      });
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          hook({ model: 'Attempt', args: { where: { organization_id: otherOrgId }, data: {} }, query: mockQuery }),
+        ),
+      ).rejects.toThrow(/Violación de aislamiento tenant en Attempt: organization_id discordante/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          hook({ model: 'Attempt', args: { where: { status: 'pending' }, data: { organization_id: otherOrgId } }, query: mockQuery }),
+        ),
+      ).rejects.toThrow(/Violación de aislamiento tenant en Attempt: organization_id discordante/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          hook({
+            model: 'Attempt',
+            args: { where: { status: 'pending' }, data: { organization: { connect: { id: otherOrgId } } } },
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/Violación de aislamiento tenant en Attempt: mutación inválida de relación organization/);
+
+      await expect(
+        hook({ model: 'Attempt', args: { where: { status: 'pending' }, data: {} }, query: mockQuery }),
+      ).rejects.toThrow(/Operación multi-tenant rechazada: organization_id ausente/);
+    });
+
+    it('SEC-TENANT-01: $queryRaw, $executeRaw y métodos *Unsafe bloquean evasiones con NOW(), SELECT 1 FROM, literales SQL y comentarios aunque TenantContext esté activo', async () => {
+      const def = extractExtensionDef();
+      const queryRawHook = def.query?.$queryRaw;
+      const executeRawHook = def.query?.$executeRaw;
+      const queryRawUnsafeHook = Reflect.get(def.query ?? {}, '$' + 'queryRawUnsafe') as
+        | ((params: { args: unknown; query: (args: unknown) => Promise<unknown> }) => Promise<unknown>)
+        | undefined;
+      const executeRawUnsafeHook = Reflect.get(def.query ?? {}, '$' + 'executeRawUnsafe') as
+        | ((params: { args: unknown; query: (args: unknown) => Promise<unknown> }) => Promise<unknown>)
+        | undefined;
+      expect(queryRawHook).toBeDefined();
+      expect(executeRawHook).toBeDefined();
+      expect(queryRawUnsafeHook).toBeDefined();
+      expect(executeRawUnsafeHook).toBeDefined();
+      if (!queryRawHook || !executeRawHook || !queryRawUnsafeHook || !executeRawUnsafeHook) return;
+      const mockQuery = vi.fn().mockResolvedValue([]);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({ args: rawArgs(['SELECT * FROM students WHERE id = ', '::uuid'], 's-1'), query: mockQuery }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      // Evasión mediante NOW() en predicado sobre tabla de tenant
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: rawArgs(['SELECT * FROM auth_sessions WHERE expires_at > NOW()']),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      // Evasión mediante SELECT 1 FROM <table> o encadenamiento con ;
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: rawArgs(['SELECT 1 FROM users WHERE email = ', ''], 'a@b.co'),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          executeRawHook({
+            args: rawArgs(['SELECT 1; DELETE FROM groups WHERE id = ', '::uuid'], 'g-1'),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$executeRaw sin filtro organization_id con TenantContext activo/);
+
+      // Comentarios SQL (línea, bloque anidado) y literales de cadena ('...' y $$...$$) o subcadenas
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: rawArgs(['SELECT * FROM students -- organization_id']),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: [{ strings: ['SELECT * FROM students /* outer /* organization_id */ still comment */'], values: [] }],
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: rawArgs(["SELECT * FROM users WHERE email = 'organization_id@school.edu'"]),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: rawArgs(['SELECT $$organization_id$$ FROM users']),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({
+            args: rawArgs(['SELECT id AS fake_organization_id FROM users']),
+            query: mockQuery,
+          }),
+        ),
+      ).rejects.toThrow(/\$queryRaw sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          executeRawHook({ args: rawArgs(['UPDATE attempts SET flags = \'{}\' WHERE id = ', ''], 'a-1'), query: mockQuery }),
+        ),
+      ).rejects.toThrow(/\$executeRaw sin filtro organization_id con TenantContext activo/);
+
+      // Métodos *Unsafe bloqueados en runtime fuera de bypass explícito
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawUnsafeHook({ args: ['SELECT * FROM users WHERE organization_id = $1', orgId], query: mockQuery }),
+        ),
+      ).rejects.toThrow(/prohibido fuera de bypass explícito/);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          executeRawUnsafeHook({ args: ['DELETE FROM groups WHERE organization_id = $1', orgId], query: mockQuery }),
+        ),
+      ).rejects.toThrow(/prohibido fuera de bypass explícito/);
+
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('SEC-TENANT-01: permite SQL crudo con organization_id, consultas de sistema y bypass explícito', async () => {
+      const def = extractExtensionDef();
+      const queryRawHook = def.query?.$queryRaw;
+      const executeRawHook = def.query?.$executeRaw;
+      if (!queryRawHook || !executeRawHook) throw new Error('hooks ausentes');
+      const mockQuery = vi.fn().mockResolvedValue([]);
+
+      await TenantContext.run({ organizationId: orgId }, async () => {
+        await queryRawHook({
+          args: rawArgs(['SELECT id FROM attempts WHERE id = ', '::uuid AND organization_id = ', '::uuid FOR UPDATE'], 'a-1', orgId),
+          query: mockQuery,
+        });
+        await queryRawHook({ args: rawArgs(['SELECT 1']), query: mockQuery });
+        await executeRawHook({ args: rawArgs(['SELECT pg_advisory_xact_lock(', ')'], 42), query: mockQuery });
+      });
+      await TenantContext.runBypass(async () => {
+        await executeRawHook({ args: rawArgs(['DELETE FROM auth_sessions WHERE expires_at < NOW()']), query: mockQuery });
+      });
+
+      expect(mockQuery).toHaveBeenCalledTimes(4);
+    });
+
+    it('SEC-TENANT-01: solo admite el bloqueo de la fila raíz de la organización activa', async () => {
+      const queryRawHook = extractExtensionDef().query?.$queryRaw;
+      if (!queryRawHook) throw new Error('hook ausente');
+      const mockQuery = vi.fn().mockResolvedValue([]);
+      const rootLock = ['\n          SELECT id FROM organizations\n          WHERE id = ', '::uuid\n          FOR UPDATE\n        '];
+
+      await TenantContext.run({ organizationId: orgId }, async () =>
+        queryRawHook({ args: rawArgs(rootLock, orgId), query: mockQuery }),
+      );
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+
+      await expect(
+        TenantContext.run({ organizationId: orgId }, async () =>
+          queryRawHook({ args: rawArgs(rootLock, otherOrgId), query: mockQuery }),
+        ),
+      ).rejects.toThrow(/sin filtro organization_id con TenantContext activo/);
+
+      await expect(
+        queryRawHook({ args: rawArgs(rootLock, orgId), query: mockQuery }),
+      ).rejects.toThrow(/organization_id ausente en TenantContext para \$queryRaw/);
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

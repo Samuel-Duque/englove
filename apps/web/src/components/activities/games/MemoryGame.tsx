@@ -10,6 +10,8 @@ import {
   deterministicShuffle,
 } from '@upward-english/shared';
 import { soundManager } from '../../../lib/sound';
+import kidsStyles from './kids-game.module.css';
+import teensStyles from './teens-game.module.css';
 
 export function MemoryGame({
   config,
@@ -135,13 +137,17 @@ export function MemoryGame({
   };
 
   const isKids = theme === 'kids';
+  const isTeens = theme === 'teens';
+  const styles = isTeens ? teensStyles : kidsStyles;
 
   return (
     <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
+      className={`${styles.board} w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
         isKids
           ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+          : isTeens
+            ? ''
+            : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
       }`}
     >
       {previewMode && (
@@ -156,7 +162,7 @@ export function MemoryGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
+        <div className={`${styles.legacyInstructions} mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs`}>
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
             {config.instructions}
           </p>
@@ -164,7 +170,7 @@ export function MemoryGame({
       )}
 
       {/* Grid of cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
+      <div className={`${styles.memoryGrid} grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 mb-8`}>
         {shuffledCards.map((card) => {
           const isResolved = resolvedCardIds.has(card.id);
           const isTurnFlipped = activeFlippedIds.includes(card.id);
@@ -181,27 +187,50 @@ export function MemoryGame({
                   handleCardClick(card.id);
                 }
               }}
-              className={`min-h-24 sm:min-h-28 rounded-2xl p-3 border-2 font-black text-sm sm:text-base flex items-center justify-center text-center shadow-xs transition-all touch-manipulation select-none focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+              data-state={isResolved ? 'correct' : isFaceUp ? (isLocked ? 'incorrect' : 'open') : 'covered'}
+              className={`${styles.piece} ${styles.card} min-h-24 sm:min-h-28 rounded-2xl p-3 border-2 font-black text-sm sm:text-base flex items-center justify-center text-center shadow-xs transition-all touch-manipulation select-none ${
+                isTeens ? 'font-bold' : 'focus:outline-none focus:ring-2 focus:ring-amber-500'
+              } ${
                 isInactive ? 'cursor-default' : 'cursor-pointer'
               } ${
-                isFaceUp
-                  ? isResolved
-                    ? 'border-emerald-400 bg-emerald-100/90 text-emerald-950 scale-102 ring-2 ring-emerald-300'
-                    : 'border-amber-400 bg-amber-100 text-amber-950 scale-105 ring-4 ring-amber-300'
-                  : isKids
-                    ? 'border-amber-400 bg-gradient-to-br from-amber-400 to-amber-500 text-amber-950 hover:from-amber-400 hover:to-amber-500 active:scale-95'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-750 active:scale-95'
+                isTeens
+                  ? ''
+                  : isFaceUp
+                    ? isResolved
+                      ? 'border-emerald-400 bg-emerald-100/90 text-emerald-950 scale-102 ring-2 ring-emerald-300'
+                      : 'border-amber-400 bg-amber-100 text-amber-950 scale-105 ring-4 ring-amber-300'
+                    : isKids
+                      ? 'border-amber-400 bg-gradient-to-br from-amber-400 to-amber-500 text-amber-950 hover:from-amber-400 hover:to-amber-500 active:scale-95'
+                      : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-750 active:scale-95'
               }`}
               aria-label={isFaceUp ? card.text : 'Tarjeta oculta'}
             >
               {isFaceUp ? (
                 <div className="flex flex-col items-center gap-1">
-                  <span>{card.text}</span>
-                  {isResolved && <span className="text-xs">✨</span>}
+                  <span lang="en">{card.text}</span>
+                  {isResolved && <span className="text-xs" aria-hidden="true">✓</span>}
+                  {isLocked && !isResolved && <span className="text-xs" aria-hidden="true">✕</span>}
                 </div>
+              ) : isTeens ? (
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 28 28"
+                  fill="none"
+                  aria-hidden="true"
+                  className="text-[#5E3E2C]"
+                >
+                  <circle cx="14" cy="14" r="10.5" stroke="currentColor" strokeWidth="1.75" />
+                  <path
+                    d="M14 7.5L16.7 14L14 20.5L11.3 14L14 7.5Z"
+                    stroke="#C6470B"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               ) : (
                 <span className="text-2xl" aria-hidden="true">
-                  ❓
+                  {isKids ? '🧭' : '❓'}
                 </span>
               )}
             </button>
@@ -210,21 +239,23 @@ export function MemoryGame({
       </div>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-amber-200/60 flex items-center justify-between">
-        <p className="text-xs font-semibold text-zinc-500">
+      <div className={`${styles.footer} pt-4 ${isTeens ? '' : 'border-t border-amber-200/60'} flex items-center justify-between`}>
+        <p className={`${styles.meta} text-xs font-semibold ${isTeens ? '' : 'text-zinc-500'}`}>
           Parejas encontradas: {foundPairsCount} de {totalPairsCount} · Turnos jugados: {selections.length}
         </p>
 
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
+          className={`${styles.finish} min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
             isKids
               ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+              : isTeens
+                ? ''
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
-          Finalizar juego de memoria ✨
+          {isTeens ? 'Finalizar memoria' : 'Finalizar juego de memoria ✨'}
         </button>
       </div>
     </div>

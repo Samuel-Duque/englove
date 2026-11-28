@@ -1,6 +1,6 @@
 # Upward English — Contexto raíz del proyecto
 
-> **Estado vigente de la remediación, 2026-11-12:** la [auditoría general](../planning/auditoria-general-2026-11-12.md) y su [informe de correcciones](../planning/remediacion-auditoria-2026-11-12.md) complementan los registros históricos siguientes. La enmienda NEG-01 de SPEC-08 alinea el umbral con las decisiones vigentes 83/132, autorizada al solicitar corregir los hallazgos; su re-verificación CI está pendiente. Los conteos anteriores son evidencia fechada y el lanzamiento continúa sujeto a staging y aceptación operativa. No cambia el alcance del piloto ni se añade una decisión de producto.
+> **Diagnóstico técnico vigente (2026-11-26):** ver [`planning/auditoria-integral-estado-actual.md`](../planning/auditoria-integral-estado-actual.md) (las auditorías e informes de remediación cerrados del 2026-11-12 y 2026-11-13 se retiraron del árbol y permanecen en el historial de Git). La enmienda NEG-01 de SPEC-08 alinea el umbral con las decisiones vigentes 83/132, autorizada al solicitar corregir los hallazgos; su re-verificación CI está pendiente. Los conteos anteriores son evidencia fechada y el lanzamiento continúa sujeto a staging y aceptación operativa. No cambia el alcance del piloto ni se añade una decisión de producto.
 
 > **Propósito de este documento.** Fuente única de verdad sobre visión, alcance, arquitectura y decisiones de Upward English. Está pensado para que cualquier agente o persona que entre al proyecto pueda trabajar sin releer conversaciones anteriores.
 >
@@ -677,6 +677,12 @@ Cada etapa comienza con la redacción y aprobación de su spec (§11.1).
 | # | Decisión | Estado |
 | --- | --- | --- |
 | 146 | **Nombre definitivo del producto: «Upward English»:** se adopta **Upward English** como nombre definitivo del producto y plataforma (en reemplazo del nombre provisional anterior) en contexto, especificaciones, documentación, manifiesto PWA, paquetes `@upward-english/*`, prefijos `upward_english_*` y dominios `upwardenglish.*`. Cierra el pendiente de CONTEXT §15, el riesgo de `planning/pbp-development.md` (Etapa 11), el pendiente de `planning/taskboard.md` y la pregunta Q-05 de SPEC-09. | Decidido por el líder del proyecto |
+
+### Ronda 20 — 2026-11-26 (dominio definitivo `.app`)
+
+| # | Decisión | Estado |
+| --- | --- | --- |
+| 147 | **Dominio definitivo `upwardenglish.app`:** al encontrarse registrado `upwardenglish.org` por terceros, se registra y adopta `upwardenglish.app` como dominio raíz del proyecto (`app-staging.upwardenglish.app`, `api-staging.upwardenglish.app`, `app.upwardenglish.app`, `api.upwardenglish.app`, `COOKIE_DOMAIN=.upwardenglish.app` y `MAIL_FROM` bajo `@upwardenglish.app`). Precisa la Decisión 146. | Decidido por el líder del proyecto |
 
 Para registrar una decisión nueva: añadir una fila en la ronda vigente (o abrir una ronda nueva con fecha) y actualizar la sección afectada de este documento en el mismo cambio.
 

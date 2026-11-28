@@ -1,113 +1,121 @@
 'use client';
 
-import React, { useTransition } from 'react';
+import { useId, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { BookOpen, ChartNoAxesColumn, ClipboardList, FileCheck, House, LibraryBig, LogOut, Menu, Users, UsersRound, X } from 'lucide-react';
 import { logoutSharedDevice } from '../lib/auth-hygiene';
+import { UpwardCompassEmblem } from './landing/brand-emblem';
+import styles from './teacher-portal.module.css';
 
-interface TeacherNavProps {
-  teacherName?: string;
-}
+export const teacherDestinations = [
+  { label: 'Inicio', href: '/inicio', icon: House, description: '' },
+  { label: 'Actividades', href: '/actividades', icon: BookOpen, description: 'Consulta y organiza el catálogo de actividades.' },
+  { label: 'Asignaciones', href: '/asignaciones', icon: ClipboardList, description: 'Programa tareas y consulta sus entregas.' },
+  { label: 'Revisión', href: '/revision', icon: FileCheck, description: 'Revisa respuestas y califica entregas.' },
+  { label: 'Alumnos', href: '/alumnos', icon: Users, description: 'Gestiona alumnos y solicitudes de registro.' },
+  { label: 'Grupos', href: '/grupos', icon: UsersRound, description: 'Organiza tus grupos y sus integrantes.' },
+  { label: 'Estadísticas', href: '/estadisticas', icon: ChartNoAxesColumn, description: 'Consulta el rendimiento y la constancia.' },
+  { label: 'Contenido extra', href: '/contenido-extra', icon: LibraryBig, description: 'Administra recursos complementarios.' },
+];
 
-export function TeacherNav({ teacherName }: TeacherNavProps) {
+const navGroups = [
+  { label: 'Docencia', items: teacherDestinations.slice(0, 4) },
+  { label: 'Gestión y seguimiento', items: teacherDestinations.slice(4) },
+];
+
+const childLabels: Readonly<Record<string, string>> = {
+  '/actividades/nueva': 'Nueva actividad',
+  '/asignaciones/nueva': 'Nueva asignación',
+  '/alumnos/bloqueados': 'Cuentas bloqueadas',
+};
+
+export function TeacherBreadcrumbs() {
   const pathname = usePathname();
-  const [isLoggingOut, startLogout] = useTransition();
-
-  const navItems = [
-    { label: 'Inicio', href: '/inicio' },
-    { label: 'Actividades', href: '/actividades' },
-    { label: 'Asignaciones', href: '/asignaciones' },
-    { label: 'Revisión', href: '/revision' },
-    { label: 'Estadísticas', href: '/estadisticas' },
-    { label: 'Grupos', href: '/grupos' },
-    { label: 'Alumnos', href: '/alumnos' },
-    { label: 'Contenido extra', href: '/contenido-extra' },
-  ];
-
-  const handleLogout = () => {
-    startLogout(async () => {
-      await logoutSharedDevice();
-      window.location.href = '/login';
-    });
-  };
+  const parent = teacherDestinations.find(({ href }) => pathname.startsWith(`${href}/`));
+  if (!parent) return <span>Panel Docente</span>;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-4">
-          <Link
-            href="/inicio"
-            className="flex items-center gap-2 text-xl font-bold tracking-tight text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-extrabold text-sm">
-              E
-            </span>
-            <span>Upward English</span>
-          </Link>
+    <nav aria-label="Ruta actual" className={styles.breadcrumbs}>
+      <Link href={parent.href} className={styles.actionLink}>{parent.label}</Link>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{childLabels[pathname] ?? 'Detalle'}</span>
+    </nav>
+  );
+}
 
-          <nav className="hidden xl:flex items-center gap-1" aria-label="Navegación principal">
-            {navItems.map((item) => {
-              const isActive =
-                item.href === '/inicio'
-                  ? pathname === '/inicio'
-                  : pathname.startsWith(item.href);
+export function TeacherNav({ teacherName }: { teacherName?: string }) {
+  const pathname = usePathname();
+  const panelId = useId();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const isOpen = openPath === pathname;
+  const [isLoggingOut, startLogout] = useTransition();
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                      : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
-                  }`}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+  function closeMenu() {
+    setOpenPath(null);
+  }
 
-        <div className="flex shrink-0 items-center gap-2">
-          {teacherName && (
-            <span className="hidden sm:inline-block max-w-40 truncate text-xs font-medium text-zinc-600">
-              {teacherName}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="min-h-12 min-w-12 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50 transition-colors"
-          >
+  return (
+    <header className={styles.sidebar} onKeyDown={(event) => {
+      if (event.key === 'Escape' && isOpen && menuButton.current?.getClientRects().length) {
+        closeMenu();
+        menuButton.current.focus();
+      }
+    }}>
+      <div className={styles.sidebarHeader}>
+        <Link href="/inicio" className={styles.brand} onClick={closeMenu}>
+          <span className={styles.emblem}><UpwardCompassEmblem size={28} /></span>
+          <span className={styles.brandText}><strong>Upward English</strong><small>Panel Docente</small></span>
+        </Link>
+        <button
+          ref={menuButton}
+          type="button"
+          className={styles.menuButton}
+          aria-label="Menú docente"
+          aria-controls={panelId}
+          aria-expanded={isOpen}
+          onClick={() => setOpenPath(isOpen ? null : pathname)}
+        >
+          {isOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
+        </button>
+      </div>
+
+      <div id={panelId} className={styles.navPanel} data-open={isOpen}>
+        <nav aria-label="Navegación docente" className={styles.navigation}>
+          {navGroups.map(({ label, items }) => (
+            <div key={label} role="group" aria-label={label}>
+              <p className={styles.navLabel}>{label}</p>
+              <ul className={styles.navList}>
+                {items.map(({ label: itemLabel, href, icon: Icon }) => (
+                  <li key={href}>
+                    <Link
+                      className={styles.navLink}
+                      href={href}
+                      onClick={closeMenu}
+                      aria-current={pathname === href ? 'page' : pathname.startsWith(`${href}/`) ? 'location' : undefined}
+                    >
+                      <Icon size={19} strokeWidth={1.65} aria-hidden="true" />{itemLabel}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+        <div className={styles.sidebarFooter}>
+          <p>{teacherName || 'Profesora'}</p>
+          <button type="button" className={styles.secondaryButton} disabled={isLoggingOut} onClick={() => {
+            startLogout(async () => {
+              await logoutSharedDevice();
+              window.location.href = '/login';
+            });
+          }}>
+            <LogOut size={18} strokeWidth={1.65} aria-hidden="true" />
             {isLoggingOut ? 'Cerrando…' : 'Cerrar sesión'}
           </button>
         </div>
       </div>
-      {/* Mobile nav bar */}
-      <nav className="grid grid-cols-2 gap-1 border-t border-zinc-100 px-2 py-1 sm:grid-cols-4 xl:hidden" aria-label="Navegación móvil">
-        {navItems.map((item) => {
-          const isActive =
-            item.href === '/inicio'
-              ? pathname === '/inicio'
-              : pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`inline-flex min-h-12 min-w-12 items-center justify-center rounded-md px-2 py-1.5 text-center text-xs font-medium ${
-                isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-zinc-600'
-              }`}
-              aria-current={isActive ? 'page' : undefined}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
     </header>
   );
 }

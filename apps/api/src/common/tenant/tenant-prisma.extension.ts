@@ -145,6 +145,48 @@ function applyTenantFilter<T extends WithWhere | undefined>(
   return (args ? Object.assign(args, effectiveArgs) : effectiveArgs) as unknown as T;
 }
 
+function assertMutationDataTenantScope(model: string, data: unknown): void {
+  if (model === 'Organization' || TenantContext.isBypassed() || !isRecord(data)) {
+    return;
+  }
+  const orgId = TenantContext.getOrganizationId();
+  if (isRecord(data.organization)) {
+    const connectTarget = isRecord(data.organization.connect)
+      ? data.organization.connect.id
+      : undefined;
+    if (
+      'disconnect' in data.organization ||
+      'create' in data.organization ||
+      'connectOrCreate' in data.organization ||
+      (orgId
+        ? connectTarget === undefined || !matchesOrgId(connectTarget, orgId)
+        : connectTarget === undefined || !isValidExplicitTenantFilter(connectTarget))
+    ) {
+      throw new Error(
+        `Violación de aislamiento tenant en ${model}: mutación inválida de relación organization`,
+      );
+    }
+  }
+  if (orgId) {
+    if (data.organization_id !== undefined && !matchesOrgId(data.organization_id, orgId)) {
+      const explicitStr =
+        typeof data.organization_id === 'object'
+          ? JSON.stringify(data.organization_id)
+          : String(data.organization_id);
+      throw new Error(
+        `Violación de aislamiento tenant en ${model}: organization_id discordante (${explicitStr} !== ${orgId})`,
+      );
+    }
+  } else if (
+    data.organization_id !== undefined &&
+    !isValidExplicitTenantFilter(data.organization_id)
+  ) {
+    throw new Error(
+      `Operación multi-tenant rechazada: organization_id inválido en TenantContext para modelo ${model}`,
+    );
+  }
+}
+
 function applyTenantFilterForMutation<T extends WithWhere | undefined>(
   model: string,
   args: T,
@@ -230,11 +272,185 @@ function extractSqlString(args: unknown): string {
     if (Array.isArray(first)) {
       return first.filter((part): part is string => typeof part === 'string').join(' ');
     }
+    if (isRecord(first) && Array.isArray(first.strings)) {
+      return first.strings.filter((part): part is string => typeof part === 'string').join(' ');
+    }
+    if (isRecord(first) && typeof first.sql === 'string') {
+      return first.sql;
+    }
   }
   if (isRecord(args) && Array.isArray(args.strings)) {
     return args.strings.filter((part): part is string => typeof part === 'string').join(' ');
   }
+  if (isRecord(args) && typeof args.sql === 'string') {
+    return args.sql;
+  }
   return '';
+}
+
+function extractSqlValues(args: unknown): unknown[] {
+  if (Array.isArray(args) && args.length > 0) {
+    const first = args[0];
+    if (Array.isArray(first)) {
+      return args.slice(1);
+    }
+    if (isRecord(first) && Array.isArray(first.values)) {
+      return first.values;
+    }
+  }
+  if (isRecord(args) && Array.isArray(args.values)) {
+    return args.values;
+  }
+  return [];
+}
+
+function sanitizeSqlForScopeCheck(sql: string): string {
+  let out = '';
+  let i = 0;
+  const len = sql.length;
+
+  while (i < len) {
+    const ch = sql[i]!;
+    const next = sql[i + 1];
+
+    if (ch === '-' && next === '-') {
+      i += 2;
+      while (i < len && sql[i] !== '\n' && sql[i] !== '\r') i += 1;
+      out += ' ';
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      i += 2;
+      let depth = 1;
+      while (i < len && depth > 0) {
+        if (sql[i] === '/' && sql[i + 1] === '*') {
+          depth += 1;
+          i += 2;
+        } else if (sql[i] === '*' && sql[i + 1] === '/') {
+          depth -= 1;
+          i += 2;
+        } else {
+          i += 1;
+        }
+      }
+      out += ' ';
+      continue;
+    }
+
+    if (ch === "'") {
+      const escapedLiteral = i > 0 && (sql[i - 1] === 'E' || sql[i - 1] === 'e');
+      i += 1;
+      while (i < len) {
+        if (escapedLiteral && sql[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (sql[i] === "'") {
+          if (sql[i + 1] === "'") {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      out += "''";
+      continue;
+    }
+
+    if (ch === '$') {
+      const dollarMatch = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sql.slice(i));
+      if (dollarMatch) {
+        const tag = dollarMatch[0];
+        const endIdx = sql.indexOf(tag, i + tag.length);
+        i = endIdx === -1 ? len : endIdx + tag.length;
+        out += "''";
+        continue;
+      }
+    }
+
+    out += ch;
+    i += 1;
+  }
+
+  return out;
+}
+
+function isAllowedSystemRawQuery(sanitizedSql: string, allowReadScalars: boolean): boolean {
+  const withoutTrailingSemi = sanitizedSql
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/;\s*$/, '')
+    .trim();
+  if (
+    withoutTrailingSemi === '' ||
+    withoutTrailingSemi.includes(';') ||
+    /\b(?:FROM|JOIN|INTO|UPDATE|DELETE|INSERT|MERGE|ALTER|DROP|TRUNCATE|CREATE|COPY|GRANT|REVOKE|SET|SHOW|RESET|WITH)\b/i.test(
+      withoutTrailingSemi,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /^SELECT\s+pg_advisory_(?:xact_)?(?:lock|try_lock|unlock|unlock_all)(?:_shared)?\s*\([\s\S]*\)$/i.test(
+      withoutTrailingSemi,
+    )
+  ) {
+    return true;
+  }
+  if (/^SELECT\s+1(?:\s+AS\s+"?[a-z_][a-z0-9_]*"?)?$/i.test(withoutTrailingSemi)) {
+    return true;
+  }
+  if (
+    allowReadScalars &&
+    /^SELECT\s+(?:NOW\s*\(\s*\)|current_database\s*\(\s*\))(?:\s+AS\s+"?[a-z_][a-z0-9_]*"?)?$/i.test(
+      withoutTrailingSemi,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+// La tabla raíz `organizations` no tiene columna organization_id: su clave es `id`. Solo se admite
+// el bloqueo exacto de la fila de la organización activa (cuota atómica de recursos), nunca otra.
+const TENANT_ROOT_LOCK_SQL =
+  /^SELECT id FROM organizations WHERE id = (?:\?|\$\d+)?::uuid FOR UPDATE$/i;
+
+function isActiveTenantRootLock(args: unknown, sanitizedSql: string): boolean {
+  const orgId = TenantContext.getOrganizationId();
+  if (!orgId) return false;
+  const normalizedSql = sanitizedSql.replace(/\s+/g, ' ').trim();
+  const values = extractSqlValues(args);
+  return TENANT_ROOT_LOCK_SQL.test(normalizedSql) && values.length === 1 && values[0] === orgId;
+}
+
+// SEC-TENANT-01: fuera de un bypass explícito, todo SQL crudo debe filtrar por organization_id,
+// también con TenantContext activo (caso habitual de las peticiones HTTP autenticadas).
+function assertRawQueryTenantScope(
+  method: '$queryRaw' | '$executeRaw',
+  args: unknown,
+  allowReadScalars: boolean,
+): void {
+  if (TenantContext.isBypassed()) return;
+  const sanitizedSql = sanitizeSqlForScopeCheck(extractSqlString(args));
+  if (
+    isAllowedSystemRawQuery(sanitizedSql, allowReadScalars) ||
+    /\borganization_id\b/i.test(sanitizedSql)
+  ) {
+    return;
+  }
+  if (isActiveTenantRootLock(args, sanitizedSql)) return;
+  if (!TenantContext.getOrganizationId()) {
+    throw new Error(
+      `Operación multi-tenant rechazada: organization_id ausente en TenantContext para ${method}`,
+    );
+  }
+  throw new Error(
+    `Operación multi-tenant rechazada: ${method} sin filtro organization_id con TenantContext activo`,
+  );
 }
 
 export function createTenantPrismaExtension() {
@@ -242,26 +458,30 @@ export function createTenantPrismaExtension() {
     return client.$extends({
       query: {
         async $queryRaw({ args, query }) {
-          if (!TenantContext.isBypassed() && !TenantContext.getOrganizationId()) {
-            const sqlStrings = extractSqlString(args);
-            const isSystemQuery = /SELECT\s+1\b|pg_advisory|NOW\(\)|current_database\(\)/i.test(sqlStrings);
-            if (!isSystemQuery && !/organization_id/i.test(sqlStrings)) {
-              throw new Error(
-                'Operación multi-tenant rechazada: organization_id ausente en TenantContext para $queryRaw',
-              );
-            }
-          }
+          // Exige organization_id fuera de bypass y consultas escalares de sistema (G-A07, SEC-TENANT-01)
+          assertRawQueryTenantScope('$queryRaw', args, true);
           return query(args);
         },
         async $executeRaw({ args, query }) {
-          if (!TenantContext.isBypassed() && !TenantContext.getOrganizationId()) {
-            const sqlStrings = extractSqlString(args);
-            const isSystemQuery = /pg_advisory|SELECT\s+1\b/i.test(sqlStrings);
-            if (!isSystemQuery && !/organization_id/i.test(sqlStrings)) {
-              throw new Error(
-                'Operación multi-tenant rechazada: organization_id ausente en TenantContext para $executeRaw',
-              );
-            }
+          // Exige organization_id fuera de bypass y consultas escalares de sistema (G-A07, SEC-TENANT-01)
+          assertRawQueryTenantScope('$executeRaw', args, false);
+          return query(args);
+        },
+        // guardrails-ignore G-A07: intercepción defensiva en runtime para bloquear llamadas no parametrizadas fuera de bypass (SEC-TENANT-01)
+        async $queryRawUnsafe({ args, query }) {
+          if (!TenantContext.isBypassed()) {
+            throw new Error(
+              'Operación multi-tenant rechazada: queryRawUnsafe está prohibido fuera de bypass explícito (G-A07)',
+            );
+          }
+          return query(args);
+        },
+        // guardrails-ignore G-A07: intercepción defensiva en runtime para bloquear llamadas no parametrizadas fuera de bypass (SEC-TENANT-01)
+        async $executeRawUnsafe({ args, query }) {
+          if (!TenantContext.isBypassed()) {
+            throw new Error(
+              'Operación multi-tenant rechazada: executeRawUnsafe está prohibido fuera de bypass explícito (G-A07)',
+            );
           }
           return query(args);
         },
@@ -290,10 +510,19 @@ export function createTenantPrismaExtension() {
           async createMany({ model, args, query }) {
             return query(applyTenantCreate(model, args));
           },
+          async createManyAndReturn({ model, args, query }) {
+            return query(applyTenantCreate(model, args));
+          },
           async update({ model, args, query }) {
+            if (isRecord(args)) assertMutationDataTenantScope(model, args.data);
             return query(applyTenantFilterForMutation(model, args));
           },
           async updateMany({ model, args, query }) {
+            if (isRecord(args)) assertMutationDataTenantScope(model, args.data);
+            return query(applyTenantFilter(model, args));
+          },
+          async updateManyAndReturn({ model, args, query }) {
+            if (isRecord(args)) assertMutationDataTenantScope(model, args.data);
             return query(applyTenantFilter(model, args));
           },
           async delete({ model, args, query }) {
@@ -312,19 +541,8 @@ export function createTenantPrismaExtension() {
               applyTenantCreate(model, createWrapper);
               args.create = createWrapper.data;
             }
-            const orgId = TenantContext.getOrganizationId();
             if (isRecord(args.update)) {
-              if (orgId) {
-                if (args.update.organization_id !== undefined && !matchesOrgId(args.update.organization_id, orgId)) {
-                  throw new Error(
-                    `Violación de aislamiento tenant en ${model}: organization_id discordante (${args.update.organization_id} !== ${orgId})`,
-                  );
-                }
-              } else if (args.update.organization_id !== undefined && !isValidExplicitTenantFilter(args.update.organization_id)) {
-                throw new Error(
-                  `Operación multi-tenant rechazada: organization_id inválido en TenantContext para modelo ${model}`,
-                );
-              }
+              assertMutationDataTenantScope(model, args.update);
             }
             return query(args);
           },

@@ -1,3 +1,4 @@
+import { addSessionCookie } from './session';
 import { test, expect } from '@playwright/test';
 
 test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (ENG-145)', () => {
@@ -93,10 +94,7 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
       });
     });
 
-    await context.addCookies([
-      { name: 'upward_english_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
-      { name: 'upward_english_local_access_token', value: 'token-valid', domain: 'localhost', path: '/' },
-    ]);
+    await addSessionCookie(context, 'token-valid');
 
     await page.fill('input[type="email"]', 'valid@upwardenglish.local');
     await page.fill('input[type="password"]', 'ValidPass123');

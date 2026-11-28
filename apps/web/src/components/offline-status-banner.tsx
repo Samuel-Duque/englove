@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { WifiOff, CheckCircle2, CloudUpload } from "lucide-react";
 import {
   subscribeOfflineStatus,
@@ -13,6 +13,28 @@ import {
   isTeensOrTeacherSegment,
   USER_SEGMENT_EVENT,
 } from "../lib/user-segment";
+import styles from './teacher-portal.module.css';
+
+function subscribeConnectivity(onChange: () => void) {
+  window.addEventListener('online', onChange);
+  window.addEventListener('offline', onChange);
+  return () => {
+    window.removeEventListener('online', onChange);
+    window.removeEventListener('offline', onChange);
+  };
+}
+
+export function TeacherOfflineStatusBanner() {
+  const isOffline = useSyncExternalStore(subscribeConnectivity, () => !navigator.onLine, () => false);
+  if (!isOffline) return null;
+
+  return (
+    <div role="status" className={styles.offline}>
+      <WifiOff size={18} aria-hidden="true" />
+      <span>Sin conexión. Algunas acciones no están disponibles.</span>
+    </div>
+  );
+}
 
 export interface OfflineStatusBannerProps {
   initialStatus?: OfflineStatus;
@@ -70,7 +92,7 @@ export function OfflineStatusBanner({
       <div
         role="status"
         aria-live="polite"
-        className="bg-emerald-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all"
+        className="student-offline student-offline-synced bg-emerald-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all"
       >
         <CheckCircle2 className="w-4 h-4 text-emerald-200" aria-hidden="true" />
         <span>
@@ -88,7 +110,7 @@ export function OfflineStatusBanner({
       <div
         role="status"
         aria-live="polite"
-        className="bg-amber-500 text-zinc-950 px-4 py-2 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 shadow-sm border-b border-amber-600/30"
+        className="student-offline bg-amber-500 text-zinc-950 px-4 py-2 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 shadow-sm border-b border-amber-600/30"
       >
         <div className="flex items-center gap-2 mx-auto sm:mx-0">
           {status.isOffline ? (
@@ -98,7 +120,7 @@ export function OfflineStatusBanner({
             />
           ) : (
             <CloudUpload
-              className="w-4 h-4 text-zinc-900 shrink-0 animate-pulse"
+              className="w-4 h-4 text-zinc-900 shrink-0 motion-safe:animate-pulse"
               aria-hidden="true"
             />
           )}

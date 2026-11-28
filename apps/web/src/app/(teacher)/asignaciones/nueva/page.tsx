@@ -1,18 +1,23 @@
 import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { NuevaAsignacionClient } from './nueva-asignacion-client';
+import styles from './nueva-asignacion.module.css';
 
 export const metadata: Metadata = {
-  title: 'Nueva Asignación',
-  description: 'Programa una nueva actividad para un grupo de estudiantes.',
+  title: 'Nueva asignación',
+  description: 'Programa una actividad publicada para uno o varios grupos de estudiantes.',
 };
 
 export default function NewAssignmentPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-16 text-center text-zinc-500 text-sm">
-          Cargando formulario de asignación…
+        <div className={styles.page} role="status" aria-live="polite">
+          <div className={styles.loadingWrap}>
+            <p className={styles.loadingText}>Cargando formulario de asignación…</p>
+            <div className={styles.skeletonBlock} />
+            <div className={styles.skeletonBlock} />
+          </div>
         </div>
       }
     >

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { clearSharedDeviceSession } from '../src/lib/auth-hygiene';
+import {
+  clearSharedDeviceSession,
+  getCookieDomainCandidates,
+} from '../src/lib/auth-hygiene';
 
 describe('RF-18: client-side storage hygiene on shared devices', () => {
   const originalWindow = globalThis.window;
@@ -233,5 +236,105 @@ describe('RF-18: client-side storage hygiene on shared devices', () => {
     // Runtime caches are deleted
     expect(deletedCaches).toContain('static-image-assets');
     expect(deletedCaches).toContain('google-fonts');
+  });
+
+  describe('SEC-LOGOUT-01: expiración de session_hint tanto host-only como con dominio padre registrable', () => {
+    it('SEC-LOGOUT-01: getCookieDomainCandidates deriva subdominio y dominio padre y omite localhost/IPs', () => {
+      expect(getCookieDomainCandidates('app-staging.upwardenglish.app')).toEqual([
+        '.app-staging.upwardenglish.app',
+        '.upwardenglish.app',
+      ]);
+      expect(getCookieDomainCandidates('a.b.upwardenglish.app')).toEqual([
+        '.a.b.upwardenglish.app',
+        '.b.upwardenglish.app',
+        '.upwardenglish.app',
+      ]);
+      expect(getCookieDomainCandidates('app.upwardenglish.app.')).toEqual([
+        '.app.upwardenglish.app',
+        '.upwardenglish.app',
+      ]);
+      expect(getCookieDomainCandidates('upwardenglish.app')).toEqual(['.upwardenglish.app']);
+      expect(getCookieDomainCandidates('localhost')).toEqual([]);
+      expect(getCookieDomainCandidates('app.localhost')).toEqual([]);
+      expect(getCookieDomainCandidates('127.0.0.1')).toEqual([]);
+      expect(getCookieDomainCandidates('[::1]')).toEqual([]);
+      expect(getCookieDomainCandidates('localhost:3000')).toEqual([]);
+      expect(getCookieDomainCandidates('')).toEqual([]);
+    });
+
+    it('SEC-LOGOUT-01: expira cookies session_hint emitidas con Domain=.upwardenglish.app (incluidos valores con = y subdominios anidados) e ignora valores sin =', async () => {
+      // Simula un cookie jar RFC 6265 §5.3 donde (name, scope) distingue host-only de dominios padres
+      const jar = new Map<string, string>([
+        ['upward_english_stg_session_hint|domain=upwardenglish.app', '1=a=b'],
+        ['upward_english_stg_session_hint|domain=b.upwardenglish.app', '1'],
+        ['upward_english_session_hint|host=a.b.upwardenglish.app', '1'],
+        ['upward_english_user_logged|domain=upwardenglish.app', '1'],
+        ['unrelated|domain=upwardenglish.app', 'session_hint=keep'],
+      ]);
+      const writes: string[] = [];
+
+      const mockDoc = {
+        get cookie() {
+          const pairs: string[] = ['nameless_session_hint_token'];
+          for (const [compoundKey, val] of jar.entries()) {
+            const [cookieName = ''] = compoundKey.split('|');
+            pairs.push(`${cookieName}=${val}`);
+          }
+          return pairs.join('; ');
+        },
+        set cookie(raw: string) {
+          writes.push(raw);
+          const parts = raw.split(';').map((p) => p.trim());
+          const [pair = ''] = parts;
+          const eq = pair.indexOf('=');
+          const name = eq >= 0 ? pair.slice(0, eq).trim() : '';
+          const domainAttr = parts
+            .find((p) => p.toLowerCase().startsWith('domain='))
+            ?.slice('domain='.length)
+            .replace(/^\./, '')
+            .toLowerCase();
+          const scopeKey = domainAttr
+            ? `${name}|domain=${domainAttr}`
+            : `${name}|host=a.b.upwardenglish.app`;
+          if (/max-age=0/i.test(raw)) {
+            jar.delete(scopeKey);
+          } else {
+            jar.set(scopeKey, eq >= 0 ? pair.slice(eq + 1) : '');
+          }
+        },
+      };
+
+      (globalThis as unknown as { document: unknown }).document = mockDoc;
+      (globalThis as unknown as { window: unknown }).window = {
+        location: {
+          hostname: 'a.b.upwardenglish.app',
+          protocol: 'https:',
+        },
+        sessionStorage: { clear: vi.fn() },
+      };
+
+      try {
+        await clearSharedDeviceSession();
+
+        // Tanto las cookies con Domain= padre como la host-only deben haber expirado
+        expect(jar.has('upward_english_stg_session_hint|domain=upwardenglish.app')).toBe(false);
+        expect(jar.has('upward_english_stg_session_hint|domain=b.upwardenglish.app')).toBe(false);
+        expect(jar.has('upward_english_session_hint|host=a.b.upwardenglish.app')).toBe(false);
+        expect(jar.has('upward_english_user_logged|domain=upwardenglish.app')).toBe(false);
+        expect(jar.get('unrelated|domain=upwardenglish.app')).toBe('session_hint=keep');
+        expect(writes.some((w) => w.startsWith('nameless_session_hint_token='))).toBe(false);
+        expect(
+          writes.some(
+            (w) =>
+              w.startsWith('upward_english_stg_session_hint=;') &&
+              w.includes('expires=Thu, 01 Jan 1970 00:00:00 GMT') &&
+              w.includes('; Secure') &&
+              w.includes('; domain=.upwardenglish.app'),
+          ),
+        ).toBe(true);
+      } finally {
+        delete (globalThis as unknown as { document?: unknown }).document;
+      }
+    });
   });
 });

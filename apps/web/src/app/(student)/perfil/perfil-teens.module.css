@@ -1,0 +1,246 @@
+.page,
+.loading {
+  display: grid;
+  gap: 20px;
+  max-width: 820px;
+  margin-inline: auto;
+  color: var(--ink-1);
+}
+
+.page h1,
+.page h2 {
+  font-family: var(--font-upward-display), sans-serif;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.page h1 {
+  font-size: clamp(1.55rem, 1.35rem + 0.8vw, 1.95rem);
+  font-weight: 800;
+}
+
+.page h2 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+
+.card {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding: clamp(16px, 5vw, 24px);
+  border: 1.5px solid var(--border-rest);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  box-shadow: 0 2px 8px rgb(43 21 10 / 5%);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-rest);
+}
+
+.avatar {
+  display: grid;
+  flex: 0 0 52px;
+  height: 52px;
+  place-items: center;
+  border: 1.5px solid var(--border-active);
+  border-radius: 12px;
+  background: var(--hero-start);
+  color: var(--yellow);
+  font: 800 1.5rem/1 var(--font-upward-display), sans-serif;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.columns dt,
+.description,
+.themeOption small {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.columns dd {
+  margin-top: 2px;
+  font-weight: 700;
+}
+
+.columns dd,
+.description,
+.notice {
+  overflow-wrap: anywhere;
+}
+
+.readOnly,
+.notice {
+  padding: 12px 14px;
+  border: 1.5px solid var(--border-rest);
+  border-radius: var(--radius-btn);
+  background: var(--surface-2);
+}
+
+.themeOption {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 92px;
+  padding: 18px;
+  border: 1.5px solid var(--border-rest);
+  border-radius: 14px;
+  background: var(--surface-1);
+  text-align: left;
+}
+
+.themeOptionTitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.themeOption:not(:disabled):hover {
+  border-color: var(--border-active);
+}
+
+.themeOption[aria-pressed='true'] {
+  border: 2px solid var(--orange);
+  background: var(--tint-orange-bg);
+}
+
+.success {
+  border-color: var(--status-ok-ink);
+  background: var(--status-ok-bg);
+  color: var(--status-ok-ink);
+}
+
+.failure {
+  border-color: var(--red);
+  background: var(--tint-red-bg);
+  color: var(--tint-red-ink);
+}
+
+.form {
+  display: grid;
+  min-width: 0;
+  max-width: 480px;
+  gap: 16px;
+}
+
+.form label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.form .description {
+  margin-bottom: 6px;
+}
+
+.input,
+.button {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border-control);
+  border-radius: var(--radius-btn);
+  font-size: 1rem;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface-1);
+}
+
+.input:focus {
+  border-color: var(--border-active);
+}
+
+.otp {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.15em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.button {
+  min-width: 120px;
+  max-width: 100%;
+  padding-inline: 18px;
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.button:not(:disabled):hover {
+  border-color: var(--border-active);
+}
+
+.primary {
+  border-color: var(--border-active);
+  background: var(--orange);
+  box-shadow: 0 2px var(--border-active);
+  color: #fff;
+}
+
+.primary:not(:disabled):hover {
+  background: var(--orange-hover);
+}
+
+.button:disabled,
+.themeOption:disabled {
+  cursor: default;
+}
+
+.button:disabled {
+  border-color: var(--border-rest);
+  background: var(--surface-2);
+  box-shadow: none;
+  color: var(--ink-2);
+}
+
+.openButton {
+  justify-self: start;
+  width: 100%;
+  min-width: min(100%, 210px);
+}
+
+.errorState,
+.loading {
+  display: none;
+}
+
+:global([data-theme='teens']) .errorState {
+  display: block;
+}
+
+:global([data-theme='teens']) .loading {
+  display: grid;
+}
+
+.skeleton {
+  height: 180px;
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+}
+
+@media (min-width: 640px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .openButton {
+    width: auto;
+  }
+}

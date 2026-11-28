@@ -7,7 +7,7 @@ import { JobRunStatus, Role } from '@upward-english/shared';
 
 describe('SPEC-08 RF-12: Job teacher_pending_summary cada 3 días (ENG-104)', () => {
   const orgId = '11111111-1111-4111-8111-111111111111';
-  const teacherEmail = 'profesora@upwardenglish.org';
+  const teacherEmail = 'profesora@upwardenglish.app';
 
   let service: MaintenanceService;
   let mockPrisma: any;

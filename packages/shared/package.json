@@ -48,7 +48,7 @@
     "@upward-english/prettier-config": "workspace:*",
     "tsup": "^8.4.0",
     "typescript": "~5.9.3",
-    "vitest": "^3.0.7",
+    "vitest": "^4.1.12",
     "eslint": "^9.21.0"
   }
 }

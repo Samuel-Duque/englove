@@ -28,7 +28,10 @@ import { OrderWordsGame } from './games/OrderWordsGame';
 import { DragDropGame } from './games/DragDropGame';
 import { MemoryGame } from './games/MemoryGame';
 import { TimedChoiceGame } from './games/TimedChoiceGame';
-import { speak } from '../../lib/speech';
+import { speak, speechSegments } from '../../lib/speech';
+import { ListenButton } from '../listen-button';
+import kidsStyles from './games/kids-game.module.css';
+import teensStyles from './games/teens-game.module.css';
 
 export interface SimulatedResult {
   score: number;
@@ -130,7 +133,10 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
     }
   };
 
-  const promptToSpeak = config.instructions || '';
+  const isKids = !previewMode && (props.theme ?? 'kids') === 'kids';
+  const isTeens = !previewMode && props.theme === 'teens';
+  const styles = isTeens ? teensStyles : kidsStyles;
+  const promptToSpeak = config.instructions?.trim() ?? '';
   const [isPlayingTts, setIsPlayingTts] = useState(false);
 
   const handleSpeakPrompt = () => {
@@ -140,18 +146,36 @@ export function GameRenderer(props: ActivityRuntimeProps<GamePublicConfig, GameA
   };
 
   return (
-    <div className="w-full">
+    <div
+      className={isKids ? `${kidsStyles.theme} w-full` : isTeens ? `${teensStyles.theme} w-full` : 'w-full'}
+      data-theme={isKids ? 'kids' : isTeens ? 'teens' : undefined}
+    >
       {promptToSpeak && (
-        <div className="mb-4 flex items-center justify-between gap-3 p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/80">
-          <p className="text-sm font-bold text-amber-950">{promptToSpeak}</p>
-          <button
-            type="button"
-            onClick={handleSpeakPrompt}
-            aria-label="Escuchar enunciado en inglés"
-            className="shrink-0 inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
-          >
-            <span>{isPlayingTts ? '🔊 Reproduciendo…' : '🔊 Escuchar'}</span>
-          </button>
+        <div
+          className={`${styles.instructions} mb-4 flex items-center justify-between gap-3 ${
+            isTeens ? '' : 'p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/80'
+          }`}
+        >
+          <p className={isTeens ? 'text-base font-semibold text-[#2B150A]' : 'text-sm font-bold text-amber-950'}>
+            {speechSegments(promptToSpeak).map(({ text, lang }, index) => (
+              <React.Fragment key={`${lang}-${index}`}>
+                {index > 0 && ' '}
+                <span lang={lang}>{text}</span>
+              </React.Fragment>
+            ))}
+          </p>
+          {isKids ? (
+            <ListenButton text={promptToSpeak} />
+          ) : !isTeens ? (
+            <button
+              type="button"
+              onClick={handleSpeakPrompt}
+              aria-label="Escuchar enunciado en inglés"
+              className="shrink-0 inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <span>{isPlayingTts ? '🔊 Reproduciendo…' : '🔊 Escuchar'}</span>
+            </button>
+          ) : null}
         </div>
       )}
       {previewMode && (

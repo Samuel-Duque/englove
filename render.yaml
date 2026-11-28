@@ -4,6 +4,7 @@
 services:
   - type: web
     name: upward-english-api-staging
+    region: virginia
     env: docker
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .
@@ -29,7 +30,7 @@ services:
       - key: R2_PUBLIC_URL
         sync: false
       - key: COOKIE_DOMAIN
-        value: .upwardenglish.org
+        value: .upwardenglish.app
       - key: COOKIE_PREFIX
         value: upward_english_stg_
       - key: WEB_BASE_URL
@@ -37,7 +38,7 @@ services:
       - key: NEXT_PUBLIC_API_URL
         sync: false
       - key: MAIL_FROM
-        value: notificaciones@upwardenglish.org
+        value: notificaciones@upwardenglish.app
       - key: RESEND_API_KEY
         sync: false
       - key: JWT_SECRET

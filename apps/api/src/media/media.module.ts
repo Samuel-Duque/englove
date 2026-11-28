@@ -10,11 +10,14 @@ import { MediaController } from './media.controller';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret:
-          config.get<string>('JWT_ATTEMPT_SECRET') ||
-          config.getOrThrow<string>('JWT_SECRET'),
-      }),
+      // SEC-01: misma clave con la que AttemptsService firma el attemptToken.
+      useFactory: (config: ConfigService) => {
+        const secret = config.getOrThrow<string>('JWT_SECRET');
+        if (!secret.trim()) {
+          throw new Error('JWT_SECRET configuration cannot be empty');
+        }
+        return { secret };
+      },
     }),
   ],
   controllers: [MediaController],

@@ -1,0 +1,327 @@
+.page {
+  --group-target: 42px;
+  display: grid;
+  min-width: 0;
+  gap: 20px;
+  color: var(--ink-primary);
+}
+
+.page :where(a, button, input, [tabindex]):focus-visible,
+.dialog [role='dialog'] button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.breadcrumb,
+.metadata,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb {
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.identity {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.identity h1,
+.sectionHeading {
+  font-family: var(--font-upward-display), sans-serif;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.identity h1 {
+  margin: 0 0 8px;
+  font-size: 1.625rem;
+}
+
+.metadata {
+  color: var(--ink-secondary);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-weight: 700;
+}
+
+.active,
+.success {
+  background: var(--status-ok-bg);
+  color: var(--status-ok-ink);
+}
+
+.archived {
+  background: var(--accent-warm-soft);
+  color: var(--accent-warm-ink);
+}
+
+.button,
+.dialog [role='dialog'] button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--group-target);
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--surface-card);
+  color: var(--ink-primary);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.button:hover,
+.dialog [role='dialog'] button:hover {
+  background: var(--surface-subtle);
+}
+
+.dangerButton {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger-ink);
+}
+
+.dangerButton:hover {
+  background: var(--accent-danger-soft);
+}
+
+.primaryButton {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: white;
+}
+
+.primaryButton:hover {
+  background: var(--accent-primary-hover);
+}
+
+.button:disabled,
+.button[aria-disabled='true'] {
+  cursor: not-allowed;
+  border-color: var(--border-hairline);
+  background: var(--surface-subtle);
+  color: var(--ink-secondary);
+}
+
+.card {
+  min-width: 0;
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  background: var(--surface-card);
+  box-shadow: 0 1px 3px rgb(43 21 10 / 6%);
+}
+
+.rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px;
+}
+
+.field {
+  display: grid;
+  flex: 1 1 17rem;
+  min-width: 0;
+  max-width: 32rem;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: var(--group-target);
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--surface-card);
+  font-weight: 400;
+}
+
+.callout,
+.error,
+.success {
+  border: 1px solid var(--border-hairline);
+  border-radius: 10px;
+  padding: 12px 16px;
+  overflow-wrap: anywhere;
+}
+
+.callout {
+  background: var(--surface-callout);
+  color: var(--ink-secondary);
+}
+
+.error {
+  background: var(--accent-danger-soft);
+  color: var(--accent-danger-ink);
+}
+
+.sectionHeading {
+  padding: 16px;
+  font-size: 1.1875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  border-radius: 0 0 12px 12px;
+}
+
+.tableScroll:focus-visible {
+  outline-offset: -3px;
+}
+
+.tableScroll table {
+  width: 100%;
+  min-width: 36rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.tableScroll thead {
+  background: var(--surface-subtle);
+}
+
+.tableScroll tr {
+  height: 50px;
+}
+
+.tableScroll :is(th, td) {
+  border-top: 1px solid var(--border-hairline);
+  padding: 12px 16px;
+}
+
+.tableScroll :is(th, td):last-child {
+  white-space: nowrap;
+}
+
+.tableScroll tbody tr:hover {
+  background: var(--bg-canvas);
+}
+
+.link {
+  color: var(--accent-primary-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tableScroll a {
+  display: inline-block;
+  padding-block: 2px;
+}
+
+.segment {
+  text-transform: capitalize;
+}
+
+.empty,
+.pagination {
+  padding: 0 16px 16px;
+  color: var(--ink-secondary);
+}
+
+.pagination {
+  justify-content: flex-end;
+  padding-top: 16px;
+}
+
+.loading {
+  display: grid;
+  gap: 16px;
+}
+
+.card .loading {
+  padding: 0 16px 16px;
+}
+
+.skeletonHeading,
+.skeletonTable {
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.skeletonHeading {
+  width: min(100%, 18rem);
+  height: 52px;
+}
+
+.skeletonTable {
+  height: 144px;
+}
+
+.dialog [role='dialog'] {
+  max-width: 520px;
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  border-color: var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface-card);
+  box-shadow: 0 6px 20px rgb(43 21 10 / 8%);
+}
+
+.dialog [role='dialog'] :is(h2, p) {
+  color: var(--ink-primary);
+}
+
+.dialog [role='dialog'] h2 {
+  font-family: var(--font-upward-display), sans-serif;
+}
+
+.dialog [role='dialog'] button {
+  min-height: max(44px, var(--group-target));
+}
+
+.dialog [role='dialog'] button:global(.bg-rose-600) {
+  border-color: var(--accent-danger);
+  background: var(--accent-danger);
+  color: white;
+}
+
+.dialog [role='dialog'] button:global(.bg-rose-600):hover {
+  background: var(--accent-danger-hover);
+}
+
+.dialog [role='dialog'] button[aria-label] {
+  min-width: var(--group-target);
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  .page {
+    --group-target: 48px;
+  }
+}
+
+@media (max-width: 479px) {
+  .header .actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  }
+}

@@ -401,25 +401,27 @@ describe.skipIf(!isPostgresAvailable)(
           const token = started.attemptToken ?? '';
 
           try {
-            await prisma.$executeRaw`
-              CREATE OR REPLACE FUNCTION rt03_fail_progress_event_insert() RETURNS trigger AS $$
-              BEGIN
-                IF NEW.organization_id = '88880001-1111-4111-8111-111111111111'::uuid THEN
-                  RAISE EXCEPTION 'Simulated transient failure on progress_events for RT-03';
-                END IF;
-                RETURN NEW;
-              END;
-              $$ LANGUAGE plpgsql;
-            `;
-            await prisma.$executeRaw`
-              DROP TRIGGER IF EXISTS trg_rt03_fail_progress_event ON progress_events;
-            `;
-            await prisma.$executeRaw`
-              CREATE TRIGGER trg_rt03_fail_progress_event
-              BEFORE INSERT ON progress_events
-              FOR EACH ROW
-              EXECUTE FUNCTION rt03_fail_progress_event_insert();
-            `;
+            await TenantContext.runBypass(async () => {
+              await prisma.$executeRaw`
+                CREATE OR REPLACE FUNCTION rt03_fail_progress_event_insert() RETURNS trigger AS $$
+                BEGIN
+                  IF NEW.organization_id = '88880001-1111-4111-8111-111111111111'::uuid THEN
+                    RAISE EXCEPTION 'Simulated transient failure on progress_events for RT-03';
+                  END IF;
+                  RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+              `;
+              await prisma.$executeRaw`
+                DROP TRIGGER IF EXISTS trg_rt03_fail_progress_event ON progress_events;
+              `;
+              await prisma.$executeRaw`
+                CREATE TRIGGER trg_rt03_fail_progress_event
+                BEFORE INSERT ON progress_events
+                FOR EACH ROW
+                EXECUTE FUNCTION rt03_fail_progress_event_insert();
+              `;
+            });
 
             // 1) Falla durante completeAttempt
             await expect(
@@ -438,8 +440,10 @@ describe.skipIf(!isPostgresAvailable)(
             });
             expect(eventsDuringFailure).toBe(0);
           } finally {
-            await prisma.$executeRaw`DROP TRIGGER IF EXISTS trg_rt03_fail_progress_event ON progress_events;`;
-            await prisma.$executeRaw`DROP FUNCTION IF EXISTS rt03_fail_progress_event_insert();`;
+            await TenantContext.runBypass(async () => {
+              await prisma.$executeRaw`DROP TRIGGER IF EXISTS trg_rt03_fail_progress_event ON progress_events;`;
+              await prisma.$executeRaw`DROP FUNCTION IF EXISTS rt03_fail_progress_event_insert();`;
+            });
           }
 
           // 2) Dependencia recuperada: reintento completa attempt y registra progress_event en la misma tx

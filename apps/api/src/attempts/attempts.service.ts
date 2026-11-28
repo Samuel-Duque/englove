@@ -312,11 +312,13 @@ export class AttemptsService {
             ? await tx.activity.findFirst({
                 where: { id: assignment.activity.id, organization_id: organizationId },
                 include: {
-                  fill_blank_detail: true,
-                  open_question_detail: true,
-                  speaking_detail: true,
-                  game_detail: true,
-                  exam_detail: true,
+                  // El tipo es inmutable. Cargar solo su detalle evita paralelizar
+                  // lecturas internas de Prisma sobre la conexión transaccional.
+                  fill_blank_detail: assignment.activity.type === ActivityType.fill_blank,
+                  open_question_detail: assignment.activity.type === ActivityType.open_question,
+                  speaking_detail: assignment.activity.type === ActivityType.speaking,
+                  game_detail: assignment.activity.type === ActivityType.game,
+                  exam_detail: assignment.activity.type === ActivityType.exam,
                 },
               })
             : undefined;

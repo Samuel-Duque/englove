@@ -1,49 +1,82 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  GroupView,
-  GroupViewSchema,
-  GroupListResponse,
   GroupListResponseSchema,
-} from '@upward-english/shared';
-import { apiFetch, ApiError } from '../../../lib/api';
-import { ConfirmDialog } from '../../../components/ui/modal';
+  GroupViewSchema,
+  type GroupListResponse,
+  type GroupView,
+} from "@upward-english/shared";
+import {
+  EditorialBadge,
+  EditorialConfirmDialog,
+} from "../../../components/teacher-editorial";
+import { apiFetch, ApiError } from "../../../lib/api";
+import styles from "./grupos.module.css";
+
+const filters = [
+  { value: "active", label: "Activos" },
+  { value: "archived", label: "Archivados" },
+  { value: "all", label: "Todos" },
+] as const;
+
+type GroupFilter = (typeof filters)[number]["value"];
+type GroupAction = { group: GroupView; kind: "archive" | "delete" };
+type GroupError = { message: string; showStudents?: boolean };
+
+const archiveBlocked = {
+  message:
+    "Este grupo tiene alumnos vigentes. Trasládalos a otro grupo antes de archivarlo.",
+  showStudents: true,
+};
+
+function focusInput(node: HTMLInputElement | null) {
+  node?.focus();
+}
+
+function focusAlert(node: HTMLDivElement | null) {
+  if (node)
+    requestAnimationFrame(() => {
+      if (node.isConnected) node.focus();
+    });
+}
+
+function reportError(error: unknown, fallback: string): GroupError {
+  return { message: error instanceof Error ? error.message : fallback };
+}
+
+export function GroupsLoading() {
+  return (
+    <div className={styles.skeleton} role="status">
+      <span className="sr-only">Cargando grupos…</span>
+      {[1, 2, 3, 4].map((row) => (
+        <div key={row} aria-hidden="true" />
+      ))}
+    </div>
+  );
+}
 
 export function GruposClient() {
   const queryClient = useQueryClient();
-
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<GroupError | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  // Filter: all, active, archived
-  const [archivedFilter, setArchivedFilter] = useState<'all' | 'active' | 'archived'>('active');
-
-  // Modal / Form state for creating group
+  const [archivedFilter, setArchivedFilter] = useState<GroupFilter>("active");
   const [isCreating, setIsCreating] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
-
-  // Rename state
+  const [newGroupName, setNewGroupName] = useState("");
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    isDestructive?: boolean;
-    onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [editingName, setEditingName] = useState("");
+  const [confirmation, setConfirmation] = useState<GroupAction | null>(null);
 
   const groupsQuery = useQuery({
-    queryKey: ['teacher', 'groups', archivedFilter],
-    queryFn: async () => {
+    queryKey: ["teacher", "groups", archivedFilter],
+    queryFn: () => {
       const params = new URLSearchParams();
-      if (archivedFilter === 'active') params.set('archived', 'false');
-      else if (archivedFilter === 'archived') params.set('archived', 'true');
-      params.set('limit', '100');
-      return apiFetch<GroupListResponse>(`/api/v1/groups?${params.toString()}`, {
+      if (archivedFilter !== "all")
+        params.set("archived", String(archivedFilter === "archived"));
+      params.set("limit", "100");
+      return apiFetch<GroupListResponse>(`/api/v1/groups?${params}`, {
         schema: GroupListResponseSchema,
       });
     },
@@ -51,488 +84,489 @@ export function GruposClient() {
 
   const createGroupMutation = useMutation({
     mutationFn: (name: string) =>
-      apiFetch<GroupView>('/api/v1/groups', {
-        method: 'POST',
+      apiFetch<GroupView>("/api/v1/groups", {
+        method: "POST",
         body: JSON.stringify({ name }),
         schema: GroupViewSchema,
       }),
-    onSuccess: (newGroup) => {
-      setSuccess(`Grupo "${newGroup.name}" creado exitosamente.`);
-      setNewGroupName('');
+    onSuccess: (group) => {
+      setSuccess(`Se creó el grupo «${group.name}».`);
+      setNewGroupName("");
       setIsCreating(false);
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+      if (archivedFilter === "archived") setArchivedFilter("active");
+      void queryClient.invalidateQueries({ queryKey: ["teacher", "groups"] });
     },
-    onError: (err: unknown) => {
-      setActionError(err instanceof ApiError ? err.message : 'No se pudo crear el grupo');
-    },
+    onError: (error) =>
+      setActionError(reportError(error, "No se pudo crear el grupo.")),
   });
 
   const renameGroupMutation = useMutation({
     mutationFn: (payload: { id: string; name: string }) =>
       apiFetch<GroupView>(`/api/v1/groups/${payload.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ name: payload.name }),
         schema: GroupViewSchema,
       }),
-    onSuccess: (_, payload) => {
-      setSuccess('Grupo renombrado exitosamente.');
+    onSuccess: (group) => {
+      setSuccess(`El grupo ahora se llama «${group.name}».`);
       setEditingGroupId(null);
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'group', payload.id] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'students'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher', 'assignments'] });
+      queryClient.setQueryData(["teacher", "group", group.id], group);
+      void queryClient.invalidateQueries({ queryKey: ["teacher", "groups"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher", "students"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["teacher", "assignments"],
+      });
     },
-    onError: (err: unknown) => {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_ARCHIVED') {
-          setActionError('No es posible renombrar un grupo archivado.');
-        } else {
-          setActionError(err.message);
-        }
-      } else {
-        setActionError('No se pudo renombrar el grupo');
+    onError: (error, { id }) => {
+      if (error instanceof ApiError && error.code === "GROUP_ARCHIVED") {
+        setEditingGroupId(null);
+        setActionError({
+          message:
+            "Este grupo ya está archivado. Su nombre no se puede cambiar.",
+          showStudents: true,
+        });
+        void queryClient.invalidateQueries({ queryKey: ["teacher", "groups"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["teacher", "group", id],
+        });
+        return;
       }
+      setActionError(reportError(error, "No se pudo renombrar el grupo."));
     },
   });
 
   const archiveGroupMutation = useMutation({
-    mutationFn: (groupId: string) =>
-      apiFetch<GroupView>(`/api/v1/groups/${groupId}/archive`, {
-        method: 'POST',
+    mutationFn: (id: string) =>
+      apiFetch<GroupView>(`/api/v1/groups/${id}/archive`, {
+        method: "POST",
         schema: GroupViewSchema,
       }),
-    onSuccess: (updated) => {
-      setSuccess(`Grupo "${updated.name}" archivado exitosamente.`);
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+    onSuccess: (group) => {
+      setSuccess(`Se archivó el grupo «${group.name}».`);
+      queryClient.setQueryData(["teacher", "group", group.id], group);
+      void queryClient.invalidateQueries({ queryKey: ["teacher", "groups"] });
     },
-    onError: (err: unknown) => {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_HAS_ACTIVE_STUDENTS') {
-          setActionError(
-            'No es posible archivar un grupo con alumnos activos. Traslada sus alumnos a otro grupo antes de archivar.',
-          );
-        } else {
-          setActionError(err.message);
-        }
-      } else {
-        setActionError('No se pudo archivar el grupo');
+    onError: (error, id) => {
+      if (
+        error instanceof ApiError &&
+        error.code === "GROUP_HAS_ACTIVE_STUDENTS"
+      ) {
+        setActionError(archiveBlocked);
+        void queryClient.invalidateQueries({ queryKey: ["teacher", "groups"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["teacher", "group", id],
+        });
+        return;
       }
+      setActionError(reportError(error, "No se pudo archivar el grupo."));
     },
   });
 
   const deleteGroupMutation = useMutation({
-    mutationFn: (groupId: string) =>
-      apiFetch(`/api/v1/groups/${groupId}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher', 'groups'] });
+    mutationFn: (group: GroupView) =>
+      apiFetch(`/api/v1/groups/${group.id}`, { method: "DELETE" }),
+    onSuccess: (_, group) => {
+      setSuccess(`Se eliminó el grupo «${group.name}».`);
+      queryClient.removeQueries({ queryKey: ["teacher", "group", group.id] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher", "groups"] });
     },
-    onError: (err: unknown) => {
-      if (err instanceof ApiError) {
-        if (err.code === 'GROUP_HAS_HISTORY') {
-          setActionError('No se puede borrar un grupo con historial de alumnos o asignaciones. Archívalo en su lugar.');
-        } else {
-          setActionError(err.message);
-        }
-      } else {
-        setActionError('No se pudo eliminar el grupo');
-      }
+    onError: (error) => {
+      setActionError(
+        error instanceof ApiError && error.code === "GROUP_HAS_HISTORY"
+          ? {
+              message:
+                "El grupo tiene historial de alumnos o asignaciones y no se puede eliminar.",
+            }
+          : reportError(error, "No se pudo eliminar el grupo."),
+      );
     },
   });
 
-  const handleCreateGroup = (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newGroupName.trim();
-    if (!name) return;
-
-    setActionError(null);
-    setSuccess(null);
-    createGroupMutation.mutate(name);
-  };
-
+  const isChangingGroup =
+    renameGroupMutation.isPending ||
+    archiveGroupMutation.isPending ||
+    deleteGroupMutation.isPending;
+  const isConfirming =
+    archiveGroupMutation.isPending || deleteGroupMutation.isPending;
   const isSubmitting = createGroupMutation.isPending;
-
-  const handleStartRename = (group: GroupView) => {
-    setEditingGroupId(group.id);
-    setEditingName(group.name);
-  };
-
-  const handleSaveRename = (id: string) => {
-    const name = editingName.trim();
-    if (!name) return;
-
-    setActionError(null);
-    setSuccess(null);
-    renameGroupMutation.mutate({ id, name });
-  };
-
-  const handleArchive = (group: GroupView) => {
-    if (group.activeStudentCount > 0) {
-      setActionError(
-        `No es posible archivar el grupo "${group.name}": tiene ${group.activeStudentCount} alumno(s) activo(s). Traslada los alumnos antes de archivar (decisión 96).`,
-      );
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Archivar grupo',
-      message: `¿Seguro que deseas archivar el grupo "${group.name}"?`,
-      isDestructive: false,
-      onConfirm: () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setActionError(null);
-        setSuccess(null);
-        archiveGroupMutation.mutate(group.id);
-      },
-    });
-  };
-
-  const handleDelete = (group: GroupView) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar grupo',
-      message: `¿Seguro que deseas eliminar el grupo "${group.name}"? Esta acción solo se permite si el grupo no tiene historial.`,
-      isDestructive: true,
-      onConfirm: () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setActionError(null);
-        setSuccess(null);
-        deleteGroupMutation.mutate(group.id, {
-          onSuccess: () => {
-            setSuccess(`Grupo "${group.name}" eliminado exitosamente.`);
-          },
-        });
-      },
-    });
-  };
-
+  const canMutate = !isChangingGroup && !isSubmitting;
   const groups = groupsQuery.data?.items ?? [];
   const total = groupsQuery.data?.total ?? 0;
-  const isLoading = groupsQuery.isLoading;
-  const error = actionError || (groupsQuery.error instanceof ApiError ? groupsQuery.error.message : groupsQuery.error instanceof Error ? groupsQuery.error.message : null);
+
+  function clearFeedback() {
+    setActionError(null);
+    setSuccess(null);
+  }
+
+  function startCreating() {
+    clearFeedback();
+    setEditingGroupId(null);
+    setIsCreating(true);
+  }
+
+  function submitCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newGroupName.trim();
+    if (!name || !canMutate) return;
+    clearFeedback();
+    createGroupMutation.mutate(name);
+  }
+
+  function submitRename(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    const name = editingName.trim();
+    if (!name || !canMutate) return;
+    clearFeedback();
+    renameGroupMutation.mutate({ id, name });
+  }
+
+  function openConfirmation(group: GroupView, kind: GroupAction["kind"]) {
+    clearFeedback();
+    if (kind === "archive" && group.activeStudentCount > 0) {
+      setActionError({ ...archiveBlocked });
+      return;
+    }
+    setConfirmation({ group, kind });
+  }
+
+  function confirmGroupAction() {
+    if (!confirmation || !canMutate) return;
+    const { group, kind } = confirmation;
+    const onSettled = () => setConfirmation(null);
+    if (kind === "archive")
+      archiveGroupMutation.mutate(group.id, { onSettled });
+    else deleteGroupMutation.mutate(group, { onSettled });
+  }
+
+  const isDeleting = confirmation?.kind === "delete";
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <section className={styles.page} aria-labelledby="groups-title">
+      <header className={styles.header}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            Gestión de Grupos
-          </h1>
-          <p className="text-sm text-zinc-600">
-            Organiza tus aulas temáticas y asigna alumnos a un único grupo vigente.
-          </p>
+          <h1 id="groups-title">Grupos</h1>
+          <p>Organiza tus grupos y consulta sus alumnos vigentes.</p>
         </div>
         <button
+          className={styles.primary}
           type="button"
-          onClick={() => {
-            setIsCreating(true);
-            setActionError(null);
-          }}
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+          aria-expanded={isCreating}
+          aria-controls={isCreating ? "create-group" : undefined}
+          disabled={!canMutate}
+          onClick={startCreating}
         >
-          + Crear grupo
+          <span aria-hidden="true">+</span> Nuevo grupo
         </button>
-      </div>
+      </header>
 
-      {/* Alerts */}
-      {error && (
+      {actionError && !confirmation && (
         <div
+          className={styles.alert}
           role="alert"
-          className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 flex justify-between items-center"
+          tabIndex={-1}
+          ref={focusAlert}
         >
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => setActionError(null)}
-            className="text-rose-600 hover:text-rose-800 font-bold ml-4"
-          >
-            ✕
-          </button>
+          <p>{actionError.message}</p>
+          {actionError.showStudents && (
+            <Link href="/alumnos" className={styles.detail}>
+              Ir a Alumnos
+            </Link>
+          )}
         </div>
       )}
-
       {success && (
-        <div
-          role="status"
-          className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 flex justify-between items-center"
-        >
-          <span>{success}</span>
-          <button
-            type="button"
-            onClick={() => setSuccess(null)}
-            className="text-emerald-600 hover:text-emerald-800 font-bold ml-4"
-          >
-            ✕
-          </button>
-        </div>
+        <p className={styles.success} role="status">
+          {success}
+        </p>
       )}
 
-      {/* Create Group Form Card */}
       {isCreating && (
         <form
-          onSubmit={handleCreateGroup}
-          className="rounded-xl border border-blue-200 bg-blue-50/50 p-5 shadow-sm space-y-4"
+          id="create-group"
+          className={styles.create}
+          onSubmit={submitCreate}
+          aria-labelledby="create-group-title"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-zinc-900">Crear nuevo grupo</h2>
+          <h2 id="create-group-title">Crear grupo</h2>
+          <label htmlFor="new-group-name">Nombre del grupo</label>
+          <input
+            id="new-group-name"
+            ref={focusInput}
+            required
+            maxLength={100}
+            value={newGroupName}
+            readOnly={isSubmitting}
+            onChange={(event) => setNewGroupName(event.target.value)}
+          />
+          <div className={styles.formActions}>
             <button
+              className={styles.secondary}
               type="button"
-              onClick={() => setIsCreating(false)}
-              className="text-xs text-zinc-500 hover:text-zinc-700 font-medium"
-            >
-              Cancelar
-            </button>
-          </div>
-
-          <div>
-            <label htmlFor="new-group-name" className="block text-xs font-semibold text-zinc-700 mb-1">
-              Nombre del grupo *
-            </label>
-            <input
-              id="new-group-name"
-              type="text"
-              required
-              maxLength={100}
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="Ej. Primaria 3A - Martes y Jueves"
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsCreating(false)}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+              disabled={isSubmitting}
+              onClick={() => {
+                setIsCreating(false);
+                setNewGroupName("");
+                clearFeedback();
+              }}
             >
               Cancelar
             </button>
             <button
+              className={styles.primary}
               type="submit"
-              disabled={isSubmitting || !newGroupName.trim()}
-              className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              disabled={!canMutate || !newGroupName.trim()}
             >
-              {isSubmitting ? 'Creando…' : 'Crear grupo'}
+              {isSubmitting ? "Creando…" : "Crear grupo"}
             </button>
           </div>
         </form>
       )}
 
-      {/* Filters Bar */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm flex items-center justify-between">
-        <div className="inline-flex rounded-lg border border-zinc-200 p-1 bg-zinc-50 text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => setArchivedFilter('active')}
-            className={`px-3 py-1.5 rounded-md transition-colors ${
-              archivedFilter === 'active'
-                ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Grupos activos
-          </button>
-          <button
-            type="button"
-            onClick={() => setArchivedFilter('archived')}
-            className={`px-3 py-1.5 rounded-md transition-colors ${
-              archivedFilter === 'archived'
-                ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Archivados
-          </button>
-          <button
-            type="button"
-            onClick={() => setArchivedFilter('all')}
-            className={`px-3 py-1.5 rounded-md transition-colors ${
-              archivedFilter === 'all'
-                ? 'bg-white text-zinc-900 shadow-sm font-semibold'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Todos
-          </button>
+      <div className={styles.toolbar}>
+        <div
+          className={styles.filters}
+          role="group"
+          aria-label="Filtrar grupos por estado"
+        >
+          {filters.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={archivedFilter === value}
+              disabled={!canMutate}
+              onClick={() => {
+                if (value !== archivedFilter) {
+                  clearFeedback();
+                  setEditingGroupId(null);
+                  setArchivedFilter(value);
+                }
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-
-        <span className="text-xs text-zinc-500 font-medium">
-          {total} grupo{total !== 1 ? 's' : ''}
-        </span>
+        {groupsQuery.data && (
+          <span className={styles.count} role="status">
+            {total} {total === 1 ? "grupo" : "grupos"}
+          </span>
+        )}
       </div>
 
-      {/* Group List */}
-      {isLoading ? (
-        <div className="py-12 text-center text-zinc-500 text-sm">
-          Cargando grupos…
-        </div>
-      ) : groups.length === 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-base font-semibold text-zinc-800">
-            Crea tu primer grupo para aprobar solicitudes
-          </p>
-          <p className="mt-1 text-sm text-zinc-500 mb-6">
-            Los alumnos aprobados requieren pertenecer a un grupo activo para recibir asignaciones.
+      {groupsQuery.isError && (
+        <div className={styles.alert} role="alert">
+          <p>
+            {
+              reportError(
+                groupsQuery.error,
+                "No se pudieron cargar los grupos.",
+              ).message
+            }
           </p>
           <button
             type="button"
-            onClick={() => {
-              setIsCreating(true);
-              setActionError(null);
-            }}
-            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            className={styles.secondary}
+            onClick={() => void groupsQuery.refetch()}
           >
-            + Crear mi primer grupo
+            Reintentar
           </button>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead className="bg-zinc-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase tracking-wider"
-                >
-                  Nombre del grupo
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase tracking-wider"
-                >
-                  Estado
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-semibold text-zinc-600 uppercase tracking-wider"
-                >
-                  Alumnos vigentes
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-right text-xs font-semibold text-zinc-600 uppercase tracking-wider"
-                >
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-zinc-200">
-              {groups.map((group) => {
-                const isArchived = Boolean(group.archivedAt);
-                const isEditingThis = editingGroupId === group.id;
+      )}
 
-                return (
-                  <tr key={group.id} className="hover:bg-zinc-50/80 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
-                      {isEditingThis ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            id={`edit-group-name-${group.id}`}
-                            aria-label={`Editar nombre del grupo ${group.name}`}
-                            type="text"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            className="rounded border border-zinc-300 px-2 py-1 text-xs"
-                          />
+      {groupsQuery.isLoading ? (
+        <GroupsLoading />
+      ) : (
+        groupsQuery.data &&
+        (groups.length === 0 ? (
+          <div className={styles.empty}>
+            <h2>
+              {archivedFilter === "archived"
+                ? "No hay grupos archivados"
+                : "Crea tu primer grupo"}
+            </h2>
+            {archivedFilter !== "archived" && (
+              <>
+                <p>
+                  Los alumnos aprobados necesitan un grupo activo para recibir
+                  asignaciones.
+                </p>
+                {!isCreating && (
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    disabled={!canMutate}
+                    onClick={startCreating}
+                  >
+                    Crear un grupo
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className={styles.directory}>
+            <table
+              className={styles.table}
+              role="table"
+              aria-label="Directorio de grupos"
+            >
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    Nombre del grupo
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Estado
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Alumnos vigentes
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody role="rowgroup">
+                {groups.map((group) => {
+                  const isArchived = Boolean(group.archivedAt);
+                  const isEditing = !isArchived && editingGroupId === group.id;
+                  const href = `/grupos/${group.id}`;
+
+                  return (
+                    <tr key={group.id} role="row">
+                      <th role="rowheader" scope="row">
+                        {isEditing ? (
+                          <form
+                            className={styles.rename}
+                            onSubmit={(event) => submitRename(event, group.id)}
+                          >
+                            <label
+                              className="sr-only"
+                              htmlFor={`edit-group-name-${group.id}`}
+                            >
+                              Nombre del grupo {group.name}
+                            </label>
+                            <input
+                              id={`edit-group-name-${group.id}`}
+                              ref={focusInput}
+                              required
+                              maxLength={100}
+                              value={editingName}
+                              readOnly={renameGroupMutation.isPending}
+                              onChange={(event) =>
+                                setEditingName(event.target.value)
+                              }
+                            />
+                            <div className={styles.formActions}>
+                              <button
+                                type="button"
+                                className={styles.secondary}
+                                disabled={!canMutate}
+                                onClick={() => {
+                                  setEditingGroupId(null);
+                                  clearFeedback();
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="submit"
+                                className={styles.primary}
+                                disabled={!canMutate || !editingName.trim()}
+                              >
+                                {renameGroupMutation.isPending
+                                  ? "Guardando…"
+                                  : "Guardar"}
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <Link className={styles.name} href={href}>
+                            {group.name}
+                          </Link>
+                        )}
+                      </th>
+                      <td role="cell">
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Estado
+                        </span>
+                        <EditorialBadge tone={isArchived ? "warm" : "ok"}>
+                          {isArchived ? "Archivado" : "Activo"}
+                        </EditorialBadge>
+                      </td>
+                      <td role="cell" className={styles.count}>
+                        <span className={styles.mobileLabel} aria-hidden="true">
+                          Alumnos vigentes
+                        </span>
+                        {group.activeStudentCount}
+                      </td>
+                      <td role="cell">
+                        <div className={styles.rowActions}>
+                          <Link
+                            className={styles.detail}
+                            href={href}
+                            aria-label={`Ver detalle de ${group.name}`}
+                          >
+                            Ver detalle <span aria-hidden="true">→</span>
+                          </Link>
+                          {!isArchived && !isEditing && (
+                            <button
+                              type="button"
+                              disabled={!canMutate}
+                              onClick={() => {
+                                clearFeedback();
+                                setIsCreating(false);
+                                setEditingGroupId(group.id);
+                                setEditingName(group.name);
+                              }}
+                            >
+                              Renombrar
+                            </button>
+                          )}
+                          {!isArchived && (
+                            <button
+                              type="button"
+                              disabled={!canMutate}
+                              onClick={() => openConfirmation(group, "archive")}
+                            >
+                              Archivar
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => handleSaveRename(group.id)}
-                            className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                            className={styles.danger}
+                            disabled={!canMutate}
+                            onClick={() => openConfirmation(group, "delete")}
                           >
-                            Guardar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingGroupId(null)}
-                            className="text-xs text-zinc-500 hover:text-zinc-700"
-                          >
-                            Cancelar
+                            Eliminar
                           </button>
                         </div>
-                      ) : (
-                        <Link
-                          href={`/grupos/${group.id}`}
-                          className="hover:text-blue-600 font-semibold"
-                        >
-                          {group.name}
-                        </Link>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          isArchived
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {isArchived ? 'Archivado' : 'Activo'}
-                      </span>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                      <Link
-                        href={`/grupos/${group.id}`}
-                        className="text-zinc-800 hover:text-blue-600 font-medium"
-                      >
-                        {group.activeStudentCount} alumno{group.activeStudentCount !== 1 ? 's' : ''}
-                      </Link>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-3">
-                      <Link
-                        href={`/grupos/${group.id}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Ver miembros
-                      </Link>
-
-                      {!isArchived && !isEditingThis && (
-                        <button
-                          type="button"
-                          onClick={() => handleStartRename(group)}
-                          className="text-zinc-600 hover:text-zinc-900"
-                        >
-                          Renombrar
-                        </button>
-                      )}
-
-                      {!isArchived && (
-                        <button
-                          type="button"
-                          onClick={() => handleArchive(group)}
-                          className="text-amber-700 hover:text-amber-900"
-                        >
-                          Archivar
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(group)}
-                        className="text-rose-600 hover:text-rose-800"
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))
       )}
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        isDestructive={confirmDialog.isDestructive}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
-      />
-    </div>
+
+      {confirmation && (
+        <EditorialConfirmDialog
+          isOpen
+          title={isDeleting ? "Eliminar grupo" : "Archivar grupo"}
+          message={
+            isDeleting
+              ? `¿Eliminar «${confirmation.group.name}»? Solo se pueden eliminar grupos sin historial.`
+              : `¿Archivar «${confirmation.group.name}»? El grupo dejará de estar disponible para nuevas asignaciones y conservará su historial.`
+          }
+          confirmText={isDeleting ? "Eliminar grupo" : "Archivar grupo"}
+          isDestructive={isDeleting}
+          isPending={isConfirming}
+          onConfirm={confirmGroupAction}
+          onCancel={() => setConfirmation(null)}
+        />
+      )}
+    </section>
   );
 }

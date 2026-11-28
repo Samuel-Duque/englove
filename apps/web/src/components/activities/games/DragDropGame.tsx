@@ -11,6 +11,8 @@ import {
 } from '@upward-english/shared';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { soundManager } from '../../../lib/sound';
+import kidsStyles from './kids-game.module.css';
+import teensStyles from './teens-game.module.css';
 
 export function DragDropGame({
   config,
@@ -102,13 +104,17 @@ export function DragDropGame({
   };
 
   const isKids = theme === 'kids';
+  const isTeens = theme === 'teens';
+  const styles = isTeens ? teensStyles : kidsStyles;
 
   return (
     <div
-      className={`w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
+      className={`${styles.board} w-full max-w-4xl mx-auto p-4 sm:p-6 rounded-3xl ${
         isKids
           ? 'bg-amber-50/70 border-2 border-amber-200'
-          : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+          : isTeens
+            ? ''
+            : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
       }`}
     >
       {previewMode && (
@@ -123,7 +129,7 @@ export function DragDropGame({
       </div>
 
       {config.instructions && (
-        <div className="mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs">
+        <div className={`${styles.legacyInstructions} mb-6 p-4 rounded-2xl bg-white/80 border border-amber-200/60 shadow-xs`}>
           <p className="text-sm sm:text-base font-semibold text-zinc-800 leading-relaxed">
             {config.instructions}
           </p>
@@ -152,6 +158,7 @@ export function DragDropGame({
               }
               placedObjects={placedInThis}
               isKids={isKids}
+              isTeens={isTeens}
               isTargetActive={isTargetActive}
               onDropObject={(objId) => handlePlace(objId, target.id)}
               onClickCategory={() => {
@@ -169,30 +176,36 @@ export function DragDropGame({
 
       {/* Objects Tray */}
       <div className="space-y-3 mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h4
-            className={`text-xs font-extrabold uppercase tracking-wider ${
-              isKids ? 'text-amber-800' : 'text-zinc-400'
+            className={`${styles.label} text-xs font-extrabold uppercase tracking-wider ${
+              isKids ? 'text-amber-800' : isTeens ? '' : 'text-zinc-400'
             }`}
           >
             Bandeja de objetos ({trayObjects.length} disponibles)
           </h4>
           {selectedObjectId && (
-            <span className="text-xs font-bold text-amber-700 animate-pulse">
+            <span
+              className={`${styles.meta} text-xs font-bold ${
+                isTeens ? 'text-[#872E06]' : 'text-amber-700 motion-safe:animate-pulse'
+              }`}
+            >
               Seleccionado: {objectMap.get(selectedObjectId)?.text} — Elige una categoría arriba
             </span>
           )}
         </div>
 
         <div
-          className={`min-h-20 p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-2.5 items-center transition-colors ${
-            selectedObjectId
-              ? 'border-amber-400 bg-amber-100/50'
-              : 'border-amber-200/90 bg-white/70'
+          className={`${styles.zone} min-h-20 p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-2.5 items-center transition-colors ${
+            isTeens
+              ? ''
+              : selectedObjectId
+                ? 'border-amber-400 bg-amber-100/50'
+                : 'border-amber-200/90 bg-white/70'
           }`}
         >
           {trayObjects.length === 0 ? (
-            <p className="text-xs font-medium text-zinc-400 italic">
+            <p className={`${styles.meta} text-xs font-medium ${isTeens ? '' : 'text-zinc-400'} italic`}>
               Todos los objetos están colocados en las categorías.
             </p>
           ) : (
@@ -203,6 +216,7 @@ export function DragDropGame({
                 text={obj.text}
                 isSelected={selectedObjectId === obj.id}
                 isKids={isKids}
+                isTeens={isTeens}
                 onSelect={() => {
                   if (selectedObjectId === obj.id) {
                     setSelectedObjectId(null);
@@ -217,21 +231,23 @@ export function DragDropGame({
       </div>
 
       {/* Footer */}
-      <div className="pt-4 border-t border-amber-200/60 flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500">
+      <div className={`${styles.footer} pt-4 ${isTeens ? '' : 'border-t border-amber-200/60'} flex items-center justify-between`}>
+        <p className={`${styles.meta} text-xs font-medium ${isTeens ? '' : 'text-zinc-500'}`}>
           {Object.keys(placements).length} de {originalObjects.length} clasificados
         </p>
 
         <button
           type="button"
           onClick={handleComplete}
-          className={`min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation ${
+          className={`${styles.finish} min-h-12 min-w-12 px-6 py-3 rounded-2xl font-black text-sm shadow-md transition-transform active:scale-95 touch-manipulation cursor-pointer ${
             isKids
               ? 'bg-amber-500 hover:bg-amber-400 text-amber-950 font-black'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+              : isTeens
+                ? ''
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
           }`}
         >
-          Finalizar clasificación ✨
+          {isTeens ? 'Finalizar clasificación' : 'Finalizar clasificación ✨'}
         </button>
       </div>
     </div>
@@ -243,15 +259,18 @@ function DraggableObjectToken({
   text,
   isSelected,
   isKids,
+  isTeens,
   onSelect,
 }: {
   id: string;
   text: string;
   isSelected: boolean;
   isKids: boolean;
+  isTeens: boolean;
   onSelect: () => void;
 }) {
-  const elRef = useRef<HTMLDivElement>(null);
+  const styles = isTeens ? teensStyles : kidsStyles;
+  const elRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const el = elRef.current;
@@ -264,31 +283,28 @@ function DraggableObjectToken({
   }, [id]);
 
   return (
-    <div
+    <button
       ref={elRef}
-      role="button"
-      tabIndex={0}
+      type="button"
       aria-pressed={isSelected}
       onClick={onSelect}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        } else if (e.key === 'Escape') {
-          if (isSelected) onSelect();
-        }
+        if (e.key === 'Escape' && isSelected) onSelect();
       }}
-      className={`min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all touch-manipulation cursor-pointer flex items-center gap-1.5 ${
-        isSelected
-          ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-300 text-amber-950 scale-105'
-          : isKids
-            ? 'border-amber-300 bg-white text-amber-950 hover:bg-amber-100 hover:border-amber-400'
-            : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+      data-state={isSelected ? 'selected' : undefined}
+      className={`${styles.piece} min-h-12 min-w-12 px-4 py-2.5 rounded-2xl font-black text-sm border-2 shadow-xs transition-all touch-manipulation cursor-pointer flex items-center gap-1.5 ${
+        isTeens
+          ? 'font-bold'
+          : isSelected
+            ? 'border-amber-500 ring-4 ring-amber-300 bg-amber-300 text-amber-950 scale-105'
+            : isKids
+              ? 'border-amber-300 bg-white text-amber-950 hover:bg-amber-100 hover:border-amber-400'
+              : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
       }`}
     >
-      <span>📦</span>
-      <span>{text}</span>
-    </div>
+      <span aria-hidden="true">{isTeens ? (isSelected ? '✓' : '·') : isSelected ? '✓' : '📦'}</span>
+      <span lang="en">{text}</span>
+    </button>
   );
 }
 
@@ -297,6 +313,7 @@ function TargetCategoryContainer({
   name,
   placedObjects,
   isKids,
+  isTeens,
   isTargetActive,
   onDropObject,
   onClickCategory,
@@ -308,6 +325,7 @@ function TargetCategoryContainer({
   name: string;
   placedObjects: Array<{ id: string; text: string }>;
   isKids: boolean;
+  isTeens: boolean;
   isTargetActive: boolean;
   onDropObject: (objectId: string) => void;
   onClickCategory: () => void;
@@ -315,6 +333,7 @@ function TargetCategoryContainer({
   onSelectObject: (objectId: string) => void;
   selectedObjectId: string | null;
 }) {
+  const styles = isTeens ? teensStyles : kidsStyles;
   const elRef = useRef<HTMLDivElement>(null);
   const [isOver, setIsOver] = useState(false);
 
@@ -338,28 +357,48 @@ function TargetCategoryContainer({
   return (
     <div
       ref={elRef}
-      className={`min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all select-none ${
-        isOver
-          ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg'
-          : isTargetActive
-            ? 'border-dashed border-amber-400 bg-amber-100/50 animate-pulse'
-            : isKids
-              ? 'border-amber-300/80 bg-white shadow-xs'
-              : 'border-zinc-700 bg-zinc-800'
+      data-target={isOver || isTargetActive}
+      className={`${styles.zone} min-h-36 p-4 rounded-3xl border-2 flex flex-col justify-between transition-all select-none ${
+        isTeens
+          ? ''
+          : isOver
+            ? 'border-indigo-500 ring-4 ring-indigo-300 bg-indigo-50 shadow-lg'
+            : isTargetActive
+              ? 'border-dashed border-amber-400 bg-amber-100/50 animate-pulse'
+              : isKids
+                ? 'border-amber-300/80 bg-white shadow-xs'
+                : 'border-zinc-700 bg-zinc-800'
       }`}
     >
       <div>
         <button
           type="button"
           onClick={onClickCategory}
-          aria-label={`Colocar ítem en categoría ${name}. Actualmente ${placedObjects.length} ítems`}
-          className={`w-full flex items-center justify-between pb-2 border-b text-left rounded-lg p-1 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors ${
-            isKids ? 'border-zinc-100 hover:bg-zinc-50' : 'border-zinc-700 hover:bg-zinc-750'
+          className={`${styles.zoneControl} w-full flex items-center justify-between pb-2 border-b text-left rounded-lg p-1 cursor-pointer transition-colors ${
+            isTeens
+              ? 'border-[#D8C2A8] hover:bg-[#F3EADA]'
+              : isKids
+                ? 'border-zinc-100 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-amber-500'
+                : 'border-zinc-700 hover:bg-zinc-750 focus:outline-none focus:ring-2 focus:ring-amber-500'
           }`}
         >
-          <span className={`text-sm font-black ${isKids ? 'text-zinc-900' : 'text-zinc-100'}`}>{name}</span>
-          <span className="text-xs font-bold text-zinc-400">
-            {isTargetActive ? '👈 Tocar para colocar' : `${placedObjects.length} ítems`}
+          <span
+            lang="en"
+            className={`text-sm font-black ${
+              isTeens ? 'text-[#2B150A]' : isKids ? 'text-zinc-900' : 'text-zinc-100'
+            }`}
+          >
+            {name}
+          </span>
+          {' '}
+          <span className={`${styles.meta} text-xs font-bold ${isTeens ? '' : 'text-zinc-400'}`}>
+            {isTeens
+              ? isTargetActive
+                ? 'Colocar aquí'
+                : `${placedObjects.length} ítems`
+              : isTargetActive
+                ? '👈 Tocar para colocar'
+                : `${placedObjects.length} ítems`}
           </span>
         </button>
 
@@ -367,24 +406,35 @@ function TargetCategoryContainer({
           {placedObjects.map((obj) => (
             <div
               key={obj.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectObject(obj.id);
-              }}
-              className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-extrabold shadow-2xs border ${
-                selectedObjectId === obj.id
-                  ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-200'
-                  : 'border-emerald-300 bg-emerald-50 text-emerald-950'
+              data-state={selectedObjectId === obj.id ? 'selected' : 'linked'}
+              className={`${styles.piece} inline-flex items-center gap-1 rounded-xl ${isTeens ? 'px-2 py-1' : 'px-2.5 py-1'} text-xs font-extrabold shadow-2xs border ${
+                isTeens
+                  ? ''
+                  : selectedObjectId === obj.id
+                    ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-200'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-950'
               }`}
             >
-              <span>{obj.text}</span>
+              <button
+                type="button"
+                onClick={() => onSelectObject(obj.id)}
+                aria-pressed={selectedObjectId === obj.id}
+                className="min-h-12 min-w-12 rounded-lg px-2 font-bold cursor-pointer"
+              >
+                <span lang="en">{obj.text}</span>
+                {selectedObjectId === obj.id && <span aria-hidden="true"> ✓</span>}
+              </button>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   onRemoveObject(obj.id);
                 }}
-                className="min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-black text-rose-600 hover:text-rose-800 ml-1 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className={
+                  isTeens
+                    ? `${styles.iconBtn} text-xs font-bold text-[#831712] hover:bg-[#FDECE9] ml-0.5 cursor-pointer`
+                    : 'min-h-6 min-w-6 inline-flex items-center justify-center text-xs font-black text-rose-600 hover:text-rose-800 ml-1 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500'
+                }
                 title="Devolver a la bandeja"
                 aria-label={`Devolver ${obj.text} a la bandeja`}
               >
@@ -396,8 +446,14 @@ function TargetCategoryContainer({
       </div>
 
       <div className="pt-2 text-right">
-        <span className="text-2xs font-bold text-zinc-400">
-          {isTargetActive ? '👈 Tocar para colocar aquí' : '📥 Arrastra aquí'}
+        <span className={`${styles.meta} text-2xs font-bold ${isTeens ? '' : 'text-zinc-400'}`}>
+          {isTeens
+            ? isTargetActive
+              ? 'Toca para colocar aquí'
+              : 'Arrastra o selecciona'
+            : isTargetActive
+              ? '👈 Tocar para colocar aquí'
+              : '📥 Arrastra aquí'}
         </span>
       </div>
     </div>

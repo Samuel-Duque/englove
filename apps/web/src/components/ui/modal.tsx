@@ -9,6 +9,8 @@ export interface AccessibleModalProps {
   description?: string;
   children: React.ReactNode;
   maxWidthClass?: string;
+  dialogClassName?: string;
+  dismissible?: boolean;
 }
 
 export function AccessibleModal({
@@ -18,14 +20,18 @@ export function AccessibleModal({
   description,
   children,
   maxWidthClass = 'max-w-md',
+  dialogClassName = '',
+  dismissible = true,
 }: AccessibleModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
+  const dismissibleRef = useRef(dismissible);
 
   useEffect(() => {
     onCloseRef.current = onClose;
+    dismissibleRef.current = dismissible;
   });
 
   useEffect(() => {
@@ -37,7 +43,7 @@ export function AccessibleModal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onCloseRef.current();
+        if (dismissibleRef.current) onCloseRef.current();
         return;
       }
 
@@ -69,9 +75,11 @@ export function AccessibleModal({
     // Initial focus on first interactive element or content container
     const timer = setTimeout(() => {
       if (contentRef.current) {
-        const firstFocusable = contentRef.current.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
+        const firstFocusable =
+          contentRef.current.querySelector<HTMLElement>('[data-initial-focus]') ??
+          contentRef.current.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          );
         if (firstFocusable) {
           firstFocusable.focus();
         } else {
@@ -94,9 +102,9 @@ export function AccessibleModal({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="student-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={(e) => {
-        if (e.target === overlayRef.current) {
+        if (dismissible && e.target === overlayRef.current) {
           onCloseRef.current();
         }
       }}
@@ -109,7 +117,7 @@ export function AccessibleModal({
         aria-labelledby="modal-title"
         aria-describedby={description ? 'modal-desc' : undefined}
         tabIndex={-1}
-        className={`w-full ${maxWidthClass} bg-white rounded-3xl p-6 shadow-2xl border border-zinc-200 outline-none space-y-4`}
+        className={`student-modal w-full ${maxWidthClass} bg-white rounded-3xl p-6 shadow-2xl border border-zinc-200 outline-none space-y-4 ${dialogClassName}`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -124,9 +132,10 @@ export function AccessibleModal({
           </div>
           <button
             type="button"
-            onClick={() => onCloseRef.current()}
+            onClick={() => { if (dismissible) onCloseRef.current(); }}
+            aria-disabled={!dismissible || undefined}
             aria-label="Cerrar modal"
-            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="student-modal-close rounded-lg p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             ✕
           </button>
@@ -162,7 +171,7 @@ export function ConfirmDialog({
   return (
     <AccessibleModal isOpen={isOpen} onClose={onCancel} title={title}>
       <p className="text-sm text-zinc-600 leading-relaxed">{message}</p>
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="student-modal-actions flex justify-end gap-3 pt-4">
         <button
           type="button"
           onClick={onCancel}
@@ -173,6 +182,7 @@ export function ConfirmDialog({
         <button
           type="button"
           onClick={onConfirm}
+          data-destructive={isDestructive ? 'true' : undefined}
           className={`px-4 py-2 rounded-xl text-xs font-semibold text-white transition-colors focus:outline-none focus:ring-2 ${
             isDestructive
               ? 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500'

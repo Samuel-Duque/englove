@@ -1,0 +1,353 @@
+.page {
+  --group-target: 48px;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  container-type: inline-size;
+  overflow-wrap: anywhere;
+}
+
+.header,
+.toolbar,
+.filters,
+.formActions,
+.rowActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.header,
+.toolbar {
+  justify-content: space-between;
+}
+
+.header h1,
+.create h2,
+.empty h2 {
+  font-family: var(--font-upward-display), sans-serif;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.header h1 {
+  font-size: 1.625rem;
+  letter-spacing: -0.015em;
+}
+.header p,
+.empty p {
+  margin-top: 0.35rem;
+  color: var(--ink-secondary);
+}
+.create h2,
+.empty h2 {
+  font-size: 1.1875rem;
+}
+
+.primary,
+.secondary,
+.filters button,
+.rowActions button,
+.detail,
+.name {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: var(--group-target);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--accent-primary);
+  color: #fff;
+}
+.primary:hover {
+  background: var(--accent-primary-hover);
+}
+.secondary {
+  background: var(--surface-card);
+  border-color: var(--border-control);
+}
+.secondary:hover,
+.rowActions button:hover {
+  background: var(--surface-subtle);
+}
+
+.page :is(button, a, input):focus-visible,
+.alert:focus {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.page button:disabled {
+  cursor: default;
+  color: var(--ink-secondary);
+  background: var(--surface-subtle);
+  border-color: var(--border-hairline);
+}
+
+.create,
+.empty,
+.alert,
+.success,
+.directory,
+.skeleton {
+  min-width: 0;
+  padding: 1.125rem 1.25rem;
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+}
+
+.create,
+.rename {
+  display: grid;
+  gap: 0.625rem;
+}
+.create {
+  border-color: var(--border-strong);
+}
+.create label {
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.create input,
+.rename input {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--group-target);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  background: var(--surface-card);
+  font-size: 1rem;
+}
+
+.formActions {
+  justify-content: flex-end;
+}
+.rename .formActions {
+  justify-content: flex-start;
+}
+.empty button,
+.alert > :is(button, a) {
+  margin-top: 0.625rem;
+}
+.alert {
+  color: var(--accent-danger-ink);
+  background: var(--accent-danger-soft);
+  border-color: var(--accent-danger);
+}
+.alert a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.success {
+  color: var(--status-ok-ink);
+  background: var(--status-ok-bg);
+}
+
+.toolbar {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  padding: 0.5rem 0.625rem;
+}
+
+.filters button {
+  padding-inline: 1rem;
+  color: var(--ink-secondary);
+}
+.filters button:hover {
+  background: var(--bg-canvas);
+}
+.filters button[aria-pressed="true"] {
+  background: var(--surface-card);
+  color: var(--accent-primary-ink);
+  border-color: var(--accent-primary);
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-secondary);
+  font-weight: 600;
+}
+
+.directory,
+.skeleton {
+  padding: 0;
+  box-shadow: 0 1px 3px rgb(43 21 10 / 6%);
+}
+
+.directory {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.table thead {
+  background: var(--surface-subtle);
+  color: var(--ink-secondary);
+}
+.table :is(th, td) {
+  height: 52px;
+  padding: 0.5rem 1rem;
+  text-align: start;
+}
+.table tbody tr {
+  border-top: 1px solid var(--border-hairline);
+}
+.table tbody tr:hover {
+  background: var(--bg-canvas);
+}
+.table thead th:last-child {
+  text-align: end;
+}
+.table thead th,
+.table td:nth-child(2) {
+  white-space: nowrap;
+}
+.table th[scope="row"] {
+  width: 36%;
+}
+
+.rowActions {
+  justify-content: flex-end;
+  gap: 0.125rem;
+}
+.rowActions button,
+.detail,
+.name {
+  padding-inline: 0.375rem;
+}
+.detail {
+  color: var(--accent-primary-ink);
+}
+.name {
+  text-align: start;
+  padding-inline: 0;
+}
+.rowActions .danger {
+  color: var(--accent-danger-ink);
+}
+.detail:hover,
+.name:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.mobileLabel {
+  display: none;
+}
+
+.skeleton {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+.skeleton div {
+  height: 52px;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+@media (min-width: 1024px) and (pointer: fine) {
+  .page {
+    --group-target: 42px;
+  }
+  .header .primary {
+    min-height: 44px;
+  }
+  .filters button {
+    min-height: 40px;
+  }
+}
+
+@container (740px < width < 900px) {
+  .rowActions {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+  }
+}
+@container (min-width: 900px) {
+  .table td:last-child {
+    width: 1%;
+  }
+  .rowActions {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+}
+
+@container (max-width: 740px) {
+  .directory {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .table,
+  .table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+  }
+  .table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem;
+    background: var(--surface-card);
+    border: 1px solid var(--border-hairline);
+    border-radius: 12px;
+  }
+  .table tbody :is(th, td) {
+    height: auto;
+    padding: 0;
+  }
+  .table th[scope="row"],
+  .table td:last-child {
+    grid-column: 1 / -1;
+    width: auto;
+  }
+  .table td:last-child {
+    border-top: 1px solid var(--border-hairline);
+    padding-top: 0.375rem;
+  }
+  .rowActions {
+    justify-content: flex-start;
+  }
+  .mobileLabel {
+    display: block;
+    color: var(--ink-secondary);
+    margin-bottom: 0.25rem;
+  }
+}
+
+@container (max-width: 360px) {
+  .header .primary {
+    width: 100%;
+  }
+  .filters {
+    gap: 0.125rem;
+  }
+  .filters button {
+    padding-inline: 0.5rem;
+  }
+}

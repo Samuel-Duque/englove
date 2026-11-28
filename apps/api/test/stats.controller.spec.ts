@@ -13,14 +13,14 @@ describe('SPEC-08: StatsController & RBAC Security (ENG-101, ENG-102)', () => {
     id: 'u-1',
     sessionId: 'sess-1',
     organizationId: orgId,
-    email: 'profesora@upwardenglish.org',
+    email: 'profesora@upwardenglish.app',
     role: Role.teacher,
   };
   const studentUser: AuthenticatedUser = {
     id: 'u-2',
     sessionId: 'sess-2',
     organizationId: orgId,
-    email: 'estudiante@upwardenglish.org',
+    email: 'estudiante@upwardenglish.app',
     role: Role.student,
     studentId: 'st-1',
   };

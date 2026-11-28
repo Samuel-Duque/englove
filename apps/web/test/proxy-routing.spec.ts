@@ -5,7 +5,7 @@ import { proxy } from "../src/proxy";
 describe("RF-17: proxy routing and redirect logic", () => {
   it("SEG-01: pending logout ignores retained HttpOnly session cookies on login and private routes", async () => {
     const headers = {
-      cookie: "upward_english_access_token=valid-jwt-token; upward_english_logout_pending=1",
+      cookie: "upward_english_local_access_token=valid-jwt-token; upward_english_logout_pending=1",
     };
     const login = await proxy(
       new NextRequest("http://localhost:3000/login", { headers }),
@@ -46,7 +46,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("redirects authenticated user on public auth route to /inicio", async () => {
     const req = new NextRequest("http://localhost:3000/login", {
       headers: {
-        cookie: "upward_english_access_token=valid-jwt-token",
+        cookie: "upward_english_local_access_token=valid-jwt-token",
       },
     });
     const res = await proxy(req);
@@ -57,7 +57,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("allows authenticated user on private route to pass through", async () => {
     const req = new NextRequest("http://localhost:3000/inicio", {
       headers: {
-        cookie: "upward_english_access_token=valid-jwt-token",
+        cookie: "upward_english_local_access_token=valid-jwt-token",
       },
     });
     const res = await proxy(req);
@@ -93,7 +93,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const expiredToken = `header.${expiredPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/inicio", {
       headers: {
-        cookie: `upward_english_access_token=${expiredToken}`,
+        cookie: `upward_english_local_access_token=${expiredToken}`,
       },
     });
     const res = await proxy(req);
@@ -137,7 +137,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("redirects authenticated user on root / to /inicio", async () => {
     const req = new NextRequest("http://localhost:3000/", {
       headers: {
-        cookie: "upward_english_access_token=valid-jwt-token",
+        cookie: "upward_english_local_access_token=valid-jwt-token",
       },
     });
     const res = await proxy(req);
@@ -152,7 +152,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const studentToken = `header.${studentPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/alumnos", {
       headers: {
-        cookie: `upward_english_access_token=${studentToken}`,
+        cookie: `upward_english_local_access_token=${studentToken}`,
       },
     });
     const res = await proxy(req);
@@ -167,7 +167,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const teacherToken = `header.${teacherPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/perfil", {
       headers: {
-        cookie: `upward_english_access_token=${teacherToken}`,
+        cookie: `upward_english_local_access_token=${teacherToken}`,
       },
     });
     const res = await proxy(req);
@@ -182,7 +182,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const studentToken = `header.${studentPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/contenido-extra", {
       headers: {
-        cookie: `upward_english_access_token=${studentToken}`,
+        cookie: `upward_english_local_access_token=${studentToken}`,
       },
     });
     const res = await proxy(req);
@@ -197,7 +197,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const teacherToken = `header.${teacherPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/extra", {
       headers: {
-        cookie: `upward_english_access_token=${teacherToken}`,
+        cookie: `upward_english_local_access_token=${teacherToken}`,
       },
     });
     const res = await proxy(req);
@@ -214,7 +214,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/contenido-extra",
       {
         headers: {
-          cookie: `upward_english_access_token=${teacherToken}`,
+          cookie: `upward_english_local_access_token=${teacherToken}`,
         },
       },
     );
@@ -227,7 +227,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const studentToken = `header.${studentPayload}.sig`;
     const reqStudent = new NextRequest("http://localhost:3000/extra", {
       headers: {
-        cookie: `upward_english_access_token=${studentToken}`,
+        cookie: `upward_english_local_access_token=${studentToken}`,
       },
     });
     const resStudent = await proxy(reqStudent);
@@ -241,7 +241,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
     const teacherToken = `header.${teacherPayload}.sig`;
     const req = new NextRequest("http://localhost:3000/actividades", {
       headers: {
-        cookie: `upward_english_access_token=${teacherToken}`,
+        cookie: `upward_english_local_access_token=${teacherToken}`,
       },
     });
     const res = await proxy(req);
@@ -251,7 +251,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/actividades/nueva",
       {
         headers: {
-          cookie: `upward_english_access_token=${teacherToken}`,
+          cookie: `upward_english_local_access_token=${teacherToken}`,
         },
       },
     );
@@ -268,7 +268,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/actividades",
       {
         headers: {
-          cookie: `upward_english_access_token=${studentToken}`,
+          cookie: `upward_english_local_access_token=${studentToken}`,
         },
       },
     );
@@ -280,7 +280,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
       "http://localhost:3000/actividad/attempt-123",
       {
         headers: {
-          cookie: `upward_english_access_token=${studentToken}`,
+          cookie: `upward_english_local_access_token=${studentToken}`,
         },
       },
     );
@@ -306,7 +306,7 @@ describe("RF-17: proxy routing and redirect logic", () => {
   it("allows authenticated access to /offline without redirecting to /inicio", async () => {
     const req = new NextRequest("http://localhost:3000/offline", {
       headers: {
-        cookie: "upward_english_access_token=valid-token",
+        cookie: "upward_english_local_access_token=valid-token",
       },
     });
     const res = await proxy(req);
@@ -338,9 +338,10 @@ describe("RF-17: proxy routing and redirect logic", () => {
       process.env.NEXT_PUBLIC_APP_ENV = "local";
       const localAuthRes = await proxy(
         new NextRequest("http://localhost:3000/inicio", {
-          headers: { cookie: "upward_english_access_token=valid-token" },
+          headers: { cookie: "upward_english_local_access_token=valid-token" },
         }),
       );
+      expect(localAuthRes.headers.get("location")).toBeNull();
       expect(localAuthRes.headers.get("x-content-type-options")).toBe("nosniff");
       expect(localAuthRes.headers.get("content-security-policy")).toContain("http://localhost:3001");
       expect(localAuthRes.headers.get("content-security-policy")).toContain("http://127.0.0.1:9000");
@@ -349,6 +350,72 @@ describe("RF-17: proxy routing and redirect logic", () => {
       else process.env.NEXT_PUBLIC_APP_ENV = prevPublicEnv;
       if (prevAppEnv === undefined) delete process.env.APP_ENV;
       else process.env.APP_ENV = prevAppEnv;
+    }
+  });
+
+  it("SEC-LOGOUT-01: alinea el fallback de COOKIE_PREFIX en local con .env.example y respeta staging/production y overrides explícitos", async () => {
+    const prevCookiePrefix = process.env.COOKIE_PREFIX;
+    const prevPublicCookiePrefix = process.env.NEXT_PUBLIC_COOKIE_PREFIX;
+    const prevAppEnv = process.env.APP_ENV;
+    const prevPublicAppEnv = process.env.NEXT_PUBLIC_APP_ENV;
+
+    try {
+      delete process.env.COOKIE_PREFIX;
+      delete process.env.NEXT_PUBLIC_COOKIE_PREFIX;
+      delete process.env.APP_ENV;
+      delete process.env.NEXT_PUBLIC_APP_ENV;
+
+      // En local sin COOKIE_PREFIX, reconoce upward_english_local_access_token e ignora upward_english_access_token
+      const localOk = await proxy(
+        new NextRequest("http://localhost:3000/inicio", {
+          headers: { cookie: "upward_english_local_access_token=valid-jwt-token" },
+        }),
+      );
+      expect(localOk.headers.get("location")).toBeNull();
+
+      const prodCookieInLocal = await proxy(
+        new NextRequest("http://localhost:3000/inicio", {
+          headers: { cookie: "upward_english_access_token=valid-jwt-token" },
+        }),
+      );
+      expect(prodCookieInLocal.status).toBe(307);
+      expect(prodCookieInLocal.headers.get("location")).toContain("/login");
+
+      // En staging sin COOKIE_PREFIX explícito, cae a upward_english_stg_
+      process.env.NEXT_PUBLIC_APP_ENV = "staging";
+      const stagingOk = await proxy(
+        new NextRequest("http://localhost:3000/inicio", {
+          headers: { cookie: "upward_english_stg_access_token=valid-jwt-token" },
+        }),
+      );
+      expect(stagingOk.headers.get("location")).toBeNull();
+
+      // En production sin COOKIE_PREFIX explícito, cae a upward_english_
+      process.env.NEXT_PUBLIC_APP_ENV = "production";
+      const prodOk = await proxy(
+        new NextRequest("http://localhost:3000/inicio", {
+          headers: { cookie: "upward_english_access_token=valid-jwt-token" },
+        }),
+      );
+      expect(prodOk.headers.get("location")).toBeNull();
+
+      // COOKIE_PREFIX explícito prevalece siempre
+      process.env.COOKIE_PREFIX = "custom_prefix_";
+      const customOk = await proxy(
+        new NextRequest("http://localhost:3000/inicio", {
+          headers: { cookie: "custom_prefix_access_token=valid-jwt-token" },
+        }),
+      );
+      expect(customOk.headers.get("location")).toBeNull();
+    } finally {
+      if (prevCookiePrefix === undefined) delete process.env.COOKIE_PREFIX;
+      else process.env.COOKIE_PREFIX = prevCookiePrefix;
+      if (prevPublicCookiePrefix === undefined) delete process.env.NEXT_PUBLIC_COOKIE_PREFIX;
+      else process.env.NEXT_PUBLIC_COOKIE_PREFIX = prevPublicCookiePrefix;
+      if (prevAppEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevAppEnv;
+      if (prevPublicAppEnv === undefined) delete process.env.NEXT_PUBLIC_APP_ENV;
+      else process.env.NEXT_PUBLIC_APP_ENV = prevPublicAppEnv;
     }
   });
 });

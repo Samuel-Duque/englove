@@ -4,6 +4,7 @@
 services:
   - type: web
     name: upward-english-api-staging
+    region: virginia
     env: docker
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .

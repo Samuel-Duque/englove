@@ -11,7 +11,10 @@ import {
   clearSharedProfile,
   isLogoutPending,
 } from "../../../lib/auth-session";
-import { reconcilePendingLogout } from "../../../lib/auth-hygiene";
+import {
+  expireSessionHintCookies,
+  reconcilePendingLogout,
+} from "../../../lib/auth-hygiene";
 import { clearSharedFeatureFlags } from "../../../lib/feature-flags-client";
 import { purgeOtherUsersEntries } from "../../../lib/offline-queue";
 import { getQueryClient } from "../../../lib/query-client";
@@ -74,17 +77,25 @@ export function LoginClient({ demoAccounts }: { demoAccounts: readonly DemoAccou
         return false;
       }
       // Only attempt silent refresh if there is an active session hint (QA-02, P0-02)
+      const activeHintCookie = `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || "upward_english_"}session_hint`;
+      let hasStaleHint = false;
       const hasSessionHint =
         typeof window !== "undefined" &&
         document.cookie.split(";").some((c) => {
           const [key, val] = c.split("=").map((s) => s.trim());
-          return (
-            (key === "session_hint" ||
-              key?.endsWith("_session_hint") ||
-              key?.includes("session_hint")) &&
-            val === "1"
-          );
+          if (!key || val !== "1") return false;
+          if (key === activeHintCookie || key === "session_hint") {
+            return true;
+          }
+          if (key.endsWith("_session_hint") || key.includes("session_hint")) {
+            hasStaleHint = true;
+          }
+          return false;
         });
+
+      if (hasStaleHint && !hasSessionHint) {
+        expireSessionHintCookies();
+      }
 
       if (!hasSessionHint) {
         return false;
@@ -100,8 +111,9 @@ export function LoginClient({ demoAccounts }: { demoAccounts: readonly DemoAccou
           router.replace(destination);
           return true;
         }
+        expireSessionHintCookies();
       } catch {
-        // Fallback: stay on login page
+        expireSessionHintCookies();
       }
 
       return false;

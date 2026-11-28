@@ -1,5 +1,8 @@
 import { addSessionCookie } from './session';
+import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
+
+const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderboard (ENG-145)', () => {
   test.beforeEach(async ({ context, page }) => {
@@ -170,19 +173,29 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     });
 
     // 1.1 Navegar a /estadisticas
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/estadisticas');
 
-    // 1.2 Verificar KPIs y Alerta de inactividad de 14 días
-    await expect(page.locator('p:has-text("4.2"), p:has-text("4,2")').first()).toBeVisible({ timeout: 5000 });
+    // 1.2 Verificar KPIs, tablist accesible y Alerta de inactividad de 14 días
+    const tablist = page.getByRole('tablist', { name: 'Pestañas de estadísticas' });
+    await expect(tablist).toBeVisible();
+    await expect(tablist.getByRole('tab', { name: 'Vista General' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('p:has-text("4.2"), p:has-text("4,2")').first()).toBeVisible();
     await expect(page.locator('text=85%').first()).toBeVisible();
     await expect(page.locator('text=Alumnos en riesgo de deserción o abandono')).toBeVisible();
     await expect(page.locator('text=Sebastián Inactivo')).toBeVisible();
     await expect(page.locator('text=16 días')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+    expect((await new AxeBuilder({ page }).withTags(wcagTags).analyze()).violations).toEqual([]);
 
     // 1.3 Cambiar a pestaña Por Grupo y conmutar tendencias 30d vs 7d
-    await page.click('button:has-text("Por Grupo")');
+    await tablist.getByRole('tab', { name: 'Por Grupo' }).click();
+    await expect(tablist.getByRole('tab', { name: 'Por Grupo' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('p:has-text("Grupo A1 Mañana")')).toBeVisible();
+    await expect(page.getByRole('img', { name: /Tendencia académica del grupo/i })).toBeVisible();
     await expect(page.locator('text=Tendencia comparada:')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Alumno/ }).getByRole('button')).toBeVisible();
+    expect((await new AxeBuilder({ page }).withTags(wcagTags).analyze()).violations).toEqual([]);
 
     const weeklyBtn = page.locator('button:has-text("Semanal (7 días)")');
     await expect(weeklyBtn).toBeVisible();
@@ -193,10 +206,11 @@ test.describe('SPEC-08: Estadísticas Docentes, Alertas de Inactividad y Leaderb
     await monthlyBtn.click();
 
     // 1.4 Cambiar a pestaña Leaderboard Privado y probar filtros
-    await page.click('button:has-text("Leaderboard de Notas")');
+    await tablist.getByRole('tab', { name: 'Leaderboard de Notas' }).click();
     await expect(page.locator('text=Aviso de confidencialidad docente')).toBeVisible();
-    await expect(page.locator('text=Ana Sofía')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Ana Sofía')).toBeVisible();
     await expect(page.locator('text=Santiago Ruiz')).toBeVisible();
+    expect((await new AxeBuilder({ page }).withTags(wcagTags).analyze()).violations).toEqual([]);
 
     // Filtrar por Nivel A1
     const a1Filter = page.locator('button:has-text("A1")').first();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState, useTransition } from 'react';
+import { useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, ChartNoAxesColumn, ClipboardList, FileCheck, House, LibraryBig, LogOut, Menu, Users, UsersRound, X } from 'lucide-react';
@@ -50,10 +50,18 @@ export function TeacherNav({ teacherName }: { teacherName?: string }) {
   const menuButton = useRef<HTMLButtonElement>(null);
   const [openPath, setOpenPath] = useState<string | null>(null);
   const isOpen = openPath === pathname;
-  const [isLoggingOut, startLogout] = useTransition();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   function closeMenu() {
     setOpenPath(null);
+  }
+
+  async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    await logoutSharedDevice(undefined, { keepInMemoryLock: true });
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    window.location.replace('/login');
   }
 
   return (
@@ -106,10 +114,7 @@ export function TeacherNav({ teacherName }: { teacherName?: string }) {
         <div className={styles.sidebarFooter}>
           <p>{teacherName || 'Profesora'}</p>
           <button type="button" className={styles.secondaryButton} disabled={isLoggingOut} onClick={() => {
-            startLogout(async () => {
-              await logoutSharedDevice();
-              window.location.href = '/login';
-            });
+            void handleLogout();
           }}>
             <LogOut size={18} strokeWidth={1.65} aria-hidden="true" />
             {isLoggingOut ? 'Cerrando…' : 'Cerrar sesión'}

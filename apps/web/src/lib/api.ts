@@ -1,5 +1,9 @@
 import { checkAppMinVersion } from "./pwa-manager";
-import { requestSharedRefresh, isLogoutPending } from "./auth-session";
+import {
+  requestSharedRefresh,
+  isLogoutPending,
+  isPublicAppRoute,
+} from "./auth-session";
 
 export interface ApiErrorResponse {
   statusCode: number;
@@ -83,11 +87,16 @@ export async function apiFetch<T>(
     path.includes("/auth/signup") ||
     path.includes("/auth/session");
 
+  const currentPathname =
+    typeof window !== "undefined" ? (window.location?.pathname ?? "/") : "/";
+
   if (
     response.status === 401 &&
     !isRetry &&
     !isAuthRoute &&
-    typeof window !== "undefined"
+    typeof window !== "undefined" &&
+    !isLogoutPending() &&
+    !isPublicAppRoute(currentPathname)
   ) {
     const refreshed = await requestSharedRefresh();
     if (refreshed) {

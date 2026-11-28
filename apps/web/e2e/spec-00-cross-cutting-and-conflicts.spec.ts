@@ -507,7 +507,7 @@ test.describe('SPEC-00 a SPEC-08: Ausencia de Conflictos Transversales e Integri
     await expect(page.locator('text=Actividad Archivada pero Vigente')).toBeVisible();
 
     // Abrir runner y completar intento
-    await page.click('text=Continuar actividad');
+    await page.getByRole('link', { name: 'Continuar actividad' }).click();
     await expect(page).toHaveURL(/\/actividad\/att-dec95-1/);
 
     await page.fill('input[type="text"]', 'world');

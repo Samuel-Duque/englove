@@ -203,11 +203,16 @@ test.describe('SPEC-06: Microjuegos en Navegador Real (ENG-145)', () => {
     });
 
     // 3. Probar redirección transparente desde /juegos/:activityId hacia /juegos
+    const consoleErrors: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
     await page.goto('/juegos/act-game-1');
     await expect(page).toHaveURL(/\/juegos/);
 
     // Verificar que la pestaña Juegos cargue y muestre la tarjeta
-    await expect(page.locator('text=Colors Match Challenge')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Colors Match Challenge')).toBeVisible();
+    expect(consoleErrors.filter((e) => e.toLowerCase().includes('hydration'))).toEqual([]);
     await expect(page.getByRole('heading', { name: 'Campamento de Microjuegos' })).toBeVisible();
     await expect(page.getByText('Estrellas de práctica: 3 / 3')).toBeVisible();
     await expect(page.getByText('Partidas jugadas: 1')).toBeVisible();

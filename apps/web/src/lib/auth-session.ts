@@ -217,15 +217,40 @@ export function markLogoutPending(): void {
   }
 }
 
-export function confirmLogoutComplete(): void {
-  logoutPendingInMemory = false;
+export function isPublicAppRoute(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/offline" ||
+    pathname === "/terminos" ||
+    pathname.startsWith("/terminos/") ||
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/registro" ||
+    pathname.startsWith("/registro/") ||
+    pathname.startsWith("/recuperar") ||
+    pathname === "/restablecer" ||
+    pathname.startsWith("/restablecer/")
+  );
+}
+
+export function confirmLogoutComplete(options?: {
+  keepInMemoryLock?: boolean;
+}): void {
+  if (!options?.keepInMemoryLock) {
+    logoutPendingInMemory = false;
+  }
   try {
     window.localStorage?.removeItem(LOGOUT_PENDING_KEY);
   } catch {
     /* Cookie fallback. */
   }
-  if (typeof document !== "undefined")
-    document.cookie = `${LOGOUT_PENDING_KEY}=; path=/; max-age=0; SameSite=Lax`;
+  if (typeof document !== "undefined") {
+    const secure =
+      typeof window !== "undefined" && window.location?.protocol === "https:"
+        ? "; Secure"
+        : "";
+    document.cookie = `${LOGOUT_PENDING_KEY}=; path=/; max-age=0; SameSite=Lax${secure}`;
+  }
 }
 
 export async function settleSharedRefresh(): Promise<void> {

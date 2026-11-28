@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
@@ -11,7 +11,11 @@ import {
 } from '@upward-english/shared';
 import { apiFetch, ApiError } from '../../../lib/api';
 import { fetchSharedFeatureFlags } from '../../../lib/feature-flags-client';
-import { fetchSharedProfile } from '../../../lib/auth-session';
+import {
+  fetchSharedProfile,
+  isLogoutPending,
+  subscribeSessionEpoch,
+} from '../../../lib/auth-session';
 import { GamesCampLoading } from './games-camp-loading';
 import { KidsGamesCamp } from './kids-games-camp';
 import { TeensGamesLoading } from './teens-games-loading';
@@ -23,10 +27,16 @@ const flagsUnavailableError = new Error(
 
 export function JuegosClient() {
   const router = useRouter();
+  const logoutPending = useSyncExternalStore(
+    subscribeSessionEpoch,
+    isLogoutPending,
+    () => false,
+  );
 
   const profileQuery = useQuery({
     queryKey: ['student', 'profile', 'shell'],
     queryFn: () => fetchSharedProfile(),
+    enabled: !logoutPending,
   });
   const ageSegment = profileQuery.data?.student?.ageSegment ?? 'kids';
   const isKids = ageSegment === 'kids';
@@ -42,6 +52,7 @@ export function JuegosClient() {
       if (!flagRes) throw new Error('No se pudieron obtener las feature flags');
       return flagRes;
     },
+    enabled: !logoutPending,
   });
 
   const gamesEnabled = Boolean(flagsQuery.data?.flags?.games);
@@ -52,7 +63,7 @@ export function JuegosClient() {
       apiFetch<StudentGamesListResponse>('/api/v1/me/games', {
         schema: StudentGamesListResponseSchema,
       }),
-    enabled: gamesEnabled,
+    enabled: gamesEnabled && !logoutPending,
   });
 
   const startGameMutation = useMutation({
@@ -79,7 +90,9 @@ export function JuegosClient() {
     },
   });
 
-  const isLoading = flagsQuery.isLoading || (gamesEnabled && gamesQuery.isLoading);
+  const isLoading =
+    (flagsQuery.isPending && !flagsQuery.isPaused) ||
+    (gamesEnabled && gamesQuery.isPending && !gamesQuery.isPaused);
   const games: StudentGameCard[] = gamesQuery.data?.items || [];
 
   const handleStartGame = (game: StudentGameCard) => {

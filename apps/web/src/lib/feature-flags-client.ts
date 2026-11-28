@@ -1,5 +1,6 @@
 import { FeatureFlagsResponseSchema, type FeatureFlagsResponse } from '@upward-english/shared';
 import { apiFetch } from './api';
+import { isLogoutPending } from './auth-session';
 
 export type { FeatureFlagsResponse };
 
@@ -14,6 +15,9 @@ const CACHE_TTL_MS = 60 * 1000; // 60 segundos de caché en memoria de cliente
  * el rate limiter de la API (ISSUE-09).
  */
 export async function fetchSharedFeatureFlags(force = false): Promise<FeatureFlagsResponse | null> {
+  if (isLogoutPending()) {
+    return null;
+  }
   const now = Date.now();
   if (!force && cachedFeatureFlags && now - cachedFeatureFlags.timestamp < CACHE_TTL_MS) {
     return cachedFeatureFlags.data;

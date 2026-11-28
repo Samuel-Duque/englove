@@ -172,8 +172,20 @@ test("RT-04: multi-tab logout clears second tab immediately and removes private 
 
   const page1 = await context.newPage();
   const page2 = await context.newPage();
+  const abortedLogoutRequests: string[] = [];
+  let logoutStatus: number | null = null;
   page1.on("pageerror", (err) => pageErrors.push(err.message));
   page2.on("pageerror", (err) => pageErrors.push(err.message));
+  page1.on("requestfailed", (req) => {
+    if (req.url().includes("/api/v1/auth/logout")) {
+      abortedLogoutRequests.push(`${req.url()} (${req.failure()?.errorText ?? "failed"})`);
+    }
+  });
+  page1.on("response", (res) => {
+    if (res.url().includes("/api/v1/auth/logout")) {
+      logoutStatus = res.status();
+    }
+  });
 
   await page1.goto("/inicio");
   await page2.goto("/inicio");
@@ -183,6 +195,8 @@ test("RT-04: multi-tab logout clears second tab immediately and removes private 
 
   await page1.getByRole("button", { name: "Cerrar sesión", exact: true }).click();
   await expect(page1).toHaveURL(/\/login/);
+  expect(abortedLogoutRequests).toEqual([]);
+  expect(logoutStatus).toBe(204);
 
   await page2.bringToFront();
   await expect(page2).toHaveURL(/\/login/);

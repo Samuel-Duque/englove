@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useTransition, useState } from "react";
+import React, { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   ExternalLink,
@@ -14,6 +14,11 @@ import { useQuery } from "@tanstack/react-query";
 import { ConfirmDialog } from "./ui/modal";
 import { usePathname } from "next/navigation";
 import { logoutSharedDevice } from "../lib/auth-hygiene";
+import {
+  isLogoutPending,
+  isPublicAppRoute,
+  subscribeSessionEpoch,
+} from "../lib/auth-session";
 import { fetchSharedFeatureFlags } from "../lib/feature-flags-client";
 import {
   hasPendingWork,
@@ -37,12 +42,19 @@ export function StudentNav({
   extraContentEnabled,
 }: StudentNavProps) {
   const pathname = usePathname();
-  const [isLoggingOut, startLogout] = useTransition();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [isAttemptingFlush, setIsAttemptingFlush] = useState(false);
+  const logoutPending = useSyncExternalStore(
+    subscribeSessionEpoch,
+    isLogoutPending,
+    () => false,
+  );
 
   const shouldFetchFlags =
-    gamesEnabled === undefined || extraContentEnabled === undefined;
+    (gamesEnabled === undefined || extraContentEnabled === undefined) &&
+    !logoutPending &&
+    !isPublicAppRoute(pathname ?? "/");
   const featureFlagsQuery = useQuery({
     queryKey: ["feature-flags"],
     queryFn: () => fetchSharedFeatureFlags(),
@@ -76,10 +88,13 @@ export function StudentNav({
   ];
 
   const performLogout = () => {
-    startLogout(async () => {
-      await logoutSharedDevice();
-      window.location.href = "/login";
-    });
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    void (async () => {
+      await logoutSharedDevice(undefined, { keepInMemoryLock: true });
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+      window.location.replace("/login");
+    })();
   };
 
   const handleLogoutClick = async () => {

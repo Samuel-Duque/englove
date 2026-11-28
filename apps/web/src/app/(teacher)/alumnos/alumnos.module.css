@@ -232,12 +232,13 @@
 }
 
 .table thead th {
-  padding: 0.75rem 0.75rem;
+  padding: 0.75rem 0.625rem;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
   text-align: start;
 }
 
@@ -260,8 +261,9 @@
 
 .table tbody th,
 .table tbody td {
-  padding: 0.75rem 0.75rem;
+  padding: 0.75rem 0.625rem;
   min-height: 52px;
+  min-width: 0;
   vertical-align: middle;
   color: var(--ink-primary, #2b150a);
   text-align: start;
@@ -274,10 +276,12 @@
 
 .studentNameLink {
   display: inline-block;
+  max-width: 100%;
   font-weight: 700;
   color: var(--ink-primary, #2b150a);
   text-decoration: none;
   border-radius: 6px;
+  overflow-wrap: anywhere;
 }
 
 .studentNameLink:hover {
@@ -288,7 +292,7 @@
 
 .emailText {
   display: block;
-  max-width: 11rem;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -321,10 +325,12 @@
 
 .groupLink {
   display: inline-block;
+  max-width: 100%;
   color: var(--ink-primary, #2b150a);
   font-weight: 600;
   text-decoration: none;
   border-radius: 6px;
+  overflow-wrap: anywhere;
 }
 
 .groupLink:hover {
@@ -340,7 +346,8 @@
 .guardianCell {
   display: grid;
   gap: 0.125rem;
-  max-width: 10rem;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .guardianName {
@@ -369,9 +376,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
   min-height: 40px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.5rem;
   border-radius: 8px;
   color: var(--accent-primary-hover, #a53906);
   font-weight: 700;
@@ -495,6 +502,47 @@
   ):focus-visible {
   outline: 3px solid var(--focus-ring, #1d4ed8);
   outline-offset: 2px;
+}
+
+@container (width >= 640px) {
+  .table:not(.lockedTable) {
+    table-layout: fixed;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(1),
+  .table:not(.lockedTable) tbody th:nth-child(1) {
+    width: 17%;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(2),
+  .table:not(.lockedTable) tbody td:nth-child(2) {
+    width: 19%;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(3),
+  .table:not(.lockedTable) tbody td:nth-child(3) {
+    width: 9%;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(4),
+  .table:not(.lockedTable) tbody td:nth-child(4) {
+    width: 15%;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(5),
+  .table:not(.lockedTable) tbody td:nth-child(5) {
+    width: 10%;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(6),
+  .table:not(.lockedTable) tbody td:nth-child(6) {
+    width: 16%;
+  }
+
+  .table:not(.lockedTable) thead th:nth-child(7),
+  .table:not(.lockedTable) tbody td:nth-child(7) {
+    width: 14%;
+  }
 }
 
 @container (width < 640px) {

@@ -16,14 +16,26 @@ test.describe('SPEC-01 & SPEC-02: Rutas Públicas y Flujos de Autenticación (EN
     page,
     context,
   }) => {
+    const unexpectedApi401s: string[] = [];
+    page.on('response', (res) => {
+      const url = res.url();
+      if (
+        res.status() === 401 &&
+        (url.includes('/api/v1/feature-flags') || url.includes('/api/v1/auth/refresh'))
+      ) {
+        unexpectedApi401s.push(`${res.status()} ${url}`);
+      }
+    });
+
     // Mock silent refresh as 401 so login form displays
     await page.route('**/api/v1/auth/refresh', async (route) => {
       await route.fulfill({ status: 401, json: { code: 'AUTH_UNAUTHORIZED' } });
     });
 
-    // 1.1 Renderizado de login
+    // 1.1 Renderizado de login sin sesión previa: cero 401 en feature-flags o auth/refresh
     await page.goto('/login');
     await expect(page.locator('input[type="email"]')).toBeVisible();
+    expect(unexpectedApi401s).toEqual([]);
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
     await expect(page.locator('*:has-text("¿Olvidaste tu contraseña?"), *:has-text("Olvidé mi contraseña")').first()).toBeVisible();

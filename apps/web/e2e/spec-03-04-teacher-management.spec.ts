@@ -179,7 +179,14 @@ test.describe('SPEC-03 & SPEC-04: Panel Docente, Gestor de Contenidos y Asignaci
 
     const duplicateBtn = page.locator('button:has-text("Duplicar")').first();
     await expect(duplicateBtn).toBeVisible();
-    await duplicateBtn.click();
+    await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/v1/activities/act-1/duplicate') &&
+          res.status() === 201,
+      ),
+      duplicateBtn.click(),
+    ]);
     await expect(page).toHaveURL(/\/actividades\/act-1-copy/);
   });
 

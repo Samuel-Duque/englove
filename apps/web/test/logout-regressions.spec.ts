@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { Role } from "@upward-english/shared";
 import {
+  expireSessionHintCookies,
   logoutSharedDevice,
   reconcilePendingLogout,
   startCrossTabSessionSync,
 } from "../src/lib/auth-hygiene";
+import { fetchSharedFeatureFlags } from "../src/lib/feature-flags-client";
 import {
   SESSION_EPOCH_KEY,
   fetchSharedSession,
@@ -326,5 +328,100 @@ describe("SEG-01: failed logout never silently restores the previous account", (
     expect(onInvalidate).toHaveBeenCalledWith("account_switch");
     expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
     stop();
+  });
+
+  it("keeps the in-memory logout lock on the departing page when keepInMemoryLock is true while clearing persistent cookie/storage markers with Secure on HTTPS", async () => {
+    const writes: string[] = [];
+    const cookies = new Map<string, string>();
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+      sessionStorage: { clear: vi.fn() },
+      location: {
+        origin: "https://app.upwardenglish.app",
+        hostname: "app.upwardenglish.app",
+        protocol: "https:",
+        pathname: "/juegos",
+      },
+    });
+    vi.stubGlobal("document", {
+      get cookie() {
+        return [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+      },
+      set cookie(raw: string) {
+        writes.push(raw);
+        const [pair = ""] = raw.split(";");
+        const sep = pair.indexOf("=");
+        const k = pair.slice(0, sep).trim();
+        const v = pair.slice(sep + 1);
+        if (/max-age=0/i.test(raw)) cookies.delete(k);
+        else cookies.set(k, v);
+      },
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(
+      await logoutSharedDevice(new QueryClient(), { keepInMemoryLock: true }),
+    ).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isLogoutPending()).toBe(true);
+    expect(storage.has("upward_english_logout_pending")).toBe(false);
+    expect(cookies.has("upward_english_logout_pending")).toBe(false);
+    expect(
+      writes.some(
+        (entry) =>
+          entry.startsWith("upward_english_logout_pending=;") &&
+          entry.includes("max-age=0") &&
+          entry.includes("; Secure"),
+      ),
+    ).toBe(true);
+
+    fetchMock.mockClear();
+    expect(await fetchSharedFeatureFlags(true)).toBeNull();
+    await expect(apiFetch("/api/v1/me")).rejects.toMatchObject({
+      code: "LOGOUT_PENDING",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips GET /api/v1/feature-flags while logout is pending and expires stale session_hint cookies", async () => {
+    const cookies = new Map<string, string>([
+      ["upward_english_local_session_hint", "1"],
+      ["englove_local_session_hint", "1"],
+    ]);
+    vi.stubGlobal("document", {
+      get cookie() {
+        return [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+      },
+      set cookie(raw: string) {
+        const [pair = ""] = raw.split(";");
+        const sep = pair.indexOf("=");
+        const k = pair.slice(0, sep).trim();
+        const v = pair.slice(sep + 1);
+        if (/max-age=0/i.test(raw)) cookies.delete(k);
+        else cookies.set(k, v);
+      },
+    });
+
+    expireSessionHintCookies();
+    expect(cookies.has("upward_english_local_session_hint")).toBe(false);
+    expect(cookies.has("englove_local_session_hint")).toBe(false);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await logoutSharedDevice(new QueryClient())).toBe(false);
+    fetchMock.mockClear();
+
+    expect(await fetchSharedFeatureFlags(true)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

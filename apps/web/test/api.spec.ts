@@ -127,4 +127,24 @@ describe('T1.1 / P0-09: apiFetch Zod validation and ApiError details preservatio
     (globalThis as unknown as { window: unknown }).window = {};
     expect(getApiBaseUrl()).toBe('http://localhost:3001');
   });
+
+  it('does not call POST /api/v1/auth/refresh on 401 when on a public route like /login', async () => {
+    (globalThis as unknown as { window: unknown }).window = {
+      location: { pathname: '/login', origin: 'http://localhost:3000' },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ code: 'AUTH_UNAUTHORIZED', message: 'No autorizado' }),
+    });
+    globalThis.fetch = fetchMock;
+
+    await expect(apiFetch('/api/v1/feature-flags')).rejects.toMatchObject({
+      statusCode: 401,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/feature-flags');
+  });
 });

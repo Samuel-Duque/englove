@@ -8,6 +8,7 @@ import {
   isPublicAppRoute,
   startCrossTabSessionSync,
 } from "../lib/auth-hygiene";
+import { isLogoutInitiatedLocally } from "../lib/auth-session";
 
 export function SessionSyncListener({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
@@ -20,6 +21,9 @@ export function SessionSyncListener({ children }: { children: ReactNode }) {
       getPathname: () =>
         typeof window !== "undefined" ? window.location.pathname : "/",
       onInvalidate: () => {
+        if (isLogoutInitiatedLocally()) {
+          return;
+        }
         const currentPath =
           typeof window !== "undefined" ? window.location.pathname : "/";
         if (isPublicAppRoute(currentPath)) {

@@ -181,6 +181,12 @@ for (const [width, height] of [
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(width);
+    if (width >= 1280) {
+      const activeStudentsRegion = main.getByRole('region', { name: 'Alumnos activos' });
+      await expect
+        .poll(() => activeStudentsRegion.evaluate((el) => el.scrollWidth - el.clientWidth))
+        .toBe(0);
+    }
     expect((await new AxeBuilder({ page }).withTags(wcagTags).analyze()).violations).toEqual([]);
 
     await page.goto('/alumnos/solicitudes');

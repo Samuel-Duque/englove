@@ -9,6 +9,7 @@ import {
   getTabInstanceId,
   isLogoutInitiatedLocally,
   isLogoutPending,
+  isPublicAppRoute,
   markLogoutPending,
   parseSessionEpoch,
   publishSessionEpoch,
@@ -32,7 +33,6 @@ export async function clearSharedDeviceSession(
   // Drop in-memory session, flags, and cached responses synchronously before awaiting async cleanup
   clearSharedSession();
   clearSharedFeatureFlags();
-  queryClient.clear();
   if (options?.broadcast !== false && !isLogoutInitiatedLocally()) {
     const persisted = readPersistedSessionEpoch();
     if (persisted?.state !== "logged_out") {
@@ -176,29 +176,36 @@ export async function clearSharedDeviceSession(
   if (typeof window !== "undefined") {
     try {
       if ("sessionStorage" in window) window.sessionStorage.clear();
-      if (typeof document !== "undefined") {
-        expireClientCookie("upward_english_user_logged");
-        const expiredHintNames = new Set<string>();
-        const cookies = document.cookie.split(";");
-        for (const c of cookies) {
-          const eqIdx = c.indexOf("=");
-          if (eqIdx <= 0) continue;
-          const name = c.slice(0, eqIdx).trim();
-          if (
-            name &&
-            !expiredHintNames.has(name) &&
-            (name === "session_hint" ||
-              name.endsWith("_session_hint") ||
-              name.includes("session_hint"))
-          ) {
-            expiredHintNames.add(name);
-            expireClientCookie(name);
-          }
-        }
-      }
+      expireSessionHintCookies();
     } catch {
       // Ignore
     }
+  }
+}
+
+export function expireSessionHintCookies(): void {
+  if (typeof document === "undefined") return;
+  try {
+    expireClientCookie("upward_english_user_logged");
+    const expiredHintNames = new Set<string>();
+    const cookies = document.cookie.split(";");
+    for (const c of cookies) {
+      const eqIdx = c.indexOf("=");
+      if (eqIdx <= 0) continue;
+      const name = c.slice(0, eqIdx).trim();
+      if (
+        name &&
+        !expiredHintNames.has(name) &&
+        (name === "session_hint" ||
+          name.endsWith("_session_hint") ||
+          name.includes("session_hint"))
+      ) {
+        expiredHintNames.add(name);
+        expireClientCookie(name);
+      }
+    }
+  } catch {
+    // Ignore
   }
 }
 
@@ -262,7 +269,9 @@ function expireClientCookie(name: string): void {
 let logoutRequest: Promise<boolean> | null = null;
 
 /** Revoke the old family before allowing another account or silent refresh. */
-export function reconcilePendingLogout(): Promise<boolean> {
+export function reconcilePendingLogout(options?: {
+  keepInMemoryLock?: boolean;
+}): Promise<boolean> {
   if (!isLogoutPending()) return Promise.resolve(true);
   if (logoutRequest) return logoutRequest;
   logoutRequest = (async () => {
@@ -300,8 +309,13 @@ export function reconcilePendingLogout(): Promise<boolean> {
             )
           : revoke();
       const response = await Promise.race([revocation, timeout]);
+      if (typeof response.text === "function") {
+        await response.text().catch(() => undefined);
+      }
       if (!response.ok) return false;
-      confirmLogoutComplete();
+      confirmLogoutComplete(
+        options?.keepInMemoryLock ? { keepInMemoryLock: true } : undefined,
+      );
       return true;
     } catch {
       return false;
@@ -315,27 +329,14 @@ export function reconcilePendingLogout(): Promise<boolean> {
 
 export async function logoutSharedDevice(
   queryClient: QueryClient = getQueryClient(),
+  options?: { keepInMemoryLock?: boolean },
 ): Promise<boolean> {
   markLogoutPending();
   await clearSharedDeviceSession(queryClient, { broadcast: false });
-  return reconcilePendingLogout();
+  return reconcilePendingLogout(options);
 }
 
-export function isPublicAppRoute(pathname: string): boolean {
-  return (
-    pathname === "/" ||
-    pathname === "/offline" ||
-    pathname === "/terminos" ||
-    pathname.startsWith("/terminos/") ||
-    pathname === "/login" ||
-    pathname.startsWith("/login/") ||
-    pathname === "/registro" ||
-    pathname.startsWith("/registro/") ||
-    pathname.startsWith("/recuperar") ||
-    pathname === "/restablecer" ||
-    pathname.startsWith("/restablecer/")
-  );
-}
+export { isPublicAppRoute };
 
 export type CrossTabInvalidationReason = "logout" | "account_switch";
 
